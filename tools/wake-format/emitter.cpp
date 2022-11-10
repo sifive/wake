@@ -92,9 +92,15 @@ static inline bool is_floating_comment(wcl::doc_builder& builder, ctx_t ctx, CST
   return it->second.bound_to.id() == TOKEN_COMMENT;
 }
 
+// determines if the pointed to node is simple enough to be flattened
+static inline bool is_simple_literal(wcl::doc_builder&, ctx_t, CSTElement& node,
+                                     const token_traits_map_t&) {
+  return node.id() == CST_LITERAL || node.id() == CST_ID;
+}
+
 // determines if the rest of the node
 // - only has one sibling node
-// - and that node is a "single" thing (literal or identifier)
+// - and that node is a "simple" thing as defined by is_simple_literal
 static inline bool is_single_literal(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                                      const token_traits_map_t& traits) {
   CSTElement copy = node;
@@ -106,7 +112,7 @@ static inline bool is_single_literal(wcl::doc_builder& builder, ctx_t ctx, CSTEl
   while (!copy.empty()) {
     node_count++;
 
-    if (copy.id() != CST_LITERAL && copy.id() != CST_ID) {
+    if (!is_simple_literal(builder, ctx, node, traits)) {
       return false;
     }
 
@@ -1265,20 +1271,23 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
                   .token(TOKEN_KW_IF)
                   .consume_wsnlc()
                   .space()
-                  .walk(is_expression, WALK_NODE)  // if cond
+                  .fmt_if_else(is_simple_literal, fmt().walk(WALK_NODE),
+                               fmt().next().newline())  // if cond
                   .consume_wsnlc()
                   .space()
                   .token(TOKEN_KW_THEN)
                   .consume_wsnlc()
                   .space()
-                  .walk(is_expression, WALK_NODE)  // true body
+                  .fmt_if_else(is_simple_literal, fmt().walk(WALK_NODE),
+                               fmt().next().newline())  // true body
                   .consume_wsnlc()
                   .space()
                   .token(TOKEN_KW_ELSE)
                   .consume_wsnlc()
                   .space()
-                  .walk(is_expression, WALK_NODE),     // false body
-              fmt().walk_all(fmt().next()).newline())  // garbage format to fail NL check
+                  .fmt_if_else(is_simple_literal, fmt().walk(WALK_NODE),
+                               fmt().next().newline()),  // false body
+              fmt().walk_all(fmt().next()).newline())    // garbage format to fail NL check
           .format(ctx, node.firstChildElement(), token_traits);
 
   if (!fits_no_nl->has_newline() && !ctx.prefer_explode) {
