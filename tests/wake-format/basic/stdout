@@ -238,11 +238,17 @@ def t9 =
 
 
 def ff =
-    a | b | c | d
+    a
+    | b
+    | c
+    | d
 
 
 def ff =
-    a $ b $ c $ d
+    a
+    $ b
+    $ c
+    $ d
 
 
 def ff =
@@ -522,17 +528,24 @@ def toVariant =
 
 export def build: List String => Result String Error =
     match _
-        "tarball", Nil = tarball Unit | rmap (\_ "TARBALL")
+        "tarball", Nil =
+            tarball Unit
+            | rmap (\_ "TARBALL")
         kind, Nil =
             require Pass variant = toVariant kind
-            all variant | rmap (\_ "BUILD")
+            all variant
+            | rmap (\_ "BUILD")
         _ = Fail "no target specified (try: build default/debug/tarball)".makeError
 
 
 export def install: List String => Result String Error =
     match _
-        dest, kind, Nil = doInstall (in cwd dest) kind | rmap (\_ "INSTALL")
-        dest, Nil = doInstall (in cwd dest) "default" | rmap (\_ "INSTALL")
+        dest, kind, Nil =
+            doInstall (in cwd dest) kind
+            | rmap (\_ "INSTALL")
+        dest, Nil =
+            doInstall (in cwd dest) "default"
+            | rmap (\_ "INSTALL")
         _ = Fail "no directory specified (try: install /opt/local)".makeError
 
 
@@ -550,7 +563,9 @@ def targets =
 
 
 def all variant =
-    require Pass x = map (_ variant) targets | findFail
+    require Pass x =
+        map (_ variant) targets
+        | findFail
     Pass (flatten x)
 
 
@@ -578,7 +593,8 @@ def setVersion release file =
         sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
         mv "%{file}.tmp" "%{file}"
         %"
-    shellJob script (in, Nil) | getJobOutput
+    shellJob script (in, Nil)
+    | getJobOutput
 
 
 # Create a release tarball
@@ -598,7 +614,11 @@ def tarball Unit =
         | filter (!matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
         | filter (!matches `(.*/)*\.gitignore` _.getPathName) # omit git files
     def Pair testPaths wakePaths = splitBy (matches `tests/.*` _.getPathName) srcs
-    def wakeSourcesString = wakePaths | map (_.getPathName.format) | foldr (_, ",\n  ", _) Nil | cat
+    def wakeSourcesString =
+        wakePaths
+        | map (_.getPathName.format)
+        | foldr (_, ",\n  ", _) Nil
+        | cat
     def testSourcesString =
         testPaths
         | map (getPathName _ | format | replace `^"tests/` '"{here}/')
@@ -636,7 +656,9 @@ def tarball Unit =
                     which "tar"
                 else
                     gnutar
-            def files = map getPathName (manifest, testManifest, spec, srcs) | sortBy (_ <* _)
+            def files =
+                map getPathName (manifest, testManifest, spec, srcs)
+                | sortBy (_ <* _)
             tar,
             "--mtime={time}",
             "--transform=s@^@wake-{release}/@",
@@ -646,7 +668,8 @@ def tarball Unit =
             "-cJf",
             "wake_{release}.tar.xz",
             files
-        job cmd (manifest, testManifest, spec, srcs) | getJobOutput
+        job cmd (manifest, testManifest, spec, srcs)
+        | getJobOutput
     Pass (tarball, changelog, Nil)
 
 
@@ -667,7 +690,8 @@ export def static _: Result Path Error =
         "-cJf",
         "wake-static_{release}.tar.xz",
         map getPathName files | sortBy (_ <* _)
-    job cmd files | getJobOutput
+    job cmd files
+    | getJobOutput
 
 
 from test_wake import topic wakeTestBinary

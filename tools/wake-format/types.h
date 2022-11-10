@@ -44,6 +44,7 @@ struct ctx_t {
   // 1: By default, don't explode unless you have to
   // 2: if prefer_explode, explode if you can
   bool prefer_explode = false;
+  bool nested_binop = false;
 
   ctx_t nest() const {
     ctx_t copy = *this;
@@ -54,6 +55,12 @@ struct ctx_t {
   ctx_t explode() {
     ctx_t copy = *this;
     copy.prefer_explode = true;
+    return copy;
+  }
+
+  ctx_t binop() {
+    ctx_t copy = *this;
+    copy.nested_binop = true;
     return copy;
   }
 
@@ -68,7 +75,7 @@ struct ctx_t {
 
   bool operator==(const ctx_t& other) const {
     return state == other.state && nest_level == other.nest_level &&
-           prefer_explode == other.prefer_explode;
+           prefer_explode == other.prefer_explode && nested_binop == other.nested_binop;
   }
 };
 
