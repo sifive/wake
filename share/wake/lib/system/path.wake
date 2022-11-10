@@ -21,7 +21,7 @@ export def simplify (path: String): String =
     p path
 
 export def sortPaths (paths: List Path): List Path =
-  def fn a b = a.getPathName <~ b.getPathName
+  def fn a b = a.getPathName <=>~ b.getPathName
   sortBy fn paths
 
 # Concatenate two paths

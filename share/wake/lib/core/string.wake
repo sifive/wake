@@ -211,7 +211,7 @@ export def unicodeLowercase (str: String): String =
 
 # sortStrings: sort a list of strings as a human would judge them.
 export def sortStrings (list: List String): List String =
-    sortBy (_ <~ _) list
+    sortBy (_ <=>~ _) list
 
 # Unicode NFC string comparison Ç == C+◌̧
 export def scmpCanonical (x: String) (y: String): Order =

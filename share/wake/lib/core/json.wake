@@ -383,7 +383,7 @@ def filterNonDigitJDouble (n: Double): Result Double Error = match n.dclass
 #    be removed.
 def deduplicateJObjectKeys (simplifyValueList: List JValue => Result JValue Error) (dict: List (Pair String JValue)): Result (List (Pair String JValue)) Error =
     def cmpKeysOnly (Pair k1 _) (Pair k2 _) =
-        k1 <* k2
+        scmp k1 k2
     def simplifyKeyGroup (pairs: List (Pair String JValue)): Result (Pair String JValue) Error =
         match pairs
             Nil =
