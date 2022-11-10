@@ -134,7 +134,7 @@ def tarball Unit =
         def cmd =
             def gnutar = which "gnutar"
             def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
-            def files = map getPathName (manifest, testManifest, spec, srcs) | sortBy (_<*_)
+            def files = map getPathName (manifest, testManifest, spec, srcs) | sortBy scmp
             tar, "--mtime={time}", "--transform=s@^@wake-{release}/@",
             "--owner=0", "--group=0", "--numeric-owner", "-cJf",
             "wake_{release}.tar.xz", files
@@ -152,7 +152,7 @@ export def static _: Result Path Error =
     def cmd =
         which "tar", "--mtime={time}", "--transform=s@^tmp/@wake-{release}/@",
         "--owner=0", "--group=0", "--numeric-owner", "-cJf",
-        "wake-static_{release}.tar.xz", map getPathName files | sortBy (_<*_)
+        "wake-static_{release}.tar.xz", map getPathName files | sortBy scmp
     job cmd files
     | getJobOutput
 

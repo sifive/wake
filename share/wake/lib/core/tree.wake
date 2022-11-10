@@ -38,11 +38,11 @@ export def listToTree cmp list = vectorToTree cmp (listToVector list)
 export def listToTreeMulti cmp list = vectorToTreeMulti cmp (listToVector list)
 
 export def vectorToTreeMulti cmp v =
-  Tree cmp (build (vsortBy (cmp _ _ | isLT) v))
+  Tree cmp (build (vsortBy cmp v))
 
 # Convert a Vector to a Tree.
 export def vectorToTree cmp v =
-  Tree cmp (build (vdistinctRunBy (cmp _ _ | isEQ) (vsortBy (cmp _ _ | isLT) v)))
+  Tree cmp (build (vdistinctRunBy (cmp _ _ | isEQ) (vsortBy cmp v)))
 
 def build v = match (vlen v)
   0 = Tip

@@ -23,7 +23,7 @@ def targz output paths =
     def cmd =
         # Intentionally record mtime in ns (posix) => needed for incremental builds
         tarExe Unit, "--numeric-owner", "--owner=0", "--group=0", "--format=posix", "-czf",
-        output, map getPathName paths | sortBy (_<*_)
+        output, map getPathName paths | sortBy scmp
     makeExecPlan cmd paths
     | setPlanLocalOnly True
     | setPlanFnOutputs (\_ output, Nil)
