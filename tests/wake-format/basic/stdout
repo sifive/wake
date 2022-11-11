@@ -651,11 +651,7 @@ def tarball Unit =
     require Pass tarball =
         def cmd =
             def gnutar = which "gnutar"
-            def tar =
-                if gnutar ==* "gnutar" then
-                    which "tar"
-                else
-                    gnutar
+            def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
             def files =
                 map getPathName (manifest, testManifest, spec, srcs)
                 | sortBy (_ <* _)
@@ -1061,5 +1057,22 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
         )
 
     json
+
+
+def anyArray =
+    exists (_.getJArray | isSome) value
+
+
+def a =
+    rec Nil (if indent > 0 then Some "" else None) lhs
+
+
+def a = Some ""
+
+
+def a =
+    def x = if a then b, else !b
+    require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
+    x
 
 
