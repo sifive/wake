@@ -19,18 +19,24 @@ export def distinctBy (lessThanFn: a => a => Boolean) (list: List a): List a =
     from wake import imp = distinctBy
     imp (makeCmpFn lessThanFn) list
 
+
 export def groupBy (lessThanFn: a => a => Boolean) (list: List a): List (List a) =
     from wake import imp = groupBy
     imp (makeCmpFn lessThanFn) list
+
 
 export def sortBy (lessThanFn: a => a => Boolean) (list: List a): List a =
     from wake import imp = sortBy
     imp (makeCmpFn lessThanFn) list
 
+
 export def vsortBy (lessThanFn: a => a => Boolean) (vector: Vector a): Vector a =
     from wake import imp = vsortBy
     imp (makeCmpFn lessThanFn) vector
 
+
 export def mexists: (key: k) => (map: Map k v) => Boolean =
     from wake import imp = mcontains
     imp
+
+

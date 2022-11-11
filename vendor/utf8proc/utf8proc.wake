@@ -13,12 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 from wake import _
 from gcc_wake import _
 
 # Prefer to use system utf8proc if available
-def utf8proc variant = match (pkgConfig "utf8proc")
-    Some x = Pass x
-    None   =
-        vendor here variant "2.2.0" `.*\.h|utf8proc_data\.c` `utf8proc\.c`
+def utf8proc variant =
+    match (pkgConfig "utf8proc")
+        Some x = Pass x
+        None = vendor @here variant "2.2.0" `.*\.h|utf8proc_data\.c` `utf8proc\.c`
+
+

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # Read the file contents of a Path
@@ -21,6 +22,7 @@ export def read (path: Path): Result String Error =
     match (imp path.getPathName)
         Pass body = Pass body
         Fail f = Fail (makeError f)
+
 
 target writeImp inputs mode path content =
     def writeRunner =
@@ -36,7 +38,7 @@ target writeImp inputs mode path content =
                     Pass path = Pass (editRunnerOutputOutputs (path, _) output)
         makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
     makeExecPlan ("<write>", str mode, path, Nil) inputs
-    | setPlanOnce        False
+    | setPlanOnce False
     | setPlanEnvironment Nil
     | runJobWith writeRunner
     | getJobOutput
@@ -49,29 +51,28 @@ export def write (path: String) (content: String): Result Path Error =
         | mkdir
     writeImp (parent, Nil) 0644 spath content
 
+
 # Create a file with the given mode in the specified directory
 export def writeIn (parent: Path) (mode: Integer) (name: String) (content: String): Result Path Error =
     writeImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify content
 
+
 # installAs: copy a file to a specified destination
 export def installAs (dest: String) (file: Path): Result Path Error =
-    def sdest =
-        simplify dest
-    def cmd =
-        which "cp", file.getPathName, sdest, Nil
+    def sdest = simplify dest
+    def cmd = which "cp", file.getPathName, sdest, Nil
     require Pass destDir =
         simplify "{dest}/.."
         | mkdir
-    def inputs =
-        destDir, file, Nil
-    def foutputs _ =
-        sdest, Nil
+    def inputs = destDir, file, Nil
+    def foutputs _ = sdest, Nil
     makeExecPlan cmd inputs
     | setPlanEnvironment Nil
     | setPlanLocalOnly True
     | setPlanFnOutputs foutputs
     | runJob
     | getJobOutput
+
 
 # Copy a file from one directory subtree to another
 # installIn "/to" "from"  "from/subdir/file"  => "/to/subdir/file"
@@ -84,8 +85,7 @@ export def installAs (dest: String) (file: Path): Result Path Error =
 # installIn "/to" "from"  "/from/subdir/file"
 # installIn "/to" "/from" "from/subdir/file"
 export def installIn (toRoot: String) (fromRoot: String) (sourcePath: Path): Result Path Error =
-    def sourceStr =
-        sourcePath.getPathName
+    def sourceStr = sourcePath.getPathName
     def rel = relative fromRoot sourceStr
     def isAbs = matches `/.*`
     def uneq a b = (a && !b) || (!a && b)
@@ -93,6 +93,7 @@ export def installIn (toRoot: String) (fromRoot: String) (sourcePath: Path): Res
         failWithError "{sourceStr} is not contained in {fromRoot}"
     else
         installAs (in toRoot rel) sourcePath
+
 
 def mkdirRunner: Runner =
     def imp m p = prim "mkdir"
@@ -104,7 +105,9 @@ def mkdirRunner: Runner =
     def post = match _
         Pair (Fail f) _ = Fail f
         Pair (Pass output) (Pair smode dir) =
-            def mode = int smode | getOrElse 0x200
+            def mode =
+                int smode
+                | getOrElse 0x200
             if mode < 0 || mode > 0x1ff then
                 Fail (makeError "mkdir {dir}: Invalid mode ({smode})")
             else match (imp mode dir)
@@ -112,29 +115,33 @@ def mkdirRunner: Runner =
                 Pass path = Pass (editRunnerOutputOutputs (path, _) output)
     makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
 
+
 def mkdirImp inputs mode path =
     makeExecPlan ("<mkdir>", "-m", "0{strOctal mode}", path, Nil) inputs
-    | setPlanKeep        False
+    | setPlanKeep False
     | setPlanEnvironment Nil
     | runJobWith mkdirRunner
     | getJobOutput
+
 
 # Create a directory in the parent
 export def mkdirIn (parent: Path) (mode: Integer) (name: String): Result Path Error =
     mkdirImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify
 
+
 # Make all every element in the directory path with mode 0755
 export def mkdir (path: String): Result Path Error =
     def root = match _
         "", x, t = Pair (mkdirImp Nil 0755 "/{x}") t
-        x, t     = Pair (mkdirImp Nil 0755 x) t
-        Nil      = unreachable "tokenize never returns an empty list"
+        x, t = Pair (mkdirImp Nil 0755 x) t
+        Nil = unreachable "tokenize never returns an empty list"
     def mkdirRecursive (Pair rootResult pathTail) =
-        require Pass root =
-            rootResult
+        require Pass root = rootResult
         rfoldl (mkdirIn _ 0755 _) root pathTail
     path
     | simplify
     | tokenize `/`
     | root
     | mkdirRecursive
+
+

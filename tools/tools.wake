@@ -13,49 +13,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 
 from wake import _
 from gcc_wake import _
 
 def tool (dir: String) (addHeaders: List Path) (variant: Pair String String) (output: String) (deps: List (Pair String String => Result SysLib Error)) (extraFiles: List Path) (extraLFlags: List String): Result (List Path) Error =
-    def Pair cppVariant cVariant =
-        variant
+    def Pair cppVariant cVariant = variant
 
     require Pass libs =
         map (_ variant) deps
         | findFail
 
-    def lib =
-        flattenSysLibs libs
+    def lib = flattenSysLibs libs
 
-    require Pass headerPaths =
-        sources here `.*\.h`
-    def headers =
-        lib.getSysLibHeaders ++
-        headerPaths ++
-        addHeaders
+    require Pass headerPaths = sources @here `.*\.h`
+    def headers = lib.getSysLibHeaders ++ headerPaths ++ addHeaders
 
-    def cflags =
-        lib.getSysLibCFlags
+    def cflags = lib.getSysLibCFlags
 
-    require Pass cSources =
-        sources dir `.*\.c`
-    require Pass cppSources =
-        sources dir `.*\.cpp`
+    require Pass cSources = sources dir `.*\.c`
+    require Pass cppSources = sources dir `.*\.cpp`
     def objectResults =
-        map (compileC cVariant   cflags headers) cSources ++
-        map (compileC cppVariant cflags headers) cppSources
+        map (compileC cVariant cflags headers) cSources
+        ++ map (compileC cppVariant cflags headers) cppSources
 
-    require Pass objects =
-        findFail objectResults
+    require Pass objects = findFail objectResults
 
-    def allObjects =
-        lib.getSysLibObjects ++
-        objects.flatten
+    def allObjects = lib.getSysLibObjects ++ objects.flatten
 
-    require Pass cppSources =
-        sources dir `.*\.cpp`
+    require Pass cppSources = sources dir `.*\.cpp`
 
     def linkKind =
         if empty cppSources then
@@ -64,3 +52,5 @@ def tool (dir: String) (addHeaders: List Path) (variant: Pair String String) (ou
             cppVariant
 
     linkO linkKind (lib.getSysLibLFlags ++ extraLFlags) allObjects output extraFiles
+
+

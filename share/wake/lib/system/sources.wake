@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # The source topic is used to inform wake about source files.
@@ -23,8 +24,13 @@ package wake
 export topic source: String
 
 # Private implementation of global sources
-def add_sources str = prim "add_sources"
-def got_sources = add_sources (subscribe source | map simplify | implode)
+def add_sources str =
+    prim "add_sources"
+
+
+def got_sources =
+    add_sources (subscribe source | map simplify | implode)
+
 
 # Find files
 # WARNING! Use of this method can make a build unreproducible.
@@ -34,6 +40,7 @@ export def files (dir: String) (regexp: RegExp): List String =
     def p d r = prim "files"
     p dir regexp
 
+
 def raw_source file =
     def get_modtime file = prim "get_modtime"
     def time = get_modtime file
@@ -41,22 +48,23 @@ def raw_source file =
         failWithError "{file}: source does not exist. Did you delete it or move it without telling git?"
     else
         makeExecPlan ("<source>", str time, file, Nil) Nil
-        | setPlanShare       False
-        | setPlanEcho        logDebug
+        | setPlanShare False
+        | setPlanEcho logDebug
         | setPlanEnvironment Nil
-        | setPlanFnOutputs   (file, _)
+        | setPlanFnOutputs (file, _)
         | runJobWith virtualRunner
         | getJobOutput
+
 
 export def source (file: String): Result Path Error =
     def base = basename file
     def dir = dirname file
-    require Pass allSources =
-        sources dir base.quote
+    require Pass allSources = sources dir base.quote
     match allSources
-        Nil    = failWithError "{file}: not a source file"
+        Nil = failWithError "{file}: not a source file"
         x, Nil = Pass x
-        _      = unreachable "a quoted RegExp can never match more than one distinct String"
+        _ = unreachable "a quoted RegExp can never match more than one distinct String"
+
 
 # Allows claiming of a file so long as the file is within
 # wake's workspace. Keep in mind that if another job
@@ -90,35 +98,40 @@ export def claim (file: String): Result Path Error =
             # Its important that the command here is distinct from what `source` would use
             # so that claim and source do not overlap.
             makeExecPlan ("<claim>", str time, file, Nil) Nil
-            | setPlanShare       False
-            | setPlanEcho        logDebug
+            | setPlanShare False
+            | setPlanEcho logDebug
             | setPlanEnvironment Nil
-            | setPlanFnOutputs   (file, _)
+            | setPlanFnOutputs (file, _)
             | runJobWith virtualRunner
             | getJobOutput
 
     # Compute the relative path in simplest form
     def isAbs = matches `/.*` file
-    def relPath = if isAbs then
-        relative workspace file
-    else
-        simplify file
+    def relPath =
+        if isAbs then
+            relative workspace file
+        else
+            simplify file
 
     # Fail if we're outside of wake's workspace (relPath must be simplified)
     def isOutsideRoot = matches `\.\..*/.*` relPath
     require False = isOutsideRoot
-    else failWithError "{file}: claim cannot be used on files outside of wake's workspace. Consider using claimFileAsPath instead."
+    else
+        failWithError
+        "{file}: claim cannot be used on files outside of wake's workspace. Consider using claimFileAsPath instead."
 
     # Now that our path is uniform check if it could have been fetched with `source`
     def base = basename relPath
     def dir = dirname relPath
     def scan dir regexp = prim "sources"
-    def canBeSourced = exists (_==~relPath) (scan dir base.quote)
+    def canBeSourced = exists (_ ==~ relPath) (scan dir base.quote)
     require False = canBeSourced
-    else failWithError "{file}: Is a source file, please use `source` or `sources` instead of `claim`"
+    else
+        failWithError "{file}: Is a source file, please use `source` or `sources` instead of `claim`"
 
     # Finally if the file is inside of wake's workspace and can't be sourced we're in the clear
     raw_claim relPath
+
 
 # Find sources files
 export def sources (dir: String) (filterRegexp: RegExp): Result (List Path) Error =
@@ -127,8 +140,8 @@ export def sources (dir: String) (filterRegexp: RegExp): Result (List Path) Erro
         True =
             scan dir filterRegexp
             | findFailFn raw_source
-        False =
-            unreachable "add_sources always returns True"
+        False = unreachable "add_sources always returns True"
+
 
 # This API makes it possible to include a non-source file into a wake build.
 # Generally, one should obtain Paths from sources or as the output of Jobs.
@@ -142,6 +155,7 @@ export def claimFileAsPath (existingFile: String) (desiredWorkspacePath: String)
         | mkdir
     claimFileAsPathIn destDir existingFile fileName
 
+
 export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (desiredName: String): Result Path Error =
     def get_modtime file = prim "get_modtime"
     def time = get_modtime existingFile
@@ -152,8 +166,10 @@ export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (des
         def visible = outputDirectory, Nil
         def cmdline = which "cp", existingFile, desiredWorkspacePath, Nil
         makeExecPlan cmdline visible
-        | setPlanLocalOnly   True
+        | setPlanLocalOnly True
         | setPlanPersistence Once
-        | setPlanFnOutputs   (\_ desiredWorkspacePath, Nil)
+        | setPlanFnOutputs (\_ desiredWorkspacePath, Nil)
         | runJobWith localRunner
         | getJobOutput
+
+

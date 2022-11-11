@@ -13,41 +13,55 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 from wake import _
 
 topic releaseAs: String
-def buildAs Unit = match (subscribe releaseAs)
-    version, Nil = Pass version
-    _ =
-        def cmdline = which "git", "describe", "--tags", "--dirty", Nil
-        require Pass stdout =
-            makeExecPlan cmdline Nil
-            | setPlanKeep False
-            | setPlanLocalOnly True
-            | setPlanStdout logNever
-            | runJob
-            | getJobStdout
-        stdout
-        | replace `^v|\n.*` ''
-        | replace `-([0-9]{1,3})-` '.\1+'
-        | replace `-` '~'
-        | Pass
-        # The replace accomplish this:
-        # v0.15.0-alpha-4-g6efe8e9-dirty ... for a tag v0.15.0-alpha with +4 commits
-        #  0.15.0~alpha.4+g6efe8e9~dirty ... which sorts correctly for both rpm+deb
-        # ^      ^     ^ ^        ^
+def buildAs Unit =
+    match (subscribe releaseAs)
+        version, Nil = Pass version
+        _ =
+            def cmdline = which "git", "describe", "--tags", "--dirty", Nil
+            require Pass stdout =
+                makeExecPlan cmdline Nil
+                | setPlanKeep False
+                | setPlanLocalOnly True
+                | setPlanStdout logNever
+                | runJob
+                | getJobStdout
+            stdout
+            | replace `^v|\n.*` ''
+            | replace `-([0-9]{1,3})-` '.\1+'
+            | replace `-` '~'
+            | Pass
+
+
+# The replace accomplish this:
+
+
+# v0.15.0-alpha-4-g6efe8e9-dirty ... for a tag v0.15.0-alpha with +4 commits
+
+
+#  0.15.0~alpha.4+g6efe8e9~dirty ... which sorts correctly for both rpm+deb
+
+
+# ^      ^     ^ ^        ^
+
 
 topic releaseOn: String
-def buildOn Unit = match (subscribe releaseOn)
-    date, Nil = Pass date
-    _ =
-        def cmdline = which "git", "show", "-s", "--format=%ci", "HEAD", Nil
-        require Pass stdout =
-            makeExecPlan cmdline Nil
-            | setPlanKeep False
-            | setPlanLocalOnly True
-            | setPlanStdout logNever
-            | runJob
-            | getJobStdout
-        Pass (replace `\n.*` '' stdout)
+def buildOn Unit =
+    match (subscribe releaseOn)
+        date, Nil = Pass date
+        _ =
+            def cmdline = which "git", "show", "-s", "--format=%ci", "HEAD", Nil
+            require Pass stdout =
+                makeExecPlan cmdline Nil
+                | setPlanKeep False
+                | setPlanLocalOnly True
+                | setPlanStdout logNever
+                | runJob
+                | getJobStdout
+            Pass (replace `\n.*` '' stdout)
+
+

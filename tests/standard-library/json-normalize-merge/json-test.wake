@@ -3,10 +3,10 @@ package test_wake_json
 from wake import _
 
 export def jsonTest (normalization: JSONNormalize) (inputs: List String): Result Unit Error =
-    def testFn =
-        normalizeJSONWith normalization
+    def testFn = normalizeJSONWith normalization
     findFailFn (test (_) testFn) inputs
     | rmap (\_ Unit)
+
 
 export def jsonArrayTest (joinFn: List JValue => Result JValue Error) (inputs: List String): Result Unit Error =
     def preprocessFn json =
@@ -15,13 +15,13 @@ export def jsonArrayTest (joinFn: List JValue => Result JValue Error) (inputs: L
     findFailFn (test preprocessFn joinFn) inputs
     | rmap (\_ Unit)
 
+
 def test (preprocessFn: JValue => a) (testFn: a => Result JValue Error) (input: String): Result Unit Error =
     require Pass inputPath =
         # There doesn't seem to be an easy way to get `source` to recognize the
         # input file, so claim it instead.
         claimFileAsPath input "build/claimed-json/{input}"
-    require Pass json =
-        parseJSONFile inputPath
+    require Pass json = parseJSONFile inputPath
     def testResult =
         json
         | preprocessFn
@@ -36,3 +36,5 @@ def test (preprocessFn: JValue => a) (testFn: a => Result JValue Error) (input: 
             err.getErrorCause
             | printlnLevel logError
             | Pass
+
+

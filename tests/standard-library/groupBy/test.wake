@@ -1,1 +1,5 @@
-export def test _ = seq 11 | groupBy (\l\r icmp (l/3) (r/3))
+export def test _ =
+    seq 11
+    | groupBy (\l \r icmp (l / 3) (r / 3))
+
+

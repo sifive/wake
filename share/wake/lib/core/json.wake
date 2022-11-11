@@ -13,161 +13,242 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # The JSON data type
 export data JValue =
-  JString  String
-  JInteger Integer
-  JDouble  Double
-  JBoolean Boolean
-  JNull
-  JObject  (List (Pair String JValue))
-  JArray   (List JValue)
+    JString String
+    JInteger Integer
+    JDouble Double
+    JBoolean Boolean
+    JNull
+    JObject (List (Pair String JValue))
+    JArray (List JValue)
 
-export def getJString: JValue => Option String = match _
-  JString x               = Some x
-  JArray (JString x, Nil) = Some x
-  _                       = None
-export def getJInteger: JValue => Option Integer = match _
-  JInteger x               = Some x
-  JArray (JInteger x, Nil) = Some x
-  _                        = None
-export def getJDouble: JValue => Option Double = match _
-  JDouble x               = Some x
-  JInteger x              = Some (dint x)
-  JArray (JDouble x, Nil) = Some x
-  JArray (JInteger x, Nil)= Some (dint x)
-  _                       = None
-export def getJBoolean: JValue => Option Boolean = match _
-  JBoolean x               = Some x
-  JArray (JBoolean x, Nil) = Some x
-  _                        = None
-export def getJObject: JValue => Option (List (Pair String JValue)) = match _
-  JObject x               = Some x
-  JArray (JObject x, Nil) = Some x
-  _                       = None
-export def getJArray: JValue => Option (List JValue) = match _
-  JArray x = Some x
-  _        = None
+export def getJString: JValue => Option String =
+    match _
+        JString x = Some x
+        JArray (JString x, Nil) = Some x
+        _ = None
+
+
+export def getJInteger: JValue => Option Integer =
+    match _
+        JInteger x = Some x
+        JArray (JInteger x, Nil) = Some x
+        _ = None
+
+
+export def getJDouble: JValue => Option Double =
+    match _
+        JDouble x = Some x
+        JInteger x = Some (dint x)
+        JArray (JDouble x, Nil) = Some x
+        JArray (JInteger x, Nil) = Some (dint x)
+        _ = None
+
+
+export def getJBoolean: JValue => Option Boolean =
+    match _
+        JBoolean x = Some x
+        JArray (JBoolean x, Nil) = Some x
+        _ = None
+
+
+export def getJObject: JValue => Option (List (Pair String JValue)) =
+    match _
+        JObject x = Some x
+        JArray (JObject x, Nil) = Some x
+        _ = None
+
+
+export def getJArray: JValue => Option (List JValue) =
+    match _
+        JArray x = Some x
+        _ = None
+
 
 export def parseJSONBody (body: String): Result JValue Error =
-  def imp b = prim "json_body"
-  match (imp body)
-    Pass jvalue = Pass jvalue
-    Fail cause = Fail (makeError cause)
+    def imp b = prim "json_body"
+    match (imp body)
+        Pass jvalue = Pass jvalue
+        Fail cause = Fail (makeError cause)
+
 
 export def parseJSONFile (path: Path): Result JValue Error =
-    def imp f =
-        prim "json_file"
+    def imp f = prim "json_file"
     match (imp path.getPathName)
         Pass body = Pass body
         Fail f = Fail (makeError f)
 
-export def jsonEscape str = prim "json_str"
+
+export def jsonEscape str =
+    prim "json_str"
+
 
 tuple JSONFormat =
-  export String:  String  => String
-  export Integer: Integer => String
-  export Double:  Double  => String
-  export Indent:  Integer
+    export String: String => String
+    export Integer: Integer => String
+    export Double: Double => String
+    export Indent: Integer
 
 def doFormat (fmt: JSONFormat) (lhs: JValue): List String =
-  def indent = fmt.getJSONFormatIndent
-  def space = if indent > 0 then " " else ""
-  def indention = tab (\_ ' ') indent | cat
-  def rec rhs depth lhs =
-    def deeper = omap ("{indention}{_}") depth
-    def tabbed = omap ("\n{_}") depth | getOrElse ""
-    def tabbeder = omap ("\n{_}") deeper | getOrElse ""
-    match lhs
-      JString  s    = '"', fmt.getJSONFormatString s, '"', rhs
-      JInteger i    = fmt.getJSONFormatInteger i,          rhs
-      JDouble  d    = fmt.getJSONFormatDouble d,           rhs
-      JBoolean True = "true",   rhs
-      JBoolean False= "false",  rhs
-      JNull         = "null",   rhs
-      JArray   list =
-        def helper value acc = ",{tabbeder}", rec acc deeper value
-        if list.empty then '[]', rhs
-        else "[{tabbeder}", foldr helper ("{tabbed}]", rhs) list | tail
-      JObject  list =
-        def helper (Pair key value) acc =
-          ",{tabbeder}", '"', jsonEscape key, ("\":{space}", rec acc deeper value)
-        if list.empty then '{}', rhs
-        else "\{{tabbeder}", foldr helper ("{tabbed}\}", rhs) list | tail
-  rec Nil (if indent > 0 then Some "" else None) lhs
+    def indent = fmt.getJSONFormatIndent
+    def space = if indent > 0 then " " else ""
+    def indention =
+        tab (\_ ' ') indent
+        | cat
+    def rec rhs depth lhs =
+        def deeper = omap ("{indention}{_}") depth
+        def tabbed =
+            omap ("\n{_}") depth
+            | getOrElse ""
+        def tabbeder =
+            omap ("\n{_}") deeper
+            | getOrElse ""
+        match lhs
+            JString s = '"', fmt.getJSONFormatString s, '"', rhs
+            JInteger i = fmt.getJSONFormatInteger i, rhs
+            JDouble d = fmt.getJSONFormatDouble d, rhs
+            JBoolean True = "true", rhs
+            JBoolean False = "false", rhs
+            JNull = "null", rhs
+            JArray list =
+                def helper value acc = ",{tabbeder}", rec acc deeper value
+                if list.empty then
+                    '[]', rhs
+                else
+                    "[{tabbeder}", foldr helper ("{tabbed}]", rhs) list | tail
+            JObject list =
+                def helper (Pair key value) acc =
+                    ",{tabbeder}", '"', jsonEscape key, ("\":{space}", rec acc deeper value)
+                if list.empty then
+                    '{}', rhs
+                else
+                    "\{{tabbeder}", foldr helper ("{tabbed}\}", rhs) list | tail
+    rec Nil (if indent > 0 then Some "" else None) lhs
+
 
 export def defaultJSONFormat: JSONFormat =
-  def formatDouble d =
-    match (dclass d)
-      DoubleInfinite if d <. 0e0 = "-Infinity"
-      DoubleInfinite = "Infinity"
-      DoubleNaN      = "NaN"
-      _              = dstr d
-  JSONFormat jsonEscape str formatDouble 0
+    def formatDouble d = match (dclass d)
+        DoubleInfinite if d <. 0e0 = "-Infinity"
+        DoubleInfinite = "Infinity"
+        DoubleNaN = "NaN"
+        _ = dstr d
+    JSONFormat jsonEscape str formatDouble 0
 
-export def prettyJSONFormat = defaultJSONFormat | setJSONFormatIndent 2
 
-export def customFormatJSON fmt body = doFormat fmt body | cat
+export def prettyJSONFormat =
+    defaultJSONFormat
+    | setJSONFormatIndent 2
+
+
+export def customFormatJSON fmt body =
+    doFormat fmt body
+    | cat
+
+
 export def formatJSON = customFormatJSON defaultJSONFormat
+
+
 export def prettyJSON = customFormatJSON prettyJSONFormat
 
-export def root /| filterFn = jfilter filterFn root
-export def jfilter filterFn root = match root
-  JArray l = JArray (filter filterFn l)
-  _ = if filterFn root then JArray (root, Nil) else JArray Nil
 
-export def root /../ filterFn = jfind filterFn root
+export def root /| filterFn =
+    jfilter filterFn root
+
+
+export def jfilter filterFn root =
+    match root
+        JArray l = JArray (filter filterFn l)
+        _ =
+            if filterFn root then
+                JArray (root, Nil)
+            else
+                JArray Nil
+
+
+export def root /../ filterFn =
+    jfind filterFn root
+
+
 export def jfind filterFn root =
-  def helper node acc = match node
-    JArray l =
-      def tail = foldr helper acc l
-      if filterFn node then node, tail else tail
-    JObject l =
-      def tail = foldr (helper _.getPairSecond _) acc l
-      if filterFn node then node, tail else tail
-    _ =
-      if filterFn node then node, acc else acc
-  helper root Nil | JArray
+    def helper node acc = match node
+        JArray l =
+            def tail = foldr helper acc l
+            if filterFn node then
+                node, tail
+            else
+                tail
+        JObject l =
+            def tail = foldr (helper _.getPairSecond _) acc l
+            if filterFn node then
+                node, tail
+            else
+                tail
+        _ =
+            if filterFn node then
+                node, acc
+            else
+                acc
+    helper root Nil
+    | JArray
 
-export def jempty root = empty (jlist root)
-export def jlist root = match root
-  JArray x = x
-  _ = root, Nil
+
+export def jempty root =
+    empty (jlist root)
+
+
+export def jlist root =
+    match root
+        JArray x = x
+        _ = root, Nil
+
 
 export def x // y =
-  def helper tail = match _
-    JString  _ = tail
-    JInteger _ = tail
-    JDouble  _ = tail
-    JBoolean _ = tail
-    JNull      = tail
-    JObject  l =
-      def flatten v tail = match v.getPairSecond
-        JArray l = l ++ tail
-        w = w, tail
-      foldr flatten tail (filter (matches y _.getPairFirst) l)
-    JArray   l =
-      def flatten v tail = helper tail v
-      foldr flatten tail l
-  JArray (helper Nil x)
+    def helper tail = match _
+        JString _ = tail
+        JInteger _ = tail
+        JDouble _ = tail
+        JBoolean _ = tail
+        JNull = tail
+        JObject l =
+            def flatten v tail = match v.getPairSecond
+                JArray l = l ++ tail
+                w = w, tail
+            foldr flatten tail (filter (matches y _.getPairFirst) l)
+        JArray l =
+            def flatten v tail = helper tail v
+            foldr flatten tail l
+    JArray (helper Nil x)
 
-export def x ==/ y = match x y
-  (JString  a) (JString  b) = a ==~ b
-  (JInteger a) (JInteger b) = a ==  b
-  (JDouble  a) (JDouble  b) = a ==. b
-  (JBoolean a) (JBoolean b) = if a then b else !b
-  JNull        JNull        = True
-  (JObject  a) (JObject  b) =
-    def helper (Pair (Pair k c) (Pair l d)) = k ==~ l && c ==/ d
-    if a.len != b.len then False else zip a b | forall helper
-  (JArray   a) (JArray   b) =
-    def helper (Pair c d) = c ==/ d
-    if a.len != b.len then False else zip a b | forall helper
-  (JArray a) _ = exists (_ ==/ y) a
-  _ (JArray b) = exists (_ ==/ x) b
-  _ _ = False
+
+export def x ==/ y =
+    match x y
+        (JString a) (JString b) = a ==~ b
+        (JInteger a) (JInteger b) = a == b
+        (JDouble a) (JDouble b) = a ==. b
+        (JBoolean a) (JBoolean b) = if a then b else !b
+        JNull JNull = True
+        (JObject a) (JObject b) =
+            def helper (Pair (Pair k c) (Pair l d)) = k ==~ l && c ==/ d
+            if a.len != b.len then
+                False
+            else
+                zip a b
+                | forall helper
+        (JArray a) (JArray b) =
+            def helper (Pair c d) = c ==/ d
+            if a.len != b.len then
+                False
+            else
+                zip a b
+                | forall helper
+        (JArray a) _ = exists (_ ==/ y) a
+        _ (JArray b) = exists (_ ==/ x) b
+        _ _ = False
+
 
 # Simplify a JSON structure for broad compatibility as defined by the specs.
 # While doing so is unnecessary where Wake is always used to consume any
@@ -178,8 +259,8 @@ export def x ==/ y = match x y
 #
 # This is equivalent to calling `normalizeJSONWith` using the rules defined by
 # `normalizeJSONCompat`.
-export def normalizeJSON: (json: JValue) => Result JValue Error =
-    normalizeJSONWith normalizeJSONCompat
+export def normalizeJSON: (json: JValue) => Result JValue Error = normalizeJSONWith normalizeJSONCompat
+
 
 # Simplify a JSON structure according to the rules given.
 # For example, Wake's implementation of JSON is more lenient than the base
@@ -206,21 +287,16 @@ export def normalizeJSONWith (fmt: JSONNormalize) (json: JValue): Result JValue 
         JBoolean a =
             getJSONNormalizeBoolean fmt a
             | rmap JBoolean
-        JNull =
-            Pass JNull
+        JNull = Pass JNull
         JObject a =
             def normalizeJObjectValue entry =
-                def Pair key value =
-                    entry
-                def normalized =
-                    normalizeJSONWith fmt value
+                def Pair key value = entry
+                def normalized = normalizeJSONWith fmt value
                 match normalized
-                    (Pass norm)  = Pass (Pair key norm)
+                    (Pass norm) = Pass (Pair key norm)
                     (Fail error) = addJSONErrorPath key error
-            def normalizedList =
-                map normalizeJObjectValue a
-            require Pass children =
-                findFail normalizedList
+            def normalizedList = map normalizeJObjectValue a
+            require Pass children = findFail normalizedList
             children
             | getJSONNormalizeObject fmt
             | rmap JObject
@@ -236,6 +312,7 @@ export def normalizeJSONWith (fmt: JSONNormalize) (json: JValue): Result JValue 
             | rmap JArray
     normalized
     | rmapFail (addJSONErrorPath "")
+
 
 # Attempt to merge several JSON structures, while resolving any duplicate keys.
 # In particular, this function will concatenate the members of two `JArray`
@@ -264,9 +341,9 @@ export def mergeJSON (jsons: List JValue): Result JValue Error =
     require joinedValue, _ =
         joinedList
         | map getPairSecond
-    else
-        Pass JNull
+    else Pass JNull
     Pass joinedValue
+
 
 # Use the value of the key appearing last in the list, but recurse into `JObject`s.
 # Essentially, allows overwriting any key in the object tree by specifying a new
@@ -299,9 +376,9 @@ export def overrideJSON (jsons: List JValue): JValue =
     require joinedValue, _ =
         joinedList
         | map getPairSecond
-    else
-        JNull
+    else JNull
     joinedValue
+
 
 # Prepend the given path segment to an error message, to be called by `rmapFail`.
 # This is meant to be called bottom-up, with the inner-most object/array passing
@@ -319,12 +396,13 @@ def addJSONErrorPath (node: String) (error: Error): Result a Error =
             if strlen node == 0 then
                 cause
             else
-            "/{node}{cause}"
+                "/{node}{cause}"
         else
             "/{node}: {cause}"
     error
     | editErrorCause prependNode
     | Fail
+
 
 # The rules by which `normalizeJSONWith` will simplify JSON values.
 # If any particular function is unable to operate on every input value (e.g. a
@@ -342,25 +420,25 @@ export tuple JSONNormalize =
 export def normalizeJSONIdentity: JSONNormalize =
     JSONNormalize Pass Pass Pass Pass Pass Pass
 
+
 # Target the minimum JSON language described by the specifications.
 export def normalizeJSONCompat: JSONNormalize =
-    def nfkcKeys =
-        map (editPairFirst unicodeIdentifier)
+    def nfkcKeys = map (editPairFirst unicodeIdentifier)
     normalizeJSONIdentity
     | setJSONNormalizeString (Pass _.unicodeCanonical)
     | setJSONNormalizeDouble filterNonDigitJDouble
     | setJSONNormalizeObject (deduplicateJObjectKeys (mergeValueList True) _.nfkcKeys)
 
+
 # Fail on any `Double` values which can't be represented numerically.
 # Published JSON specifications describe their double values as allowing decimal
 # or exponential forms, but don't implement the full IEEE standard.
-def filterNonDigitJDouble (n: Double): Result Double Error = match n.dclass
-    DoubleInfinite =
-        failWithError "For compatibility, JSON doubles should not be infinite."
-    DoubleNaN =
-        failWithError "For compatibility, JSON doubles should not be NaN values."
-    _ =
-        Pass n
+def filterNonDigitJDouble (n: Double): Result Double Error =
+    match n.dclass
+        DoubleInfinite = failWithError "For compatibility, JSON doubles should not be infinite."
+        DoubleNaN = failWithError "For compatibility, JSON doubles should not be NaN values."
+        _ = Pass n
+
 
 # Attempt to simplify any `JObject`s which contain multiple instances of a key.
 # While the published specifications explicitly allow such duplicate keys, none
@@ -382,8 +460,7 @@ def filterNonDigitJDouble (n: Double): Result Double Error = match n.dclass
 #  - `dict`: The original key-value pairs from which any duplicate keys should
 #    be removed.
 def deduplicateJObjectKeys (simplifyValueList: List JValue => Result JValue Error) (dict: List (Pair String JValue)): Result (List (Pair String JValue)) Error =
-    def cmpKeysOnly (Pair k1 _) (Pair k2 _) =
-        scmp k1 k2
+    def cmpKeysOnly (Pair k1 _) (Pair k2 _) = scmp k1 k2
     def simplifyKeyGroup (pairs: List (Pair String JValue)): Result (Pair String JValue) Error =
         match pairs
             Nil =
@@ -397,12 +474,12 @@ def deduplicateJObjectKeys (simplifyValueList: List JValue => Result JValue Erro
                 match simplified
                     (Pass value) = Pass (Pair key value)
                     (Fail error) = addJSONErrorPath key error
-    def simplifyValues (values: List JValue): Result JValue Error =
-        match values
-            v, Nil = Pass v
-            _      = simplifyValueList values
+    def simplifyValues (values: List JValue): Result JValue Error = match values
+        v, Nil = Pass v
+        _ = simplifyValueList values
     groupBy cmpKeysOnly dict
     | findFailFn simplifyKeyGroup
+
 
 # Attempt to determine equality across simple values, concatenate `JArray`s, and
 # recurse into `JObject`s.
@@ -413,7 +490,12 @@ def mergeValueList (describeCompat: Boolean) (values: List JValue): Result JValu
     # message depending on that environment.
     def compatibilityMessage upper lower error =
         if describeCompat then
-            ("For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, ", lower, error, Nil)
+            (
+                "For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, ",
+                lower,
+                error,
+                Nil
+            )
             | cat
         else
             (upper, error, Nil)
@@ -423,16 +505,17 @@ def mergeValueList (describeCompat: Boolean) (values: List JValue): Result JValu
             if eqFn x y then
                 Pass x
             else
-                compatibilityMessage "N" "n" "ot every type can combine multiple different values. The incompatible values are: {map wrapFn values | formatExamples}"
+                compatibilityMessage
+                "N"
+                "n"
+                "ot every type can combine multiple different values. The incompatible values are: {map wrapFn values | formatExamples}"
                 | failWithError
         match values
             v1, v2, vs =
                 rfoldl eqOrFail v1 (v2, vs)
                 | rmap wrapFn
-            v, Nil =
-                Pass (wrapFn v)
-            _ =
-                unreachable "groupBy invariant reached in mergeValueList"
+            v, Nil = Pass (wrapFn v)
+            _ = unreachable "groupBy invariant reached in mergeValueList"
     def formatExamples examples =
         map formatJSON examples
         | catWith ", "
@@ -442,31 +525,25 @@ def mergeValueList (describeCompat: Boolean) (values: List JValue): Result JValu
         # value, but if *everything* is a `JNull` we do want to return that.
         def isNull = match _
             JNull = True
-            _     = False
-        def allNull =
-            forall isNull values
-        def nonNullValues =
-            filter (! _.isNull) values
+            _ = False
+        def allNull = forall isNull values
+        def nonNullValues = filter (!_.isNull) values
         # The `getJ*` functions also return `Some` for single-element arrays
         # of the proper type, but we don't want that fallback when merging.
-        def anyArray =
-            exists (_.getJArray | isSome) values
+        def anyArray = exists (_.getJArray | isSome) values
         match allNull anyArray
-            True _ =
-                Some values; None; None; None; None; None; None
+            True _ = Some values; None; None; None; None; None; None
             _ True =
                 def arrays =
                     def getJArrayOrNull = match _
                         JNull = Some (JNull, Nil)
-                        json  = getJArray json
+                        json = getJArray json
                     findNoneFn getJArrayOrNull values
                 None; None; None; None; None; None; arrays
             _ _ =
                 # If *all* values are of the same type, get those values.
-                def strings =
-                    findNoneFn getJString nonNullValues
-                def ints =
-                    findNoneFn getJInteger nonNullValues
+                def strings = findNoneFn getJString nonNullValues
+                def ints = findNoneFn getJInteger nonNullValues
                 def doubles =
                     # `getJDouble` will convert any `JInteger` values.
                     def isDouble = match _
@@ -476,22 +553,15 @@ def mergeValueList (describeCompat: Boolean) (values: List JValue): Result JValu
                         findNoneFn getJDouble nonNullValues
                     else
                         None
-                def bools =
-                    findNoneFn getJBoolean nonNullValues
-                def objects =
-                    findNoneFn getJObject nonNullValues
+                def bools = findNoneFn getJBoolean nonNullValues
+                def objects = findNoneFn getJObject nonNullValues
                 None; strings; ints; doubles; bools; objects; None
     match nullTest stringTest intTest doubleTest boolTest objectTest arrayTest
-        (Some _) None None None None None None =
-            Pass JNull
-        _ (Some strings) None None None None None =
-            requireEqual (_==*_) JString strings
-        _ None (Some ints) None None None None =
-            requireEqual (_==_) JInteger ints
-        _ None None (Some doubles) None None None =
-            requireEqual (_==._) JDouble doubles
-        _ None None None (Some bools) None None =
-            requireEqual enor JBoolean bools
+        (Some _) None None None None None None = Pass JNull
+        _ (Some strings) None None None None None = requireEqual (_ ==* _) JString strings
+        _ None (Some ints) None None None None = requireEqual (_ == _) JInteger ints
+        _ None None (Some doubles) None None None = requireEqual (_ ==. _) JDouble doubles
+        _ None None None (Some bools) None None = requireEqual enor JBoolean bools
         _ None None None None (Some objects) None =
             # If multiple keys all point to a `JObject`, there's a chance
             # keys are shared between those objects (even if not within the
@@ -508,8 +578,12 @@ def mergeValueList (describeCompat: Boolean) (values: List JValue): Result JValu
             | JArray
             | Pass
         _ _ _ _ _ _ _ =
-            compatibilityMessage "V" "v" "alues of different types may not be combined. The incompatible values are: {formatExamples values}"
+            compatibilityMessage
+            "V"
+            "v"
+            "alues of different types may not be combined. The incompatible values are: {formatExamples values}"
             | failWithError
+
 
 # Use the value of the key appearing last in the list, but recurse into `JObject`s.
 # Essentially, allows overwriting any key in the object tree by specifying a new
@@ -518,11 +592,10 @@ def mergeValueList (describeCompat: Boolean) (values: List JValue): Result JValu
 #
 # See `overrideJSON` for examples of usage.
 export def lastValueInList (values: List JValue): Result JValue Error =
-    def revValues =
-        reverse values
+    def revValues = reverse values
     def isNotObject = match _
         JObject _ = False
-        _         = True
+        _ = True
     match (takeUntil isNotObject revValues)
         Nil =
             revValues
@@ -536,3 +609,5 @@ export def lastValueInList (values: List JValue): Result JValue Error =
             | flatten
             | deduplicateJObjectKeys lastValueInList
             | rmap JObject
+
+

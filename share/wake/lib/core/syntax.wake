@@ -13,35 +13,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # Syntax helpers
 
+
 # Flip function and argument order.
 # fn obj.getXYZ = fn (getXYZ obj)
-export def (argument: a) . (memberFn: a => b): b =
-    memberFn argument 
+export def (argument: a) . (memberFn: a => b): b = memberFn argument
+
 
 # Flip function and argument order.
 # seq 10 | map str | catWith " " = catWith " " (map str (seq 10))
-export def (argument: a) | (pipeFn: a => b): b =
-    pipeFn argument
+export def (argument: a) | (pipeFn: a => b): b = pipeFn argument
+
 
 # Avoid ()s without changing order.
 # catWith " " $ map str $ seq 10 = catWith " " (map str (seq 10))
-export def (dollarFn: a => b) $ (argument: a): b =
-    dollarFn argument
+export def (dollarFn: a => b) $ (argument: a): b = dollarFn argument
+
 
 # The ring operator is used to denote the composition of functions.
 # (f ∘ g) x = f (g x)
 export def (f: b => c) ∘ (g: a => b): a => c =
     \x f (g x)
 
+
 # Allows flipping the parameters of a function.
 # icmp.flip 4 5 = GT
 # icmp.flip 5 4 = LT
 export def flip (f: a => b => c) (x: b) (y: a): c =
     f y x
+
 
 # Wait for 'x' to be computed before invoking (f x).
 # If 'x' is a list, f will run once 'x' can be distinguished between Nil and (_, _).
@@ -53,8 +57,9 @@ export def flip (f: a => b => c) (x: b) (y: a): c =
 export def wait (f: a => b) (x: a): b =
     def imp x = prim "true"
     match (imp x)
-        True  = f x
+        True = f x
         False = unreachable "true returned false"
+
 
 # Tell the wake interpreter that it is impossible to reach this expression.
 # The behaviour of an execution which DOES reach `unreachable` is undefined.
@@ -98,3 +103,5 @@ export def wait (f: a => b) (x: a): b =
 export def unreachable (reason: String): a =
     def f x = prim "unreachable"
     f reason
+
+

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package test_wake
 from wake import _
 
@@ -35,12 +36,14 @@ export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
 # the way we test currently.
 export topic wakeUnitTestBinary: (variant: Pair String String) => Result (List Path) Error
 
-def wakeToTestDir Unit = match (subscribe wakeTestBinary)
-    buildTestWake, Nil =
-        require Pass (Pair path visible) = buildTestWake Unit
-        Pass (Pair (simplify "{path}/..") visible)
-    Nil = Pass (Pair "{wakePath}" Nil)
-    _ = Fail (makeError "Two wake binaries declared for testing!")
+def wakeToTestDir Unit =
+    match (subscribe wakeTestBinary)
+        buildTestWake, Nil =
+            require Pass (Pair path visible) = buildTestWake Unit
+            Pass (Pair (simplify "{path}/..") visible)
+        Nil = Pass (Pair "{wakePath}" Nil)
+        _ = Fail (makeError "Two wake binaries declared for testing!")
+
 
 def wakeUnitToTest Unit =
     require buildWakeUnit, Nil = subscribe wakeUnitTestBinary
@@ -50,30 +53,31 @@ def wakeUnitToTest Unit =
     else failWithError "wake-unit binary not found"
     Pass result
 
+
 export def runTests (cmdline: List String): Result String Error =
     require Pass filter = match cmdline
-        Nil      = Pass `.*`
+        Nil = Pass `.*`
         arg, Nil = stringToRegExp arg
-        _        = Fail (makeError "Too many arguments to runTests")
+        _ = Fail (makeError "Too many arguments to runTests")
 
-    require Pass (Pair wakeDir _) =
-        wakeToTestDir Unit
+    require Pass (Pair wakeDir _) = wakeToTestDir Unit
 
-    require Pass tests =
-        sources here `${filter}/(pass|fail)\.sh`
+    require Pass tests = sources @here `${filter}/(pass|fail)\.sh`
 
     def prepareReport test =
-        def folder = replace `^${quote here}/` "" test.getPathName
+        def folder = replace `^${quote @here}/` "" test.getPathName
         def category = replace `/.*$` "" folder
-        def testName = replace `^[^/]*/` "" folder | replace `/(pass|fail)\.sh$` ""
+        def testName =
+            replace `^[^/]*/` "" folder
+            | replace `/(pass|fail)\.sh$` ""
         def result = runTest test
         Triple category testName result
 
-    def results =
-        map prepareReport tests
+    def results = map prepareReport tests
 
     def formatCategory list =
-        require Triple category _ _, _ = list else "impossible"
+        require Triple category _ _, _ = list
+        else "impossible"
         def reportFailed = match _
             Triple _ name (Fail (Error cause _)) = Some "    - {name}: {cause}"
             _ = None
@@ -82,8 +86,7 @@ export def runTests (cmdline: List String): Result String Error =
             def failed = len failures
             def total = len list
             def pass = total - failed
-            "  - {category}: {str pass}/{str total} tests pass",
-            failures
+            "  - {category}: {str pass}/{str total} tests pass", failures
         catWith "\n" text
 
     def report =
@@ -96,23 +99,23 @@ export def runTests (cmdline: List String): Result String Error =
 
     require Pass _ = findFailFn getTripleThird results
 
-    Pass "All {len tests | str} tests completed successfully."
+    Pass "All {len tests
+    | str} tests completed successfully."
+
 
 export def runUnitTests _: Result Unit Error =
-    def testDirectory = "{here}/wake-unit"
-    require Pass testScript =
-      source "{testDirectory}/unit-test.sh"
+    def testDirectory = "{@here}/wake-unit"
+    require Pass testScript = source "{testDirectory}/unit-test.sh"
 
     def testName =
         testDirectory
-        | replace `^${quote here}/` ""
+        | replace `^${quote @here}/` ""
 
     def readFile list = match list
         Some file =
             require Pass content = read file
             Pass (Some content)
-        None =
-            Pass None
+        None = Pass None
 
     require Pass expectedStdout =
         source "{testDirectory}/stdout"
@@ -124,17 +127,16 @@ export def runUnitTests _: Result Unit Error =
         | getPass
         | readFile
 
-    require Pass visibleFiles =
-        sources testDirectory `.*`
+    require Pass visibleFiles = sources testDirectory `.*`
 
-    def inTestDir path =
-        relative testDirectory path
+    def inTestDir path = relative testDirectory path
 
-    require Pass wakeUnitBin =
-        wakeUnitToTest Unit
+    require Pass wakeUnitBin = wakeUnitToTest Unit
 
     def testJob =
-        makeExecPlan ("./{testScript.getPathName.inTestDir}", wakeUnitBin.getPathName.inTestDir, Nil) (wakeUnitBin, visibleFiles)
+        makeExecPlan
+        ("./{testScript.getPathName.inTestDir}", wakeUnitBin.getPathName.inTestDir, Nil)
+        (wakeUnitBin, visibleFiles)
         | setPlanDirectory testDirectory
         | setPlanLabel "testing: {testName}"
         | setPlanStdout logNever
@@ -162,9 +164,10 @@ export def runUnitTests _: Result Unit Error =
         _ = Fail (makeError "Unexpected standard output '{replace `\n` "\\\\n" jobStdout}'")
 
     match testJob.isJobOk
-        True  = Pass Unit
+        True = Pass Unit
         False =
             Fail (makeError "Test failed ({format testJob.getJobStatus}) with '{replace `\n.*` "" jobStderr}'")
+
 
 def runTest (testScript: Path): Result Unit Error =
     def shouldPass =
@@ -179,14 +182,13 @@ def runTest (testScript: Path): Result Unit Error =
 
     def testName =
         testDirectory
-        | replace `^${quote here}/` ""
+        | replace `^${quote @here}/` ""
 
     def readFile list = match list
         Some file =
             require Pass content = read file
             Pass (Some content)
-        None =
-            Pass None
+        None = Pass None
 
     require Pass expectedStdout =
         source "{testDirectory}/stdout"
@@ -198,17 +200,16 @@ def runTest (testScript: Path): Result Unit Error =
         | getPass
         | readFile
 
-    require Pass visibleFiles =
-        sources testDirectory `.*`
+    require Pass visibleFiles = sources testDirectory `.*`
 
-    def inTestDir path =
-        relative testDirectory path
+    def inTestDir path = relative testDirectory path
 
-    require Pass (Pair wakeDir wakeVisible) =
-        wakeToTestDir Unit
+    require Pass (Pair wakeDir wakeVisible) = wakeToTestDir Unit
 
     def testJob =
-        makeExecPlan ("./{testScript.getPathName.inTestDir}", wakeDir.inTestDir, Nil) (visibleFiles ++ wakeVisible)
+        makeExecPlan
+        ("./{testScript.getPathName.inTestDir}", wakeDir.inTestDir, Nil)
+        (visibleFiles ++ wakeVisible)
         | setPlanDirectory testDirectory
         | setPlanLabel "testing: {testName}"
         | setPlanLocalOnly True # On OS/X you cannot mount fuse within fuse
@@ -235,9 +236,11 @@ def runTest (testScript: Path): Result Unit Error =
         _ = Fail (makeError "Unexpected standard output '{replace `\n` "\\\\n" jobStdout}'")
 
     match shouldPass testJob.isJobOk
-        True  True  = Pass Unit
+        True True = Pass Unit
         False False = Pass Unit
-        True  False =
+        True False =
             Fail (makeError "Test failed ({format testJob.getJobStatus}) with '{replace `\n.*` "" jobStderr}'")
-        False True  =
+        False True =
             Fail (makeError "Test should not have passed with '{replace `\n.*` "" jobStderr}'")
+
+

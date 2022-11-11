@@ -1,9 +1,26 @@
-def Pair (_: Integer) (_: String)                      = Pair 44 "as"
-def Pair (_: Integer) (_: String): Pair Integer String = Pair 44 "as"
-def Pair _ _:                      Pair Integer String = Pair 44 "as"
+def Pair (_: Integer) (_: String) =
+    Pair 44 "as"
+
+
+def Pair (_: Integer) (_: String): Pair Integer String =
+    Pair 44 "as"
+
+
+def Pair _ _:                      Pair Integer String =
+    Pair 44 "as"
+
 
 def id x = x
-def Pair (_: a => a) (_: b => b) = Pair (id: a => a) (id: b => b)
-def Pair (_: (a => b) => (List a => List b)) _ = Pair map 99
+
+
+def Pair (_: a => a) (_: b => b) =
+    Pair (id: a => a) (id: b => b)
+
+
+def Pair (_: (a => b) => (List a => List b)) _ =
+    Pair map 99
+
 
 export def test _ = Pass 0
+
+
