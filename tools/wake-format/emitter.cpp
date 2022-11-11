@@ -93,33 +93,24 @@ static inline bool is_floating_comment(wcl::doc_builder& builder, ctx_t ctx, CST
 }
 
 // determines if the pointed to node is simple enough to be flattened
-static inline bool is_simple_literal(wcl::doc_builder&, ctx_t, CSTElement& node,
-                                     const token_traits_map_t&) {
-  return node.id() == CST_LITERAL || node.id() == CST_ID;
-}
-
-// determines if the rest of the node
-// - only has one sibling node
-// - and that node is a "simple" thing as defined by is_simple_literal
-static inline bool is_single_literal(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+static inline bool is_simple_literal(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                                      const token_traits_map_t& traits) {
-  CSTElement copy = node;
-  if (!copy.isNode()) {
-    copy.nextSiblingNode();
+  if (node.id() != CST_UNARY) {
+    return node.id() == CST_LITERAL || node.id() == CST_ID || node.id() == CST_OP;
   }
 
-  size_t node_count = 0;
-  while (!copy.empty()) {
-    node_count++;
-
-    if (!is_simple_literal(builder, ctx, node, traits)) {
-      return false;
-    }
-
-    copy.nextSiblingNode();
+  CSTElement part = node.firstChildNode();
+  if (!is_simple_literal(builder, ctx, part, traits)) {
+    return false;
   }
 
-  return node_count == 1;
+  part.nextSiblingNode();
+  if (!is_simple_literal(builder, ctx, part, traits)) {
+    return false;
+  }
+
+  part.nextSiblingNode();
+  return part.empty();
 }
 
 static inline bool contains_req_else(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
@@ -279,6 +270,147 @@ static wcl::doc binop_rhs_separator(const CSTElement& op) {
   }
 }
 
+static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement node) {
+  if (node.id() != CST_BINARY) {
+    return {node};
+  }
+
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
+  CSTElement left = node.firstChildNode();
+  CSTElement op = left;
+  op.nextSiblingNode();
+  CSTElement right = op;
+  right.nextSiblingNode();
+
+  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
+        op.firstChildElement().fragment().segment().str() ==
+            collect_over.fragment().segment().str())) {
+    return {node};
+  }
+
+  auto collect = collect_left_binary(collect_over, left);
+  collect.push_back(right);
+
+  return collect;
+}
+
+static std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CSTElement node) {
+  if (node.id() != CST_BINARY) {
+    return {node};
+  }
+
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
+  CSTElement left = node.firstChildNode();
+  CSTElement op = left;
+  op.nextSiblingNode();
+  CSTElement right = op;
+  right.nextSiblingNode();
+
+  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
+        op.firstChildElement().fragment().segment().str() ==
+            collect_over.fragment().segment().str())) {
+    return {node};
+  }
+
+  std::vector<CSTElement> collect = {left};
+  auto right_collect = collect_right_binary(collect_over, right);
+
+  collect.insert(collect.end(), right_collect.begin(), right_collect.end());
+
+  return collect;
+}
+
+static std::vector<CSTElement> collect_apply_parts(CSTElement node) {
+  if (node.id() != CST_APP) {
+    return {node};
+  }
+
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
+  CSTElement lhs = node.firstChildNode();
+  CSTElement rhs = lhs;
+  rhs.nextSiblingNode();
+
+  auto collect = collect_apply_parts(lhs);
+  collect.push_back(rhs);
+
+  return collect;
+}
+
+static inline bool is_simple_binop(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                                   const token_traits_map_t& traits) {
+  if (node.id() != CST_BINARY) {
+    return is_simple_literal(builder, ctx, node, traits);
+  }
+
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
+  CSTElement lhs = node.firstChildNode();
+  CSTElement op = lhs;
+  op.nextSiblingNode();
+  CSTElement rhs = op;
+  rhs.nextSiblingNode();
+
+  FMT_ASSERT(op.id() == CST_OP, op, "Expected CST_OP for operator");
+  CSTElement op_token = op.firstChildElement();
+
+  std::vector<CSTElement> parts = {};
+  if (is_op_left_assoc(op_token)) {
+    parts = collect_left_binary(op_token, node);
+  } else {
+    parts = collect_right_binary(op_token, node);
+  }
+
+  if (parts.size() != 2) {
+    return false;
+  }
+
+  return is_simple_literal(builder, ctx, parts[0], traits) &&
+         is_simple_literal(builder, ctx, parts[1], traits);
+}
+
+static inline bool is_simple_apply(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                                   const token_traits_map_t& traits) {
+  if (node.id() != CST_APP) {
+    return is_simple_literal(builder, ctx, node, traits);
+  }
+
+  auto parts = collect_apply_parts(node);
+
+  if (parts.size() != 2) {
+    return false;
+  }
+
+  return is_simple_literal(builder, ctx, parts[0], traits) &&
+         is_simple_literal(builder, ctx, parts[1], traits);
+}
+
+// determines if the rest of the node
+// - only has one sibling node
+// - and that node is a "simple" thing as defined by is_simple_apply
+static inline bool is_single_apply(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                                   const token_traits_map_t& traits) {
+  CSTElement copy = node;
+  if (!copy.isNode()) {
+    copy.nextSiblingNode();
+  }
+
+  size_t node_count = 0;
+  while (!copy.empty()) {
+    node_count++;
+
+    if (!is_simple_apply(builder, ctx, node, traits)) {
+      return false;
+    }
+
+    copy.nextSiblingNode();
+  }
+
+  return node_count == 1;
+}
+
 Emitter::~Emitter() { MEMO_RESET(); }
 
 auto Emitter::rhs_fmt(bool always_newline) {
@@ -305,7 +437,7 @@ auto Emitter::rhs_fmt(bool always_newline) {
    }, full_fmt)
     // Always newline when requested unless the thing to be formatted is a "single literal".
     // Used for top-level defs and top-level "constant" defs
-   .pred(ConstPredicate(always_newline), fmt().fmt_if_else(is_single_literal, flat_fmt, full_fmt))
+   .pred(ConstPredicate(always_newline), fmt().fmt_if_else(is_single_apply, flat_fmt, full_fmt))
 
     // if our hand hand hasn't yet been forced then decide based on how well RHS fits
    .pred(requires_fits_all, fmt().fmt_if_fits_all(flat_fmt, full_fmt))
@@ -868,23 +1000,6 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   MEMO_RET(std::move(builder).build());
 }
 
-static std::vector<CSTElement> collect_apply_parts(CSTElement node) {
-  if (node.id() != CST_APP) {
-    return {node};
-  }
-
-  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
-  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
-  CSTElement lhs = node.firstChildNode();
-  CSTElement rhs = lhs;
-  rhs.nextSiblingNode();
-
-  auto collect = collect_apply_parts(lhs);
-  collect.push_back(rhs);
-
-  return collect;
-}
-
 wcl::optional<wcl::doc> Emitter::combine_apply_flat(ctx_t ctx,
                                                     const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
@@ -965,58 +1080,6 @@ wcl::doc Emitter::walk_arity(ctx_t ctx, CSTElement node) {
 wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   MEMO_RET(walk_placeholder(ctx, node));
-}
-
-static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement node) {
-  if (node.id() != CST_BINARY) {
-    return {node};
-  }
-
-  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
-  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
-  CSTElement left = node.firstChildNode();
-  CSTElement op = left;
-  op.nextSiblingNode();
-  CSTElement right = op;
-  right.nextSiblingNode();
-
-  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
-        op.firstChildElement().fragment().segment().str() ==
-            collect_over.fragment().segment().str())) {
-    return {node};
-  }
-
-  auto collect = collect_left_binary(collect_over, left);
-  collect.push_back(right);
-
-  return collect;
-}
-
-static std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CSTElement node) {
-  if (node.id() != CST_BINARY) {
-    return {node};
-  }
-
-  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
-  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
-  CSTElement left = node.firstChildNode();
-  CSTElement op = left;
-  op.nextSiblingNode();
-  CSTElement right = op;
-  right.nextSiblingNode();
-
-  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
-        op.firstChildElement().fragment().segment().str() ==
-            collect_over.fragment().segment().str())) {
-    return {node};
-  }
-
-  std::vector<CSTElement> collect = {left};
-  auto right_collect = collect_right_binary(collect_over, right);
-
-  collect.insert(collect.end(), right_collect.begin(), right_collect.end());
-
-  return collect;
 }
 
 wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
@@ -1318,21 +1381,21 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
                   .token(TOKEN_KW_IF)
                   .consume_wsnlc()
                   .space()
-                  .fmt_if_else(is_simple_literal, fmt().walk(WALK_NODE),
+                  .fmt_if_else(is_simple_binop, fmt().walk(WALK_NODE),
                                fmt().next().newline())  // if cond
                   .consume_wsnlc()
                   .space()
                   .token(TOKEN_KW_THEN)
                   .consume_wsnlc()
                   .space()
-                  .fmt_if_else(is_simple_literal, fmt().walk(WALK_NODE),
+                  .fmt_if_else(is_simple_apply, fmt().walk(WALK_NODE),
                                fmt().next().newline())  // true body
                   .consume_wsnlc()
                   .space()
                   .token(TOKEN_KW_ELSE)
                   .consume_wsnlc()
                   .space()
-                  .fmt_if_else(is_simple_literal, fmt().walk(WALK_NODE),
+                  .fmt_if_else(is_simple_apply, fmt().walk(WALK_NODE),
                                fmt().next().newline()),  // false body
               fmt().walk_all(fmt().next()).newline())    // garbage format to fail NL check
           .format(ctx, node.firstChildElement(), token_traits);
@@ -1521,6 +1584,8 @@ wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
 wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_PAREN, node, "Expected CST_PAREN");
+
+  ctx = ctx.binop();
 
   auto no_nl = fmt()
                    .token(TOKEN_P_POPEN)

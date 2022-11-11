@@ -882,3 +882,18 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
   )
 
   json
+
+def anyArray =
+            exists (_.getJArray | isSome) value
+
+def a = rec Nil (if indent > 0 then Some "" else None) lhs
+def a = Some ""
+
+def a =
+  def x =
+    if a then
+      b,
+    else
+      !b
+  require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
+  x
