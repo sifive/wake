@@ -108,7 +108,7 @@ export def tinsertWith (fn: (incoming: a) => (existing: a) => a) (y: a) (tree: T
                 # Get all other values equal to y, while maintaining the order
                 # in which they occur.
                 def Triple lm le lg = split y cmp l
-                def Triple rm re rg = split y cmp l
+                def Triple rm re rg = split y cmp r
                 def m = join2 lm rm
                 def g = join2 lg rg
                 # Collapse all equal values into a single result.

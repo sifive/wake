@@ -1,0 +1,23 @@
+def unfiltered =
+    "D",
+    "B",
+    "D",
+    "B",
+    "D",
+    "F",
+    "A",
+    "D",
+    "B",
+    "D",
+    "B",
+    "D",
+    "C",
+    "E",
+    "F",
+    Nil
+def accumulateFn accum str =
+    tinsertWith (\_\r r) str accum
+export def test _ =
+    zip (len unfiltered | seq) unfiltered
+    | foldl accumulateFn (tnew (scmp _.getPairSecond _.getPairSecond))
+    | treeToList
