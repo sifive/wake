@@ -15,29 +15,14 @@ def name Unit =
     def other = @here
     def other =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 
 def name Unit =
     def other = @here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    another
 
-
-def name Unit =
-    def other = @here
-
-    # not floating
-    
-    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    another
-
-
-def name Unit =
-    def other = @here
-
-    # not floating
-    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
 
 
@@ -46,6 +31,24 @@ def name Unit =
     # not floating
     
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+    another
+
+
+def name Unit =
+    def other = @here
+    # not floating
+    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+    another
+
+
+def name Unit =
+    def other = @here
+    # not floating
+    
+    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 
@@ -56,6 +59,7 @@ global export def glob1 = 34
 def name Unit =
     def other = @here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 
@@ -71,6 +75,7 @@ def name Unit =
     # wake-format off
     def other = here
     def other = @here
+
     another
 
 
@@ -79,6 +84,7 @@ def name Unit =
     # wake-format off
     def other = here
     def other = @here
+
     another
 
 
@@ -86,8 +92,8 @@ def name Unit =
     def other = @here
     # wake-format off
     def other = here
-
     def other = @here
+
     another
 
 
@@ -95,6 +101,7 @@ def name Unit =
     # ordinary comment
     def other = @here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 
@@ -205,6 +212,7 @@ def t10 =
 def name Unit = # wake-format off
     def other = here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 
@@ -299,6 +307,7 @@ def wakeToTestDir Unit =
     match (subscribe wakeTestBinary)
         buildTestWake, Nil =
             require Pass (Pair path visible) = buildTestWake Unit
+
             Pass (Pair (simplify "{path}/..") visible)
         Nil = Pass (Pair "{wakePath}" Nil)
         _ = Fail (makeError "Two wake binaries declared for testing!")
@@ -312,6 +321,7 @@ def wakeToTestDir Unit =
                 # comment
                 (Pair path visible)
             ) = buildTestWake Unit
+
             Pass (Pair (simplify "{path}/..") visible)
         Nil = Pass (Pair "{wakePath}" Nil)
         _ = Fail (makeError "Two wake binaries declared for testing!")
@@ -479,11 +489,9 @@ def buildRE2WASM Unit =
     else
         # comment
         failWithError "emmake is not available"
-
     def emsdk = replace `/[^/]*$` "" emmake
 
     require Pass patch = source "{@here}/re2.patch"
-
     require Pass buildDir = vendorBuildDir Unit
 
     def job =
@@ -503,11 +511,8 @@ def buildRE2WASM Unit =
     require Pass outputs = job.getJobOutputs
 
     def headers = filter (matches `.*\.h` _.getPathName) outputs
-
     def objects = filter (matches `.*\.o` _.getPathName) outputs
-
     def cflags = "-I{@here}/.build/re2-{version}", Nil
-
     def lflags = Nil
 
     Pass (SysLib "1.0" headers objects cflags lflags)
@@ -533,6 +538,7 @@ export def build: List String => Result String Error =
             | rmap (\_ "TARBALL")
         kind, Nil =
             require Pass variant = toVariant kind
+
             all variant
             | rmap (\_ "BUILD")
         _ = Fail "no target specified (try: build default/debug/tarball)".makeError
@@ -566,6 +572,7 @@ def all variant =
     require Pass x =
         map (_ variant) targets
         | findFail
+
     Pass (flatten x)
 
 
@@ -573,26 +580,32 @@ def all variant =
 def doInstall dest kind =
     require Pass variant = toVariant kind
     require Pass datfiles = sources "{@here}/share" `.*`
+
     def binfilesResult = all variant
     def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
+
     require Pass datinstall = findFailFn (installIn dest ".") datfiles
     require Pass readmeSource = source "README.md"
     require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
     require Pass binfiles = binfilesResult
     require Pass bininstall = findFailFn releaseBin binfiles
+
     def outputs = readme, bininstall ++ datinstall
+
     Pass outputs
 
 
 # Replace @VERSION@ with 'release'
 def setVersion release file =
     require Pass in = source "{file}.in"
+
     def script =
         "%
         set -e
         sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
         mv "%{file}.tmp" "%{file}"
         %"
+
     shellJob script (in, Nil)
     | getJobOutput
 
@@ -601,6 +614,7 @@ def setVersion release file =
 def tarball Unit =
     def releaseResult = buildAs Unit
     def timeResult = buildOn Unit
+
     require Pass release = releaseResult
     require Pass time = timeResult
     # Create debian + RedHat package files
@@ -608,6 +622,7 @@ def tarball Unit =
     require Pass spec = setVersion release "wake.spec"
     # Identify those sources files to include in the tarball
     require Pass allSources = sources "." `.*`
+
     def srcs =
         allSources
         | filter (!matches `(debian/|wake.spec).*` _.getPathName) # omit packaging files
@@ -644,6 +659,7 @@ def tarball Unit =
         publish source =
           %{testSourcesString}Nil
         %"
+
     # Create a manifest which describes the release and source files
     require Pass manifest = write "manifest.wake" manifestStr
     require Pass testManifest = write "tests/manifest.wake" testsManifestStr
@@ -655,6 +671,7 @@ def tarball Unit =
             def files =
                 map getPathName (manifest, testManifest, spec, srcs)
                 | sortBy (_ <* _)
+
             tar,
             "--mtime={time}",
             "--transform=s@^@wake-{release}/@",
@@ -664,8 +681,10 @@ def tarball Unit =
             "-cJf",
             "wake_{release}.tar.xz",
             files
+
         job cmd (manifest, testManifest, spec, srcs)
         | getJobOutput
+
     Pass (tarball, changelog, Nil)
 
 
@@ -673,9 +692,11 @@ export def static _: Result Path Error =
     def filesResult = doInstall "tmp" "static"
     def releaseResult = buildAs Unit
     def timeResult = buildOn Unit
+
     require Pass release = releaseResult
     require Pass time = timeResult
     require Pass files = filesResult
+
     def cmd =
         which "tar",
         "--mtime={time}",
@@ -686,6 +707,7 @@ export def static _: Result Path Error =
         "-cJf",
         "wake-static_{release}.tar.xz",
         map getPathName files | sortBy (_ <* _)
+
     job cmd files
     | getJobOutput
 
@@ -696,6 +718,13 @@ publish wakeTestBinary = defaultWake, Nil
 publish wakeUnitTestBinary = buildWakeUnit, Nil
 
 def defaultWake Unit =
+    require Pass wakeVisible = doInstall "tmp" "default"
+
+    Pass (Pair "tmp/bin/wake" wakeVisible)
+
+
+def defaultWake Unit =
+    require Pass wakeVisible = doInstall "tmp" "default"
     require Pass wakeVisible = doInstall "tmp" "default"
 
     Pass (Pair "tmp/bin/wake" wakeVisible)
@@ -764,8 +793,10 @@ export def vfoldl (combiningFn: accum => element => accum): accum => Vector elem
             accumulator
         else
             def element = vget v s
+
             loop (combiningFn accumulator element) v (s + 1) e
     def top a (Vector v s e) = loop a v s e
+
     top
 
 
@@ -852,14 +883,20 @@ def buildRE2WASM Unit =
 def buildRE2WASM Unit =
     require Pass outputs = job.getJobOutputs
     else blah
-
     Pass (SysLib "1.0" headers objects cflags lflags)
 
 
 def buildRE2WASM Unit =
     require Pass outputs = job.getJobOutputs
     else blah
+    Pass (SysLib "1.0" headers objects cflags lflags)
 
+
+def buildRE2WASM Unit =
+    require Pass outputs = job.getJobOutputs
+    else blah
+    require Pass outputs = job.getJobOutputs
+    else blah
     Pass (SysLib "1.0" headers objects cflags lflags)
 
 
@@ -870,12 +907,11 @@ def x =
 def a =
     # comment
     def b = 5
-
     # comment
     
     def c = 5
-
     def d = 5
+
     # comment
     
     result
@@ -894,6 +930,7 @@ def name Unit =
     def other = @here
     def other =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another # comment
 
 
@@ -912,6 +949,7 @@ def name Unit =
     def other = @here
     def other =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another # comment
 
 
@@ -920,6 +958,7 @@ def name Unit =
     def other = @here
     def other =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another # comment
 
 
@@ -937,6 +976,7 @@ def a =
         5
     else
         require Pass a = b
+
         a
 
 
@@ -989,6 +1029,7 @@ def longFunc param: Result (List Path) Error =
         Nil = Nil,
         a, b =
             def f = funcB b
+
             match f
                 Some x = x
                 None = x
@@ -1007,9 +1048,11 @@ export def mapPartial (f: a => Option b): (list: List a) => List b =
         h, t =
             # don't wait on f to process tail:
             def sub = loop t
+
             match (f h)
                 Some x = x, sub
                 None = sub
+
     loop
 
 
@@ -1025,7 +1068,9 @@ target writeImp inputs mode path content =
                 else match (imp mode path content)
                     Fail f = Fail (makeError f)
                     Pass path = Pass (editRunnerOutputOutputs (path, _) output)
+
         makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
+
     makeExecPlan ("<write>", str mode, path, Nil) inputs
     | setPlanOnce False
     | setPlanEnvironment Nil
@@ -1072,7 +1117,9 @@ def a = Some ""
 
 def a =
     def x = if a then b, else !b
+
     require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
+
     x
 
 

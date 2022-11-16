@@ -1,0 +1,28 @@
+def x =
+    require a = b
+    require c = d
+    def e = f
+    def g = h
+    require i = j
+    require k = l
+    def m = n
+
+    Pass outputs
+
+def x =
+  require a = B
+
+  def z = a b c
+  z
+
+def x =
+  require a = b
+  else
+    def d = f
+
+
+    def f = g
+
+
+    f
+  a

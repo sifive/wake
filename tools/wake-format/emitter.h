@@ -199,6 +199,7 @@ class Emitter {
   wcl::doc walk_prim(ctx_t ctx, CSTElement node);
   wcl::doc walk_publish(ctx_t ctx, CSTElement node);
   wcl::doc walk_require(ctx_t ctx, CSTElement node);
+  wcl::doc walk_flattened_require(ctx_t ctx, CSTElement node);
   wcl::doc walk_req_else(ctx_t ctx, CSTElement node);
   wcl::doc walk_subscribe(ctx_t ctx, CSTElement node);
   wcl::doc walk_target(ctx_t ctx, CSTElement node);

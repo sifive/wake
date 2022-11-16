@@ -547,6 +547,14 @@ def defaultWake Unit =
 
     Pass (Pair "tmp/bin/wake" wakeVisible)
 
+def defaultWake Unit =
+    require Pass wakeVisible =
+        doInstall "tmp" "default"
+    require Pass wakeVisible =
+        doInstall "tmp" "default"
+
+    Pass (Pair "tmp/bin/wake" wakeVisible)
+
 export data JValue =
   JString  String
   JInteger Integer
@@ -697,6 +705,18 @@ def buildRE2WASM Unit =
     Pass (SysLib "1.0" headers objects cflags lflags)
 
 def buildRE2WASM Unit =
+    require Pass outputs =
+        job.getJobOutputs
+    else
+        blah
+
+    Pass (SysLib "1.0" headers objects cflags lflags)
+
+def buildRE2WASM Unit =
+    require Pass outputs =
+        job.getJobOutputs
+    else
+        blah
     require Pass outputs =
         job.getJobOutputs
     else

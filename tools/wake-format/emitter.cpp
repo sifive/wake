@@ -98,17 +98,17 @@ static inline bool is_simple_literal(wcl::doc_builder& builder, ctx_t ctx, CSTEl
   if (node.id() != CST_UNARY) {
     return node.id() == CST_LITERAL || node.id() == CST_ID || node.id() == CST_OP;
   }
-  
+
   CSTElement part = node.firstChildNode();
   if (!is_simple_literal(builder, ctx, part, traits)) {
     return false;
   }
-  
+
   part.nextSiblingNode();
   if (!is_simple_literal(builder, ctx, part, traits)) {
     return false;
   }
-  
+
   part.nextSiblingNode();
   return part.empty();
 }
@@ -334,8 +334,111 @@ static std::vector<CSTElement> collect_apply_parts(CSTElement node) {
   return collect;
 }
 
+static std::vector<CSTElement> collect_sibling_nodes(CSTElement node) {
+  std::vector<CSTElement> collect = {};
+
+  if (!node.isNode()) {
+    node.nextSiblingNode();
+  }
+
+  while (!node.empty()) {
+    collect.push_back(node);
+    node.nextSiblingNode();
+  }
+
+  return collect;
+}
+
+// Forward declare mutually recursive func
+static std::vector<CSTElement> collect_flattened_block(CSTElement node);
+
+static std::vector<CSTElement> collect_flattened_req(CSTElement node) {
+  FMT_ASSERT(node.id() == CST_REQUIRE, node, "Expected CST_REQUIRE");
+  std::vector<CSTElement> collect = {node};
+
+  CSTElement body = node.firstChildNode();  // LHS
+  body.nextSiblingNode();                   // RHS
+  body.nextSiblingNode();                   // Either body or else
+  if (body.id() == CST_REQ_ELSE) {
+    body.nextSiblingNode();  // body
+  }
+
+  switch (body.id()) {
+    case CST_BLOCK: {
+      auto flat_block = collect_flattened_block(body);
+      collect.insert(collect.end(), flat_block.begin(), flat_block.end());
+      break;
+    }
+    case CST_REQUIRE: {
+      auto flat_req = collect_flattened_req(body);
+      collect.insert(collect.end(), flat_req.begin(), flat_req.end());
+      break;
+    }
+    default:
+      collect.push_back(body);
+      break;
+  }
+
+  return collect;
+}
+
+static std::vector<CSTElement> collect_flattened_block(CSTElement node) {
+  FMT_ASSERT(node.id() == CST_BLOCK, node, "Expected CST_BLOCK");
+  std::vector<CSTElement> collect = {};
+
+  CSTElement child = node.firstChildNode();
+
+  while (!child.empty()) {
+    if (child.id() == CST_REQUIRE) {
+      auto flat_req = collect_flattened_req(child);
+      collect.insert(collect.end(), flat_req.begin(), flat_req.end());
+      child.nextSiblingNode();
+    } else {
+      collect.push_back(child);
+    }
+    child.nextSiblingNode();
+  }
+
+  return collect;
+}
+
+static std::vector<std::vector<CSTElement>> collect_potential_pseudo_blocks(CSTElement node) {
+  std::vector<std::vector<CSTElement>> collect = {};
+
+  std::vector<CSTElement> nodes = {};
+  if (node.id() == CST_BLOCK) {
+    nodes = collect_flattened_block(node);
+  } else if (node.id() == CST_REQUIRE) {
+    nodes = collect_flattened_req(node);
+  } else {
+    // TODO, better message
+    assert(false);
+  }
+
+  // TODO, better message
+  assert(nodes.size() > 1);
+
+  collect.push_back({nodes.front()});
+
+  // anything of the same CST type that is a single line is in the same bloc
+  // last thing is always in its own block
+  for (size_t i = 1; i < nodes.size() - 1; i++) {
+    CSTElement prev = collect.back().back();
+    CSTElement curr = nodes[i];
+
+    if (prev.id() == curr.id()) {
+      collect.back().push_back(curr);
+    } else {
+      collect.push_back({curr});
+    }
+  }
+
+  collect.push_back({nodes.back()});
+  return collect;
+}
+
 static inline bool is_simple_binop(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
-                                     const token_traits_map_t& traits) {
+                                   const token_traits_map_t& traits) {
   if (node.id() != CST_BINARY) {
     return is_simple_literal(builder, ctx, node, traits);
   }
@@ -356,17 +459,18 @@ static inline bool is_simple_binop(wcl::doc_builder& builder, ctx_t ctx, CSTElem
     parts = collect_left_binary(op_token, node);
   } else {
     parts = collect_right_binary(op_token, node);
-  }  
-  
+  }
+
   if (parts.size() != 2) {
     return false;
   }
-  
-  return is_simple_literal(builder, ctx, parts[0], traits) && is_simple_literal(builder, ctx, parts[1], traits);
+
+  return is_simple_literal(builder, ctx, parts[0], traits) &&
+         is_simple_literal(builder, ctx, parts[1], traits);
 }
 
 static inline bool is_simple_apply(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
-                                     const token_traits_map_t& traits) {
+                                   const token_traits_map_t& traits) {
   if (node.id() != CST_APP) {
     return is_simple_literal(builder, ctx, node, traits);
   }
@@ -376,15 +480,16 @@ static inline bool is_simple_apply(wcl::doc_builder& builder, ctx_t ctx, CSTElem
   if (parts.size() != 2) {
     return false;
   }
-  
-  return is_simple_literal(builder, ctx, parts[0], traits) && is_simple_literal(builder, ctx, parts[1], traits);
+
+  return is_simple_literal(builder, ctx, parts[0], traits) &&
+         is_simple_literal(builder, ctx, parts[1], traits);
 }
 
 // determines if the rest of the node
 // - only has one sibling node
 // - and that node is a "simple" thing as defined by is_simple_apply
 static inline bool is_single_apply(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
-                                     const token_traits_map_t& traits) {
+                                   const token_traits_map_t& traits) {
   CSTElement copy = node;
   if (!copy.isNode()) {
     copy.nextSiblingNode();
@@ -1222,19 +1327,54 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_BLOCK, node, "Expected CST_BLOCK");
 
-  // clang-format off
-  auto body_fmt = fmt().match(
-    // Block level newlines should be re-emitted as these are the
-    // user creating 'pseudo-blocks'
-    pred(TOKEN_NL, fmt().newline().newline().next())
-   .pred(TOKEN_WS, fmt().next())
-   // Comments are followed by ws/nl/c that have already been tagged and will be
-   // handled later. Skip them for now.
-   .pred(TOKEN_COMMENT, fmt().consume_wsnlc())
-   .otherwise(fmt().freshline().walk(WALK_NODE)));
-  // clang-format on
+  wcl::doc_builder builder;
+  auto blocks = collect_potential_pseudo_blocks(node);
+  for (size_t i = 0; i < blocks.size(); i++) {
+    const std::vector<CSTElement>& nodes = blocks[i];
+    for (CSTElement n : nodes) {
+      builder.append(fmt()
+                         .freshline()
+                         .match(pred(CST_REQUIRE, fmt().walk(DISPATCH(walk_flattened_require)))
+                                    .otherwise(fmt().walk(WALK_NODE)))
+                         .compose(ctx.sub(builder), n, token_traits));
+    }
 
-  MEMO_RET(fmt().walk_all(body_fmt).format(ctx, node.firstChildElement(), token_traits));
+    if (i != blocks.size() - 1) {
+      builder.append(cat().newline().newline().concat(ctx.sub(builder)));
+    }
+  }
+
+  MEMO_RET(std::move(builder).build());
+
+  // auto nodes = collect_sibling_nodes(node.firstChildNode());
+
+  // FMT_ASSERT(nodes.size() > 1, node, "CST_BLOCK should always have at least 2 children");
+
+  // wcl::doc_builder builder;
+
+  // for (size_t i = 0; i < nodes.size() - 1; i++) {
+  //   builder.append(fmt().freshline().walk(WALK_NODE).compose(ctx.sub(builder), nodes[i],
+  //   token_traits));
+  // }
+
+  // builder.append(fmt().newline().newline().freshline().walk(WALK_NODE).format(ctx, nodes.back(),
+  // token_traits));
+
+  // MEMO_RET(std::move(builder).build());
+
+  // // clang-format off
+  // auto body_fmt = fmt().match(
+  //   // Block level newlines should be re-emitted as these are the
+  //   // user creating 'pseudo-blocks'
+  //   pred(TOKEN_NL, fmt().newline().newline().next())
+  //  .pred(TOKEN_WS, fmt().next())
+  //  // Comments are followed by ws/nl/c that have already been tagged and will be
+  //  // handled later. Skip them for now.
+  //  .pred(TOKEN_COMMENT, fmt().consume_wsnlc())
+  //  .otherwise(fmt().freshline().walk(WALK_NODE)));
+  // // clang-format on
+
+  // MEMO_RET(fmt().walk_all(body_fmt).format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
@@ -1570,7 +1710,7 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
   FMT_ASSERT(node.id() == CST_PAREN, node, "Expected CST_PAREN");
 
   ctx = ctx.binop();
-  
+
   auto no_nl = fmt()
                    .token(TOKEN_P_POPEN)
                    .consume_wsnlc()
@@ -1614,21 +1754,21 @@ wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) {
                .format(ctx, node.firstChildElement(), token_traits));
 }
 
-wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
+wcl::doc Emitter::walk_flattened_require(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_REQUIRE, node, "Expected CST_REQUIRE");
 
   auto else_fmt =
       fmt()
+          .freshline()
           .token(TOKEN_KW_ELSE)
           .fmt_if_fits_all(fmt().space().consume_wsnlc().walk(WALK_NODE),
                            fmt().nest(fmt().freshline().consume_wsnlc().walk(WALK_NODE)))
-          // if the author added extra newlines, re-emit them
-          .fmt_if(TOKEN_NL, fmt().next().fmt_while(TOKEN_NL, fmt().next().newline()))
           .consume_wsnlc()
           .newline()
           .freshline();
 
+  CSTElement child = node.firstChildElement();
   MEMO_RET(fmt()
                .freshline()
                .token(TOKEN_KW_REQUIRE)
@@ -1639,17 +1779,34 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
                .join(rhs_fmt())
-               .fmt_if_else(
-                   contains_req_else,
-                   fmt(),  // Do nothing if true, else re-emit author added newlines
-                   fmt().fmt_if(TOKEN_NL, fmt().next().fmt_while(TOKEN_NL, fmt().next().newline())))
                .consume_wsnlc()
-               .newline()
-               .freshline()
                .fmt_if(TOKEN_KW_ELSE, else_fmt)
-               .walk(WALK_NODE)
                .consume_wsnlc()
-               .format(ctx, node.firstChildElement(), token_traits));
+               .compose(ctx, child, token_traits));
+}
+
+wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
+  MEMO(ctx, node);
+  FMT_ASSERT(node.id() == CST_REQUIRE, node, "Expected CST_REQUIRE");
+
+  wcl::doc_builder builder;
+  auto blocks = collect_potential_pseudo_blocks(node);
+  for (size_t i = 0; i < blocks.size(); i++) {
+    const std::vector<CSTElement>& nodes = blocks[i];
+    for (CSTElement n : nodes) {
+      builder.append(fmt()
+                         .freshline()
+                         .match(pred(CST_REQUIRE, fmt().walk(DISPATCH(walk_flattened_require)))
+                                    .otherwise(fmt().walk(WALK_NODE)))
+                         .compose(ctx.sub(builder), n, token_traits));
+    }
+
+    if (i != blocks.size() - 1) {
+      builder.append(cat().newline().newline().concat(ctx.sub(builder)));
+    }
+  }
+
+  MEMO_RET(std::move(builder).build());
 }
 
 wcl::doc Emitter::walk_req_else(ctx_t ctx, CSTElement node) {
