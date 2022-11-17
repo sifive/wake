@@ -1266,6 +1266,7 @@ static Expr *dst_block(CSTElement block) {
         dst_import(child, *map);
         break;
       case CST_DEF:
+      case CST_TARGET:
         dst_def(child, *map, nullptr, nullptr);
         break;
       default:

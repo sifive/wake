@@ -378,6 +378,13 @@ blockdef(R) ::= KW_DEF(b) pattern(P)                 error NL(e). { R = 1; add(C
 blockdef(R) ::= KW_DEF(b) pattern(P) P_EQUALS              NL(e). { R = 1; add(CST_ERROR, e); add(CST_DEF, b, P+1, e); fail("definitions must be followed by an '= expression'", e); }
 blockdef(R) ::= KW_DEF(b) pattern(P) P_EQUALS block_opt(B) NL(e). { R = 1;                    add(CST_DEF, b, P+B, e); }
 
+blockdef(R) ::= KW_TARGET                                     NL(e). { R = 0; fail("keyword 'target' must be followed by a pattern", e); }
+blockdef(R) ::= KW_TARGET                                     error NL.    { R = 0; }
+blockdef(R) ::= KW_TARGET(b) pattern(P)                       NL(e). { R = 1; add(CST_ERROR, e); add(CST_TARGET, b, P+1, e); fail("targets must be followed by an '= expression'", e); }
+blockdef(R) ::= KW_TARGET(b) pattern(P)                       error NL(e). { R = 1; add(CST_ERROR, e); add(CST_TARGET, b, P+1, e); }
+blockdef(R) ::= KW_TARGET(b) pattern(P) P_EQUALS              NL(e). { R = 1; add(CST_ERROR, e); add(CST_TARGET, b, P+1, e); fail("targets must be followed by an '= expression'", e); }
+blockdef(R) ::= KW_TARGET(b) pattern(P) P_EQUALS block_opt(B) NL(e). { R = 1;                    add(CST_TARGET, b, P+B, e); }
+
 blockdef(R) ::= KW_FROM                                                NL(e). { R = 0; fail("keyword 'from' must be followed by a package name", e); }
 blockdef(R) ::= KW_FROM                                          error NL.    { R = 0; }
 blockdef(R) ::= KW_FROM(b) id(I)                                       NL(e). { R = 1;           add(CST_IMPORT, b, I, e); fail("keyword 'from' must be followed by a package name and 'import'", e); }
