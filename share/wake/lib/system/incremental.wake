@@ -20,15 +20,26 @@ target tarExe Unit =
     if gnutar ==* "gnutar" then which "tar" else gnutar
 
 def targz output paths =
-    def cmd =
-        # Intentionally record mtime in ns (posix) => needed for incremental builds
-        tarExe Unit, "--numeric-owner", "--owner=0", "--group=0", "--format=posix", "-czf",
-        output, map getPathName paths | sortBy scmp
-    makeExecPlan cmd paths
-    | setPlanLocalOnly True
-    | setPlanFnOutputs (\_ output, Nil)
-    | runJobWith       localRunner
-    | getJobOutput
+    require Pass fileList =
+        def fileListPath =
+            replace `\.tar\.gz` ".F" output
+        map getPathName paths
+        | sortBy scmp
+        | catWith "\n"
+        | write fileListPath
+    def script =
+        """
+            # Intentionally record mtime in ns (posix) => needed for incremental builds
+            %{tarExe Unit} --numeric-owner --owner=0 --group=0 --format=posix -czf %{output}.tmp -T %{fileList.getPathName} && \
+            mv %{output}.tmp %{output}
+        """
+    require Pass tar =
+        makePlan "incremental snapshot: {output}" paths script
+        | setPlanLocalOnly True
+        | setPlanFnOutputs (\_ output, Nil)
+        | runJobWith       localRunner
+        | getJobOutput
+    Pass tar
 
 # This API allows a Job to access those outputs from its last invocation
 # which are accepted by reusedOutputFilterFn. To use this method, you must
