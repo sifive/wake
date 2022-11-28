@@ -451,10 +451,22 @@ int main(int argc, char **argv) {
 
     // Delete all the files
     for (const auto &path : paths) {
+      // Don't delete the root directory
+      // - Certain writes will create the parent dir "." which shouldn't be deleted
+      if (path == ".") {
+        continue;
+      }
+
       // First we try to unlink the file
       if (unlink(path.c_str()) == -1) {
+#if defined(__linux__)
+        bool is_dir = (errno == EISDIR);
+#else
+        bool is_dir = (errno == EPERM || errno == EACCES);
+#endif
+
         // If it was actually a directory we remove it instead
-        if (errno == EISDIR) {
+        if (is_dir) {
           if (rmdir(path.c_str()) == -1) {
             if (errno == ENOTEMPTY) continue;
             std::cerr << "error: rmdir(" << path << "): " << strerror(errno) << std::endl;
@@ -463,8 +475,10 @@ int main(int argc, char **argv) {
           continue;
         }
 
-        // If it wasn't a directory then we fail
+        // If the entry doesn't exist then nothing to delete
         if (errno == ENOENT) continue;
+
+        // If it wasn't a directory then we fail
         std::cerr << "error: unlink(" << path << "): " << strerror(errno) << std::endl;
         return 1;
       }
