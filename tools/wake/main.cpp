@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <random>
 #include <set>
@@ -141,7 +142,20 @@ class TerminalReporter : public DiagnosticReporter {
   }
 };
 
+std::chrono::steady_clock::time_point print_profile(const char *msg,
+                                                    std::chrono::steady_clock::time_point start) {
+  auto now = std::chrono::steady_clock::now();
+  std::stringstream s;
+  s << msg << " (" << std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count()
+    << "ms)" << std::endl;
+  std::string out = s.str();
+  status_write("echo", out.data(), out.size());
+  return now;
+}
+
 int main(int argc, char **argv) {
+  auto now = std::chrono::steady_clock::now();
+
   TerminalReporter terminalReporter;
   reporter = &terminalReporter;
 
@@ -416,12 +430,39 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  /* Setup logging streams */
+  if (noexecute && !fd1) fd1 = "error";
+  if (debug && !fd1) fd1 = "debug,info,echo,report,warning,error";
+  if (verbose && !fd1) fd1 = "info,echo,report,warning,error";
+  if (quiet && !fd1) fd1 = "error";
+  if (!tty && !fd1) fd1 = "echo,report,warning,error";
+  if (!fd1) fd1 = "report,warning,error";
+  if (!fd2) fd2 = "error";
+
+  status_set_bulk_fd(1, fd1);
+  status_set_bulk_fd(2, fd2);
+  status_set_bulk_fd(3, fd3);
+  status_set_bulk_fd(4, fd4);
+  status_set_bulk_fd(5, fd5);
+
+  // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
+  std::cout << std::flush;
+  std::cerr << std::flush;
+  fflush(stdout);
+  fflush(stderr);
+
+  status_init();
+
+  now = print_profile("Parsed Arguments & Initialized Profiling", now);
+
   Database db(debugdb);
   std::string fail = db.open(wait, !workspace, tty);
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
     return 1;
   }
+
+  now = print_profile("Opened DB", now);
 
   // If the user asked to list all files we *would* clean.
   // This is the same as asking for all output files.
@@ -568,6 +609,8 @@ int main(int argc, char **argv) {
     // The unreadable location might be irrelevant to the build
   }
 
+  now = print_profile("Located wake source files", now);
+
   // Select a default package
   int longest_src_dir = -1;
   bool warned_conflict = false;
@@ -607,6 +650,8 @@ int main(int argc, char **argv) {
       }
     }
   }
+
+  now = print_profile("Read and parsed wake source files", now);
 
   if (in) {
     auto it = top->packages.find(in);
@@ -692,21 +737,6 @@ int main(int argc, char **argv) {
   if (parse) top->format(std::cout, 0);
   if (notype) return (ok && !terminalReporter.errors) ? 0 : 1;
 
-  /* Setup logging streams */
-  if (noexecute && !fd1) fd1 = "error";
-  if (debug && !fd1) fd1 = "debug,info,echo,report,warning,error";
-  if (verbose && !fd1) fd1 = "info,echo,report,warning,error";
-  if (quiet && !fd1) fd1 = "error";
-  if (!tty && !fd1) fd1 = "echo,report,warning,error";
-  if (!fd1) fd1 = "report,warning,error";
-  if (!fd2) fd2 = "error";
-
-  status_set_bulk_fd(1, fd1);
-  status_set_bulk_fd(2, fd2);
-  status_set_bulk_fd(3, fd3);
-  status_set_bulk_fd(4, fd4);
-  status_set_bulk_fd(5, fd5);
-
   /* Primitives */
   JobTable jobtable(&db, memory_budget, cpu_budget, debug, verbose, quiet, check, !tty);
   StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(wake_cwd), cmdline);
@@ -715,6 +745,8 @@ int main(int argc, char **argv) {
   bool isTreeBuilt = true;
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
   if (!isTreeBuilt) ok = false;
+
+  now = print_profile("Bound refs", now);
 
   sums_ok();
 
@@ -792,9 +824,13 @@ int main(int argc, char **argv) {
     }
   }
 
+  now = print_profile("Typechecked source files", now);
+
   // Convert AST to optimized SSA
   std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root), runtime);
   if (optim) ssa = Term::optimize(std::move(ssa), runtime);
+
+  now = print_profile("Converted to optimized SSA", now);
 
   // Upon request, dump out the SSA
   if (dumpssa) {
@@ -809,21 +845,18 @@ int main(int argc, char **argv) {
   if (noexecute) return 0;
 
   db.prepare(original_command_line);
-  runtime.init(static_cast<RFun *>(ssa.get()));
+  now = print_profile("Prepared DB", now);
 
-  // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
-  std::cout << std::flush;
-  std::cerr << std::flush;
-  fflush(stdout);
-  fflush(stderr);
+  runtime.init(static_cast<RFun *>(ssa.get()));
+  now = print_profile("Initialized runtime", now);
 
   runtime.abort = false;
-
-  status_init();
   do {
     runtime.run();
   } while (!runtime.abort && jobtable.wait(runtime));
   status_finish();
+
+  now = print_profile("Completed execution", now);
 
   runtime.heap.report();
   tree.report(profile, command);
