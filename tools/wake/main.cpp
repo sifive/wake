@@ -572,13 +572,44 @@ int main(int argc, char **argv) {
   int longest_src_dir = -1;
   bool warned_conflict = false;
 
+  /* Setup logging streams */
+  if (noexecute && !fd1) fd1 = "error";
+  if (debug && !fd1) fd1 = "debug,info,echo,report,warning,error";
+  if (verbose && !fd1) fd1 = "info,echo,report,warning,error";
+  if (quiet && !fd1) fd1 = "error";
+  if (!tty && !fd1) fd1 = "echo,report,warning,error";
+  if (!fd1) fd1 = "report,warning,error";
+  if (!fd2) fd2 = "error";
+
+  status_set_bulk_fd(1, fd1);
+  status_set_bulk_fd(2, fd2);
+  status_set_bulk_fd(3, fd3);
+  status_set_bulk_fd(4, fd4);
+  status_set_bulk_fd(5, fd5);
+
+  // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
+  std::cout << std::flush;
+  std::cerr << std::flush;
+  fflush(stdout);
+  fflush(stderr);
+
+  status_init();
+
   // Read all wake build files
   bool ok = true;
   Scope::debug = debug;
   std::unique_ptr<Top> top(new Top);
   std::vector<ExternalFile> wakefiles;
   wakefiles.reserve(wakefilenames.size());
+
+  struct timespec now;
+  clock_gettime(CLOCK_REALTIME, &now);
+  Status status("Locating Wake Source Files", 0, now);
+  status_state.jobs.push_back(status);
+
   for (auto &i : wakefilenames) {
+    status_refresh(false);
+
     if (verbose && debug) std::cerr << "Parsing " << i << std::endl;
 
     wakefiles.emplace_back(terminalReporter, i.c_str());
@@ -607,6 +638,8 @@ int main(int argc, char **argv) {
       }
     }
   }
+
+  status_state.jobs.pop_back();
 
   if (in) {
     auto it = top->packages.find(in);
@@ -691,21 +724,6 @@ int main(int argc, char **argv) {
 
   if (parse) top->format(std::cout, 0);
   if (notype) return (ok && !terminalReporter.errors) ? 0 : 1;
-
-  /* Setup logging streams */
-  if (noexecute && !fd1) fd1 = "error";
-  if (debug && !fd1) fd1 = "debug,info,echo,report,warning,error";
-  if (verbose && !fd1) fd1 = "info,echo,report,warning,error";
-  if (quiet && !fd1) fd1 = "error";
-  if (!tty && !fd1) fd1 = "echo,report,warning,error";
-  if (!fd1) fd1 = "report,warning,error";
-  if (!fd2) fd2 = "error";
-
-  status_set_bulk_fd(1, fd1);
-  status_set_bulk_fd(2, fd2);
-  status_set_bulk_fd(3, fd3);
-  status_set_bulk_fd(4, fd4);
-  status_set_bulk_fd(5, fd5);
 
   /* Primitives */
   JobTable jobtable(&db, memory_budget, cpu_budget, debug, verbose, quiet, check, !tty);
@@ -810,16 +828,8 @@ int main(int argc, char **argv) {
 
   db.prepare(original_command_line);
   runtime.init(static_cast<RFun *>(ssa.get()));
-
-  // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
-  std::cout << std::flush;
-  std::cerr << std::flush;
-  fflush(stdout);
-  fflush(stderr);
-
   runtime.abort = false;
 
-  status_init();
   do {
     runtime.run();
   } while (!runtime.abort && jobtable.wait(runtime));
