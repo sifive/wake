@@ -335,6 +335,9 @@ void status_init() {
     sigaction(SIGALRM, &sa, 0);
     setitimer(ITIMER_REAL, &timer, 0);
   }
+
+  status_set_fd("stdout", 1);
+  status_set_fd("stderr", 2);
 }
 
 struct StreamSettings {
