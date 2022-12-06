@@ -20,8 +20,8 @@
 
 #include <sys/time.h>
 
-#include <sstream>
 #include <list>
+#include <sstream>
 #include <string>
 
 struct Status {
@@ -70,8 +70,8 @@ void status_set_fd(const char *name, int fd);
 void status_set_bulk_fd(int fd, const char *streams);
 
 class StatusBuff : public std::stringbuf {
-  public:
-   StatusBuff(const char* name): name(name) {}
+ public:
+  StatusBuff(const char *name) : name(name) {}
 
   // Called every time the buffer is flushed
   virtual int sync() override {
@@ -83,8 +83,9 @@ class StatusBuff : public std::stringbuf {
 
     return 0;
   }
-  private:
-    const char* name;
+
+ private:
+  const char *name;
 };
 
 #endif

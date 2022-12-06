@@ -142,6 +142,7 @@ class TerminalReporter : public DiagnosticReporter {
 };
 
 int main(int argc, char **argv) {
+  std::cout << "fex - starting wake" << std::endl;
   TerminalReporter terminalReporter;
   reporter = &terminalReporter;
 
@@ -415,6 +416,7 @@ int main(int argc, char **argv) {
   clock_gettime(CLOCK_REALTIME, &now);
   Status status("Starting Wake", 0, now);
   status_state.jobs.push_back(status);
+  status_refresh(false);
 
   StatusBuff outbuf("stdout");
   StatusBuff errbuf("stderr");
