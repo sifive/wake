@@ -20,6 +20,7 @@
 
 #include <sys/time.h>
 
+#include <sstream>
 #include <list>
 #include <string>
 
@@ -67,5 +68,23 @@ void status_finish();
 void status_set_colour(const char *name, int colour);
 void status_set_fd(const char *name, int fd);
 void status_set_bulk_fd(int fd, const char *streams);
+
+class StatusBuff : public std::stringbuf {
+  public:
+   StatusBuff(const char* name): name(name) {}
+
+  // Called every time the buffer is flushed
+  virtual int sync() override {
+    // Emit the buffer to the appropiate stream
+    status_write(name, str());
+
+    // Clear and reset the buffer
+    str("");
+
+    return 0;
+  }
+  private:
+    const char* name;
+};
 
 #endif

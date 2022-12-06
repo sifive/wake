@@ -458,11 +458,10 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   // Double-check that ::parse() did not do something crazy.
   assert(imp->limit > 0);
 
-  std::stringstream s;
+  StatusBuff echobuf("echo");
+  std::ostream s(&echobuf);
   s << "wake: targeting utilization for " << imp->limit << " threads and "
     << ResourceBudget::format(imp->phys_limit) << " of memory." << std::endl;
-  std::string out = s.str();
-  status_write("echo", out.data(), out.size());
 
   // Wake creates files + dirs with explicit permissions.
   // We do not want the umask to interfere.

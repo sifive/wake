@@ -416,8 +416,13 @@ int main(int argc, char **argv) {
   Status status("Starting Wake", 0, now);
   status_state.jobs.push_back(status);
 
+  StatusBuff outbuf("stdout");
+  StatusBuff errbuf("stderr");
+  std::ostream outstream(&outbuf);
+  std::ostream errstream(&errbuf);
+
   if (noargs && argc > 1) {
-    std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
+    errstream << "Unexpected positional arguments on the command-line!" << std::endl;
     return 1;
   }
 
@@ -427,11 +432,11 @@ int main(int argc, char **argv) {
   std::string wake_cwd, src_dir;  // form: "" | .+/
   if (init) {
     if (!make_workspace(init)) {
-      std::cerr << "Unable to initialize a workspace in " << init << std::endl;
+      errstream << "Unable to initialize a workspace in " << init << std::endl;
       return 1;
     }
   } else if (workspace && !chdir_workspace(chdir, wake_cwd, src_dir)) {
-    std::cerr << "Unable to locate wake.db in any parent directory." << std::endl;
+    errstream << "Unable to locate wake.db in any parent directory." << std::endl;
     return 1;
   }
 
@@ -440,14 +445,14 @@ int main(int argc, char **argv) {
   // check that the .wakeroot is compatible with the wake version
   std::string version_check = check_version(workspace, VERSION_STR);
   if (!version_check.empty()) {
-    std::cerr << ".wakeroot: " << version_check << std::endl;
+    errstream << ".wakeroot: " << version_check << std::endl;
     return 1;
   }
 
   Database db(debugdb);
   std::string fail = db.open(wait, !workspace, tty);
   if (!fail.empty()) {
-    std::cerr << "Failed to open wake.db: " << fail << std::endl;
+    errstream << "Failed to open wake.db: " << fail << std::endl;
     return 1;
   }
 
@@ -459,7 +464,7 @@ int main(int argc, char **argv) {
 
     // print them all out
     for (const auto &file : files) {
-      std::cout << file << std::endl;
+      outstream << file << std::endl;
     }
 
     return 0;
@@ -497,7 +502,7 @@ int main(int argc, char **argv) {
         if (is_dir) {
           if (rmdir(path.c_str()) == -1) {
             if (errno == ENOTEMPTY) continue;
-            std::cerr << "error: rmdir(" << path << "): " << strerror(errno) << std::endl;
+            errstream << "error: rmdir(" << path << "): " << strerror(errno) << std::endl;
             return 1;
           }
           continue;
@@ -507,7 +512,7 @@ int main(int argc, char **argv) {
         if (errno == ENOENT) continue;
 
         // If it wasn't a directory then we fail
-        std::cerr << "error: unlink(" << path << "): " << strerror(errno) << std::endl;
+        errstream << "error: unlink(" << path << "): " << strerror(errno) << std::endl;
         return 1;
       }
     }
@@ -526,19 +531,19 @@ int main(int argc, char **argv) {
 
   if (timeline) {
     if (argc == 1) {
-      get_and_write_timeline(std::cout, db);
+      get_and_write_timeline(outstream, db);
       return 0;
     }
     char *timeline_str = argv[1];
     if (strcmp(timeline_str, "job-reflections") == 0) {
-      get_and_write_job_reflections(std::cout, db);
+      get_and_write_job_reflections(outstream, db);
       return 0;
     }
     if (strcmp(timeline_str, "file-accesses") == 0) {
-      get_and_write_file_accesses(std::cout, db);
+      get_and_write_file_accesses(outstream, db);
       return 0;
     }
-    std::cerr << "Unrecognized option after --timeline" << std::endl;
+    errstream << "Unrecognized option after --timeline" << std::endl;
     return 1;
   }
 
@@ -546,7 +551,7 @@ int main(int argc, char **argv) {
     auto hits = db.explain(std::atol(job), verbose || tag);
     describe(hits, script, debug, verbose, tag);
     if (hits.empty())
-      std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
+      errstream << "Job '" << job << "' was not found in the database!" << std::endl;
   }
 
   if (input) {
@@ -573,7 +578,7 @@ int main(int argc, char **argv) {
 
   if (tagdag) {
     JAST json = create_tagdag(db, tagdag);
-    std::cout << json << std::endl;
+    outstream << json << std::endl;
   }
 
   if (noparse) return 0;
@@ -582,7 +587,7 @@ int main(int argc, char **argv) {
   std::string libdir = make_canonical(find_execpath() + "/../share/wake/lib");
   auto wakefilenames = find_all_wakefiles(enumok, workspace, verbose, libdir, ".");
   if (!enumok) {
-    if (verbose) std::cerr << "Workspace wake file enumeration failed" << std::endl;
+    if (verbose) errstream << "Workspace wake file enumeration failed" << std::endl;
     // Try to run the build anyway; if wake files are missing, it will fail later
     // The unreadable location might be irrelevant to the build
   }
@@ -591,7 +596,7 @@ int main(int argc, char **argv) {
   Runtime runtime(profile ? &tree : nullptr, profileh, heap_factor);
   bool sources = find_all_sources(runtime, workspace);
   if (!sources) {
-    if (verbose) std::cerr << "Source file enumeration failed" << std::endl;
+    if (verbose) errstream << "Source file enumeration failed" << std::endl;
     // Try to run the build anyway; if sources are missing, it will fail later
     // The unreadable location might be irrelevant to the build
   }
@@ -608,13 +613,13 @@ int main(int argc, char **argv) {
   wakefiles.reserve(wakefilenames.size());
 
   clock_gettime(CLOCK_REALTIME, &now);
-  Status status2("Locating Wake Source Files", 0, now);
-  status_state.jobs.push_back(status2);
+  Status scan_status("Scanning Wake Source Files", 0, now);
+  status_state.jobs.push_back(scan_status);
 
   for (auto &i : wakefilenames) {
     status_refresh(false);
 
-    if (verbose && debug) std::cerr << "Parsing " << i << std::endl;
+    if (verbose && debug) errstream << "Parsing " << i << std::endl;
 
     wakefiles.emplace_back(terminalReporter, i.c_str());
     FileContent &file = wakefiles.back();
@@ -632,7 +637,7 @@ int main(int argc, char **argv) {
         warned_conflict = false;
       } else if (dirlen == longest_src_dir) {
         if (top->def_package != package && !warned_conflict) {
-          std::cerr << "Directory " << (dir.empty() ? "." : dir.c_str())
+          errstream << "Directory " << (dir.empty() ? "." : dir.c_str())
                     << " has wakefiles with both package '" << top->def_package << "' and '"
                     << package << "'. This prevents default package selection;"
                     << " defaulting to no package." << std::endl;
@@ -648,7 +653,7 @@ int main(int argc, char **argv) {
   if (in) {
     auto it = top->packages.find(in);
     if (it == top->packages.end()) {
-      std::cerr << "Package '" << in << "' selected by --in does not exist!" << std::endl;
+      errstream << "Package '" << in << "' selected by --in does not exist!" << std::endl;
       ok = false;
     } else {
       top->def_package = in;
@@ -671,7 +676,7 @@ int main(int argc, char **argv) {
     }
     if (defs.empty()) {
       ok = false;
-      std::cerr << "No targets were found to recommend for use on the command-line." << std::endl
+      errstream << "No targets were found to recommend for use on the command-line." << std::endl
                 << std::endl
                 << "Potential solutions include:" << std::endl
                 << "  cd project-directory; wake # lists targets for current directory" << std::endl
@@ -726,7 +731,7 @@ int main(int argc, char **argv) {
 
   TypeVar type = top->body->typeVar;
 
-  if (parse) top->format(std::cout, 0);
+  if (parse) top->format(outstream, 0);
   if (notype) return (ok && !terminalReporter.errors) ? 0 : 1;
 
   /* Primitives */
@@ -740,35 +745,35 @@ int main(int argc, char **argv) {
 
   sums_ok();
 
-  if (tcheck) std::cout << root.get();
+  if (tcheck) outstream << root.get();
 
   if (!ok || terminalReporter.errors || (fwarning && terminalReporter.warnings)) {
-    std::cerr << ">>> Aborting without execution <<<" << std::endl;
+    errstream << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
 
-  if (html) markup_html(libdir, std::cout, root.get());
+  if (html) markup_html(libdir, outstream, root.get());
 
   if (api) {
     std::vector<std::string> mixed(types.begin(), types.end());
-    std::cout << "package " << api << std::endl;
-    format_reexports(std::cout, export_package.c_str(), "type", mixed);
+    outstream << "package " << api << std::endl;
+    format_reexports(outstream, export_package.c_str(), "type", mixed);
   } else if (!types.empty()) {
-    std::cout << "types";
+    outstream << "types";
     for (auto &t : types) {
-      std::cout << " ";
+      outstream << " ";
       if (t.compare(0, 7, "binary ") == 0) {
-        std::cout << t.c_str() + 7;
+        outstream << t.c_str() + 7;
       } else if (t.compare(0, 6, "unary ") == 0) {
-        std::cout << t.c_str() + 6;
+        outstream << t.c_str() + 6;
       } else {
-        std::cout << t.c_str();
+        outstream << t.c_str();
       }
     }
-    std::cout << std::endl;
+    outstream << std::endl;
   }
 
-  if (targets) std::cout << "Available wake targets:" << std::endl;
+  if (targets) outstream << "Available wake targets:" << std::endl;
 
   if (api) {
     std::vector<std::string> def, topic;
@@ -779,8 +784,8 @@ int main(int argc, char **argv) {
         def.emplace_back(d.first);
       }
     }
-    format_reexports(std::cout, export_package.c_str(), "def", def);
-    format_reexports(std::cout, export_package.c_str(), "topic", topic);
+    format_reexports(outstream, export_package.c_str(), "def", def);
+    format_reexports(outstream, export_package.c_str(), "topic", topic);
   } else {
     for (auto &g : defs) {
       Expr *e = root.get();
@@ -803,11 +808,11 @@ int main(int argc, char **argv) {
             list[0].unify(Data::typeString);
             if (!clone.tryUnify(fn1)) continue;    // must accept List String
             if (clone[1].tryUnify(fn2)) continue;  // and not return a function
-            std::cout << "  " << g.first << std::endl;
+            outstream << "  " << g.first << std::endl;
           } else {
-            std::cout << g.first << ": ";
-            v->typeVar.format(std::cout, v->typeVar);
-            std::cout << " = <" << v->fragment.location() << ">" << std::endl;
+            outstream << g.first << ": ";
+            v->typeVar.format(outstream, v->typeVar);
+            outstream << " = <" << v->fragment.location() << ">" << std::endl;
           }
         }
       }
@@ -821,7 +826,7 @@ int main(int argc, char **argv) {
   // Upon request, dump out the SSA
   if (dumpssa) {
     TermFormat format;
-    ssa->format(std::cout, format);
+    ssa->format(outstream, format);
   }
 
   // Implement scope
@@ -849,7 +854,7 @@ int main(int argc, char **argv) {
     pass = false;
   } else if (JobTable::exit_now()) {
     dont_report_future_targets();
-    std::cerr << "Early termination requested" << std::endl;
+    errstream << "Early termination requested" << std::endl;
     pass = false;
   } else {
     HeapObject *v = runtime.output.get();
@@ -858,7 +863,7 @@ int main(int argc, char **argv) {
     } else if (Record *r = dynamic_cast<Record *>(v)) {
       if (r->cons->ast.name == "Fail") pass = false;
     }
-    std::ostream &os = pass ? (std::cout) : (std::cerr);
+    std::ostream &os = pass ? (outstream) : (errstream);
     if (verbose) {
       os << command << ": ";
       type.format(os, type);
