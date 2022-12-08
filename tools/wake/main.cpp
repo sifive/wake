@@ -142,19 +142,8 @@ class TerminalReporter : public DiagnosticReporter {
   }
 };
 
-std::chrono::steady_clock::time_point print_profile(const char *msg,
-                                                    std::chrono::steady_clock::time_point start) {
-  auto now = std::chrono::steady_clock::now();
-  std::stringstream s;
-  s << msg << " (" << std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count()
-    << "ms)" << std::endl;
-  std::string out = s.str();
-  status_write("echo", out.data(), out.size());
-  return now;
-}
-
 int main(int argc, char **argv) {
-  auto now = std::chrono::steady_clock::now();
+  auto start = std::chrono::steady_clock::now();
 
   TerminalReporter terminalReporter;
   reporter = &terminalReporter;
@@ -453,16 +442,12 @@ int main(int argc, char **argv) {
 
   status_init();
 
-  now = print_profile("Parsed Arguments & Initialized Profiling", now);
-
   Database db(debugdb);
   std::string fail = db.open(wait, !workspace, tty);
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
     return 1;
   }
-
-  now = print_profile("Opened DB", now);
 
   // If the user asked to list all files we *would* clean.
   // This is the same as asking for all output files.
@@ -609,8 +594,6 @@ int main(int argc, char **argv) {
     // The unreadable location might be irrelevant to the build
   }
 
-  now = print_profile("Located wake source files", now);
-
   // Select a default package
   int longest_src_dir = -1;
   bool warned_conflict = false;
@@ -622,6 +605,12 @@ int main(int argc, char **argv) {
   std::vector<ExternalFile> wakefiles;
   wakefiles.reserve(wakefilenames.size());
   for (auto &i : wakefilenames) {
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
+      std::cout << "Scanning " << wakefilenames.size() << " wake files. Cache may be cold." << std::endl;
+      start = now;
+    }
+
     if (verbose && debug) std::cerr << "Parsing " << i << std::endl;
 
     wakefiles.emplace_back(terminalReporter, i.c_str());
@@ -650,8 +639,6 @@ int main(int argc, char **argv) {
       }
     }
   }
-
-  now = print_profile("Read and parsed wake source files", now);
 
   if (in) {
     auto it = top->packages.find(in);
@@ -746,8 +733,6 @@ int main(int argc, char **argv) {
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
   if (!isTreeBuilt) ok = false;
 
-  now = print_profile("Bound refs", now);
-
   sums_ok();
 
   if (tcheck) std::cout << root.get();
@@ -824,13 +809,9 @@ int main(int argc, char **argv) {
     }
   }
 
-  now = print_profile("Typechecked source files", now);
-
   // Convert AST to optimized SSA
   std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root), runtime);
   if (optim) ssa = Term::optimize(std::move(ssa), runtime);
-
-  now = print_profile("Converted to optimized SSA", now);
 
   // Upon request, dump out the SSA
   if (dumpssa) {
@@ -845,18 +826,12 @@ int main(int argc, char **argv) {
   if (noexecute) return 0;
 
   db.prepare(original_command_line);
-  now = print_profile("Prepared DB", now);
-
   runtime.init(static_cast<RFun *>(ssa.get()));
-  now = print_profile("Initialized runtime", now);
-
   runtime.abort = false;
   do {
     runtime.run();
   } while (!runtime.abort && jobtable.wait(runtime));
   status_finish();
-
-  now = print_profile("Completed execution", now);
 
   runtime.heap.report();
   tree.report(profile, command);
