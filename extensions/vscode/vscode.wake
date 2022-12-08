@@ -63,7 +63,7 @@ export def vscode _: Result Path Error =
         setVersion (replace `~` "-" release) "{here}/package.json"
 
     require Pass nodeModules =
-        makeExecPlan (which "npm", "install", Nil) (packageJSON, packageLockJSON, Nil)
+        makeExecPlan (which "npm", "ci", Nil) (packageJSON, packageLockJSON, Nil)
         | setPlanDirectory here
         | runJob
         | getJobOutputs
