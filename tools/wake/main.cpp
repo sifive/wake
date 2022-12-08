@@ -434,14 +434,6 @@ int main(int argc, char **argv) {
   status_set_bulk_fd(4, fd4);
   status_set_bulk_fd(5, fd5);
 
-  // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
-  std::cout << std::flush;
-  std::cerr << std::flush;
-  fflush(stdout);
-  fflush(stderr);
-
-  status_init();
-
   Database db(debugdb);
   std::string fail = db.open(wait, !workspace, tty);
   if (!fail.empty()) {
@@ -604,23 +596,26 @@ int main(int argc, char **argv) {
   std::unique_ptr<Top> top(new Top);
   std::vector<ExternalFile> wakefiles;
   wakefiles.reserve(wakefilenames.size());
-  for (auto &i : wakefilenames) {
+
+  for (size_t i = 0; i < wakefilenames.size(); i++) {
+    auto &wakefile = wakefilenames[i];
     auto now = std::chrono::steady_clock::now();
     if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
-      std::cout << "Scanning " << wakefilenames.size() << " wake files. Cache may be cold." << std::endl;
+      std::cout << "Scanning " << i << "/" << wakefilenames.size()
+                << " wake files. Cache may be cold." << std::endl;
       start = now;
     }
 
-    if (verbose && debug) std::cerr << "Parsing " << i << std::endl;
+    if (verbose && debug) std::cerr << "Parsing " << wakefile << std::endl;
 
-    wakefiles.emplace_back(terminalReporter, i.c_str());
+    wakefiles.emplace_back(terminalReporter, wakefile.c_str());
     FileContent &file = wakefiles.back();
     CST cst(file, terminalReporter);
     auto package = dst_top(cst.root(), *top);
 
     // Does this file inform our choice of a default package?
-    size_t slash = i.find_last_of('/');
-    std::string dir(i, 0, slash == std::string::npos ? 0 : (slash + 1));  // "" | .+/
+    size_t slash = wakefile.find_last_of('/');
+    std::string dir(wakefile, 0, slash == std::string::npos ? 0 : (slash + 1));  // "" | .+/
     if (src_dir.compare(0, dir.size(), dir) == 0) {  // dir = prefix or parent of src_dir?
       int dirlen = dir.size();
       if (dirlen > longest_src_dir) {
@@ -824,6 +819,14 @@ int main(int argc, char **argv) {
 
   // Exit without execution for these arguments
   if (noexecute) return 0;
+
+  // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
+  std::cout << std::flush;
+  std::cerr << std::flush;
+  fflush(stdout);
+  fflush(stderr);
+
+  status_init();
 
   db.prepare(original_command_line);
   runtime.init(static_cast<RFun *>(ssa.get()));
