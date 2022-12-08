@@ -99,7 +99,7 @@ export def vscode _: Result Path Error =
         nodeModules
 
     require Pass outputs =
-        makeExecPlan (which "npx", "@vscode/vsce", "package", Nil) vsceFiles
+        makeExecPlan (which "npx", "vsce@1.103.1", "package", Nil) vsceFiles
         | setPlanDirectory here
         | runJob
         | getJobOutputs
