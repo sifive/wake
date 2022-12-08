@@ -1,4 +1,4 @@
-FROM emscripten/emsdk:latest
+FROM emscripten/emsdk:3.1.26
 
 RUN apt-get update && apt-get install -y build-essential devscripts git fuse libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config squashfuse npm
 
