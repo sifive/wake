@@ -191,8 +191,8 @@ static bool push_files_should_recurse(int dirfd, const std::string &path, struct
 }
 
 static bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd,
-                       const RE2 &re, size_t skip, std::chrono::_V2::steady_clock::time_point start,
-                       size_t *explored) {
+                       const RE2 &re, size_t skip,
+                       std::chrono::time_point<std::chrono::steady_clock> start, size_t *explored) {
   auto dir = fdopendir(dirfd);
   if (!dir) {
     close(dirfd);
