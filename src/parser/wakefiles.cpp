@@ -234,8 +234,9 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
       loop_start = now;
       fprintf(
           stdout,
-          "Finding wake files is taking longer than expected. Cache may be cold. (%ld explored).\n",
+          "Finding wake files is taking longer than expected. Cache may be cold. (%ld explored).\r",
           *explored);
+      fflush(stdout);
     }
 
     // Recurse & capture any failures
@@ -260,9 +261,14 @@ bool push_files(std::vector<std::string> &out, const std::string &path, const RE
   int flags, dirfd = open(path.c_str(), O_RDONLY);
   if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1) fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
 
+  if (dirfd == -1) {
+    return true;
+  }
+
   size_t explored = 0;
-  return dirfd == -1 ||
-         push_files(out, path, dirfd, re, skip, std::chrono::steady_clock::now(), &explored);
+  bool ret = push_files(out, path, dirfd, re, skip, std::chrono::steady_clock::now(), &explored);
+  fprintf(stdout, "\n");
+  return ret;
 }
 #endif
 

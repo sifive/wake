@@ -587,7 +587,7 @@ int main(int argc, char **argv) {
     auto now = std::chrono::steady_clock::now();
     if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
       std::cout << "Scanning " << i << "/" << wakefilenames.size()
-                << " wake files. Cache may be cold." << std::endl;
+                << " wake files. Cache may be cold.\r" << std::flush;
       start = now;
     }
 
@@ -619,6 +619,8 @@ int main(int argc, char **argv) {
       }
     }
   }
+
+  std::cout << std::endl;
 
   if (in) {
     auto it = top->packages.find(in);
