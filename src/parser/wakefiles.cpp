@@ -171,6 +171,12 @@ bool push_packaged_stdlib_files(std::vector<std::string> &out, const re2::RE2 &r
 
 #else
 
+struct profile_data {
+  std::chrono::time_point<std::chrono::steady_clock> start{std::chrono::steady_clock::now()};
+  size_t explored{0};
+  bool alerted_user{false};
+};
+
 static bool push_files_should_recurse(int dirfd, const std::string &path, struct dirent *f,
                                       bool *failed) {
   struct stat sbuf;
@@ -191,8 +197,7 @@ static bool push_files_should_recurse(int dirfd, const std::string &path, struct
 }
 
 static bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd,
-                       const RE2 &re, size_t skip,
-                       std::chrono::time_point<std::chrono::steady_clock> start, size_t *explored) {
+                       const RE2 &re, size_t skip, struct profile_data *profile) {
   auto dir = fdopendir(dirfd);
   if (!dir) {
     close(dirfd);
@@ -202,9 +207,8 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
 
   struct dirent *f;
   bool failed = false;
-  auto loop_start = start;
   for (errno = 0; 0 != (f = readdir(dir)); errno = 0) {
-    (*explored)++;
+    profile->explored++;
     std::string fdname(f->d_name);
     std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
 
@@ -230,17 +234,20 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
 
     // Check elapsed time and emit a message if this is taking too long.
     auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - loop_start).count() > 1000) {
-      loop_start = now;
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - profile->start).count() >
+        1000) {
+      profile->start = now;
+      profile->alerted_user = true;
+
       fprintf(
           stdout,
           "Finding wake files is taking longer than expected. Cache may be cold. (%ld explored).\r",
-          *explored);
+          profile->explored);
       fflush(stdout);
     }
 
     // Recurse & capture any failures
-    if (push_files(out, name, fd, re, skip, loop_start, explored)) failed = true;
+    if (push_files(out, name, fd, re, skip, profile)) failed = true;
   }
 
   if (errno != 0 && !failed) {
@@ -265,9 +272,13 @@ bool push_files(std::vector<std::string> &out, const std::string &path, const RE
     return true;
   }
 
-  size_t explored = 0;
-  bool ret = push_files(out, path, dirfd, re, skip, std::chrono::steady_clock::now(), &explored);
-  fprintf(stdout, "\n");
+  struct profile_data profile;
+  bool ret = push_files(out, path, dirfd, re, skip, &profile);
+
+  if (profile.alerted_user) {
+    fprintf(stdout, "\n");
+  }
+
   return ret;
 }
 #endif
