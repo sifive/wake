@@ -582,6 +582,8 @@ int main(int argc, char **argv) {
   std::vector<ExternalFile> wakefiles;
   wakefiles.reserve(wakefilenames.size());
 
+  bool alerted_slow_cache = false;
+
   for (size_t i = 0; i < wakefilenames.size(); i++) {
     auto &wakefile = wakefilenames[i];
     auto now = std::chrono::steady_clock::now();
@@ -589,6 +591,7 @@ int main(int argc, char **argv) {
       std::cout << "Scanning " << i << "/" << wakefilenames.size()
                 << " wake files. Cache may be cold.\r" << std::flush;
       start = now;
+      alerted_slow_cache = true;
     }
 
     if (verbose && debug) std::cerr << "Parsing " << wakefile << std::endl;
@@ -620,7 +623,10 @@ int main(int argc, char **argv) {
     }
   }
 
-  std::cout << std::endl;
+  if (alerted_slow_cache) {
+    std::cout << "Scanning " << wakefilenames.size() << "/" << wakefilenames.size()
+              << " wake files. Cache may be cold." << std::endl;
+  }
 
   if (in) {
     auto it = top->packages.find(in);
