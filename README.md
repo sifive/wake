@@ -123,6 +123,7 @@ External dependencies:
  - libfuse-dev          >= 2.8  LGPL v2.1       https://github.com/libfuse/libfuse
  - libre2-dev           >= 2013 BSD 3-clause    https://github.com/google/re2
  - libncurses5-dev      >= 5.7  MIT             https://www.gnu.org/software/ncurses/
+ - m4                   >= 1.4  GPLv3           https://www.gnu.org/software/m4/
 
 Optional dependencies:
  - re2c                 >= 1.0  public domain   http://re2c.org
