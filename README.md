@@ -115,10 +115,10 @@ Give FUSE permission to run as stated in the instructions and you should be good
     make
     ./bin/wake install $HOME/stuff # or wherever
 
-### External dependencies:
 
 | Name                                                     | Version | License       |
 | -------------------------------------------------------- | ------- | ------------- |
+| **External dependencies**                                |         |               |
 | [c++ 11](https://www.gnu.org/software/gcc/)              | >= 4.7  | GPLv3         |
 | [dash](http://gondor.apana.org.au/~herbert/dash/)        | >= 0.5  | BSD 3-clause  |
 | [sqlite3-dev](https://www.sqlite.org/)                   | >= 3.6  | public domain |
@@ -127,16 +127,10 @@ Give FUSE permission to run as stated in the instructions and you should be good
 | [libre2-dev](https://github.com/google/re2)              | >= 2013 | BSD 3-clause  |
 | [libncurses5-dev](https://www.gnu.org/software/ncurses/) | >= 5.7  | MIT           |
 | [m4](https://www.gnu.org/software/m4/)                   | >= 1.4  | GPLv3         |
-
-### Optional dependencies:
-| Name                                                     | Version | License       |
-| -------------------------------------------------------- | ------- | ------------- |
+| **Optional dependencies**                                |         |               |
 | [re2c](http://re2c.org)                                  | >= 1.0  | public domain |
 | [utf8proc](https://juliastrings.github.io/utf8proc/)     | >= 2.0  | MIT           |
-
-### Internal dependencies:
-| Name                                                     | Version | License       |
-| -------------------------------------------------------- | ------- | ------------- |
+| **Internal dependencies**                                |         |               |
 | [lemon](https://www.sqlite.org/lemon.html)               | 2021-09 | public domain |
 | [gopt](http://www.purposeful.co.uk/software/gopt/)       | 10.0    | TFL           |
 | [SipHash](https://github.com/veorq/SipHash)              | 2017-02 | CC0           |
