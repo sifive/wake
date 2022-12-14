@@ -62,8 +62,12 @@ export def vscode _: Result Path Error =
     require Pass packageJSON =
         setVersion (replace `~` "-" release) "{here}/package.json"
 
+    require Pass npm =
+        whichInEnvPath "npm"
+        | getOrFail "Unable to find npm in $PATH".makeError
+
     require Pass nodeModules =
-        makeExecPlan (which "npm", "ci", Nil) (packageJSON, packageLockJSON, Nil)
+        makeExecPlan (npm, "ci", Nil) (packageJSON, packageLockJSON, Nil)
         | setPlanDirectory here
         | runJob
         | getJobOutputs
@@ -98,8 +102,12 @@ export def vscode _: Result Path Error =
         stdlib ++
         nodeModules
 
+    require Pass npx =
+        whichInEnvPath "npx"
+        | getOrFail "Unable to find npx in $PATH".makeError
+
     require Pass outputs =
-        makeExecPlan (which "npx", "@vscode/vsce@2.15.0", "package", Nil) vsceFiles
+        makeExecPlan (npx, "@vscode/vsce@2.15.0", "package", Nil) vsceFiles
         | setPlanDirectory here
         | runJob
         | getJobOutputs
