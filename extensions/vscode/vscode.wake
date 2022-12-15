@@ -63,10 +63,15 @@ export def vscode _: Result Path Error =
         setVersion (replace `~` "-" release) "{here}/package.json"
 
     require Pass node = 
-        whichInEnvPath "node"
-        | getOrFail "Unable to find node in $PATH".makeError
+        require Pass location = 
+            whichInEnvPath "node"
+            | getOrFail "Unable to find node in $PATH".makeError
+        require Pass path = 
+            claimFileAsPath location ".build/bin"
 
-    def _ = println node
+        Pass path
+
+    def _ = println node.getPathName
 
     require Pass npm =
         whichInEnvPath "npm"
@@ -114,8 +119,11 @@ export def vscode _: Result Path Error =
         whichInEnvPath "npx"
         | getOrFail "Unable to find npx in $PATH".makeError
 
+    def emsdk = replace `/[^/]*$` "" npx
+
     require Pass outputs =
         makeExecPlan (npx, "@vscode/vsce@2.15.0", "package", Nil) vsceFiles
+        | editPlanEnvironment (addEnvironmentPath emsdk)
         | setPlanDirectory here
         | runJob
         | getJobOutputs
