@@ -62,17 +62,6 @@ export def vscode _: Result Path Error =
     require Pass packageJSON =
         setVersion (replace `~` "-" release) "{here}/package.json"
 
-    require Pass node = 
-        require Pass location = 
-            whichInEnvPath "node"
-            | getOrFail "Unable to find node in $PATH".makeError
-        require Pass path = 
-            claimFileAsPath location ".build/bin"
-
-        Pass path
-
-    def _ = println node.getPathName
-
     require Pass npm =
         whichInEnvPath "npm"
         | getOrFail "Unable to find npm in $PATH".makeError
