@@ -73,8 +73,9 @@ export def vscode _: Result Path Error =
         | getOrFail "Unable to find npm in $PATH".makeError
 
     require Pass nodeModules =
-        makeExecPlan ("node=/emsdk/node/14.18.2_64bit/bin/node", npm, "ci", Nil) (packageJSON, packageLockJSON, Nil)
+        makeExecPlan (npm, "ci", Nil) (packageJSON, packageLockJSON, Nil)
         | setPlanDirectory here
+        | editPlanEnvironment("node=/emsdk/node/14.18.2_64bit/bin/node", _)
         | runJob
         | getJobOutputs
 
