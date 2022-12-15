@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include <iostream>
 #include <memory>
@@ -42,10 +43,26 @@ std::string find_execpath() {
   return exepath;
 }
 
+// TODO: this should be in the compat/util stuff
+static bool is_directory(const std::string& path) {
+  struct stat sbuf;
+  if (stat(path.c_str(), &sbuf) != 0) {
+      // TODO: stat failed
+      return false;
+  }
+
+  return S_ISDIR(sbuf.st_mode);
+}
+
 static bool check_exec(const char *tok, size_t len, const std::string &exec, std::string &out) {
   out.assign(tok, len);
   out += "/";
   out += exec;
+
+  if (is_directory(out)) {
+      return false;
+  }
+
   return access(out.c_str(), X_OK) == 0;
 }
 
