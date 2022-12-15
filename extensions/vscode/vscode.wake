@@ -75,8 +75,6 @@ export def vscode _: Result Path Error =
         | runJob
         | getJobOutputs
 
-    def _ = nodeModules | map (println _.getPathName)
-
     require Pass stdlibSources =
         sources "share/wake/lib" `.*`
     require Pass stdlib =
