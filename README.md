@@ -115,26 +115,27 @@ Give FUSE permission to run as stated in the instructions and you should be good
     make
     ./bin/wake install $HOME/stuff # or wherever
 
-External dependencies:
- - c++ 11               >= 4.7  GPLv3           https://www.gnu.org/software/gcc/
- - dash                 >= 0.5  BSD 3-clause    http://gondor.apana.org.au/~herbert/dash/
- - sqlite3-dev          >= 3.6  public domain   https://www.sqlite.org/
- - libgmp-dev           >= 4.3  LGPL v3         https://gmplib.org
- - libfuse-dev          >= 2.8  LGPL v2.1       https://github.com/libfuse/libfuse
- - libre2-dev           >= 2013 BSD 3-clause    https://github.com/google/re2
- - libncurses5-dev      >= 5.7  MIT             https://www.gnu.org/software/ncurses/
- - m4                   >= 1.4  GPLv3           https://www.gnu.org/software/m4/
 
-Optional dependencies:
- - re2c                 >= 1.0  public domain   http://re2c.org
- - utf8proc             >= 2.0  MIT             https://juliastrings.github.io/utf8proc/
-
-Internal dependencies:
- - lemon                2021-09 public domain   https://www.sqlite.org/lemon.html
- - gopt                 10.0    TFL             http://www.purposeful.co.uk/software/gopt/
- - SipHash              2017-02 CC0             https://github.com/veorq/SipHash
- - BLAKE2               2018-07 CC0             https://github.com/BLAKE2/libb2
- - whereami             2018-09 WTFPLV2         https://github.com/gpakosz/whereami
+| Name                                                     | Version | License       |
+| -------------------------------------------------------- | ------- | ------------- |
+| **External dependencies**                                |         |               |
+| [c++ 11](https://www.gnu.org/software/gcc/)              | >= 4.7  | GPLv3         |
+| [dash](http://gondor.apana.org.au/~herbert/dash/)        | >= 0.5  | BSD 3-clause  |
+| [sqlite3-dev](https://www.sqlite.org/)                   | >= 3.6  | public domain |
+| [libgmp-dev](https://gmplib.org)                         | >= 4.3  | LGPL v3       |
+| [libfuse-dev](https://github.com/libfuse/libfuse)        | >= 2.8  | LGPL v2.1     |
+| [libre2-dev](https://github.com/google/re2)              | >= 2013 | BSD 3-clause  |
+| [libncurses5-dev](https://www.gnu.org/software/ncurses/) | >= 5.7  | MIT           |
+| [m4](https://www.gnu.org/software/m4/)                   | >= 1.4  | GPLv3         |
+| **Optional dependencies**                                |         |               |
+| [re2c](http://re2c.org)                                  | >= 1.0  | public domain |
+| [utf8proc](https://juliastrings.github.io/utf8proc/)     | >= 2.0  | MIT           |
+| **Internal dependencies**                                |         |               |
+| [lemon](https://www.sqlite.org/lemon.html)               | 2021-09 | public domain |
+| [gopt](http://www.purposeful.co.uk/software/gopt/)       | 10.0    | TFL           |
+| [SipHash](https://github.com/veorq/SipHash)              | 2017-02 | CC0           |
+| [BLAKE2](https://github.com/BLAKE2/libb2)                | 2018-07 | CC0           |
+| [whereami](https://github.com/gpakosz/whereami)          | 2018-09 | WTFPLV2       |
 
 # Documentation
 
