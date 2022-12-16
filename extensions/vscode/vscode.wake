@@ -76,6 +76,7 @@ export def vscode _: Result Path Error =
         | makePlan "Installing node modules" (packageJSON, packageLockJSON, Nil)
         | editPlanEnvironment (addEnvironmentPath emsdk)
         | setPlanDirectory @here
+        | setPlanLocalOnly True
         | runJob
         | getJobOutputs
 
@@ -118,6 +119,7 @@ export def vscode _: Result Path Error =
         makeExecPlan (npx, "@vscode/vsce@2.15.0", "package", Nil) vsceFiles
         | editPlanEnvironment (addEnvironmentPath emsdk)
         | setPlanDirectory here
+        | setLocalPlanOnly True
         | runJob
         | getJobOutputs
 
