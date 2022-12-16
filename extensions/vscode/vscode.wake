@@ -68,10 +68,14 @@ export def vscode _: Result Path Error =
 
     def emsdk = dirname npm
 
+
     require Pass nodeModules =
-        makeExecPlan (npm, "ci", Nil) (packageJSON, packageLockJSON, Nil)
+        """
+            %{npm} ci --loglevel verbose
+        """
+        | makePlan "Installing node modules" (packageJSON, packageLockJSON, Nil)
         | editPlanEnvironment (addEnvironmentPath emsdk)
-        | setPlanDirectory here
+        | setPlanDirectory @here
         | runJob
         | getJobOutputs
 
