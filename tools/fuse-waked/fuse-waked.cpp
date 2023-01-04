@@ -1537,7 +1537,7 @@ int main(int argc, char *argv[]) {
    * This anti-feature was added in 2.4.0 and removed in 3.0.0.
    */
   if (fuse_opt_add_arg(&args, "wake") != 0 || fuse_opt_add_arg(&args, "-o") != 0 ||
-      fuse_opt_add_arg(&args, "nonempty") != 0) {
+      fuse_opt_add_arg(&args, "nonempty,auto_unmount") != 0) {
 #else
   if (fuse_opt_add_arg(&args, "wake") != 0) {
 #endif
