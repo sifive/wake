@@ -177,9 +177,9 @@ struct profile_data {
   bool alerted_user{false};
 };
 
-#TODO : This function should probably be under compat in a files / vfs module
-#Determines if *f *is a directory inside of *dirfd *using the best available method.
-#Sets *failed *to true if unable to successfully determine directory status
+// TODO : This function should probably be under compat in a files / vfs module
+// Determines if *f *is a directory inside of *dirfd *using the best available method.
+// Sets *failed *to true if unable to successfully determine directory status
 static bool push_files_is_directory(int dirfd, const std::string &path, struct dirent *f,
                                     bool *failed) {
   struct stat sbuf;
@@ -199,8 +199,8 @@ static bool push_files_is_directory(int dirfd, const std::string &path, struct d
   return S_ISDIR(sbuf.st_mode);
 }
 
-#Recursively fills *out *with all paths under *dirfd *matching *re *.Automatically
-#skips directories that cannot have source files in them(.git, .build, .fuse).
+// Recursively fills *out *with all paths under *dirfd *matching *re *.Automatically
+// skips directories that cannot have source files in them(.git, .build, .fuse).
 static bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd,
                        const RE2 &re, size_t skip, struct profile_data *profile) {
   auto dir = fdopendir(dirfd);
