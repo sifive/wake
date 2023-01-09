@@ -1401,14 +1401,27 @@ int main(int argc, char *argv[]) {
   int log, null;
   bool madedir;
   struct rlimit rlim;
+  bool daemonize = true;
 
-  if (argc != 3) {
-    fprintf(stderr, "Syntax: fuse-waked <mount-point> <min-timeout-seconds>\n");
+  if (argc != 4) {
+    fprintf(stderr,
+            "Syntax: fuse-waked <daemonize|no-daemonize> <mount-point> <min-timeout-seconds>\n");
     goto term;
   }
-  path = argv[1];
 
-  linger_timeout = atol(argv[2]);
+  if (strcmp(argv[1], "daemonize") == 0) {
+    daemonize = true;
+  } else if (strcmp(argv[1], "no-daemonize") == 0) {
+    daemonize = false;
+  } else {
+    fprintf(stderr,
+            "Syntax: fuse-waked <daemonize|no-daemonize> <mount-point> <min-timeout-seconds>\n");
+    goto term;
+  }
+
+  path = argv[2];
+
+  linger_timeout = atol(argv[3]);
   if (linger_timeout < 1) linger_timeout = 1;
   if (linger_timeout > 240) linger_timeout = 240;
 
@@ -1461,28 +1474,30 @@ int main(int argc, char *argv[]) {
     goto rmroot;
   }
 
-  // Become a daemon
-  pid = fork();
-  if (pid == -1) {
-    perror("fork");
-    goto rmroot;
-  } else if (pid != 0) {
-    status = 0;
-    goto term;
-  }
+  if (daemonize) {
+    // Become a daemon
+    pid = fork();
+    if (pid == -1) {
+      perror("fork");
+      goto rmroot;
+    } else if (pid != 0) {
+      status = 0;
+      goto term;
+    }
 
-  if (setsid() == -1) {
-    perror("setsid");
-    goto rmroot;
-  }
+    if (setsid() == -1) {
+      perror("setsid");
+      goto rmroot;
+    }
 
-  pid = fork();
-  if (pid == -1) {
-    perror("fork2");
-    goto rmroot;
-  } else if (pid != 0) {
-    status = 0;
-    goto term;
+    pid = fork();
+    if (pid == -1) {
+      perror("fork2");
+      goto rmroot;
+    } else if (pid != 0) {
+      status = 0;
+      goto term;
+    }
   }
 
   // Open the logfile and use as lock on it to ensure we retain ownership

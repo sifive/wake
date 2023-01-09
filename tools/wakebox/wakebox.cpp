@@ -79,6 +79,8 @@ void print_help() {
       "Other options                                                                               "
       "  \n"
       "    -h --help                Print usage                                                    "
+      "  \n"
+      "    --single-fork            Single-fork fuse-waked and wait on it to terminate"
       "  \n";
 
 #ifdef __linux__
@@ -150,12 +152,12 @@ int run_interactive(const std::string &rootfs, const std::vector<std::string> &t
 
   int retcode;
   std::string result;
-  if (!run_in_fuse(fa, retcode, result)) return 1;
+  if (!run_in_fuse(fa, /*single_fork=*/false, retcode, result)) return 1;
   return retcode;
 }
 
 int run_batch(const char *params_path, bool has_output, bool use_stdin_file, bool use_shell,
-              bool isolate_retcode, const char *result_path) {
+              bool isolate_retcode, bool single_fork, const char *result_path) {
   // Read the params file
   std::ifstream ifs(params_path);
   const std::string json((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
@@ -189,7 +191,7 @@ int run_batch(const char *params_path, bool has_output, bool use_stdin_file, boo
   int retcode;
   std::string result;
   if (!has_output) {
-    if (!run_in_fuse(args, retcode, result)) return 1;
+    if (!run_in_fuse(args, single_fork, retcode, result)) return 1;
 
     if (isolate_retcode)
       return 0;
@@ -204,7 +206,7 @@ int run_batch(const char *params_path, bool has_output, bool use_stdin_file, boo
     return 1;
   }
 
-  if (!run_in_fuse(args, retcode, result)) return 1;
+  if (!run_in_fuse(args, single_fork, retcode, result)) return 1;
 
   // write output stats as json
   ssize_t wrote = write(out_fd, result.c_str(), result.length());
@@ -233,6 +235,7 @@ int main(int argc, char *argv[]) {
         {'s', "force-shell", GOPT_ARGUMENT_FORBIDDEN},
         {'i', "interactive", GOPT_ARGUMENT_FORBIDDEN},
         {'I', "isolate-retcode", GOPT_ARGUMENT_FORBIDDEN},
+        {0, "single-fork", GOPT_ARGUMENT_FORBIDDEN},
 
         {'h', "help", GOPT_ARGUMENT_FORBIDDEN}, {
       0, 0, GOPT_LAST
@@ -246,6 +249,7 @@ int main(int argc, char *argv[]) {
   bool has_params_file = arg(options, "params")->count > 0;
   bool has_positional_cmd = argc > 1;
   bool isolate_retcode = arg(options, "isolate-retcode")->count > 0;
+  bool single_fork = arg(options, "single-fork")->count > 0;
 
   if (has_help) {
     print_help();
@@ -298,7 +302,8 @@ int main(int argc, char *argv[]) {
     bool use_stdin_file = arg(options, "interactive")->count == 0;
     bool use_shell = arg(options, "force-shell")->count > 0;
     const char *result_path = arg(options, "output-stats")->argument;
-    return run_batch(params, has_output, use_stdin_file, use_shell, isolate_retcode, result_path);
+    return run_batch(params, has_output, use_stdin_file, use_shell, isolate_retcode, single_fork,
+                     result_path);
   }
   print_help();
   return 1;

@@ -127,13 +127,13 @@ static bool collect_result_metadata(const std::string daemon_output, const struc
   return !result_ss.fail();
 }
 
-bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
+bool run_in_fuse(fuse_args &args, bool single_fork, int &status, std::string &result_json) {
   if (0 != chdir(args.working_dir.c_str())) {
     std::cerr << "chdir " << args.working_dir << ": " << strerror(errno) << std::endl;
     return false;
   }
 
-  if (!args.daemon.connect(args.visible)) return false;
+  if (!args.daemon.connect(args.visible, single_fork)) return false;
 
   struct timeval start;
   gettimeofday(&start, 0);

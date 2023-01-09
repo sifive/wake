@@ -52,7 +52,7 @@ daemon_client::daemon_client(const std::string &base_dir)
       visibles_path(mount_path + "/.i." + std::to_string(getpid())) {}
 
 // The arg 'visible' is destroyed/moved in the interest of performance with large visible lists.
-bool daemon_client::connect(std::vector<std::string> &visible) {
+bool daemon_client::connect(std::vector<std::string> &visible, bool single_fork) {
   int err = mkdir_with_parents(mount_path, 0775);
   if (0 != err) {
     std::cerr << "mkdir_with_parents ('" << mount_path << "'):" << strerror(err) << std::endl;
@@ -75,9 +75,23 @@ bool daemon_client::connect(std::vector<std::string> &visible) {
       std::string delayStr = std::to_string(exit_delay);
       const char *env[3] = {"PATH=/usr/bin:/bin:/usr/sbin:/sbin", 0, 0};
       if (getenv("DEBUG_FUSE_WAKE")) env[1] = "DEBUG_FUSE_WAKE=1";
-      execle(executable.c_str(), "fuse-waked", mount_path.c_str(), delayStr.c_str(), nullptr, env);
+      // In some cases we don't want to daemonize fuse-waked because we want to wait
+      // for fuse-waked to close before finishing.
+      if (single_fork) {
+        execle(executable.c_str(), "fuse-waked", "no-daemonize", mount_path.c_str(),
+               delayStr.c_str(), nullptr, env);
+      } else {
+        execle(executable.c_str(), "fuse-waked", "daemonize", mount_path.c_str(), delayStr.c_str(),
+               nullptr, env);
+      }
       std::cerr << "execl " << executable << ": " << strerror(errno) << std::endl;
       exit(1);
+    }
+
+    // If we want to wait for fuse-waked to close on its own before exiting we must
+    // save the child pid so that we can waitpid on it.
+    if (single_fork) {
+      child_pid = {wcl::in_place_t{}, single_fork};
     }
 
     // Sleep the full amount (even if signals like SIGWINCH arrive)
@@ -137,5 +151,15 @@ bool daemon_client::disconnect(std::string &result) {
     return false;
   }
   ifs.close();
+
+  // If we single forked we wait on the child to terminate
+  if (child_pid) {
+    pid_t res = waitpid(*child_pid, nullptr, 0);
+    if (res == -1) {
+      std::cerr << "waitpid(fuse-waked = " << *child_pid << ": " << strerror(errno) << std::endl;
+      return false;
+    }
+  }
+
   return true;
 }

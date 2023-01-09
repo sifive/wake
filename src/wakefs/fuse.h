@@ -19,6 +19,8 @@
 #ifndef FUSE_H
 #define FUSE_H
 
+#include <wcl/optional.h>
+
 #include <string>
 #include <vector>
 
@@ -40,10 +42,12 @@ struct daemon_client {
   const std::string subdir_live_file;
   // JSON input file to the fuse daemon, listing which files should be visible.
   const std::string visibles_path;
+  // The child process if we single forked
+  wcl::optional<pid_t> child_pid;
 
   daemon_client(const std::string &base_dir);
 
-  bool connect(std::vector<std::string> &visible);
+  bool connect(std::vector<std::string> &visible, bool single_fork);
   bool disconnect(std::string &result);
 
  protected:
@@ -82,6 +86,6 @@ struct fuse_args : public json_args {
 
 bool json_as_struct(const std::string &json, json_args &result);
 
-bool run_in_fuse(fuse_args &args, int &retcode, std::string &result_json);
+bool run_in_fuse(fuse_args &args, bool single_fork, int &retcode, std::string &result_json);
 
 #endif
