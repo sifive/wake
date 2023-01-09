@@ -588,8 +588,8 @@ int main(int argc, char **argv) {
     auto &wakefile = wakefilenames[i];
     auto now = std::chrono::steady_clock::now();
     if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
-      std::cout << "Scanning " << i << "/" << wakefilenames.size()
-                << " wake files. Cache may be cold.\r" << std::flush;
+      std::cout << "Scanning " << i + 1 << "/" << wakefilenames.size()
+                << " wake files. Kernel file cache may be cold.\r" << std::flush;
       start = now;
       alerted_slow_cache = true;
     }

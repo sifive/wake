@@ -177,8 +177,11 @@ struct profile_data {
   bool alerted_user{false};
 };
 
-static bool push_files_should_recurse(int dirfd, const std::string &path, struct dirent *f,
-                                      bool *failed) {
+#TODO : This function should probably be under compat in a files / vfs module
+#Determines if *f *is a directory inside of *dirfd *using the best available method.
+#Sets *failed *to true if unable to successfully determine directory status
+static bool push_files_is_directory(int dirfd, const std::string &path, struct dirent *f,
+                                    bool *failed) {
   struct stat sbuf;
 
 #if defined(DT_DIR)
@@ -196,6 +199,8 @@ static bool push_files_should_recurse(int dirfd, const std::string &path, struct
   return S_ISDIR(sbuf.st_mode);
 }
 
+#Recursively fills *out *with all paths under *dirfd *matching *re *.Automatically
+#skips directories that cannot have source files in them(.git, .build, .fuse).
 static bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd,
                        const RE2 &re, size_t skip, struct profile_data *profile) {
   auto dir = fdopendir(dirfd);
@@ -218,7 +223,7 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
     // These directories should never be pushed
     if (name == ".build" || name == ".fuse" || name == ".git") continue;
 
-    if (!push_files_should_recurse(dirfd, path, f, &failed)) {
+    if (!push_files_is_directory(dirfd, path, f, &failed)) {
       // Append the current file if it matches the regex
       re2::StringPiece p(name.c_str() + skip, name.size() - skip);
       if (RE2::FullMatch(p, re)) out.emplace_back(std::move(name));
@@ -239,10 +244,10 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
       profile->start = now;
       profile->alerted_user = true;
 
-      fprintf(
-          stdout,
-          "Finding wake files is taking longer than expected. Cache may be cold. (%ld explored).\r",
-          profile->explored);
+      fprintf(stdout,
+              "Finding wake files is taking longer than expected. Kernel file cache may be cold. "
+              "(%ld explored).\r",
+              profile->explored);
       fflush(stdout);
     }
 
