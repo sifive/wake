@@ -35,6 +35,7 @@ jobs:
       - run: mkdir build
       - run: chmod ugo+rwx build
       - run: cp /tmp/workspace/wake_*.tar.xz build
+      - run: which webpack
       - run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'tar xvJf wake_*.tar.xz && make -C wake-* vscode'
       - run: install -D -t release/vscode build/wake-*/extensions/vscode/wake-*.vsix
       - persist_to_workspace:
