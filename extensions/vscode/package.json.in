@@ -98,7 +98,7 @@
 		]
 	},
 	"scripts": {
-		"vscode:prepublish": "npm run package --loglevel verbose",
+		"vscode:prepublish": "npm run package",
 		"package": "webpack --mode production --devtool hidden-source-map",
 		"compile": "webpack",
 		"watch": "webpack --watch",

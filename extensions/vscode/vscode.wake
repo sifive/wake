@@ -68,7 +68,6 @@ export def vscode _: Result Path Error =
 
     def emsdk = dirname npm
 
-
     require Pass nodeModules =
         """
             %{npm} ci
@@ -78,8 +77,6 @@ export def vscode _: Result Path Error =
         | setPlanDirectory @here
         | runJob
         | getJobOutputs
-
-    def _ = nodeModules | map (\_ println _.getPathName)
 
     require Pass stdlibSources =
         sources "share/wake/lib" `.*`
