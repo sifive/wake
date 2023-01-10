@@ -24,6 +24,7 @@ target buildLSP variant: Result (List Path) Error = match variant
             "-s", 'EXPORTED_FUNCTIONS=_instantiateServer,_instantiateServerCustomStdLib,_processRequest',
             "-s", 'DEFAULT_LIBRARY_FUNCS_TO_INCLUDE=[$cwrap]',
             "-s", 'EXPORT_NAME="wakeLspModule"',
+            "-s", 'ENVIRONMENT="web"',
             "--post-js", postJS.getPathName,
             "--pre-js", preJS.getPathName,
         tool here Nil variant "lib/wake/lsp-wake" (dst,) (postJS, preJS,) extraLFlags

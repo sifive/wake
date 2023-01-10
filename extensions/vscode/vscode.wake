@@ -71,14 +71,15 @@ export def vscode _: Result Path Error =
 
     require Pass nodeModules =
         """
-            %{npm} ci --loglevel verbose
+            %{npm} ci
         """
         | makePlan "Installing node modules" (packageJSON, packageLockJSON, Nil)
         | editPlanEnvironment (addEnvironmentPath emsdk)
         | setPlanDirectory @here
-        | setPlanLocalOnly True
         | runJob
         | getJobOutputs
+
+    def _ = nodeModules | map (\_ println _.getPathName)
 
     require Pass stdlibSources =
         sources "share/wake/lib" `.*`
@@ -119,7 +120,6 @@ export def vscode _: Result Path Error =
         makeExecPlan (npx, "@vscode/vsce@2.15.0", "package", Nil) vsceFiles
         | editPlanEnvironment (addEnvironmentPath emsdk)
         | setPlanDirectory here
-        | setPlanLocalOnly True
         | runJob
         | getJobOutputs
 
