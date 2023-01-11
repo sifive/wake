@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <random>
 #include <set>
@@ -142,6 +143,8 @@ class TerminalReporter : public DiagnosticReporter {
 };
 
 int main(int argc, char **argv) {
+  auto start = std::chrono::steady_clock::now();
+
   TerminalReporter terminalReporter;
   reporter = &terminalReporter;
 
@@ -578,17 +581,29 @@ int main(int argc, char **argv) {
   std::unique_ptr<Top> top(new Top);
   std::vector<ExternalFile> wakefiles;
   wakefiles.reserve(wakefilenames.size());
-  for (auto &i : wakefilenames) {
-    if (verbose && debug) std::cerr << "Parsing " << i << std::endl;
 
-    wakefiles.emplace_back(terminalReporter, i.c_str());
+  bool alerted_slow_cache = false;
+
+  for (size_t i = 0; i < wakefilenames.size(); i++) {
+    auto &wakefile = wakefilenames[i];
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
+      std::cout << "Scanning " << i + 1 << "/" << wakefilenames.size()
+                << " wake files. Kernel file cache may be cold.\r" << std::flush;
+      start = now;
+      alerted_slow_cache = true;
+    }
+
+    if (verbose && debug) std::cerr << "Parsing " << wakefile << std::endl;
+
+    wakefiles.emplace_back(terminalReporter, wakefile.c_str());
     FileContent &file = wakefiles.back();
     CST cst(file, terminalReporter);
     auto package = dst_top(cst.root(), *top);
 
     // Does this file inform our choice of a default package?
-    size_t slash = i.find_last_of('/');
-    std::string dir(i, 0, slash == std::string::npos ? 0 : (slash + 1));  // "" | .+/
+    size_t slash = wakefile.find_last_of('/');
+    std::string dir(wakefile, 0, slash == std::string::npos ? 0 : (slash + 1));  // "" | .+/
     if (src_dir.compare(0, dir.size(), dir) == 0) {  // dir = prefix or parent of src_dir?
       int dirlen = dir.size();
       if (dirlen > longest_src_dir) {
@@ -606,6 +621,11 @@ int main(int argc, char **argv) {
         }
       }
     }
+  }
+
+  if (alerted_slow_cache) {
+    std::cout << "Scanning " << wakefilenames.size() << "/" << wakefilenames.size()
+              << " wake files. Kernel file cache may be cold." << std::endl;
   }
 
   if (in) {
