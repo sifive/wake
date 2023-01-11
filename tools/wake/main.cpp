@@ -625,7 +625,7 @@ int main(int argc, char **argv) {
 
   if (alerted_slow_cache) {
     std::cout << "Scanning " << wakefilenames.size() << "/" << wakefilenames.size()
-              << " wake files. Cache may be cold." << std::endl;
+              << " wake files. Kernel file cache may be cold." << std::endl;
   }
 
   if (in) {
