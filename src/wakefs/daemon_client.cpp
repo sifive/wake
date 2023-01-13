@@ -78,6 +78,8 @@ bool daemon_client::connect(std::vector<std::string> &visible, bool single_fork)
       // In some cases we don't want to daemonize fuse-waked because we want to wait
       // for fuse-waked to close before finishing.
       if (single_fork) {
+        // I've tested this and I'm not sure why but `ffd` doesn't need to be closed in order
+        // for everything to terminate. This is counterintuitive to me.
         execle(executable.c_str(), "fuse-waked", "no-daemonize", mount_path.c_str(),
                delayStr.c_str(), nullptr, env);
       } else {
@@ -91,7 +93,7 @@ bool daemon_client::connect(std::vector<std::string> &visible, bool single_fork)
     // If we want to wait for fuse-waked to close on its own before exiting we must
     // save the child pid so that we can waitpid on it.
     if (single_fork) {
-      child_pid = {wcl::in_place_t{}, single_fork};
+      child_pid = {wcl::in_place_t{}, pid};
     }
 
     // Sleep the full amount (even if signals like SIGWINCH arrive)
@@ -101,6 +103,11 @@ bool daemon_client::connect(std::vector<std::string> &visible, bool single_fork)
     } while (ok == -1 && errno == EINTR);
 
     wait_ms <<= 1;
+
+    if (single_fork) {
+      // If we single fork we can't know that the deamonize finished so there's no need to wait
+      continue;
+    }
 
     int status;
     do waitpid(pid, &status, 0);
@@ -154,6 +161,11 @@ bool daemon_client::disconnect(std::string &result) {
 
   // If we single forked we wait on the child to terminate
   if (child_pid) {
+    // The live file doesn't get closed until wakebox terminates normally.
+    // On disconnect though...perhaps we should do this regardless of if we single_forked or not?
+    // Also for some reason sending a SIGTERM did not cause fuse-waked to terminate. Sending SIGKILL
+    // obviouslly works but leaves us with the same problem.
+    close(live_fd);
     pid_t res = waitpid(*child_pid, nullptr, 0);
     if (res == -1) {
       std::cerr << "waitpid(fuse-waked = " << *child_pid << ": " << strerror(errno) << std::endl;
