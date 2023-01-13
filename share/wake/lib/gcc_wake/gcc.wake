@@ -25,15 +25,50 @@ export def releaseLFlags = (Nil)
 export def staticCFlags =  ("-Wall", "-Wno-format-security", "-O2", "-flto", Nil)
 export def staticLFlags  = ("-flto", "-static", "-s", Nil)
 
+target pwd _ =
+    makeExecPlan ("pwd",) Nil
+    | setPlanLocalOnly True
+    | runJob
+    | getJobStdout
+
 def doCompileC variant gcc flags headers cfile =
     def obj = replace `\.c(pp)?$` ".{variant}.o" cfile.getPathName
     def cmdline =
         gcc, flags ++
         ("-c", cfile.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
-    makeExecPlan cmdline (cfile, headers)
-    | setPlanLabel "compile {replace `^.*/` '' gcc} {obj}"
-    | runJob
-    | getJobOutputs
+
+    def emitCompileCmd =
+        require Some var = getenv "EMIT_COMPILE_COMMANDS"
+        else False
+
+        var ==~ "1"
+
+    def out =
+      makeExecPlan cmdline (cfile, headers)
+      | setPlanLabel "compile {replace `^.*/` '' gcc} {obj}"
+      | runJob
+      | getJobOutputs
+
+    require True = emitCompileCmd
+    else out
+
+    require Pass pwd_out = pwd Unit
+    def dir = replace `[\n]` "" pwd_out
+
+    def outJson = JObject (
+        "directory" :-> JString dir,
+        "arguments" :-> JArray $ map JString cmdline,
+        "file" :-> JString "cfile.getPathName",
+    )
+
+    def get f = prim "get_hash"
+    def path_hash = get (cfile.getPathName)
+    #require Pass _ = mkdir "compile_commands"
+    def cmd_file_path = "compile_commands/{path_hash}.json"
+
+    require Pass _ = write cmd_file_path (prettyJSON outJson)
+
+    out
 
 def doLinkO variant linker flags objects targ extraFiles =
     def cmdline =
@@ -84,7 +119,7 @@ def pickVariant variant variants =
 
 export def compileC (variant: String) (extraFlags: List String) (headers: List Path) (cfile: Path) : Result (List Path) Error =
     require Pass compileFn = pickVariant variant (subscribe compileC)
-    compileFn extraFlags headers cfile 
+    compileFn extraFlags headers cfile
 
 export def linkO    (variant: String) (extraFlags: List String) (objects: List Path) (targ: String) (extraFiles: List Path) : Result (List Path) Error =
     require Pass linkFn = pickVariant variant (subscribe linkO)

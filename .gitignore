@@ -2,6 +2,8 @@ manifest.wake
 *.o
 .build
 .fuse*
+compile_commands.json
+/compile_commands
 /.vscode/*.log
 /**/wake.db*
 /wake.db*
