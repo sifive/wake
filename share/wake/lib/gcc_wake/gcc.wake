@@ -63,7 +63,6 @@ def doCompileC variant gcc flags headers cfile =
 
     def get f = prim "get_hash"
     def path_hash = get (cfile.getPathName)
-    #require Pass _ = mkdir "compile_commands"
     def cmd_file_path = "compile_commands/{path_hash}.json"
 
     require Pass _ = write cmd_file_path (prettyJSON outJson)

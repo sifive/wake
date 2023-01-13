@@ -18,7 +18,7 @@ from os.path import isfile, join
 import json
 
 out = []
-cmd_dir = "compile_commands"
+cmd_dir = ".compile_commands"
 for compile_command_path in [f for f in listdir(cmd_dir) if isfile(join(cmd_dir, f))]:
     with open(join(cmd_dir, compile_command_path)) as compile_command_file:
         cmd_json = json.load(compile_command_file)

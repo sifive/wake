@@ -3,7 +3,7 @@ manifest.wake
 .build
 .fuse*
 compile_commands.json
-/compile_commands
+/.compile_commands
 /.vscode/*.log
 /**/wake.db*
 /wake.db*
