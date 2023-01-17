@@ -882,18 +882,24 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     // don't fail if unbound; leave that for the second pass
     rebind_ref(binding, ref->name, ref->fragment);
     return expr;
-  } else if (expr->type == &Subscribe::type) {
+  }
+
+  if (expr->type == &Subscribe::type) {
     Subscribe *sub = static_cast<Subscribe *>(expr.get());
     VarRef *out = rebind_subscribe(binding, sub->fragment, sub->name);
     if (!out) return nullptr;
     out->flags |= FLAG_AST;
     return fracture(top, true, name, std::unique_ptr<Expr>(out), binding);
-  } else if (expr->type == &App::type) {
+  }
+
+  if (expr->type == &App::type) {
     App *app = static_cast<App *>(expr.get());
     app->fn = fracture(top, true, name, std::move(app->fn), binding);
     app->val = fracture(top, true, name, std::move(app->val), binding);
     return expr;
-  } else if (expr->type == &Lambda::type) {
+  }
+
+  if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda *>(expr.get());
     ResolveBinding lbinding(binding);
     lbinding.index[lambda->name] = 0;
@@ -914,17 +920,23 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
                                                                      << lambda->name);
     }
     return expr;
-  } else if (expr->type == &Match::type) {
+  }
+
+  if (expr->type == &Match::type) {
     std::unique_ptr<Match> m(static_cast<Match *>(expr.release()));
     auto out = rebind_match(name, binding, std::move(m));
     if (!out) return out;
     return fracture(top, anon, name, std::move(out), binding);
-  } else if (expr->type == &Destruct::type) {
+  }
+
+  if (expr->type == &Destruct::type) {
     Destruct *app = static_cast<Destruct *>(expr.get());
     app->arg = fracture(top, true, name, std::move(app->arg), binding);
     for (auto &lam : app->cases) lam = fracture(top, true, name, std::move(lam), binding);
     return expr;
-  } else if (expr->type == &DefMap::type) {
+  }
+
+  if (expr->type == &DefMap::type) {
     DefMap *def = static_cast<DefMap *>(expr.get());
     ResolveBinding dbinding(binding);
     dbinding.symbols = process_import(top, def->imports, def->fragment);
@@ -950,7 +962,9 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     auto out = fracture_binding(def->fragment, dbinding.defs, std::move(body));
     if (out && (def->flags & FLAG_AST) != 0) out->flags |= FLAG_AST;
     return out;
-  } else if (expr->type == &Construct::type) {
+  }
+
+  if (expr->type == &Construct::type) {
     Construct *con = static_cast<Construct *>(expr.get());
     bool ok = true;
     if (!con->sum->scoped) {
@@ -971,24 +985,28 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     }  // else: edit/set function
     if (!ok) expr.reset();
     return expr;
-  } else if (expr->type == &Ascribe::type) {
+  }
+
+  if (expr->type == &Ascribe::type) {
     Ascribe *asc = static_cast<Ascribe *>(expr.get());
     asc->body = fracture(top, true, name, std::move(asc->body), binding);
     if (qualify_type(binding, asc->signature)) {
       return expr;
-    } else {
-      return std::move(asc->body);
     }
-  } else if (expr->type == &Prim::type) {
+
+    return std::move(asc->body);
+  }
+
+  if (expr->type == &Prim::type) {
     // Use all the arguments
     for (ResolveBinding *iter = binding; iter && iter->defs.size() == 1 && !iter->defs[0].expr;
          iter = iter->parent)
       ++iter->defs[0].uses;
     return expr;
-  } else {
-    // Literal/Get
-    return expr;
   }
+
+  // Literal/Get
+  return expr;
 }
 
 static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
@@ -1031,6 +1049,34 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
       }
     }
   }
+
+  std::map<std::string, FileFragment> imports = {};
+
+  for (auto &p : top->packages) {
+    for (auto &f : p.second->files) {
+      for (auto &i : f.content->imports.mixed) {
+        imports.insert({i.second.qualified, i.second.fragment});
+      }
+      for (auto &i : f.content->imports.defs) {
+        imports.insert({i.second.qualified, i.second.fragment});
+      }
+      for (auto &i : f.content->imports.topics) {
+        imports.insert({i.second.qualified, i.second.fragment});
+      }
+      for (auto &i : f.content->imports.types) {
+        imports.insert({i.second.qualified, i.second.fragment});
+      }
+
+      // TODO: track unused import_all imports (from x import _)
+      //  This should be achievable by:
+      //    1. looping over f.content->imports.import_all
+      //    2. storing the package name
+      //    3. counting the usages of all things from that package
+      //    4. if every 'uses' == 1 then unused
+      //    4. if any 'uses' > 1 then used
+    }
+  }
+
   gbinding.symbols.push_back(&top->globals);
   for (auto &p : top->packages) {
     pbinding.symbols.clear();
@@ -1145,6 +1191,26 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
     for (auto &e : p.second->exports.topics) {
       auto it = gbinding.index.find("topic " + e.second.qualified);
       if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+    }
+  }
+
+  // Any *import* that is only used once must be unused
+  // as that singular use came from the export.
+  for (const auto &imp : imports) {
+    auto it = gbinding.index.find(imp.first);
+    if (it == gbinding.index.end()) {
+      continue;
+    }
+
+    auto &i = gbinding.defs[it->second];
+
+    // Generated defs shouldn't be included
+    if (i.expr->flags & FLAG_SYNTHETIC) {
+      continue;
+    }
+
+    if (i.uses == 1) {
+      WARNING(imp.second.location(), "unused import of '" << imp.first << "'");
     }
   }
 

@@ -1,0 +1,3 @@
+package some_package
+
+export def unused = "hello"
