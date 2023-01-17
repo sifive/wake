@@ -596,8 +596,8 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
   if (ast.name == "_") {
     // no-op; unbound
   } else if (!ast.name.empty() && lex_kind(ast.name) == LOWER) {
-    Expr *unowned_expr = expr.release();
-    Lambda *lambda = new Lambda(unowned_expr->fragment, ast.name, unowned_expr);
+    auto frag = expr->fragment;
+    Lambda *lambda = new Lambda(frag, ast.name, expr.release());
     if (ast.name.compare(0, 3, "_ k") != 0) lambda->token = ast.token;
     expr = std::unique_ptr<Expr>(lambda);
     out.var = 0;  // bound
@@ -706,19 +706,19 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
     if (true) {
       std::string cname =
           match->patterns.size() == 1 ? fnname : fnname + ".case" + std::to_string(f);
-      Expr *unowned_p_expr = p.expr.release();
+      auto frag = p.expr->fragment;
       expr = std::unique_ptr<Expr>(
-          new Lambda(unowned_p_expr->fragment, "_", unowned_p_expr, cname.c_str()));
+          new Lambda(frag, "_", p.expr.release(), cname.c_str()));
     }
     if (p.guard) {
       patterns.back().guard_fragment = p.guard->fragment;
       std::string gname =
           match->patterns.size() == 1 ? fnname : fnname + ".guard" + std::to_string(f);
-      Expr *unowned_p_guard = p.guard.release();
+      auto frag = p.guard->fragment;
       expr = std::unique_ptr<Expr>(new App(
           FRAGMENT_CPP_LINE,
           new App(FRAGMENT_CPP_LINE, new VarRef(FRAGMENT_CPP_LINE, "Pair@wake"), expr.release()),
-          new Lambda(unowned_p_guard->fragment, "_", unowned_p_guard, gname.c_str())));
+          new Lambda(frag, "_", p.guard.release(), gname.c_str())));
     }
     patterns.back().tree = cons_lookup(binding, expr, p.pattern, multiarg);
     auto out = map->defs.insert(
