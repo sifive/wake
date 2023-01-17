@@ -882,24 +882,18 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     // don't fail if unbound; leave that for the second pass
     rebind_ref(binding, ref->name, ref->fragment);
     return expr;
-  }
-
-  if (expr->type == &Subscribe::type) {
+  } else if (expr->type == &Subscribe::type) {
     Subscribe *sub = static_cast<Subscribe *>(expr.get());
     VarRef *out = rebind_subscribe(binding, sub->fragment, sub->name);
     if (!out) return nullptr;
     out->flags |= FLAG_AST;
     return fracture(top, true, name, std::unique_ptr<Expr>(out), binding);
-  }
-
-  if (expr->type == &App::type) {
+  } else if (expr->type == &App::type) {
     App *app = static_cast<App *>(expr.get());
     app->fn = fracture(top, true, name, std::move(app->fn), binding);
     app->val = fracture(top, true, name, std::move(app->val), binding);
     return expr;
-  }
-
-  if (expr->type == &Lambda::type) {
+  } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda *>(expr.get());
     ResolveBinding lbinding(binding);
     lbinding.index[lambda->name] = 0;
@@ -920,23 +914,17 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
                                                                      << lambda->name);
     }
     return expr;
-  }
-
-  if (expr->type == &Match::type) {
+  } else if (expr->type == &Match::type) {
     std::unique_ptr<Match> m(static_cast<Match *>(expr.release()));
     auto out = rebind_match(name, binding, std::move(m));
     if (!out) return out;
     return fracture(top, anon, name, std::move(out), binding);
-  }
-
-  if (expr->type == &Destruct::type) {
+  } else if (expr->type == &Destruct::type) {
     Destruct *app = static_cast<Destruct *>(expr.get());
     app->arg = fracture(top, true, name, std::move(app->arg), binding);
     for (auto &lam : app->cases) lam = fracture(top, true, name, std::move(lam), binding);
     return expr;
-  }
-
-  if (expr->type == &DefMap::type) {
+  } else if (expr->type == &DefMap::type) {
     DefMap *def = static_cast<DefMap *>(expr.get());
     ResolveBinding dbinding(binding);
     dbinding.symbols = process_import(top, def->imports, def->fragment);
@@ -962,9 +950,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     auto out = fracture_binding(def->fragment, dbinding.defs, std::move(body));
     if (out && (def->flags & FLAG_AST) != 0) out->flags |= FLAG_AST;
     return out;
-  }
-
-  if (expr->type == &Construct::type) {
+  } else if (expr->type == &Construct::type) {
     Construct *con = static_cast<Construct *>(expr.get());
     bool ok = true;
     if (!con->sum->scoped) {
@@ -985,9 +971,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     }  // else: edit/set function
     if (!ok) expr.reset();
     return expr;
-  }
-
-  if (expr->type == &Ascribe::type) {
+  } else if (expr->type == &Ascribe::type) {
     Ascribe *asc = static_cast<Ascribe *>(expr.get());
     asc->body = fracture(top, true, name, std::move(asc->body), binding);
     if (qualify_type(binding, asc->signature)) {
@@ -995,18 +979,16 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     }
 
     return std::move(asc->body);
-  }
-
-  if (expr->type == &Prim::type) {
+  } else if (expr->type == &Prim::type) {
     // Use all the arguments
     for (ResolveBinding *iter = binding; iter && iter->defs.size() == 1 && !iter->defs[0].expr;
          iter = iter->parent)
       ++iter->defs[0].uses;
     return expr;
+  } else {
+    // Literal/Get
+    return expr;
   }
-
-  // Literal/Get
-  return expr;
 }
 
 static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
