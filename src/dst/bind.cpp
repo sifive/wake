@@ -707,8 +707,7 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
       std::string cname =
           match->patterns.size() == 1 ? fnname : fnname + ".case" + std::to_string(f);
       auto frag = p.expr->fragment;
-      expr = std::unique_ptr<Expr>(
-          new Lambda(frag, "_", p.expr.release(), cname.c_str()));
+      expr = std::unique_ptr<Expr>(new Lambda(frag, "_", p.expr.release(), cname.c_str()));
     }
     if (p.guard) {
       patterns.back().guard_fragment = p.guard->fragment;
