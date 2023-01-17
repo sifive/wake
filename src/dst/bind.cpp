@@ -976,9 +976,9 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     asc->body = fracture(top, true, name, std::move(asc->body), binding);
     if (qualify_type(binding, asc->signature)) {
       return expr;
+    } else {
+      return std::move(asc->body);
     }
-
-    return std::move(asc->body);
   } else if (expr->type == &Prim::type) {
     // Use all the arguments
     for (ResolveBinding *iter = binding; iter && iter->defs.size() == 1 && !iter->defs[0].expr;
