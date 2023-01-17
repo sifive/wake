@@ -516,7 +516,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname,
           p->index = -2;
         }
       }
-      std::unique_ptr<DefMap> rmap(new DefMap(fragment));
+      DefMap *rmap = new DefMap(fragment);
       rmap->body = expand_patterns(fnname, bucket);
       if (!rmap->body) return nullptr;
       for (size_t i = args; i > 0; --i) {
@@ -524,8 +524,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname,
             "_ a" + std::to_string(--var), DefValue(FRAGMENT_CPP_LINE, std::move(gets[i - 1]))));
         assert(out.second);
       }
-      DefMap *unowned_rmap = rmap.release();
-      Lambda *lam = new Lambda(unowned_rmap->body->fragment, "_ tuple_case", unowned_rmap);
+      Lambda *lam = new Lambda(rmap->body->fragment, "_ tuple_case", rmap);
       lam->fnname = fnname;
       des->cases.emplace_back(lam);
       for (auto p = patterns.rbegin(); p != patterns.rend(); ++p) {
@@ -573,8 +572,8 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname,
           DefValue(p.fragment, std::unique_ptr<Expr>(
                                    new App(p.fragment, new VarRef(p.fragment, "getPairSecond@wake"),
                                            new VarRef(p.fragment, "_ guardpair"))))));
-      Expr *guard_true(new App(p.fragment, new VarRef(p.fragment, "_ rhs"),
-                               new VarRef(p.fragment, "Unit@wake")));
+      Expr *guard_true =
+          new App(p.fragment, new VarRef(p.fragment, "_ rhs"), new VarRef(p.fragment, "Unit@wake"));
       std::unique_ptr<Destruct> des(
           new Destruct(fragment, Boolean,
                        new App(p.fragment, new VarRef(p.fragment, "_ guard"),
