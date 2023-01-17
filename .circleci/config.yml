@@ -31,7 +31,7 @@ jobs:
     steps:
       - attach_workspace:
           at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/wasm-latest -t wake-wasm .
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/wasm --build-arg EMSDK_VERISON=latest -t wake-wasm .
       - run: mkdir build
       - run: chmod ugo+rwx build
       - run: cp /tmp/workspace/wake_*.tar.xz build
@@ -43,7 +43,7 @@ jobs:
     steps:
       - attach_workspace:
           at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/wasm-stable -t wake-wasm .
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/wasm -t wake-wasm .
       - run: mkdir build
       - run: chmod ugo+rwx build
       - run: cp /tmp/workspace/wake_*.tar.xz build
@@ -59,7 +59,7 @@ jobs:
     steps:
       - attach_workspace:
           at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/wasm-stable -t wake-wasm .
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/wasm -t wake-wasm .
       - run: mkdir build
       - run: chmod ugo+rwx build
       - run: cp /tmp/workspace/wake_*.tar.xz build
