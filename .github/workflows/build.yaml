@@ -4,17 +4,17 @@ on:
     pull_request:
 
 jobs:
-    ubuntu_20_04:
+    ubuntu_22_04:
       runs-on: ubuntu-latest
-      name: Ubuntu 20.04
+      name: Ubuntu 22.04
       steps: 
         - name: Clone wake
           uses: actions/checkout@v2
           with:
             fetch-depth: 0
         - name: Build
-          uses: ./.github/actions/ubuntu_20_04/
-          id: ubuntu_20_04
+          uses: ./.github/actions/ubuntu_22_04/
+          id: ubuntu_22_04
 
     hello: 
       runs-on: ubuntu-latest
