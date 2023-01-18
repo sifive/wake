@@ -1,0 +1,6 @@
+# action.yml
+name: 'Ubuntu 20.04'
+description: 'Build for Ubuntu 20.04'
+runs:
+  using: 'docker'
+  image: '../../dockerfiles/ubuntu_20.04/Dockerfile'
