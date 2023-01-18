@@ -33,27 +33,73 @@ jobs:
     #         
     #     - name: Get the time
     #       run: echo "The time was ${{ steps.hello.outputs.time }}"
-    
-    ubuntu_22_04:
+  #
+    tarball:
       runs-on: ubuntu-latest
       name: Ubuntu 22.04
       steps: 
         - name: Clone wake
-          uses: actions/checkout@v2
+          uses: actions/checkout@v3
           with:
             fetch-depth: 0
 
-        - name: Build docker image
-          run: docker build -f ./.circleci/dockerfiles/ubuntu-22.04 -t wake-ubuntu-22.04 .
+        - name: Install Deps
+          run: sudo apt-get update && sudo apt-get install -y build-essential fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx clang-format-12
 
-        - name: Create docker shared build directory
-          run: mkdir ../build && chmod ugo+rwx ../build
+        - name: Check Formatting
+          run: clang-format-12 --style=file --Werror -n $(./scripts/which_clang_files all)
 
-        - name: Copy wake resources to build directory
-          run: cp -R ./ ../build
+        - name: Build Tarball
+          run: make tarball
 
-        - name: Build Wake
-          run: docker run -u build --rm --mount type=bind,source=$PWD/../build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-ubuntu-22.04 /bin/sh -c 'make -C tarball'
+        - name: Run Tests
+          run: make test && make unittest
+
+        - name: Generate Docs
+          run: mkdir www && ./bin/wake --no-workspace --html > www/index.html
+
+        - name: wake to rst
+          run: PATH=$(pwd)/bin:$PATH PYTHONPATH=$(pwd)/scripts python3 scripts/wake2rst.py
+
+        - name: Upload build artifacts
+          uses: actions/upload-artifact@v3
+          with:
+            name: tarball
+            path: wake_*.tar.xz
+
+
+      # - persist_to_workspace:
+      #     root: .
+      #     paths:
+      #       - .circleci/dockerfiles
+      #       - wake_*.tar.xz
+      #       - debian
+      #       - www
+      #       - tests
+      #       - scripts/sphinx/build/html
+
+
+    #
+    # ubuntu_22_04:
+    #   runs-on: ubuntu-latest
+    #   name: Ubuntu 22.04
+    #   steps: 
+    #     - name: Clone wake
+    #       uses: actions/checkout@v2
+    #       with:
+    #         fetch-depth: 0
+    #
+    #     - name: Build docker image
+    #       run: docker build -f ./.circleci/dockerfiles/ubuntu-22.04 -t wake-ubuntu-22.04 .
+    #
+    #     - name: Create docker shared build directory
+    #       run: mkdir ../build && chmod ugo+rwx ../build
+    #
+    #     - name: Copy wake resources to build directory
+    #       run: cp -R ./ ../build
+    #
+    #     - name: Build Wake
+    #       run: docker run -u build --rm --mount type=bind,source=$PWD/../build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-ubuntu-22.04 /bin/sh -c 'make -C tarball'
     
     
     build:
