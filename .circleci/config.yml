@@ -25,7 +25,19 @@ jobs:
             - tests
             - scripts/sphinx/build/html
 
-  vscode:
+  vscode_latest:
+    machine:
+      image: ubuntu-2004:202201-02
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/wasm --build-arg EMSDK_VERISON=latest -t wake-wasm .
+      - run: mkdir build
+      - run: chmod ugo+rwx build
+      - run: cp /tmp/workspace/wake_*.tar.xz build
+      - run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'tar xvJf wake_*.tar.xz && make -C wake-* vscode'
+
+  vscode_stable:
     machine:
       image: ubuntu-2004:202201-02
     steps:
@@ -220,7 +232,10 @@ workflows:
       - ubuntu_22_04:
           requires:
             - tarball
-      - vscode:
+      - vscode_latest:
+          requires:
+            - tarball
+      - vscode_stable:
           requires:
             - tarball
       - wasm:
@@ -234,7 +249,7 @@ workflows:
             - rocky_8        # RHEL8-compatible
             - ubuntu_18_04   # LTS
             - ubuntu_22_04   # LTS
-            - vscode
+            - vscode_stable
             - wasm
       - docs_deploy:
           requires:
