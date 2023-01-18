@@ -47,13 +47,13 @@ jobs:
           run: docker build -f ./.circleci/dockerfiles/ubuntu-22.04 -t wake-ubuntu-22.04 .
 
         - name: Create docker shared build directory
-          run: mkdir build && chmod ugo+rwx build
+          run: mkdir ../build && chmod ugo+rwx ../build
 
         - name: Copy wake resources to build directory
-          run: cp -R wake build
+          run: cp -R ./ ../build
 
         - name: Build Wake
-          run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-ubuntu-22.04 /bin/sh -c 'cd wake && make -C tarball'
+          run: docker run -u build --rm --mount type=bind,source=$PWD/../build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-ubuntu-22.04 /bin/sh -c 'make -C tarball'
     
     
     build:
