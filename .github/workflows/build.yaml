@@ -4,6 +4,19 @@ on:
     pull_request:
 
 jobs:
+    hello: 
+      runs-on: ubuntu-latest
+      name: Hello Test
+      steps:
+        - name: Hello world
+          uses: ./.github/actions/hello/
+          id: hello
+          with: 
+            who-to-greet: 'Hello custom action'
+            
+        - name: Get the time
+          run: echo "The time was ${{ steps.hello.outputs.time }}"
+      
     build:
         name: "MacOS build"
         runs-on: macos-10.15
@@ -14,15 +27,6 @@ jobs:
               with:
                 fetch-depth: 0
           
-            - name: Hello world
-              uses: ./.github/actions/hello/
-              id: hello
-              with: 
-                who-to-greet: 'Hello custom action'
-            
-            - name: Get the time
-              run: echo "The time was ${{ steps.hello.outputs.time }}"
-
             - name: "Install deps"
               run: |
                 brew install --cask osxfuse
