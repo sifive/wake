@@ -1,0 +1,5010 @@
+----
+core
+----
+
+.. toctree::
+
+
+tuple.wake
+----------
+.. wake:data:: data Unit
+
+	unit / void
+	
+
+.. wake:tuple:: tuple Pair a b
+
+	Creates a ``Pair``, a tuple containing two elements.
+	
+
+	Parameters: ``First: a,  Second: b``
+
+	Return Type: ``Pair a b``
+
+.. wake:tuple:: tuple Triple a b c
+
+	Creates a ``Triple``, a tuple containing three elements.
+	
+
+	Parameters: ``First: a,  Second: b,  Third: c``
+
+	Return Type: ``Triple a b c``
+
+.. wake:data:: data a; b
+
+	Variable length Tuples (terminate with Unit if you want ._x accessors)
+	aka: a List with fixed length and heterogeneous element types
+	Examples:
+	def tup = (1; "xx"; 1e8; Unit)
+	def (x; y; z; Unit) = tup
+	def _ = println (str tup._0)
+	def _ = println (dstr tup._2)
+	def (a; b) = (5; "z")
+	
+
+.. wake:function:: def _0 (x; _)
+
+	Handy accessor methods
+	
+
+	Parameters: ``a ; b``
+
+	Return Type: ``a``
+
+.. wake:function:: def _1 (_; x; _)
+
+	No description for this feature yet.
+
+	Parameters: ``a ; b ; c``
+
+	Return Type: ``b``
+
+.. wake:function:: def _2 (_; _; x; _)
+
+	No description for this feature yet.
+
+	Parameters: ``a ; b ; c ; d``
+
+	Return Type: ``c``
+
+.. wake:function:: def _3 (_; _; _; x; _)
+
+	No description for this feature yet.
+
+	Parameters: ``a ; b ; c ; d ; e``
+
+	Return Type: ``d``
+
+.. wake:function:: def _4 (_; _; _; _; x; _)
+
+	No description for this feature yet.
+
+	Parameters: ``a ; b ; c ; d ; e ; f``
+
+	Return Type: ``e``
+
+.. wake:function:: def _5 (_; _; _; _; _; x; _)
+
+	No description for this feature yet.
+
+	Parameters: ``a ; b ; c ; d ; e ; f ; g``
+
+	Return Type: ``f``
+
+.. wake:function:: def _6 (_; _; _; _; _; _; x; _)
+
+	No description for this feature yet.
+
+	Parameters: ``a ; b ; c ; d ; e ; f ; g ; h``
+
+	Return Type: ``g``
+
+.. wake:function:: def _7 (_; _; _; _; _; _; _; x; _)
+
+	No description for this feature yet.
+
+	Parameters: ``a ; b ; c ; d ; e ; f ; g ; h ; i``
+
+	Return Type: ``h``
+
+.. wake:function:: def _8 (_; _; _; _; _; _; _; _; x; _)
+
+	No description for this feature yet.
+
+	Parameters: ``a ; b ; c ; d ; e ; f ; g ; h ; i ; j``
+
+	Return Type: ``i``
+
+.. wake:function:: def _9 (_; _; _; _; _; _; _; _; _; x; _)
+
+	No description for this feature yet.
+
+	Parameters: ``a ; b ; c ; d ; e ; f ; g ; h ; i ; j ; k``
+
+	Return Type: ``j``
+
+boolean.wake
+------------
+.. wake:function:: def !(x: Boolean): Boolean
+
+	Unary operator for Boolean NOT.
+	
+	```
+	!True  = False
+	!False = True
+	```
+	
+
+	Parameters: ``x: Boolean``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Boolean) && (y: Boolean): Boolean
+
+	Binary operator for Boolean AND; `x && y`.
+	Both `x` and `y` must be True to return True.
+	
+	## BEWARE: unlike other languages, in wake, expression 'y' is evaluated even if 'x' is False ##
+	
+	```
+	True  && True  = True
+	False && True  = False
+	True  && False = False
+	False && False = False
+	```
+	
+
+	Parameters: ``x: Boolean,  y: Boolean``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Boolean) || (y: Boolean): Boolean
+
+	Binary operator for Boolean OR; `x || y`.
+	Either `x` or `y` must be True to return True.
+	
+	## BEWARE: unlike other languages, in wake, expression 'y' is evaluated even if 'x' is True ##
+	
+	```
+	True  || True  = True
+	False || True  = True
+	True  || False = True
+	False || False = False
+	```
+	
+
+	Parameters: ``x: Boolean,  y: Boolean``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def eor (x: Boolean) (y: Boolean): Boolean
+
+	Binary operator for Boolean XOR/EOR; `eor x y`.
+	When `x` and `y` differ, returns True.
+	
+	```
+	eor True  True  = False
+	eor False True  = True
+	eor True  False = True
+	eor False False = False
+	```
+	
+
+	Parameters: ``x: Boolean,  y: Boolean``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def enor (x: Boolean) (y: Boolean): Boolean
+
+	Binary operator for Boolean XNOR/ENOR; `enor x y`.
+	When `x` and `y` are equal, returns True.
+	
+	```
+	enor True  True  = True
+	enor False True  = False
+	enor True  False = False
+	enor False False = True
+	```
+	
+
+	Parameters: ``x: Boolean,  y: Boolean``
+
+	Return Type: ``Boolean``
+
+regexp.wake
+-----------
+.. wake:function:: def quote (str: String): RegExp
+
+	Create RegExp that only matches str, by escaping special characters.
+	quote "a.b" = `a\.b`
+	quote "hello[world]" = `hello\[world\]`
+	
+
+	Parameters: ``str: String``
+
+	Return Type: ``RegExp``
+
+.. wake:function:: def regExpCat (l: List RegExp): RegExp
+
+	Concatenate a list of regular expressions.
+	The resulting regular expression must match the elements sequentially.
+	For simple expressions, use built-in RegExp interpolation `${x}${y}${z}`.
+	regExpCast (`abc`, `def`, Nil) = `abcdef`
+	
+
+	Parameters: ``l: List RegExp``
+
+	Return Type: ``RegExp``
+
+.. wake:function:: def stringToRegExp (str: String): Result RegExp Error
+
+	Convert a String into a Regular expression.
+	If the string is an illegal RegExp, returns Fail.
+	stringToRegExp "abc" = Pass `abc`
+	stringToRegExp "a("  = Fail (Error "missing ): a(" _)
+	
+
+	Parameters: ``str: String``
+
+	Return Type: ``Result RegExp Error``
+
+.. wake:function:: def globToRegExp (glob: String): RegExp
+
+	Convert a String glob-style expression into a RegExp.
+	A glob expression has:
+	?    matches any single non-/ character
+	*    matches 0 or more non-/ characters
+	/**  matches any path after the /
+	**/  matches any path leading up to the /
+	[ab] matches either a or b
+	\*   matches a *
+	
+
+	Parameters: ``glob: String``
+
+	Return Type: ``RegExp``
+
+.. wake:function:: def regExpToString (regExp: RegExp): String
+
+	Convert a regular expression into a String.
+	stringToRegExp (regExpToString x) = Pass x
+	regExpToString `abc` = "abc"
+	regExpToString `.*`  = ".*"
+	
+
+	Parameters: ``regExp: RegExp``
+
+	Return Type: ``String``
+
+.. wake:function:: def matches (testRegExp: RegExp) (str: String): Boolean
+
+	Test if a regular expression matches an entire String.
+	matches `a*` "ba" = False
+	matches `a*` "aa" = True
+	
+
+	Parameters: ``testRegExp: RegExp,  str: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def extract (parensRegexp: RegExp) (str: String): List String
+
+	Extract fields out of a String using a parenthetical regular expression.
+	extract `(.*)-(.*)` "hello-world-hello" = ("hello", "world-hello", Nil)
+	extract `(.*)-(.*)` "helloworldhello" = Nil
+	
+
+	Parameters: ``parensRegexp: RegExp,  str: String``
+
+	Return Type: ``List String``
+
+.. wake:function:: def replace (locatorRegExp: RegExp) (replacement: String) (str: String): String
+
+	Replace all occurances of locatorRegExp in str with replacement.
+	replace `:` " " "a:b:c" = "a b c"
+	
+
+	Parameters: ``locatorRegExp: RegExp,  replacement: String,  str: String``
+
+	Return Type: ``String``
+
+.. wake:function:: def tokenize (seperatorRegExp: RegExp) (str: String): List String
+
+	Remove all occurances of seperatorRegExp from str, creating a List of String fragments.
+	tokenize `:` "hello:there:friend" = ("hello", "there", "friend", Nil)
+	
+
+	Parameters: ``seperatorRegExp: RegExp,  str: String``
+
+	Return Type: ``List String``
+
+result.wake
+-----------
+.. wake:function:: def isPass: Result a b => Boolean
+
+	isPass: report if the Result was a Pass
+	
+	isPass (Pass 123) = True
+	isPass (Fail 123) = False
+	
+
+	Parameters: ``Result a b``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def isFail: Result a b => Boolean
+
+	isFail: report if the Result was a Fail
+	
+	isFail (Pass 123) = False
+	isFail (Fail 123) = True
+	
+
+	Parameters: ``Result a b``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def getPass: Result a b => Option a
+
+	getPass: retrieve the Pass value else None
+	
+	getPass (Pass 123) = Some 123
+	getPass (Fail 123) = None
+	
+
+	Parameters: ``Result a b``
+
+	Return Type: ``Option a``
+
+.. wake:function:: def getFail: Result a b => Option b
+
+	getFail: retrieve the Fail value else None
+	
+	getFail (Pass 123) = None
+	getFail (Fail 123) = Some 123
+	
+
+	Parameters: ``Result a b``
+
+	Return Type: ``Option b``
+
+.. wake:function:: def getWhenFail (default: pass): Result pass fail => pass
+
+	getWhenFail: retrieve the Pass value, using a default value for Fail
+	
+	getWhenFail 42 (Pass 123) = 123
+	getWhenFail 42 (Pass 123) = 42
+	
+
+	Parameters: ``default: a,  Result a b``
+
+	Return Type: ``a``
+
+.. wake:function:: def getWhenPass (default: fail): Result pass fail => fail
+
+	getWhenPass: retrieve the Fail value, using a default value for Pass
+	
+	getWhenPass 42 (Pass 123) = 42
+	getWhenPass 42 (Pass 123) = 123
+	
+
+	Parameters: ``default: a,  Result b a``
+
+	Return Type: ``a``
+
+.. wake:function:: def rmap (fn: a => b): Result a fail => Result b fail
+
+	rmap: apply a function to a Pass-ing result
+	If you find yourself using the function, consider using require instead.
+	
+	rmap (_+1) (Pass 123) = Pass 124
+	rmap (_+1) (Fail 123) = Fail 123
+	
+
+	Parameters: ``fn: a,  b,  Result a c``
+
+	Return Type: ``Result b c``
+
+.. wake:function:: def rmapPass (fn: a => Result b fail): Result a fail => Result b fail
+
+	rmapPass: apply a fallible function a Pass-ing result
+	If you find yourself using the function, consider using require instead.
+	
+
+	Parameters: ``fn: a,  Result b c,  Result a c``
+
+	Return Type: ``Result b c``
+
+.. wake:function:: def rmapFail (fn: a => Result pass b): Result pass a => Result pass b
+
+	Applies a fallible function to Fail value or propogates Pass
+	If you find yourself using the function, consider using require instead.
+	
+
+	Parameters: ``fn: a,  Result b c,  Result b a``
+
+	Return Type: ``Result b c``
+
+.. wake:function:: def rfoldl (combiningFn: accumulator
+
+	Try to combine the elements of a `List` front-to-back, where each step might fail.
+	If any update step fails, the error value of the first such failure is
+	returned and no further values are processed.
+	
+	Parameters:
+	- `combiningFn`: How to attempt to meld each element into the accumulator.
+	- `acc`: The initial value of the accumulator; if `list` is empty, this is
+	returned unchanged as the `Pass` value.
+	- `list`: The elements which should be combined.
+	
+
+	Parameters: ``combiningFn: a,  b,  Result a c,  acc: a,  list: List b``
+
+	Return Type: ``Result a c``
+
+.. wake:function:: def rfoldr (combiningFn: element
+
+	Try to combine the elements of a `List` front-to-back, where each step might fail.
+	If any update step fails, the error value of the first such failure is
+	returned and no further values are processed.
+	
+	Parameters:
+	- `combiningFn`: How to attempt to meld each element into the accumulator.
+	- `acc`: The initial value of the accumulator; if `list` is empty, this is
+	returned unchanged as the `Pass` value.
+	- `list`: The elements which should be combined.
+	
+
+	Parameters: ``combiningFn: a,  b,  Result b c,  acc: b,  list: List a``
+
+	Return Type: ``Result b c``
+
+.. wake:function:: def findFailFn (fn: a
+
+	findFailFn: if fn returns Pass for all List elements, return the outputs else Fail
+	Once a Fail is found, fn is not evaluated on further elements.
+	This means that fn is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'map fn | findFail' instead.
+	
+	def toInt x = int x | getOrFail "not an Integer ({x})"
+	findFailFn toInt ("456", "123", Nil) = Pass (456, 123, Nil)
+	findFailFn toInt ("_56", "123", Nil) = Fail "not an Integer (_56)"
+	
+
+	Parameters: ``fn: a,  Result b c,  List a``
+
+	Return Type: ``Result (List b) c``
+
+.. wake:function:: def findPassFn (fn: a
+
+	findPassFn: if fn returns Fail for all List elements, return the outputs else Pass
+	Once a Pass is found, fn is not evaluated on further elements.
+	This means that fn is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'map fn | findPass' instead.
+	
+	def toInt x = int x | getOrFail "bad: {x}"
+	findPassFn toInt ("_56", "123", "777", Nil) = Pass 123
+	findPassFn toInt ("_56", "_23", "_77", Nil) = Fail ("bad: _56", "bad: _23", "bad: _77", Nil)
+	
+
+	Parameters: ``fn: a,  Result b c,  List a``
+
+	Return Type: ``Result b (List c)``
+
+.. wake:function:: def stack Unit: List String
+
+	stack: dump a stack trace from the call site
+	This function currently only works with debug mode enabled.
+	
+
+	Parameters: ``Unit``
+
+	Return Type: ``List String``
+
+.. wake:tuple:: tuple Error
+
+	An Error has a cause and a stack trace
+	Result types should generally use an Error for their Fail case.
+	
+
+	Parameters: ``Cause: String,  Stack: List String``
+
+	Return Type: ``Error``
+
+.. wake:function:: def makeError (cause: String): Error
+
+	makeError: create an Error with the specified cause
+	This captures the stack at the point of the makeError call.
+	
+
+	Parameters: ``cause: String``
+
+	Return Type: ``Error``
+
+.. wake:function:: def addErrorContext (prefix: String): Result a Error => Result a Error
+
+	addErrorContext: add a prefix to the cause string of a Fail-ure
+	This method can be useful to preserve an existing failure cause,
+	where using a require-else must supply a totally new cause.
+	
+	require Pass contents =
+	read file
+	| addErrorContext "opening {file.getPathName}"
+	
+
+	Parameters: ``prefix: String,  Result a Error``
+
+	Return Type: ``Result a Error``
+
+.. wake:function:: def failWithError (cause: String): Result a Error
+
+	failWithError: produce a Fail for us in error conditions
+	
+	require Some = int str
+	else failWithError "Could not parse {str} as an Integer"
+	
+
+	Parameters: ``cause: String``
+
+	Return Type: ``Result a Error``
+
+list.wake
+---------
+.. wake:function:: def element,
+
+	Create a singleton list from a value. This
+	can be used to slightly increase the niceness
+	of lists by avoid the Nil at the end. This is
+	especially nice for vertical lists.
+	
+	Examples:
+	```
+	10,                      # Create a singleton list containing just 10
+	1, 2, 3,                 # Create a list of 3 elements without using Nil
+	(1, 2, 3,) ++ (4, 5, 6,) # append two lists
+	```
+	
+
+	Parameters: ``element: a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def empty: List a => Boolean
+
+	Report if the list contains no elements.
+	If you find yourself using the function, consider using match instead.
+	
+	Examples:
+	```
+	empty Nil      = True
+	empty (seq 0)  = True
+	empty (1, Nil) = False
+	empty (seq 9)  = False
+	```
+	
+
+	Parameters: ``List a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def head: List a => Option a
+
+	Retrieve the first element of the list, else None.
+	If you find yourself using the function, consider using match instead.
+	
+	Examples:
+	```
+	head Nil = None
+	head ("a", "b", Nil) = Some "a"
+	head (seq 10) = Some 0
+	```
+	
+
+	Parameters: ``List a``
+
+	Return Type: ``Option a``
+
+.. wake:function:: def tail: List a => List a
+
+	Remove the first element from the List
+	If you find yourself using the function, consider using match instead.
+	
+	Examples:
+	```
+	tail (seq 5) = 1, 2, 3, 4, Nil
+	tail ("a", Nil) = Nil
+	tail Nil = Nil
+	tail (pi, 1.0, Nil) = 1.0, Nil
+	```
+	
+
+	Parameters: ``List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def map (mapFn: a
+
+	Create a new List by applying the function `mapFn` to each element of `list`.
+	The `map` function (along with `foldl`) is generally how one implements loops in wake.
+	This function (like most in wake) runs `mapFn` in parallel.
+	
+	Parameters:
+	- `mapFn`: The function to apply to each element
+	- `list`: The List of elements to feed to `mapFn`
+	
+	Guarantees:
+	- The resultant List has the same length as `list`
+	
+	Examples:
+	```
+	map str     (3, 9, Nil) = "3", "9", Nil
+	map (_+100) (3, 9, Nil) = 103, 109, Nil
+	```
+	
+
+	Parameters: ``mapFn: a,  b,  list: List a``
+
+	Return Type: ``List b``
+
+.. wake:function:: def mapFlat (mapFn: a
+
+	Create a new List by applying a function f to each element and concatenating the output.
+	
+	Parameters:
+	- `mapFn`: The function to apply to each element
+	- `list`: The list of elements to feed to `mapFn`
+	
+	Examples:
+	```
+	def twice x = x, x, Nil
+	mapFlat twice (seq 3) = 0, 0, 1, 1, 2, 2, Nil
+	mapFlat seq (seq 5) = 0, 0, 1, 0, 1, 2, 0, 1, 2, 3, Nil
+	```
+	
+
+	Parameters: ``mapFn: a,  List b,  list: List a``
+
+	Return Type: ``List b``
+
+.. wake:function:: def mapPartial (f: a
+
+	Create a new List by applying a partial function to each element of a List.
+	Partial functions can return None, in which case the result is not included in the output.
+	
+	Parameters:
+	- `mapFn`: The partial function to apply to each element
+	- `list`: The list of elements to feed to `mapFn`
+	
+	Guarantees:
+	- The resultant List is no longer than `list`
+	
+	Examples:
+	```
+	mapPartial int ("3", "x", "44", Nil) = 3, 44, Nil
+	```
+	
+
+	Parameters: ``f: a,  Option b,  list: List a``
+
+	Return Type: ``List b``
+
+.. wake:function:: def foldl (combiningFn: accumulator
+
+	Combine the elements of a List front-to-back into a single value.
+	An accumulator is updated from its initial value by combiningFn for each element.
+	
+	In C++ syntax, `foldl <combiningFn> <accumulateInitalValue> <List>` does:
+	```c++
+	auto accumulator = <accumulateInitalValue>;
+	for (element : <List>) accumulator = combiningFn(accumulator, element);
+	return accumulator;
+	```
+	In python this is similar to `functools.reduce`
+	
+	Parameters:
+	- `combiningFn`: The function to combine elements of the list with the accumulator
+	- `initialValue`: The initial value of the accumulator
+	- `list`: The list to combine the elements of
+	
+	Examples:
+	```
+	foldl f x Nil = x
+	foldl f x (a, b, c, Nil) = f (f (f x a) b) c
+	foldl (_+_) 0 (seq 6) = 15
+	foldl (_*_) 0 l = 0
+	```
+	
+
+	Parameters: ``combiningFn: a,  b,  a,  accumulator: a,  List b``
+
+	Return Type: ``a``
+
+.. wake:function:: def scanl (combiningFn: accumulator
+
+	Create a new List from an accumulator run over the elements front-to-back.
+	The last element of the produced List is equivalent to the result of foldl.
+	
+	Parameters:
+	- `combiningFn`: The function to combine elements of the list with the accumulator
+	- `initialValue`: The initial value of the accumulator
+	- `list`: The list to scan over
+	
+	Guarantees:
+	- The resultant List is exactly one element longer than `list`
+	- The first element of the resultant List will be `initialValue`
+	- The last element of the resultant List will be equal to `foldl combiningFn initialValue list`
+	- If `combiningFn` is a group operation, the difference between the resultants yields `list`
+	
+	Examples:
+	```
+	scanl f z Nil = z
+	scanl (_+_) 100 (seq 6) = 100, 100, 101, 103, 106, 110, 115, Nil
+	^^^- 100+0+1+2+3+4+5
+	^^^- 100+0+1+2
+	^^^- 100+0
+	^^^- 100
+	```
+	
+
+	Parameters: ``combiningFn: a,  b,  a,  accumulator: a,  List b``
+
+	Return Type: ``List a``
+
+.. wake:function:: def foldr (combiningFn: element
+
+	Combine the elements of a List back-to-front into a single value.
+	An accumulator is updated from its initial value by combiningFn for each element.
+	
+	Parameters:
+	- `combiningFn`: The function to combine elements of the list with the accumulator
+	- `initialValue`: The initial value of the accumulator
+	- `list`: The list to combine the elements of
+	
+	Examples:
+	```
+	foldr f x Nil = x
+	foldr f x (a, b, c, Nil) = f a (f b (f c x))
+	foldr (_,_) y x = x ++ y
+	```
+	
+
+	Parameters: ``combiningFn: a,  b,  b,  accumulator: b,  List a``
+
+	Return Type: ``b``
+
+.. wake:function:: def scanr (combiningFn: element
+
+	Create a new List from an accumulator run over the elements back-to-front.
+	The first element of the produced List is equivalent to the result of a foldr.
+	
+	Parameters:
+	- `combiningFn`: The function to combine elements of the list with the accumulator
+	- `initialValue`: The initial value of the accumulator
+	- `list`: The list to scan over
+	
+	Guarantees:
+	- The resultant List is exactly one element longer than `list`
+	- The first element of the resultant List will be `foldl combiningFn initialValue list`
+	- The last element of the resultant List will be equal to `initialValue`
+	- If `combiningFn` is a group operation, the difference between the resultants yields `list`
+	
+	Examples:
+	```
+	scanr
+	scanr (_+_) 100 (seq 6) = 115, 115, 114, 112, 109, 105, 100, Nil
+	^^^- 100
+	^^^- 5+100
+	^^^- 1+2+3+4+5+100
+	^^^- 0+1+2+3+4+5+100
+	```
+	
+
+	Parameters: ``combiningFn: a,  b,  b,  accumulator: b,  List a``
+
+	Return Type: ``List b``
+
+.. wake:function:: def (l: List a) ++ (r: List a): List a
+
+	Concatenate two lists into one List.
+	The ++ operator must be provided by the wake package for publish to work.
+	
+	Guarantees:
+	- ++ is associtive
+	- Nil is an identity of ++
+	
+	Examples:
+	```
+	(1, 2, 3, Nil) ++ (8, 9, Nil) = (1, 2, 3, 8, 9, Nil)
+	(x ++ y) ++ z = x ++ (y ++ z)                        # associtive
+	Nil ++ x = x                                         # left identity
+	x ++ Nil = x                                         # right identity
+	```
+	
+
+	Parameters: ``l: List a,  r: List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def prepend (item: a) (list: List a): List a
+
+	Add `item` to the start of `list`.
+	This is efficient no matter how large the list.
+	Consider using ',' directly as it is more idiomatic.
+	
+	Examples:
+	```
+	prepend 9 (seq 3) = 9, 0, 1, 2, Nil
+	prepend 8 Nil     = 8, Nil
+	```
+	
+
+	Parameters: ``item: a,  list: List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def append (item: a) (list: List a): List a
+
+	Add `item` to the end of `list`.
+	
+	**NOTE**: This function must recreate the entire list to add the item.
+	If you add 1000 items to an empty list, this costs 1000*1000/2 steps.
+	Therefore, if you need to add more than one item to the end of a list,
+	you should consider prepending them to an empty list and then appending
+	that list in reverse to the list you want to enlarge.
+	
+	Examples:
+	```
+	append 9 (seq 3) = 0, 1, 2, 9, Nil
+	append 9 Nil     = 9, Nil
+	
+	append 8 (append 7 (append 6 (seq 6)))
+	= 0, 1, 2, 3, 4, 5, 6, 7, 8, Nil
+	= (seq 6) ++ reverse (8, 7, 6, Nil)   # <== potentially much faster
+	```
+	
+
+	Parameters: ``item: a,  list: List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def splitAt (index: Integer) (listToDivide: List a): Pair (List a) (List a)
+
+	Given an index, cut a List into elements before and after the index
+	
+	Examples:
+	```
+	splitAt 4 (seq 8) = Pair (0, 1, 2, 3, Nil) (4, 5, 6, 7, Nil)
+	splitAt 0 (seq 8) = Pair Nil (0, 1, 2, 3, 4, 5, 6, 7, Nil)
+	splitAt 8 (seq 8) = Pair (0, 1, 2, 3, 4, 5, 6, 7, Nil) Nil
+	splitAt 1000 (seq 3) = Pair (seq 3) Nil
+	```
+	
+
+	Parameters: ``index: Integer,  listToDivide: List a``
+
+	Return Type: ``Pair (List a) (List a)``
+
+.. wake:function:: def take (length: Integer) (l: List a): List a
+
+	Keep only the first `length` elements
+	
+	Examples:
+	```
+	take 2 (seq 100) = 0, 1, Nil
+	take 0 (seq 100) = Nil
+	take 2 Nil = Nil
+	take (-2) (seq 100) = Nil
+	```
+	
+
+	Parameters: ``length: Integer,  l: List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def drop (num: Integer) (l: List a): List a
+
+	Discard the first `num` elements
+	
+	Examples:
+	```
+	drop 4 (seq 6) = 4, 5, Nil
+	drop 6 (seq 6) = Nil
+	drop 0 (seq 3) = 0, 1, 2, Nil
+	drop (-2) (seq 3) = 0, 1, 2, Nil
+	```
+	
+
+	Parameters: ``num: Integer,  l: List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def at (i: Integer) (l: List a): Option a
+
+	Extract the i-th element if it exists or else None
+	
+	Examples:
+	```
+	at 4 (seq 8) = Some 4
+	at 4 (seq 4) = None
+	at (-1) (seq 4) = None
+	```
+	
+
+	Parameters: ``i: Integer,  l: List a``
+
+	Return Type: ``Option a``
+
+.. wake:function:: def splitUntil (stopFn: a
+
+	Cut the List at the point `f` is first True
+	Once `stopFn` returns True, `stopFn` is not evaulated on further elements.
+	This means that `stopFn` is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'map f | find (_)' and splitAt.
+	
+	Examples:
+	```
+	splitUntil (_>=4) (seq 8) = Pair (0, 1, 2, 3, Nil) (4, 5, 6, 7, Nil)
+	splitUntil (_>=0) (seq 8) = Pair Nil (0, 1, 2, 3, 4, 5, 6, 7, Nil)
+	splitUntil (_>=8) (seq 8) = Pair (0, 1, 2, 3, 4, 5, 6, 7, Nil) Nil
+	```
+	
+
+	Parameters: ``stopFn: a,  Boolean,  l: List a``
+
+	Return Type: ``Pair (List a) (List a)``
+
+.. wake:function:: def takeUntil (f: a
+
+	Take the longest prefix of a list where `f` is False
+	Once `f` returns True, `f` is not evaulated on further elements.
+	This means that `f` is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'map f | find (_)' and take.
+	
+	Examples:
+	```
+	takeUntil (_>=4) (seq 8) = 0, 1, 2, 3, Nil
+	takeUntil (_>=0) (seq 8) = Nil
+	takeUntil (_>=8) (seq 8) = 0, 1, 2, 3, 4, 5, 6, 7, Nil
+	```
+	
+
+	Parameters: ``f: a,  Boolean,  List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def dropUntil (f: a
+
+	Discard elements from the list until 'f' returns True
+	Once `f` returns True, `f` is not evaulated on further elements.
+	This means that `f` is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'map f | find (_)' and drop.
+	
+	Examples:
+	```
+	dropUntil (_>=4) (seq 8) = 4, 5, 6, 7, Nil
+	dropUntil (_>=0) (seq 8) = 0, 1, 2, 3, 4, 5, 6, 7, Nil
+	dropUntil (_>=8) (seq 8) = Nil
+	```
+	
+
+	Parameters: ``f: a,  Boolean,  l: List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def find (f: a
+
+	Find the location of the first element accepted by `f`
+	Returns: `Pair value index`, such that `value` is `at index`
+	Once `f` returns True, `f` is not evaulated on further elements.
+	This means that `f` is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'map f | find (_)'.
+	
+	Examples:
+	```
+	def l = (85, 4, 10, 3, Nil)
+	find (_==10) l = Some (Pair 10 3)
+	find (_>9) l = Some (Pair 85 0)
+	find (_<3) l = None
+	```
+	
+
+	Parameters: ``f: a,  Boolean,  List a``
+
+	Return Type: ``Option (Pair a Integer)``
+
+.. wake:function:: def exists (f: a
+
+	Does `f` return True for any element in the list?
+	Once `f` returns True, `f` is not evaulated on further elements.
+	This means that `f` is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'map f | exists (_)'.
+	
+	Examples:
+	```
+	exists (_==11) (seq 20) = True
+	exists (_>100) (seq 20) = False
+	exists (_<100) (seq 20) = True
+	exists (\_ True) Nil    = False
+	exists (\_ True) (prepend x xs) = True
+	exists p xs = ! (forall (! p _) xs)
+	```
+	
+
+	Parameters: ``f: a,  Boolean,  List a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def forall (f: a
+
+	Does `f` return True for all elements in the list?
+	Once `f` returns False, `f` is not evaulated on further elements.
+	This means that `f` is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'map f | forall (_)'.
+	
+	Examples:
+	```
+	forall (_==11) (seq 20) = False
+	forall (_>100) (seq 20) = False
+	forall (_<100) (seq 20) = True
+	forall (\_ False) Nil   = True
+	forall (\_ False) (prepend x xs) = False
+	forall (\_ True) xs = True
+	forall p xs = ! (exists (! p _) xs)
+	```
+	
+
+	Parameters: ``f: a,  Boolean,  List a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def splitBy (acceptFn: a
+
+	Partition one `list` into two Lists based on the output of `acceptFn`.
+	Every element of `list` appears in exactly one of the output Lists.
+	Two elements in an output List retain the order they had in `list`.
+	
+	Parameters:
+	- `acceptFn`: The Boolean function which categorizes each element
+	- `list`: The List of elements to be categorized by `True` / `False`
+	
+	Returns `Pair true false`, where:
+	- `true`:  List of elements from `list` for which `acceptFn` returned `True`
+	- `false`: List of elements from `list` for which `acceptFn` returned `False`
+	
+	Examples:
+	```
+	def isEven x = x%2 == 0
+	splitBy isEven (0, 1, 3, 5, 6, Nil) = Pair (0, 6, Nil) (1, 3, 5, Nil)
+	splitBy p xs = Pair (filter p xs) (filter (! p _) xs)
+	```
+	
+
+	Parameters: ``acceptFn: a,  Boolean,  list: List a``
+
+	Return Type: ``Pair (true: List a) (false: List a)``
+
+.. wake:function:: def filter (f: a
+
+	Keep only those elements in the List where `f` evaluates to True
+	
+	Examples:
+	```
+	def isEven x = x%2 == 0
+	filter isEven (seq 10) = 0, 2, 4, 6, 8, Nil
+	filter p Nil = Nil
+	filter (\x True) xs = xs
+	filter (\x False) xs = Nil
+	filter p xs = getPairFirst (splitBy p xs)
+	```
+	
+
+	Parameters: ``f: a,  Boolean,  List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def sortBy (cmpFn: a
+
+	Given a less-than comparison operator, sort the list
+	Elements which compare equal retain their order in the output list.
+	The lessThanFn must provide these two properties for all x, y, z:
+	```
+	if lessThanFn x y then ! lessThanFn y x
+	if lessThanFn x z then lessThanFn x y || lessThanFn y z
+	```
+	
+	Parameters:
+	- `cmpFn`: The comparision operator that defines the ordering
+	- `list`: The list of elements to sort by `lessThanFn`
+	
+	Guarantees:
+	- The output is a permutation of `list`
+	- If `0 <= x < y < len list` then `lessThanFn (at list x) (at list y)` (ignoring None)
+	
+	Example:
+	```
+	sortBy (_<_) (6, 1, 4, 2, Nil) = 1, 2, 4, 6, Nil
+	sortBy p Nil = Nil
+	sortBy p (x, Nil) = (x, Nil)
+	sortBy (\x\y if x == y then False else ! p x y) xs = reverse (sortBy p xs)
+	```
+	
+
+	Parameters: ``cmpFn: a,  a,  Order,  l: List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def distinctBy (cmpFn: a
+
+	Keep only the first occurrence of a value
+	The order of non-duplicated elements is retained.
+	
+	This runs in O(n*lg(n))
+	
+	Example:
+	```
+	distinctBy (_<=>_) (1, 2, 1, 3, 4, 3, Nil) = 1, 2, 3, 4, Nil
+	distinctBy (_<=>_) Nil = Nil
+	```
+	
+
+	Parameters: ``cmpFn: a,  a,  Order,  List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def distinctRunBy (eqFn: a
+
+	Keep only the first occurrence in a run of equal values
+	
+	Example:
+	```
+	distinctRunBy (_==_) (1, 1, 2, 1, 3, 3, Nil) = 1, 2, 1, 3, Nil
+	distinctRunBy (_==_) Nil = Nil
+	distinctBy (_<=>_) | sortBy (_<_) = sortBy (_<_) | distinctRunBy (_==_)
+	```
+	
+
+	Parameters: ``eqFn: a,  a,  Boolean,  l: List a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def cmp (cmpFn: a
+
+	Compare two lists using an Order comparator
+	* `EQ` is the result if the lists are exactly equal.
+	* `LT` is the result if the first elements that `f` does not return `EQ` for returns `LT`
+	or if `l` is a prefix of `r`.
+	* `GT` is the result if the first elements that `f` does not return `EQ` for returns `GT`
+	or if `r` is a prefix of `l`.
+	
+	This is also called a lexicographical ordering.
+	
+	Parameters:
+	- `cmpFn`: The function by which elements of `l` and `r` are compared
+	- `l`: The left list
+	- `r`: The right list
+	
+	Example:
+	```
+	cmp (_<=>_) (seq 5)  (seq 5)  = EQ
+	cmp (_<=>_) (seq 5)  (seq 4)  = GT
+	cmp (_<=>_) (0, Nil) (1, Nil) = LT
+	```
+	
+
+	Parameters: ``cmpFn: a,  b,  Order,  l: List a,  r: List b``
+
+	Return Type: ``Order``
+
+.. wake:function:: def tab (f: Integer
+
+	Create a list of specified size by calling `f` on the index to generate.
+	
+	Example:
+	```
+	tab (_+100) 5 = 100, 101, 102, 103, 104, Nil
+	tab f 0 = Nil
+	tab f 3 = f 0, f 1, f 2, Nil
+	```
+	
+
+	Parameters: ``f: Integer,  a,  n: Integer``
+
+	Return Type: ``List a``
+
+.. wake:function:: def zip (a: List a) (b: List b): List (Pair a b)
+
+	Take two Lists and turn them into a List of Pairs
+	The shortest length of the two input lists sets the output length.
+	
+	Example:
+	```
+	zip (4, 7, Nil) ("a", "b", Nil) = (Pair 4 "a", Pair 7 "b", Nil)
+	zip (4, 7, Nil) ("a", "b", "c", Nil) = (Pair 4 "a", Pair 7 "b", Nil)
+	zip Nil x = Nil
+	zip x Nil = Nil
+	```
+	
+
+	Parameters: ``a: List a,  b: List b``
+
+	Return Type: ``List (Pair a b)``
+
+.. wake:function:: def unzip (list: List (Pair a b)): Pair (List a) (List b)
+
+	Turn a List of Pairs into a Pair of Lists
+	
+	Guarantees:
+	- Both output lists will be the same length
+	- if `(len x) == (len y)` then `unzip (zip x y) = Pair x y`
+	- `(\(Pair x y) zip x y) (unzip l) = l`
+	
+	Example:
+	```
+	unzip (Pair 4 "a", Pair 7 "b", Nil) = Pair (4, 7, Nil) ("a", "b", Nil)
+	unzip Nil = Pair Nil Nil
+	```
+	
+
+	Parameters: ``list: List Pair a b``
+
+	Return Type: ``Pair (List a) (List b)``
+
+.. wake:function:: def groupBy (cmpFn: a
+
+	Group a list by some comparison function.
+	Elements which compare equal are placed into the same bucket.
+	Buckets preserve the order of the original list.
+	The buckets appear in the sort-order specified by cmpFn.
+	
+	Examples:
+	```
+	def cmp a b = a%3 < b%3
+	def list = seq 10
+	groupBy cmp list =
+	(0,3,6,9,Nil), (1,4,7,Nil), (2,5,8,Nil), Nil
+	
+	def cmp a b = a/3 > b/3
+	def list = seq 10
+	groupBy cmp list =
+	(9,Nil), (6,7,8,Nil), (3,4,5,Nil), (0,1,2,Nil), Nil
+	```
+	
+
+	Parameters: ``cmpFn: a,  a,  Order,  list: List a``
+
+	Return Type: ``List (List a)``
+
+string.wake
+-----------
+.. wake:function:: def strlen (string: String): Integer
+
+	strlen: report the number of bytes a String consumes in UTF-8 representation.
+	>>>>>>>>>>>>> THIS IS NOT THE NUMBER OF CHARACTERS IN A STRING <<<<<<<<<<<<<<
+	This information can be relevant when reading / writing Strings to disk.
+	To manipulate Strings, such as extract-ing a substring, use regular expressions.
+	
+
+	Parameters: ``string: String``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def cat (strings: List String): String
+
+	cat: concatenate a List of Strings into a String.
+	If you have a finite list of terms, consider using String interpolation.
+	
+	cat ("hello", " ", "world", Nil) = "hello world"
+	cat (x, ":", y, ":", z, Nil) = "{x}:{y}:{z}"
+	
+
+	Parameters: ``strings: List String``
+
+	Return Type: ``String``
+
+.. wake:function:: def catWith (separator: String) (strings: List String): String
+
+	catWith: concatenate a List of Strings with a separator.
+	
+	seq 10
+	| map str
+	| catWith ":"
+	---
+	"0:1:2:3:4:5:6:7:8:9"
+	
+
+	Parameters: ``separator: String,  strings: List String``
+
+	Return Type: ``String``
+
+.. wake:function:: def explode (string: String): List String
+
+	explode: split a String up into Unicode code points
+	This is rarely useful; consider using a RegExp instead.
+	
+	explode "hello" = "h", "e", "l", "l", "o", Nil
+	explode "süß"   = "s", "ü", "ß", Nil
+	
+
+	Parameters: ``string: String``
+
+	Return Type: ``List String``
+
+.. wake:function:: def strbase (base: Integer): Option (Integer
+
+	strbase: convert an Integer into a String using a given base.
+	
+	For 2 <= base <= 36, the characters used for the encoding are:
+	0123456789abcdefghijklmnopqrstuvwxyz
+	^^^^^^^^^^^^^^^^ = base 16
+	^^^^^^^^^^ = base 10
+	For 37 <= base <= 62, the characters used for the encoding are:
+	0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
+	For -36 <=x <= -2, the characters used for the encoding are:
+	0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ
+	For any other (invalid) base, the String "" is returned.
+	
+	strbase   10    500 =  "500"
+	strbase   16  65535 = "ffff"
+	strbase (-15) 65535 = "FFFF"
+	
+
+	Parameters: ``base: Integer,  Option integerToFormat: Integer``
+
+	Return Type: ``String)``
+
+.. wake:function:: def intbase (base: Integer) (stringToParse: String): Option Integer
+
+	intbase: convert a String into an Option Integer using a given base.
+	
+	For base == 0, the string is checked for these prefixes:
+	"0b" or "0B" -- base= 2 processing for everything after the prefix
+	"0x" or "0X" -- base=16 processing for everything after the prefix
+	"0"          -- base= 8 processing for everything after the prefix
+	otherwise, process the String as base=10
+	For 2  <= base <= 36, upper- and lower-case characters are treated identically.
+	For 37 <= base <= 62, upper-case letters represent 10..35 while lower-case letters represent 36..61.
+	
+	For any other base (or an illegal input String), None is returned.
+	
+
+	Parameters: ``base: Integer,  stringToParse: String``
+
+	Return Type: ``Option Integer``
+
+.. wake:function:: def int (stringToParse: String): Option Integer
+
+	int: convert a String into an Integer with the usual prefixes.
+	
+	The base used for the conversion depends on the prefix:
+	"0b" or "0B" -- base= 2 processing for everything after the prefix
+	"0x" or "0X" -- base=16 processing for everything after the prefix
+	"0"          -- base= 8 processing for everything after the prefix
+	otherwise, process the String as base=10
+	
+	int "0x10" = Some 16
+	int "10"   = Some 10
+	int "0b10" = Some 2
+	int "0y10" = None
+	
+
+	Parameters: ``stringToParse: String``
+
+	Return Type: ``Option Integer``
+
+.. wake:function:: def integerToUnicode (codepoint: Integer): String
+
+	integerToUnicode: convert an Integer into a Unicode codepoint.
+	For Integers <= 127, this is the ASCII character set.
+	For Integers < 0, returns "".
+	
+	integerToUnicode (-2) = ""
+	integerToUnicode 48 = "0"
+	integerToUnicode 65 = "A"
+	integerToUnicode 97 = "a"
+	integerToUnicode 231 = "ç"
+	integerToUnicode 0x1f600 = "😀"
+	integerToUnicode 0 = "\x00"
+	
+
+	Parameters: ``codepoint: Integer``
+
+	Return Type: ``String``
+
+.. wake:function:: def unicodeToInteger (firstCharacterToConvert: String): Integer
+
+	unicodeToInteger: convert the first codepoint in a String to an Integer.
+	
+	unicodeToInteger "A" = 65
+	unicodeToInteger "a" = 97
+	unicodeToInteger "0123" = 48
+	unicodeToInteger "😀!" = 128512
+	unicodeToInteger "" = 0
+	unicodeToInteger "\0a" = 0
+	
+
+	Parameters: ``firstCharacterToConvert: String``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def integerToByte (byte: Integer): String
+
+	integerToByte: convert an Integer into a String using raw binary.
+	WARNING: For 128 <= byte <= 255, this function creates invalid UTF-8 / Unicode.
+	Instead of calling this function, you probably meant to call integerToUnicode.
+	For byte < 0 or byte > 255, returns "".
+	
+	integerToByte 0 = "\x00"
+	integerToByte 65 = "A"
+	integerToByte 97 = "A"
+	integerToByte 256 = ""
+	integerToByte 231 = (an illegal UTF-8 String which includes a byte with value 0xe7)
+	
+	It is possible to create legal UTF-8 from illegal String fragments; eg:
+	"{integerToByte 0xc3}{integerToByte 0xa7}" = "ç"
+	
+
+	Parameters: ``byte: Integer``
+
+	Return Type: ``String``
+
+.. wake:function:: def byteToInteger (firstByteToConvert: String): Integer
+
+	byteToInteger: convert the first byte of a UTF-8-encoded String into an Integer.
+	Instead of calling this function, you probably meant to call unicodeToInteger.
+	
+	byteToInteger "" = 0
+	byteToInteger "\x00" = 0
+	byteToInteger "A" = 65
+	byteToInteger (integerToByte 231) = 231
+	
+
+	Parameters: ``firstByteToConvert: String``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def unicodeCanonical (str: String): String
+
+	unicodeCanonical: eliminate combining characters; C+◌̧ => Ç
+	
+
+	Parameters: ``str: String``
+
+	Return Type: ``String``
+
+.. wake:function:: def unicodeIdentifier (str: String): String
+
+	unicodeIdentifier: eliminate rendering distinctions; ¼i⁹ => 1/4i9
+	
+
+	Parameters: ``str: String``
+
+	Return Type: ``String``
+
+.. wake:function:: def unicodeLowercase (str: String): String
+
+	unicodeLowercase: eliminate case distinctions; C => c
+	
+
+	Parameters: ``str: String``
+
+	Return Type: ``String``
+
+.. wake:function:: def sortStrings (list: List String): List String
+
+	sortStrings: sort a list of strings as a human would judge them.
+	
+
+	Parameters: ``list: List String``
+
+	Return Type: ``List String``
+
+.. wake:function:: def scmpCanonical (x: String) (y: String): Order
+
+	Unicode NFC string comparison Ç == C+◌̧
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Order``
+
+.. wake:function:: def scmpIdentifier (x: String) (y: String): Order
+
+	Unicode NFKC string comparison (¼i⁹ = 1/4i9)
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Order``
+
+.. wake:function:: def scmpLowercase (x: String) (y: String): Order
+
+	Unicode case insensitive NFKC comparison
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Order``
+
+.. wake:function:: def scmp (x: String) (y: String): Order
+
+	Raw binary string comparison; no normalization performed
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Order``
+
+.. wake:function:: def (x: String) <=>~ (y: String): Order
+
+	NFKC order (fancy format removed) -- secure default
+	This is the string order you should use to compare human inputs
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Order``
+
+.. wake:function:: def (x: String) <~ (y: String): Boolean
+
+	Returns True if x is less than y, as a human would judge it.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) >~ (y: String): Boolean
+
+	Returns True if x is greater than y, as a human would judge it.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) >=~ (y: String): Boolean
+
+	Returns True if x is greater than or equal to y, as a human would judge it.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) <=~ (y: String): Boolean
+
+	Returns True if x is less than or equal to y, as a human would judge it.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String)
+
+	Returns True if x is equal to y, as a human would judge it.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) !=~ (y: String): Boolean
+
+	Returns True if x is not equal to y, as a human would judge it.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) <=>^ (y: String): Order
+
+	Case insensitive order (^ = capitals ignored)
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Order``
+
+.. wake:function:: def (x: String) <^ (y: String): Boolean
+
+	Returns True if x is less than y, ignoring case.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) >^ (y: String): Boolean
+
+	Returns True if x is greater than y, ignoring case.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) >=^ (y: String): Boolean
+
+	Returns True if x is greater than or equal to y, ignoring case.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) <=^ (y: String): Boolean
+
+	Returns True if x is less than or equal to y, ignoring case.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String)
+
+	Returns True if x is equal to y, ignoring case.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) !=^ (y: String): Boolean
+
+	Returns True if x is not equal to y, ignoring case.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) <=>* (y: String): Order
+
+	Raw binary string order
+	Only use this for non-textual data
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Order``
+
+.. wake:function:: def (x: String) <* (y: String): Boolean
+
+	Returns True if x is less than y, in UTF-8 representation.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) >* (y: String): Boolean
+
+	Returns True if x is greater than y, in UTF-8 representation.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) >=* (y: String): Boolean
+
+	Returns True if x is greater than or equal to y, in UTF-8 representation.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) <=* (y: String): Boolean
+
+	Returns True if x is less than or equal to y, in UTF-8 representation.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String)
+
+	Returns True if x is equal to y, in UTF-8 representation.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: String) !=* (y: String): Boolean
+
+	Returns True if x is not equal to y, in UTF-8 representation.
+	
+
+	Parameters: ``x: String,  y: String``
+
+	Return Type: ``Boolean``
+
+integer.wake
+------------
+.. wake:function:: def +(x: Integer): Integer
+
+	Unary positive sign operator for Integer values.
+	(+5) = 5
+	
+
+	Parameters: ``x: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def -(x: Integer): Integer
+
+	Unary negative sign operator for Integer values.
+	(-5) = 0-5
+	
+
+	Parameters: ``x: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def ~(x: Integer): Integer
+
+	Unary two's complement operator for Integer values.
+	~0 = -1
+	~4 = -5
+	
+
+	Parameters: ``x: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def (x: Integer) + (y: Integer): Integer
+
+	Binary addition operator for Integer values.
+	1 + 2 = 3
+	1 + 5 = 6
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def (x: Integer) - (y: Integer): Integer
+
+	Binary subtraction operator for Integer values.
+	2 - 1 =  1
+	3 - 4 = -1
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def (x: Integer) * (y: Integer): Integer
+
+	Binary multiplication operator for Integer values.
+	3 *   4  = 12
+	-3 * (-4) = 12
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def (x: Integer) / (y: Integer): Integer
+
+	Binary division operator for Integer values.
+	12 / 3 =  4
+	13 / 3 =  4
+	-8 / 4 = -2
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def (x: Integer) % (y: Integer): Integer
+
+	Binary remainder operator for Integer values.
+	11 % 5 = 1
+	4 % 5 = 5
+	7 % 5 = 2
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def (x: Integer) << (y: Integer): Integer
+
+	Binary left shift operator for Integer values.
+	1 << 10 = 1024
+	3 <<  8 =  768
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def (x: Integer) >> (y: Integer): Integer
+
+	Binary right shift operator for Integer values.
+	1024 >> 11 = 0
+	1024 >>  9 = 2
+	768 >>  8 = 3
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def (x: Integer) ^ (y: Integer): Integer
+
+	Binary exponentiation operator for Integer values.
+	2^8 = 256
+	3^2 = 9
+	5^3 = 125
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def root (n: Integer) (x: Integer): Option Integer
+
+	Returns the n-th root of x.
+	root 2  9    = Some 3
+	root 3 27    = Some 3
+	root 3 28    = Some 3
+	root 3 (-27) = Some -3
+	root 2 (-9)  = None
+	
+
+	Parameters: ``n: Integer,  x: Integer``
+
+	Return Type: ``Option Integer``
+
+.. wake:function:: def sqrt (x: Integer): Option Integer
+
+	Unary square root operator.
+	sqrt 9    = Some 3
+	sqrt (-9) = None
+	
+
+	Parameters: ``x: Integer``
+
+	Return Type: ``Option Integer``
+
+.. wake:function:: def abs (x: Integer): Integer
+
+	Unary absolute-value operator.
+	
+
+	Parameters: ``x: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def xor (x: Integer) (y: Integer): Integer
+
+	Binary bitwise XOR operator.
+	xor 4 4 = 0
+	xor 4 3 = 7
+	xor (-4) (-3) = 1
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def and (x: Integer) (y: Integer): Integer
+
+	Binary bitwise AND operator.
+	and 4 4 = 4
+	and 4 3 = 0
+	and (-4) (-3) = -4
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def or (x: Integer) (y: Integer): Integer
+
+	Binary bitwise OR operator.
+	or 4 4 = 4
+	or 4 3 = 7
+	or (-4) (-3) = -3
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def gcd (x: Integer) (y: Integer): Integer
+
+	Greatest Common Divisor.
+	gcd 4 4 = 4
+	gcd 4 3 = 1
+	gcd (-4) (-3) = 1
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def lcm (x: Integer) (y: Integer): Integer
+
+	Least Common Multiple.
+	lcm 4 4 = 4
+	lcm 4 3 = 12
+	lcm (-4) (-3) = 12
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def powm (x: Integer) (y: Integer) (m: Integer): Integer
+
+	Computes (x^y) % m.
+	powm 2 7 5 = 4
+	powm 3 2 2 = 1
+	
+
+	Parameters: ``x: Integer,  y: Integer,  m: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def icmp (x: Integer) (y: Integer): Order
+
+	Compare two Integers for Order
+	icmp 4 5 = LT
+	icmp 5 5 = EQ
+	icmp 5 4 = GT
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Order``
+
+.. wake:function:: def (x: Integer) <=> (y: Integer): Order
+
+	Compare two Integers for Order
+	4 <=> 5 = LT
+	5 <=> 5 = EQ
+	5 <=> 4 = GT
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Order``
+
+.. wake:function:: def (x: Integer) < (y: Integer): Boolean
+
+	Binary Less-Than operator for Integers.
+	4 < 5 = True
+	4 < 4 = False
+	5 < 4 = False
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Integer) > (y: Integer): Boolean
+
+	Binary Greater-Than operator for Integers.
+	4 > 5 = False
+	4 > 4 = False
+	5 > 4 = True
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Integer) >= (y: Integer): Boolean
+
+	Binary Greater-Or-Equal operator for Integers.
+	4 >= 5 = False
+	4 >= 4 = True
+	5 >= 4 = True
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Integer) <= (y: Integer): Boolean
+
+	Binary Less-Or-Equal operator for Integers.
+	4 <= 5 = True
+	4 <= 4 = True
+	5 <= 4 = False
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Integer)
+
+	Binary Is-Equal operator for Integers.
+	4 == 5 = False
+	4 == 4 = True
+	5 == 4 = False
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Integer) != (y: Integer): Boolean
+
+	Binary Not-Equal operator for Integers.
+	4 == 5 = True
+	4 == 4 = False
+	5 == 4 = True
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def min (x: Integer) (y: Integer): Integer
+
+	Calculates the minimum of two Integers.
+	min 4 5 = 4
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def max (x: Integer) (y: Integer): Integer
+
+	Calculates the maximum of two Integers.
+	max 4 5 = 5
+	
+
+	Parameters: ``x: Integer,  y: Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def ∏ (l: List Integer): Integer
+
+	No description for this feature yet.
+
+	Parameters: ``l: List Integer``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def ∑ (l: List Integer): Integer
+
+	No description for this feature yet.
+
+	Parameters: ``l: List Integer``
+
+	Return Type: ``Integer``
+
+json.wake
+---------
+.. wake:function:: def getJString: JValue => Option String
+
+	No description for this feature yet.
+
+	Parameters: ``JValue``
+
+	Return Type: ``Option String``
+
+.. wake:function:: def getJInteger: JValue => Option Integer
+
+	No description for this feature yet.
+
+	Parameters: ``JValue``
+
+	Return Type: ``Option Integer``
+
+.. wake:function:: def getJDouble: JValue => Option Double
+
+	No description for this feature yet.
+
+	Parameters: ``JValue``
+
+	Return Type: ``Option Double``
+
+.. wake:function:: def getJBoolean: JValue => Option Boolean
+
+	No description for this feature yet.
+
+	Parameters: ``JValue``
+
+	Return Type: ``Option Boolean``
+
+.. wake:function:: def getJObject: JValue => Option (List (Pair String JValue))
+
+	No description for this feature yet.
+
+	Parameters: ``JValue``
+
+	Return Type: ``Option (List (Pair String JValue))``
+
+.. wake:function:: def getJArray: JValue => Option (List JValue)
+
+	No description for this feature yet.
+
+	Parameters: ``JValue``
+
+	Return Type: ``Option (List JValue)``
+
+.. wake:function:: def parseJSONBody (body: String): Result JValue Error
+
+	No description for this feature yet.
+
+	Parameters: ``body: String``
+
+	Return Type: ``Result JValue Error``
+
+.. wake:function:: def parseJSONFile (path: Path): Result JValue Error
+
+	No description for this feature yet.
+
+	Parameters: ``path: Path``
+
+	Return Type: ``Result JValue Error``
+
+.. wake:function:: def jsonEscape str
+
+	No description for this feature yet.
+
+	Parameters: ``str: String``
+
+	Return Type: ``String``
+
+.. wake:function:: def prettyJSONFormat
+
+	No description for this feature yet.
+
+	Parameters: None
+
+	Return Type: ``JSONFormat``
+
+.. wake:function:: def customFormatJSON fmt body
+
+	No description for this feature yet.
+
+	Parameters: ``fmt: JSONFormat,  body: JValue``
+
+	Return Type: ``String``
+
+.. wake:function:: def formatJSON
+
+	No description for this feature yet.
+
+	Parameters: ``body: JValue``
+
+	Return Type: ``String``
+
+.. wake:function:: def prettyJSON
+
+	No description for this feature yet.
+
+	Parameters: ``body: JValue``
+
+	Return Type: ``String``
+
+.. wake:function:: def root /| filterFn
+
+	No description for this feature yet.
+
+	Parameters: ``root: JValue,  filterFn: JValue,  Boolean``
+
+	Return Type: ``JValue``
+
+.. wake:function:: def jfilter filterFn root
+
+	No description for this feature yet.
+
+	Parameters: ``filterFn: JValue,  Boolean,  root: JValue``
+
+	Return Type: ``JValue``
+
+.. wake:function:: def root /../ filterFn
+
+	No description for this feature yet.
+
+	Parameters: ``root: JValue,  filterFn: JValue,  Boolean``
+
+	Return Type: ``JValue``
+
+.. wake:function:: def jfind filterFn root
+
+	No description for this feature yet.
+
+	Parameters: ``filterFn: JValue,  Boolean,  root: JValue``
+
+	Return Type: ``JValue``
+
+.. wake:function:: def jempty root
+
+	No description for this feature yet.
+
+	Parameters: ``root: JValue``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def jlist root
+
+	No description for this feature yet.
+
+	Parameters: ``root: JValue``
+
+	Return Type: ``List JValue``
+
+.. wake:function:: def x // y
+
+	No description for this feature yet.
+
+	Parameters: ``x: JValue,  y: RegExp``
+
+	Return Type: ``JValue``
+
+.. wake:function:: def x ==/ y
+
+	No description for this feature yet.
+
+	Parameters: ``x: JValue,  y: JValue``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def normalizeJSONWith (fmt: JSONNormalize) (json: JValue): Result JValue Error
+
+	Simplify a JSON structure according to the rules given.
+	For example, Wake's implementation of JSON is more lenient than the base
+	standards, so if maximum compatibility is desired in situations where some
+	other implementation may be parsing generated output, `normalizeJSONCompat`
+	may be used to target that lowest common denominator (see `normalizeJSON` for
+	that particular case).
+	
+	Note that the relevant normalization is applied to each member of a `JArray`
+	or `JObject` *before* the enclosing container. This means that if some
+	normalization fails anywhere in the JSON tree the entire call will fail, even
+	if the specific branch causing the failure would later have been pruned.
+	
+
+	Parameters: ``fmt: JSONNormalize,  json: JValue``
+
+	Return Type: ``Result JValue Error``
+
+.. wake:function:: def mergeJSON (jsons: List JValue): Result JValue Error
+
+	Attempt to merge several JSON structures, while resolving any duplicate keys.
+	In particular, this function will concatenate the members of two `JArray`
+	values, treat `JNull` as a wildcard placeholder, and otherwise return the
+	original value if both instances are equal. It fails if the same location in
+	the object tree is associated with multiple values of different types or with
+	different values of a type which cannot be combined. Returns a `JNull` value
+	if passed an empty list.
+	
+
+	Parameters: ``jsons: List JValue``
+
+	Return Type: ``Result JValue Error``
+
+.. wake:function:: def overrideJSON (jsons: List JValue): JValue
+
+	Use the value of the key appearing last in the list, but recurse into `JObject`s.
+	Essentially, allows overwriting any key in the object tree by specifying a new
+	value at the same place in a later tree. Returns `JNull` if given an empty list.
+	
+	If some location has *both* `JObject` values and values of other types, any
+	`JObject` values before the last non-`JObject` value will be dropped:
+	
+	```
+	("\{\"key\":\{\"firstSubkey\":1\}\}", "\{\"key\":\{\"secondSubkey\":2\}\}", Nil)
+	| findFailFn parseJSONBody
+	| rmapPass lastValueInList
+	| rmap formatJSON
+	Pass "\{\"key\":\{\"firstSubkey\":1,\"secondSubkey\":2\}\}"
+	```
+	
+	```
+	("\{\"firstKey\":1\}", "2", "\{\"secondKey\":3\}", Nil)
+	| findFailFn parseJSONBody
+	| rmapPass lastValueInList
+	| rmap formatJSON
+	Pass "\{\"secondKey\":3\}"
+	```
+	
+
+	Parameters: ``jsons: List JValue``
+
+	Return Type: ``JValue``
+
+.. wake:tuple:: tuple JSONNormalize
+
+	The rules by which `normalizeJSONWith` will simplify JSON values.
+	If any particular function is unable to operate on every input value (e.g. a
+	`JObject` contains duplicate keys of types which cannot be combined), that
+	rule may return a `Fail` which halts the broader processing.
+	
+
+	Parameters: ``String: String,  Result String Error,  Integer: Integer,  Result Integer Error,  Double: Double,  Result Double Error,  Boolean: Boolean,  Result Boolean Error,  Object: List Pair String JValue,  Result List Pair String JValue Error,  Array: List JValue,  Result List JValue Error``
+
+	Return Type: ``JSONNormalize``
+
+.. wake:function:: def lastValueInList (values: List JValue): Result JValue Error
+
+	Use the value of the key appearing last in the list, but recurse into `JObject`s.
+	Essentially, allows overwriting any key in the object tree by specifying a new
+	value at the same place in a later tree. Will always always succeed, returning
+	`Pass JNull` if given an empty list.
+	
+	See `overrideJSON` for examples of usage.
+	
+
+	Parameters: ``values: List JValue``
+
+	Return Type: ``Result JValue Error``
+
+order.wake
+----------
+.. wake:function:: def isLT: Order => Boolean
+
+	Is less-than: convert Order to Boolean
+	def a < b = a <=> b | isLT
+	isLT LT = True
+	isLT EQ = False
+	isLT GT = False
+	
+
+	Parameters: ``Order``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def isEQ: Order => Boolean
+
+	Is equal: convert Order Boolean
+	def a == b = a <=> b | isEQ
+	isEQ LT = False
+	isEQ EQ = True
+	isEQ GT = False
+	
+
+	Parameters: ``Order``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def isGT: Order => Boolean
+
+	Is greater-than: convert Order to Boolean
+	def a > b = a <=> b | isGT
+	isGT LT = False
+	isGT EQ = False
+	isGT GT = True
+	
+
+	Parameters: ``Order``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def isLE: Order => Boolean
+
+	Is less-than-or-equal: convert Order to Boolean
+	def a <= b = a <=> b | isLE
+	isLE LT = True
+	isLE EQ = True
+	isLE GT = False
+	
+
+	Parameters: ``Order``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def isNE: Order => Boolean
+
+	Is not-equal: convert Order to Boolean
+	def a != b = a <=> b | isNE
+	isEQ LT = True
+	isEQ EQ = False
+	isEQ GT = True
+	
+
+	Parameters: ``Order``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def isGE: Order => Boolean
+
+	Is greater-than-or-equal: convert Order to Boolean
+	def a >= b = a <=> b | isGE
+	isGE LT = False
+	isGE EQ = True
+	isGE GT = True
+	
+
+	Parameters: ``Order``
+
+	Return Type: ``Boolean``
+
+option.wake
+-----------
+.. wake:function:: def isSome: Option a => Boolean
+
+	isSome: Report if an Option has a value.
+	If you find yourself using the function, consider using a match instead.
+	
+	isSome (Some 451) = True
+	isSome (Some "x") = True
+	isSome None       = False
+	
+
+	Parameters: ``Option a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def isNone: Option a => Boolean
+
+	isNone: Report if an Option has no value.
+	If you find yourself using the function, consider using a match instead.
+	
+	isNone (Some 451) = False
+	isNone (Some "x") = False
+	isNone None       = True
+	
+
+	Parameters: ``Option a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def getOrElse (default: a): Option a => a
+
+	getOrElse: extract the value from an Option, with a supplied default if None.
+	The default value expression is evaluated whether or not the Option is None.
+	
+	int "not-an-integer"     # Option Integer
+	| getOrElse 5            # Integer
+	---
+	5
+	
+
+	Parameters: ``default: a,  Option a``
+
+	Return Type: ``a``
+
+.. wake:function:: def getOrElseFn (fn: Unit => a): Option a => a
+
+	getOrElse: extract the value from an Option, with a supplied default function if None.
+	The default value function is evaluated only when the Option is None.
+	
+	int "567"
+	| getOrElseFn (\Unit firstFactorOf 8947289472892423423423423235325)
+	---
+	567
+	
+
+	Parameters: ``fn: Unit,  a,  Option a``
+
+	Return Type: ``a``
+
+.. wake:function:: def orElse (alternate: Option a): Option a => Option a
+
+	orElse: combine two Options, using the first value found, if any.
+	
+	int "not-an-integer"
+	| orElse (int "343")
+	| orElse (int "asd")
+	---
+	Some 343
+	
+
+	Parameters: ``alternate: Option a,  Option a``
+
+	Return Type: ``Option a``
+
+.. wake:function:: def omap (f: a => b): Option a => Option b
+
+	omap: apply function `f` to the optional contents
+	If you find yourself using the function with getOrElse, consider using a match instead.
+	
+	omap (_+1) (Some 4) = Some 5
+	omap (_+1) None     = None
+	
+
+	Parameters: ``f: a,  b,  Option a``
+
+	Return Type: ``Option b``
+
+.. wake:function:: def omapPartial (f: a => Option b): Option a => Option b
+
+	omapPartial: apply partial function 'f' to the optional contents
+	A partial function returns Option; only Some cases result in a value.
+	
+	def divideEven x =
+	if x&1 == 1 then
+	None
+	else
+	Some (x / 2)
+	
+	omapPartial divideEven None     = None
+	omapPartial divideEven (Some 8) = Some 4
+	omapPartial divideEven (Some 7) = None
+	
+
+	Parameters: ``f: a,  Option b,  Option a``
+
+	Return Type: ``Option b``
+
+.. wake:function:: def ofilter (f: a => Boolean): Option a => Option a
+
+	ofilter: remove the contents of an option when `f` returns False.
+	
+	def isEven x =
+	x&x == 0
+	ofilter isEven None     = None
+	ofilter isEven (Some 7) = None
+	ofilter isEven (Some 8) = Some 8
+	
+
+	Parameters: ``f: a,  Boolean,  Option a``
+
+	Return Type: ``Option a``
+
+.. wake:function:: def findSomeFn (fn: a
+
+	findSomeFn: return the first Some output by 'fn' on a List or else None
+	Once a Some is found, fn is not evaluated on further elements.
+	This means that fn is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'map fn | findSome' instead.
+	
+	findSomeFn int ("abc", "456", "zz", "123", Nil) = Some 456
+	findSomeFn int ("abc", "_56", "zz", "_23", Nil) = None
+	
+
+	Parameters: ``fn: a,  Option b,  List a``
+
+	Return Type: ``Option b``
+
+.. wake:function:: def findNoneFn (fn: a
+
+	findNoneFn: if fn returns Some for all List elements, return the outputs else None
+	Once a None is found, fn is not evaluated on further elements.
+	This means that fn is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'map fn | findNone' instead.
+	
+	findNoneFn int ("456", "123", Nil) = Some (456, 123, Nil)
+	findNoneFn int ("_56", "123", Nil) = None
+	
+
+	Parameters: ``fn: a,  Option b,  List a``
+
+	Return Type: ``Option (List b)``
+
+.. wake:function:: def getOrFail (failVal: fail): Option pass
+
+	getOrFail: Convert Some to Pass and None to a Fail with the supplied value.
+	The fail expression is evaluated even when the Option is None.
+	
+	int "not-an-integer"
+	| getOrFail "some error"
+	---
+	Fail "some error"
+	
+	int "81234"
+	| getOrFail "some error"
+	---
+	Pass 81234
+	
+
+	Parameters: ``failVal: a,  Option b``
+
+	Return Type: ``Result b a``
+
+.. wake:function:: def getOrFailFn (failFn: Unit => fail): Option pass => Result pass fail
+
+	getOrFailFn: Convert Some to Pass and None to a Fail with the function output.
+	The fail function is evaluated only when the Option is None.
+	
+	int "not-an-integer"
+	| getOrFailFn (\Unit "some error")
+	---
+	Fail "some error"
+	
+	int "81234"
+	| getOrFailFn (\Unit "some error")
+	---
+	Pass 81234
+	
+
+	Parameters: ``failFn: Unit,  a,  Option b``
+
+	Return Type: ``Result b a``
+
+.. wake:function:: def getOrPass (passVal: pass): Option fail
+
+	getOrPass: Convert Some to Fail and None to a Pass with the supplied value.
+	The fail expression is evaluated even when the Option is None.
+	
+	int "not-an-integer"
+	| getOrPass "some error"
+	---
+	Pass "some error"
+	
+	int "81234"
+	| getOrPass "some error"
+	---
+	Fail 81234
+	
+
+	Parameters: ``passVal: a,  Option b``
+
+	Return Type: ``Result a b``
+
+.. wake:function:: def getOrPassFn (passFn: Unit => pass): Option fail => Result pass fail
+
+	getOrPassFn: Convert Some to Fail and None to a Pass with the function output.
+	The pass function is evaluated only when the Option is None.
+	
+	int "not-an-integer"
+	| getOrFailFn (\Unit "some error")
+	---
+	Pass "some error"
+	
+	int "81234"
+	| getOrFailFn (\Unit "some error")
+	---
+	Fail 81234
+	
+
+	Parameters: ``passFn: Unit,  a,  Option b``
+
+	Return Type: ``Result a b``
+
+double.wake
+-----------
+.. wake:function:: def dabs (x: Double): Double
+
+	Unary absolute value operator for a Double.
+	dabs (+. 2.5) = 2.5
+	dabs (-. 2.5) = 2.5
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def -. (x: Double): Double
+
+	Unary negative sign for a Double.
+	-. (-. 2.5) =  2.5
+	-. (+. 2.5) = -2.5
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def +. (x: Double): Double
+
+	Unary positive sign for a Double.
+	+. 2.5 = 2.5
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def (x: Double) +. (y: Double): Double
+
+	Binary addition operator for Double values.
+	1.1 +. 2.0 = 3.1
+	0.1 +. 0.5 = 0.6
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def (x: Double) -. (y: Double): Double
+
+	Binary subtraction operator for Double values.
+	4.0 -. 2.2 = 1.8
+	1.1 -. 2.0 = -. 0.9
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def (x: Double) *. (y: Double): Double
+
+	Binary multiplication operator for Double values.
+	2.0 *. 3.3 = 6.6
+	2.0 *. 4.1 = 8.2
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def (x: Double) /. (y: Double): Double
+
+	Binary division operator for Double valuess.
+	4.0 /. 2.0 = 2.0
+	5.0 /. 2.0 = 2.5
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def (x: Double) ^. (y: Double): Double
+
+	Binary exponentiation operator for Double values.
+	2.0 ^. 3.0 = 8.0
+	0.5 ^. 2.0 = 0.25
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dfma (x: Double) (y: Double) (z: Double): Double
+
+	Computes x*y + z with rounding only at the end.
+	The fused-multiply-add operation is useful in numeric algorithms.
+	It is necessary in order compute values with full precision.
+	dfma 2.0 3.0 1.0 = 7.0
+	dfma 1.0 1.0 1.0 = 3.0
+	
+
+	Parameters: ``x: Double,  y: Double,  z: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def droot (n: Double): Double
+
+	Computes the n-th root.
+	droot 2.0 9.0  = 3.0
+	droot 3.0 27.0 = 3.0
+	droot 3.0 (-. 27.0) = nan
+	
+
+	Parameters: ``n: Double,  Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def √ (x: Double): Double
+
+	Unary operator for square root, using the unicode character.
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def ∛ (x: Double): Double
+
+	Unary operator for cube root.
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def ∜ (x: Double): Double
+
+	Unary operator for fourth root.
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dcmp (x: Double) (y: Double): Option Order
+
+	Compare two Double values.
+	NaN values cannot be compared, so return None
+	nan <=>. 4.5 = None
+	4.5 <=>. nan = None
+	nan <=>. nan = None
+	4.5 <=>. 4.5 = Some EQ
+	4.5 <=>. 5.0 = Some LT
+	4.0 <=>. 4.5 = Some GT
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Option Order``
+
+.. wake:function:: def (x: Double) <=>. (y: Double): Option Order
+
+	Comparison of two Doubles.
+	NaN values cannot be compared, so return None
+	nan <=>. 4.5 = None
+	4.5 <=>. nan = None
+	nan <=>. nan = None
+	4.5 <=>. 4.5 = Some EQ
+	4.5 <=>. 5.0 = Some LT
+	4.0 <=>. 4.5 = Some GT
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Option Order``
+
+.. wake:function:: def (x: Double) <. (y: Double): Boolean
+
+	Binary Less-Than Operator.
+	IEEE 754 requires comparison with NaN to return False
+	nan <. nan = False
+	nan <. 1.0 = False
+	1.0 <. nan = False
+	1.0 <. 1.0 = False
+	1.0 <. 0.0 = False
+	1.0 <. 2.0 = True
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Double) >. (y: Double): Boolean
+
+	Binary Greater-Than Operator.
+	IEEE 754 requires comparison with NaN to return False
+	nan >. nan = False
+	nan >. 1.0 = False
+	1.0 >. nan = False
+	1.0 >. 1.0 = False
+	1.0 >. 0.0 = True
+	1.0 >. 2.0 = False
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Double) >=. (y: Double): Boolean
+
+	Binary Greater-Or-Equal Operator.
+	IEEE 754 requires comparison with NaN to return False
+	nan >=. nan = False
+	nan >=. 1.0 = False
+	1.0 >=. nan = False
+	1.0 >=. 1.0 = True
+	1.0 >=. 0.0 = True
+	1.0 >=. 2.0 = False
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Double) <=. (y: Double): Boolean
+
+	Binary Less-Or-Equal Operator.
+	IEEE 754 requires comparison with NaN to return False
+	nan <=. nan = False
+	nan <=. 1.0 = False
+	1.0 <=. nan = False
+	1.0 <=. 1.0 = True
+	1.0 <=. 0.0 = False
+	1.0 <=. 2.0 = True
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Double)
+
+	Binary Equal-To Operator.
+	IEEE 754 requires comparison with NaN to return False
+	nan ==. nan = False
+	nan ==. 1.0 = False
+	1.0 ==. nan = False
+	1.0 ==. 1.0 = True
+	1.0 ==. 0.0 = False
+	1.0 ==. 2.0 = False
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (x: Double) !=. (y: Double): Boolean
+
+	Binary Not-Equal Operator.
+	IEEE 754 requires comparison with NaN to return True
+	nan !=. nan = True
+	nan !=. 1.0 = True
+	1.0 !=. nan = True
+	1.0 !=. 1.0 = False
+	1.0 !=. 0.0 = True
+	1.0 !=. 2.0 = True
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def dmin (x: Double) (y: Double): Double
+
+	Computes the minimum of two Double values.
+	If either is nan, the result is nan.
+	dmin nan nan = nan
+	dmin nan 1.0 = nan
+	dmin 1.0 nan = nan
+	dmin 1.0 3.0 = 1.0
+	dmin 3.0 1.0 = 1.0
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dmax (x: Double) (y: Double): Double
+
+	Computes the maximum of two Doubles.
+	If either is nan, the result is nan
+	dmax nan nan = nan
+	dmax nan 1.0 = nan
+	dmax 1.0 nan = nan
+	dmax 1.0 3.0 = 3.0
+	dmax 3.0 1.0 = 3.0
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def ∏. (l: List Double): Double
+
+	No description for this feature yet.
+
+	Parameters: ``l: List Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def ∑. (l: List Double): Double
+
+	No description for this feature yet.
+
+	Parameters: ``l: List Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dformat (format: DoubleFormat): (digits: Integer)
+
+	Format a Double as a String; for digits=3:
+	DoubleFixed       1000.000   1.000       # exactly 3 digits after the decimal
+	DoubleScientific  1.000e+03  1.000e+00   # exactly 3 digits after the decimal
+	DoubleHex         0x1.f40p+9 0x1.000p+0  # exactly 3 digits after the decimal
+	DoubleDefault     1e+03      1e0         # at 3 digits of precision
+	
+
+	Parameters: ``format: DoubleFormat,  p: Integer,  x: Double``
+
+	Return Type: ``String``
+
+.. wake:function:: def double (doubleInString: String): Option Double
+
+	Convert a String into a Double
+	Can parse any Double formatted by dformat.
+	If the value could not be processed; returns None
+	double "1.0" = Some 1e0
+	double "xyz" = None
+	
+
+	Parameters: ``doubleInString: String``
+
+	Return Type: ``Option Double``
+
+.. wake:function:: def dint (x: Integer): Double
+
+	Convert an Integer into a Double
+	dint 55 = 55e0
+	dint (1 << 2000) = inf
+	
+
+	Parameters: ``x: Integer``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dclass (x: Double): DoubleClass
+
+	Categorize a Double based on the type of number
+	dclass inf = DoubleInfinite
+	dclass nan = DoubleNaN
+	dclass 1.0 = DoubleNormal
+	dclass 1.0e-322 = DoubleSubNormal
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``DoubleClass``
+
+.. wake:function:: def dfrexp (x: Double): Pair Double Integer
+
+	Split 'x' into (Pair sig exp), such that:
+	x = sig * 2^exp
+	0.5 <= sig < 1.0
+	
+	dfrexp 1.0 = Pair 0.5  1
+	dfrexp 2.0 = Pair 0.5  2
+	dfrexp 4.0 = Pair 0.5  3
+	dfrexp 3.0 = Pair 0.75 2
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Pair Double Integer``
+
+.. wake:function:: def dldexp (fraction: Double) (exponent: Integer): Double
+
+	Reverse the effects of dfrexp
+	
+	dldexp 0.5  1 = 1.0
+	dldexp 0.5  2 = 2.0
+	dldexp 0.5  3 = 4.0
+	dldexp 0.75 2 = 3.0
+	
+
+	Parameters: ``fraction: Double,  exponent: Integer``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dmodf (x: Double): Pair Integer Double
+
+	Split 'x' into (Pair int fraction), such that:
+	x = int + fraction
+	-1 < fraction < 1
+	sign(fraction) = sign(x)
+	
+	dmodf 5.0 = Pair 5 0.0
+	dmodf 5.1 = Pair 5 0.1
+	dmodf (-.5.1) = Pair -5 -0.1
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Pair Integer Double``
+
+.. wake:function:: def dcos (radians: Double): Double
+
+	Calculates the cosine of a Double.
+	dcos nan       =   nan
+	dcos 0.0       =   1.0
+	dcos (pi/.2.0) =   0.0
+	dcos pi        = -.1.0
+	
+
+	Parameters: ``radians: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dsin (radians: Double): Double
+
+	Calculates the sine of a Double.
+	dsin nan       = nan
+	dsin 0.0       = 0.0
+	dsin (pi/.2.0) = 1.0
+	dins pi        = 0.0
+	
+
+	Parameters: ``radians: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dtan (radians: Double): Double
+
+	Calculates the tangent of a Double.
+	dtan (-.pi/.2.0) = -inf
+	dtan 0.0         =  0.0
+	dtan (  pi/.2.0) = +inf
+	
+
+	Parameters: ``radians: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dacos (x: Double): Double
+
+	Calculates the inverse cosine of a Double.
+	dacos (-.1.0) = pi
+	dacos 0.0     = pi /. 2.0
+	dacos 1.0     = 0.0
+	dacos 2.0     = nan
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dasin (x: Double): Double
+
+	Calculates the inverse sine of a Double.
+	dasin (-.1.0) = -.(pi/2.0)
+	dasin 0.0     = 0.0
+	dasin 1.0     = pi/2.0
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def datan (x: Double) (y: Double): Double
+
+	Calculates the inverse tangent of y/x, giving the angle of the point(x, y) in the coordinate plane.
+	The advantage of 2-argument datan over 1-argument datan is it is defined even where x is 0.
+	datan (-. 1.0) (-. 1.0) = pi * -0.75
+	datan (-. 1.0)     0.0  = pi * -0.50
+	datan (-. 1.0)     1.0  = pi * -0.25
+	datan     0.0      1.0  = pi *  0.00
+	datan     1.0      1.0  = pi *  0.25
+	datan     1.0      0.0  = pi *  0.50
+	datan     1.0  (-. 1.0) = pi *  0.75
+	datan     0.0  (-. 1.0) = pi *  1.00
+	
+
+	Parameters: ``x: Double,  y: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dexp (x: Double): Double
+
+	Calculates e^x.
+	dexp 0.0 = 1.0
+	dexp 1.0 = 2.71828
+	dexp (-.inf) = 0.0
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dlog (x: Double): Double
+
+	Calculates the natural logarithm of x.
+	dlog (dexp x) = x
+	dlog (-. 1.0) = nan
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dexpm1 (x: Double): Double
+
+	Calculates e^.x -. 1.0
+	Useful for values of 'x' close to 0.0
+	dexpm1 (-.0.2) = -.0.18
+	dexpm1 0.0     = 0.0
+	dexpm1 0.2     = 0.22
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dlog1p  (x: Double): Double
+
+	Calculates dlog (1.0 +. x)
+	dlog1p (dexpm1 x) = x
+	Useful for values of 'x' close to 0.0
+	dlog1p (-.0.2) = -.0.22
+	dlog1p 0.0     = 0.0
+	dlog1p 0.2     = 0.18
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def derf (x: Double): Double
+
+	Calculate the 'error function'.
+	2/sqrt(pi) Integral_{0..x} e^(-t^2) dt
+	This function is handy for statistics
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def derfc (x: Double): Double
+
+	Calculate the complementary 'error function' (1-erf).
+	2/sqrt(pi) Integral_{0..x} e^(-t^2) dt
+	This function is handy for statistics
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dtgamma (x: Double): Double
+
+	Compute the gamma function; Integral_{0..inf} t^{x-1} e^t dt
+	This is an everywhere-defined factorial method; dtgamma (x+1) = x!
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+.. wake:function:: def dlgamma (x: Double): Double
+
+	Compute the logarithm of the gamma function
+	This is useful to approximate statistics like (n choose m)
+	
+
+	Parameters: ``x: Double``
+
+	Return Type: ``Double``
+
+map.wake
+--------
+.. wake:function:: def mnew (cmpKey: k
+
+	Initialize an empty `Map` which will use the given total order function.
+	
+	*Parameters:*
+	* `cmpKey`:
+	A function providing a total ordering over values of the key type.
+	
+	*Example:*
+	```
+	mnew scmp | msize = 0
+	```
+	
+
+	Parameters: ``cmpKey: a,  a,  Order``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def listToMap (cmpKey: k
+
+	Construct a `Map` from the pre-associated key-value pairs in the `List`.
+	If multiple `Pair`s have the same left value (key), then the resulting `Map`
+	will contain the right value of only the *first* occurrence.
+	
+	*Parameters:*
+	* `cmpKey`:
+	A function providing a total ordering over values of the key type.
+	* `pairs`:
+	The keys and values which the `Map` should contain.  This does not have
+	to be sorted, but each left-hand value should be unique.
+	
+	*Examples:*
+	```
+	listToMap scmp ("a" → True, "b" → False, "c" → False, Nil) | msize = 3
+	listToMap scmp ("a" → 1, "a" → 2, Nil) | mlookup "a" = Some 1
+	```
+	
+
+	Parameters: ``cmpKey: a,  a,  Order,  pairs: List Pair a b``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def vectorToMap (cmpKey: k
+
+	Construct a `Map` from the pre-associated key-value pairs in the `Vector`.
+	If multiple `Pair`s have the same left value (key), then the resulting `Map`
+	will contain the right value of only the *first* occurrence.
+	
+	*Parameters:*
+	* `cmpKey`:
+	A function providing a total ordering over values of the key type.
+	* `pairs`:
+	The keys and values which the `Map` should contain.  This does not have
+	to be sorted, but each left-hand value should be unique.
+	
+
+	Parameters: ``cmpKey: a,  a,  Order,  pairs: Vector Pair a b``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def msize (map: Map k v): Integer
+
+	Count how many key-value associations are contained in the `Map`.
+	
+	*Examples:*
+	```
+	mnew scmp | msize = 0
+	listToMap scmp ("a" → True, "b" → False, "c" → False, Nil) | msize = 3
+	```
+	
+
+	Parameters: ``map: Map a b``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def mempty (map: Map k v): Boolean
+
+	Test if the `Map` does not contain any elements.
+	
+	*Examples:*
+	```
+	mnew scmp | mempty = True
+	listToMap scmp ("a" → True, "b" → False, "c" → False, Nil) | mempty = False
+	```
+	
+
+	Parameters: ``map: Map a b``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def minsert (key: k) (value: v) (map: Map k v): Map k v
+
+	Add a given value into the map under the key, if that key does not already exist.
+	Any pair with the same key which already exists in the map *remains unchanged*.
+	
+	For a similar function which uses the new value provided, see `minsertReplace`
+	or `minsertWith`.
+	
+	*Examples:*
+	```
+	mnew scmp | minsert "a" 2 | mlookup "a" = Some 2
+	listToMap scmp ("a" → 1, Nil) | minsert "a" 2 | mlookup "a" = Some 1
+	```
+	
+
+	Parameters: ``key: a,  value: b,  map: Map a b``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def minsertReplace (key: k) (value: v) (map: Map k v): Map k v
+
+	Add a given value into the map under the key, whether or not it already exists.
+	
+	For a similar function which preserves the original value contained in the
+	map, see `minsert` or `minsertWith`.
+	
+	*Examples:*
+	```
+	mnew scmp | minsertReplace "a" 2 | mlookup "a" = Some 2
+	listToMap scmp ("a" → 1, Nil) | minsertReplace "a" 2 | mlookup "a" = Some 2
+	```
+	
+
+	Parameters: ``key: a,  value: b,  map: Map a b``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def minsertWith (fn: k
+
+	Add a given value into the map under the key, resolving conflicts as specified.
+	
+	If just replacing or keeping the original, consider using `minsert` or
+	`minsertReplace` instead. Prefer `minsertWith` when accumulating values over
+	multiple inserts.
+	
+	*Examples:*
+	```
+	mnew scmp | minsertWith (\_k (_+_)) "a" 2 | mlookup "a" = Some 2
+	listToMap scmp ("a" → 1, Nil) | minsertWith (\_k (_+_)) "a" 2 | mlookup "a" = Some 3
+	```
+	
+
+	Parameters: ``fn: a,  incoming: b,  existing: b,  b,  key: a,  value: b,  map: Map a b``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def mdelete (key: k) (map: Map k v): Map k v
+
+	Remove any value contained in the map under the given key.
+	
+	*Examples:*
+	```
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "b" | mlookup "b" = None
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "x" | msize = 2
+	```
+	
+
+	Parameters: ``key: a,  map: Map a b``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def mfoldl (fn: k
+
+	Accumulate and combine every value in the map, starting from the "smallest" key.
+	
+	*Parameters:*
+	* `fn`:
+	The manner in which each value should be added to the accumulator.
+	* `base`:
+	The value used to initialize the accumulator.  If `map` is empty, this
+	value is returned unchanged.
+	* `map`:
+	The key-value pairs which will be combined.
+	
+	*Examples:*
+	```
+	mnew scmp | mfoldl (\_\a\v a + v) 0 = 0
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldl (\_\a\v a + v) 0 = 3
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldl (\k\a\v "{a} {k}={str v}") "k=v:" = "k=v: a=1 b=2"
+	```
+	
+
+	Parameters: ``fn: a,  b,  c,  b,  base: b,  map: Map a c``
+
+	Return Type: ``b``
+
+.. wake:function:: def mfoldr (fn: k
+
+	Accumulate and combine every value in the map, starting from the "largest" key.
+	
+	*Parameters:*
+	* `fn`:
+	The manner in which each value should be added to the accumulator.
+	* `base`:
+	The value used to initialize the accumulator.  If `map` is empty, this
+	value is returned unchanged.
+	* `map`:
+	The key-value pairs which will be combined.
+	
+	*Examples:*
+	```
+	mnew scmp | mfoldr (\_\v\a v + a) 0 = 0
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldr (\_\v\a v + a) 0 = 3
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldr (\k\v\a "{a} {k}={str v}") "k=v:" = "k=v: b=2 a=1"
+	```
+	
+
+	Parameters: ``fn: a,  b,  c,  c,  base: c,  map: Map a b``
+
+	Return Type: ``c``
+
+.. wake:function:: def mfoldmap (combineFn: a
+
+	Transform and combine every value in the map in parallel.
+	
+	*Parameters:*
+	* `combineFn`:
+	The manner in which two values of the target type should be joined.
+	* `base`:
+	The value used to initialize the accumulator.  If `map` is empty, this
+	value is returned unchanged.
+	* `transformFn`:
+	The function which should be applied to every key-value pair in the map.
+	This might just be to prepare them to be combined, or it might be some
+	more complex function which happens to have a more-easily-joined output.
+	* `map`:
+	The key-value pairs which will be processed.
+	
+	*Examples:*
+	```
+	mnew scmp | mfoldmap (_+_) 0 (\_\v v) = 0
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldmap (_+_) 0 (\_\v v) = 3
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldmap ("{_} {_}") "k=v:" ("{_}={str _}") = "k=v: a=1 b=2"
+	```
+	
+
+	Parameters: ``combineFn: a,  a,  a,  base: a,  transformFn: b,  c,  a,  map: Map b c``
+
+	Return Type: ``a``
+
+.. wake:function:: def mapToList (map: Map k v): List (Pair k v)
+
+	Flatten every key-value pair in the map into a simple list.
+	
+	*Examples:*
+	```
+	mnew scmp | mapToList = Nil
+	listToMap scmp ("a" → 1, Nil) | minsert "b" 2 | mapToList = Pair "a" 1, Pair "b" 2, Nil
+	```
+	
+
+	Parameters: ``map: Map a b``
+
+	Return Type: ``List (Pair a b)``
+
+.. wake:function:: def mmap (fn: k
+
+	Apply some function to every value contained in the map.
+	
+	*Examples:*
+	```
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mmap (\_\v v + 1) | mlookup "b" = 3
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mmap (\k\v "{k}={str v}") | mlookup "b" = "b=2"
+	```
+	
+
+	Parameters: ``fn: a,  b,  c,  map: Map a b``
+
+	Return Type: ``Map a c``
+
+.. wake:function:: def mmapPass (fn: k
+
+	Apply some failable function to every value, passing only if every computation does.
+	
+	*Example:*
+	```
+	listToMap scmp ("a" → "1", "b" → "2", Nil) | mmapPass (int _ | getOrFail "") = Pass ...
+	```
+	
+
+	Parameters: ``fn: a,  b,  Result c d,  map: Map a b``
+
+	Return Type: ``Result (Map a c) d``
+
+.. wake:function:: def mmin (map: Map k v): Option (Pair k v)
+
+	Retrieve the "smallest" key from the map and its associated value.
+	This is determined according to the comparison function specified when the map
+	was originally created.
+	
+	*Examples:*
+	```
+	mnew scmp | mmin = None
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mmin = Some (Pair "a" 1)
+	```
+	
+
+	Parameters: ``map: Map a b``
+
+	Return Type: ``Option (Pair a b)``
+
+.. wake:function:: def mmax (map: Map k v): Option (Pair k v)
+
+	Retrieve the "largest" key from the map and its associated value.
+	This is determined according to the comparison function specified when the map
+	was originally created.
+	
+	*Examples:*
+	```
+	mnew scmp | mmax = None
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mmax = Some (Pair "b" 2)
+	```
+	
+
+	Parameters: ``map: Map a b``
+
+	Return Type: ``Option (Pair a b)``
+
+.. wake:function:: def mlowerGE (key: k) (map: Map k v): Option (Pair k v)
+
+	Retrieve the "smallest" key from the map that is equal to or "larger than" a known point.
+	This is determined according to the comparison function specified when the map
+	was originally created.
+	
+	*Examples:*
+	```
+	mnew scmp | mmax = None
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mlowerGE "a" = Some (Pair "a" 1)
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mlowerGE "aaa" = Some (Pair "b" 2)
+	```
+	
+
+	Parameters: ``key: a,  map: Map a b``
+
+	Return Type: ``Option (Pair a b)``
+
+.. wake:function:: def mlowerGT (key: k) (map: Map k v): Option (Pair k v)
+
+	Retrieve the "smallest" key from the map that is strictly "larger than" a known point.
+	This is determined according to the comparison function specified when the map
+	was originally created.
+	
+	*Examples:*
+	```
+	mnew scmp | mmax = None
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mlowerGT "a" = Some (Pair "b" 2)
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mlowerGT "aaa" = Some (Pair "b" 2)
+	```
+	
+
+	Parameters: ``key: a,  map: Map a b``
+
+	Return Type: ``Option (Pair a b)``
+
+.. wake:function:: def mupperLT (key: k) (map: Map k v): Option (Pair k v)
+
+	Retrieve the "largest" key from the map that is strictly "smaller than" a known point.
+	This is determined according to the comparison function specified when the map
+	was originally created.
+	
+	*Examples:*
+	```
+	mnew scmp | mmax = None
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mupperLT "b" = Some (Pair "a" 1)
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mupperLT "aaa" = Some (Pair "a" 1)
+	```
+	
+
+	Parameters: ``key: a,  map: Map a b``
+
+	Return Type: ``Option (Pair a b)``
+
+.. wake:function:: def mupperLE (key: k) (map: Map k v): Option (Pair k v)
+
+	Retrieve the "largest" key from the map that is equal to or "smaller than" a known point.
+	This is determined according to the comparison function specified when the map
+	was originally created.
+	
+	*Examples:*
+	```
+	mnew scmp | mmax = None
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mupperLE "b" = Some (Pair "b" 2)
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mupperLE "aaa" = Some (Pair "a" 1)
+	```
+	
+
+	Parameters: ``key: a,  map: Map a b``
+
+	Return Type: ``Option (Pair a b)``
+
+.. wake:function:: def mlookup (key: k) (map: Map k v): Option v
+
+	Retrieve the value associated with a particular key in the map, if one exists.
+	
+	If only the presence of the value matters, see `mexists`.
+	
+	*Examples:*
+	```
+	mnew scmp | mlookup "a" = None
+	mnew scmp | minsert "a" 1 | mlookup "a" = Some 1
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "b" | mlookup "b" = None
+	```
+	
+
+	Parameters: ``key: a,  map: Map a b``
+
+	Return Type: ``Option b``
+
+.. wake:function:: def mcontains (key: k) (map: Map k v): Boolean
+
+	Check whether some key is associated with any value in the map.
+	
+	*Examples:*
+	```
+	mnew scmp | mcontains "a" = False
+	mnew scmp | minsert "a" 1 | mcontains "a" = True
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "b" | mcontains "b" = False
+	```
+	
+
+	Parameters: ``key: a,  map: Map a b``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def mexists (fn: k
+
+	Check whether the predicate succeeds for any key-value pair in the map.
+	
+	*Examples:*
+	```
+	mnew scmp | mcexists "a" = False
+	mnew scmp | minsert "a" 1 | mexists "a" = True
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "b" | mexists "b" = False
+	```
+	
+
+	Parameters: ``fn: a,  b,  Boolean,  map: Map a b``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def msplitBy (fn: k
+
+	Divide the key-value pairs comprising one map into two according to some predicate.
+	
+	*Returns:*
+	`Pair trues falses` where `trues` contains all the values for which `fn`
+	returned `True` and `falses` where it returned `False`.  Both resulting maps
+	use the same key-comparison function as the original `map`.
+	
+
+	Parameters: ``fn: a,  b,  Boolean,  map: Map a b``
+
+	Return Type: ``Pair (Map a b) (Map a b)``
+
+.. wake:function:: def mfilter (fn: k
+
+	Discard any key-value pairs in the map for which the predicate fails.
+	
+	*Examples:*
+	```
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mfilter (\k\_ isVowel k) | mlookup "a" = Some 1
+	listToMap scmp ("a" → 1, "b" → 2, Nil) | mfilter (\k\_ isVowel k) | mlookup "b" = None
+	```
+	
+
+	Parameters: ``fn: a,  b,  Boolean,  map: Map a b``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def munion (left: Map k v) (right: Map k v): Map k v
+
+	Collect all key-value associations in either of two maps into a single one.
+	If the same key occurs in both, the value from `left` is kept and the one from
+	`right` is discarded.  However, if the key comparison function differs between
+	the two inputs, then the one from the `right` is used.
+	
+	For a similar function which provides control over how to join values of keys
+	occurring in both maps, see `munionWith`.
+	
+	*Examples:*
+	```
+	def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
+	def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
+	
+	munion left right | mlookup "a" = Some 1
+	munion left right | mlookup "b" = Some 2
+	munion left right | mlookup "f" = Some 15
+	```
+	
+
+	Parameters: ``left: Map a b,  right: Map a b``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def munionWith (fn: k
+
+	Collect all key-value associations in maps, with the given conflict resolultion.
+	If the key comparison function differs between the two inputs, then the one
+	from the `right` is used.
+	
+	If simply keeping the original in any conflicts, consider using `munion` instead.
+	
+	*Examples:*
+	```
+	def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
+	def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
+	
+	munionWith (\_\lv\rv lv + rv) left right | mlookup "a" = Some 1
+	munionWith (\_\lv\rv lv + rv) left right | mlookup "b" = Some 13
+	munionWith (\_\lv\rv lv + rv) left right | mlookup "f" = Some 15
+	```
+	
+
+	Parameters: ``fn: a,  b,  b,  b,  left: Map a b,  right: Map a b``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def msubtract (left: Map k v) (right: Map k v): Map k v
+
+	Remove all keys from the left map which occur (regardless of value) in the right.
+	If the key comparison function differs between the two inputs, then the one
+	from the `right` is used.
+	
+	*Examples:*
+	```
+	def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
+	def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
+	
+	msubtract left right | mlookup "a" = Some 1
+	msubtract left right | mlookup "b" = None
+	msubtract left right | mlookup "f" = None
+	```
+	
+
+	Parameters: ``left: Map a b,  right: Map a b``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def mintersect (left: Map k v) (right: Map k v): Map k v
+
+	Remove all keys from the left map which do not occur in the right.
+	For all keys, the value from `left` is kept and the one from `right` is
+	discarded.  However, if the key comparison function differs between the two
+	inputs, then the one from the `right` is used.
+	
+	For a similar function which provides control over how to join the values
+	contained in the map, see `mintersectWith`.
+	
+	*Examples:*
+	```
+	def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
+	def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
+	
+	mintersect left right | mlookup "a" = None
+	mintersect left right | mlookup "b" = Some 2
+	mintersect left right | mlookup "f" = None
+	```
+	
+
+	Parameters: ``left: Map a b,  right: Map a b``
+
+	Return Type: ``Map a b``
+
+.. wake:function:: def mintersectWith (fn: k
+
+	Remove all keys which do not occur in *both* maps, joining values accordingly.
+	If the key comparison function differs between the two inputs, then the one
+	from the `right` is used.
+	
+	If simply keeping the original, consider using `mintersect` instead.
+	
+	*Examples:*
+	```
+	def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
+	def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
+	
+	mintersectWith (\_\lv\rv lv + rv) left right | mlookup "a" = None
+	mintersectWith (\_\lv\rv lv + rv) left right | mlookup "b" = Some 13
+	mintersectWith (\_\lv\rv lv + rv) left right | mlookup "f" = None
+	```
+	
+
+	Parameters: ``fn: a,  b,  b,  b,  left: Map a b,  right: Map a b``
+
+	Return Type: ``Map a b``
+
+syntax.wake
+-----------
+.. wake:function:: def (argument: a) . (memberFn: a
+
+	Flip function and argument order.
+	fn obj.getXYZ = fn (getXYZ obj)
+	
+
+	Parameters: ``argument: a,  memberFn: a,  b``
+
+	Return Type: ``b``
+
+.. wake:function:: def (argument: a) | (pipeFn: a
+
+	Flip function and argument order.
+	seq 10 | map str | catWith " " = catWith " " (map str (seq 10))
+	
+
+	Parameters: ``argument: a,  pipeFn: a,  b``
+
+	Return Type: ``b``
+
+.. wake:function:: def (dollarFn: a
+
+	Avoid ()s without changing order.
+	catWith " " $ map str $ seq 10 = catWith " " (map str (seq 10))
+	
+
+	Parameters: ``dollarFn: a,  b,  argument: a``
+
+	Return Type: ``b``
+
+.. wake:function:: def (f: b
+
+	The ring operator is used to denote the composition of functions.
+	(f ∘ g) x = f (g x)
+	
+
+	Parameters: ``f: a,  b,  g: c,  a,  x: c``
+
+	Return Type: ``b``
+
+.. wake:function:: def flip (f: a
+
+	Allows flipping the parameters of a function.
+	icmp.flip 4 5 = GT
+	icmp.flip 5 4 = LT
+	
+
+	Parameters: ``f: a,  b,  c,  x: b,  y: a``
+
+	Return Type: ``c``
+
+.. wake:function:: def wait (f: a
+
+	Wait for 'x' to be computed before invoking (f x).
+	If 'x' is a list, f will run once 'x' can be distinguished between Nil and (_, _).
+	Normally, 'f x' may invoke 'f' before even this basic fact is known.
+	You generally only need 'wait' when interfacing with other wake primitives.
+	Therefore, ask a wake expert before you resort to using this function.
+	The correct way to sequence events is by consuming the results of prior events in later events.
+	A 'match x' expression on list 'x' with different case results also acts like 'wait'.
+	
+
+	Parameters: ``f: a,  b,  x: a``
+
+	Return Type: ``b``
+
+.. wake:function:: def unreachable (reason: String): a
+
+	Tell the wake interpreter that it is impossible to reach this expression.
+	The behaviour of an execution which DOES reach `unreachable` is undefined.
+	
+	### FUNCTION IS NOT INTENDED TO STOP A BUILD! ###
+	### To report Errors use a Result             ###
+	
+	Parameters:
+	- `reason`: A String describing why this code is impossible to reach
+	
+	An example of a legitimate use of unreachable:
+	```
+	def hasUniqueMinimum list =
+	match (sortBy (_<_) list)
+	Nil     = False
+	x, Nil  = True
+	x, y, _ = match (x <=> y)
+	LT = True
+	EQ = False
+	GT = unreachable "Sorted list {format list} is not sorted"
+	```
+	
+	The optimizer can legally remove unreachables (they are by definition unreachable).
+	Furthermore, the optimizer can even eliminate code that coexists with a unreachable.
+	Thus, here is an example of why you should never use unreachable for error reporting:
+	```
+	def myFun x =
+	def _ = unreachable "stop the program"
+	42 + x
+	```
+	
+	When this funciton is called from the command-line, the behaviour is undefined:
+	```
+	$ wake --no-optimize -x 'myFun 33'
+	PANIC: stop the program
+	$ wake -x 'myFun 33'
+	75
+	$ future-version-of-wake -x 'myFun 33'
+	200
+	```
+	
+
+	Parameters: ``reason: String``
+
+	Return Type: ``a``
+
+vector.wake
+-----------
+.. wake:function:: def treeToVector (t: Tree a): Vector a
+
+	treeToVector: converts a ``Tree`` to a ``Vector``.
+	
+
+	Parameters: ``t: Tree a``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vempty (v: Vector a): Boolean
+
+	vempty: returns ``True`` if the ``Vector`` has no entries, otherwise ``False``.
+	
+	vempty (vseq 4) = False
+	vempty (vseq 0) = True
+	
+
+	Parameters: ``v: Vector a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def vlen (v: Vector a): Integer
+
+	vlen: returns the length of the ``Vector``.
+	
+	vlen (vseq x) = x
+	vlen [] = 0
+	vlen [0, 5] = 2
+	
+
+	Parameters: ``v: Vector a``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def vsplitAt (index: Integer) (Vector v s e: Vector a): Pair (Vector a) (Vector a)
+
+	vsplitAt: given an index, cut a Vector into elements before and after the index
+	
+	vsplitAt 4 (vseq 8) = Pair [0, 1, 2, 3] [4, 5, 6, 7]
+	vsplitAt 0 (vseq 8) = Pair [] [0, 1, 2, 3, 4, 5, 6, 7]
+	vsplitAt 8 (vseq 8) = Pair [0, 1, 2, 3, 4, 5, 6, 7] []
+	
+
+	Parameters: ``Integer,  Vector a``
+
+	Return Type: ``Pair (Vector a) (Vector a)``
+
+.. wake:function:: def vtake (length: Integer) (v: Vector a): Vector a
+
+	vtake: keep only the first `length` elements
+	
+	vtake 2 (vseq 100) = [0, 1]
+	vtake 0 (vseq 100) = []
+	vtake 2 (vseq 0)   = []
+	
+
+	Parameters: ``length: Integer,  v: Vector a``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vdrop (index: Integer) (v: Vector a): Vector a
+
+	vdrop: remove elements up to ``index`` from the ``Vector``
+	
+	vdrop 4 (vseq 6) = [4, 5]
+	vdrop 6 (vseq 6) = []
+	vdrop 0 (vseq 3) = [0, 1, 2]
+	
+
+	Parameters: ``index: Integer,  v: Vector a``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vat (index: Integer) (Vector v s e: Vector a): Option a
+
+	vat: Returns an ``Option``, containing either the ``i``th element of the vector, or ``None`` if ``i`` is out of range.
+	
+	vat 4 (vseq 8) = Some 4
+	vat 4 (vseq 4) = None
+	vat (-1) (vseq 4) = None
+	
+
+	Parameters: ``Integer,  Vector a``
+
+	Return Type: ``Option a``
+
+.. wake:function:: def vmap (f: a
+
+	vmap: create a new Vector by applying a function f to each element of a Vector.
+	
+	vmap str    (vseq 5) = ["0", "1", "2", "3", "4"]
+	vmap (_+10) (vseq 5) = [10, 11, 12, 13, 14]
+	
+
+	Parameters: ``f: a,  b,  v: Vector a``
+
+	Return Type: ``Vector b``
+
+.. wake:function:: def vtab (f: Integer
+
+	vtab: create a Vector of specified size in parallel by calling `f` on the index to generate.
+	
+	vtab (_+100) 5 = [100, 101, 102, 103, 104]
+	
+
+	Parameters: ``f: Integer,  a,  length: Integer``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vfoldl (combiningFn: accum
+
+	vfoldl: combine the elements of a Vector front-to-back into a single value.
+	An accumulator is updated from its initial value by combiningFn for each element.
+	
+	In C++ syntax, `vfoldl <combiningFn> <accumulateInitalValue> <Vector>` does:
+	auto accumulator = <accumulateInitalValue>;
+	for (element : <Vector>) accumulator = combiningFn(accumulator, element);
+	return accumulator;
+	
+	Examples:
+	vfoldl f x [a, b, c] = f (f (f x a) b) c
+	vfoldl (_+_) 0 (vseq 6) = 15
+	
+
+	Parameters: ``combiningFn: a,  b,  a,  a,  Vector b``
+
+	Return Type: ``a``
+
+.. wake:function:: def vfoldr (combiningFn: element
+
+	vfoldr: combine the elements of a Vector back-to-front into a single value.
+	An accumulator is updated from its initial value by combiningFn for each element.
+	
+	vfoldr f x [a, b, c] = f a (f b (f c x))
+	
+
+	Parameters: ``combiningFn: a,  b,  b,  b,  Vector a``
+
+	Return Type: ``b``
+
+.. wake:function:: def vmapReduce (mapFn: element
+
+	vmapReduce: combine the elements of a Vector in parallel
+	Unlike vfold[lr], takes a map function, because reduceFn operates on the same type.
+	reduceFn must be an associative operator; ie: f x (f y z) = f (f x y) z
+	Both the mapFn and reduceFn are called exactly once for each element of the input Vector.
+	
+	vmapReduce str ("{_}{_}") ">" (vseq 10) = ">0123456789"
+	
+
+	Parameters: ``mapFn: a,  b,  reduceFn: b,  b,  b,  b,  Vector a``
+
+	Return Type: ``b``
+
+.. wake:function:: def vfind (acceptFn: a
+
+	vfind: find the location of the first element accepted by `acceptFn`
+	Returns: `Pair value index`, such that `value` is `at index`
+	Once `acceptFn` returns True, `acceptFn` is not evaulated on further elements.
+	This means that `acceptFn` is applied to the Vector mostly sequentially.
+	If more parallelism is desired, use 'vmap f | vfind (_)'.
+	
+	def v = vseq 10 | vmap (_+10)
+	vfind (_%4==0) v = Some (Pair 12 2)
+	vfind (_%4==4) v = None
+	
+
+	Parameters: ``acceptFn: a,  Boolean,  Vector a``
+
+	Return Type: ``Option (Pair a Integer)``
+
+.. wake:function:: def vsplitUntil (stopFn: a
+
+	vsplitUntil: cut the Vector at the point `stopFn` is first True
+	Once `stopFn` returns True, `stopFn` is not evaulated on further elements.
+	This means that `stopFn` is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'vmap f | vfind (_)' and vsplitAt.
+	
+	vsplitUntil (_>=4) (vseq 8) = Pair [0, 1, 2, 3] [4, 5, 6, 7]
+	vsplitUntil (_>=0) (vseq 8) = Pair [] [0, 1, 2, 3, 4, 5, 6, 7]
+	vsplitUntil (_>=8) (vseq 8) = Pair [0, 1, 2, 3, 4, 5, 6, 7] []
+	
+
+	Parameters: ``stopFn: a,  Boolean,  Vector a``
+
+	Return Type: ``Pair (Vector a) (Vector a)``
+
+.. wake:function:: def vtakeUntil (stopFn: a
+
+	vtakeUntil: take the longest prefix of a list where `stopFn` is False
+	Once `stopFn` returns True, `stopFn` is not evaulated on further elements.
+	This means that `stopFn` is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'vmap f | vfind (_)' and vtake.
+	
+	vtakeUntil (_>=4) (vseq 8) = [0, 1, 2, 3]
+	vtakeUntil (_>=0) (vseq 8) = []
+	vtakeUntil (_>=8) (vseq 8) = [0, 1, 2, 3, 4, 5, 6, 7]
+	
+
+	Parameters: ``stopFn: a,  Boolean,  Vector a``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vdropUntil (stopFn: a
+
+	dropUntil: discard elements from the list until 'stopFn' returns True
+	Once `stopFn` returns True, `stopFn` is not evaulated on further elements.
+	This means that `stopFn` is applied to the List mostly sequentially.
+	If more parallelism is desired, use 'vmap f | vfind (_)' and vdrop.
+	
+	vdropUntil (_>=4) (vseq 8) = [4, 5, 6, 7]
+	vdropUntil (_>=0) (vseq 8) = [0, 1, 2, 3, 4, 5, 6, 7]
+	vdropUntil (_>=8) (vseq 8) = []
+	
+
+	Parameters: ``stopFn: a,  Boolean,  Vector a``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vexists (acceptFn: a
+
+	vexists: does `acceptFn` return True for any element in the vector?
+	Once `acceptFn` returns True, `acceptFn` is not evaulated on further elements.
+	This means that `acceptFn` is applied to the Vector mostly sequentially.
+	If more parallelism is desired, use 'vmap f | vexists (_)'.
+	
+
+	Parameters: ``acceptFn: a,  Boolean,  Vector a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def vforall (acceptFn: a
+
+	vforall: does `acceptFn` return True for all element in the vector?
+	Once `acceptFn` returns False, `acceptFn` is not evaulated on further elements.
+	This means that `acceptFn` is applied to the Vector mostly sequentially.
+	If more parallelism is desired, use 'vmap f | vforall (_)'.
+	
+
+	Parameters: ``acceptFn: a,  Boolean,  Vector a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def vsplitBy (f: a
+
+	vsplitBy: partition a Vector into those elements with `f` True and False
+	
+	def isEven x = x%2 == 0
+	vsplitBy isEven (vseq 6) = Pair [0, 2, 4] [1, 3, 5]
+	
+
+	Parameters: ``f: a,  Boolean,  v: Vector a``
+
+	Return Type: ``Pair (Vector a) (Vector a)``
+
+.. wake:function:: def vfilter (f: a
+
+	vfilter: keep only those elements in the List where `f` evaluates to True
+	
+	def isEven x = x%2 == 0
+	vfilter isEven (vseq 10) = [0, 2, 4, 6, 8]
+	
+
+	Parameters: ``f: a,  Boolean,  v: Vector a``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vunfoldl (generatingFn: accum
+
+	vunfoldl: create a Vector from a generator function.
+	The generatingFn is called repeatedly
+	
+	vunfoldl (\x Pair (x+1) (str x)) 3 5 = ["3", "4", "5", "6", "7"]
+	
+
+	Parameters: ``generatingFn: a,  Pair a b,  a: a,  n: Integer``
+
+	Return Type: ``Vector b``
+
+.. wake:function:: def vscanl (f: a
+
+	vscanl: create a new Vector from an accumulator run over the elements front-to-back.
+	The last element of the produced Vector is equivalent to the result of vfoldl.
+	
+	Examples:
+	vscanl (_+_) 100 (vseq 6) = [100, 100, 101, 103, 106, 110, 115]
+	^^^- 100+0+1+2+3+4+5
+	^^^- 100+0+1+2
+	^^^- 100+0
+	^^^- 100
+	
+
+	Parameters: ``f: a,  b,  a,  a,  Vector b``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vscanr (f: b
+
+	vscanr: create a new Vector from an accumulator run over the elements back-to-front.
+	The first element of the produced List is equivalent to the result of a foldr.
+	
+	Examples:
+	vscanr (_+_) 100 (vseq 6) = 115, 115, 114, 112, 109, 105, 100, Nil
+	^^^- 100
+	^^^- 5+100
+	^^^- 1+2+3+4+5+100
+	^^^- 0+1+2+3+4+5+100
+	
+
+	Parameters: ``f: a,  b,  b,  b,  Vector a``
+
+	Return Type: ``Vector b``
+
+.. wake:function:: def vmapScan (mapFn: element
+
+	vmapScan: a parallel version of vscanl.
+	Unlike vscanl, takes a map function, because combineFn operates on the same type.
+	combineFn must be an associative operator; ie: f x (f y z) = f (f x y) z.
+	The mapFn is called exactly once for each element of the input Vector.
+	The combineFn may be called up to twice per input.
+	
+
+	Parameters: ``mapFn: a,  b,  combineFn: b,  b,  b,  acc: b,  v: Vector a``
+
+	Return Type: ``Vector b``
+
+.. wake:function:: def vscan (f: a
+
+	No description for this feature yet.
+
+	Parameters: ``f: a,  a,  a,  acc: a,  v: Vector a``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vsortBy (cmpFn: a
+
+	vsortBy: sort the input vector so that it is ascending wrt. lessThanFn
+	Runtime when almost-sorted is O(n), otherwise O(nlogn)
+	This is a stable sort; two equal values will retain their relative order.
+	
+	vtab vseq 10 | vflatten | vsortBy (_<_) =
+	[0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 3 3 3 3 3 3 4 4 4 4 4 5 5 5 5 6 6 6 7 7 8]
+	
+
+	Parameters: ``cmpFn: a,  a,  Order,  v: Vector a``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vdistinctBy (cmp: a
+
+	vdistinctBy: keep only the first occurrence of a value
+	The order of non-duplicated elements is retained.
+	
+	vdistinctBy (_<=>_) [1, 2, 1, 3, 4, 3] = [1, 2, 3, 4]
+	
+
+	Parameters: ``cmp: a,  a,  Order,  v: Vector a``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vdistinctRunBy (eq: a
+
+	vdistinctRunBy: keep only the first occurrence in a run of equal values
+	
+	vdistinctRunBy (_==_) [1, 1, 2, 1, 3, 3] = [1, 2, 1, 3]
+	
+
+	Parameters: ``eq: a,  a,  Boolean,  v: Vector a``
+
+	Return Type: ``Vector a``
+
+.. wake:function:: def vcmp (compareFn: a
+
+	vcmp: compare two Vectors using an Order comparator
+	
+	vcmp (_<=>_) (vseq 5)  (vseq 5)  = EQ
+	vcmp (_<=>_) (vseq 5)  (vseq 4)  = GT
+	vcmp (_<=>_) [0] [1] = LT
+	
+
+	Parameters: ``compareFn: a,  b,  Order,  Vector a,  Vector b``
+
+	Return Type: ``Order``
+
+.. wake:function:: def vmapPartial (f: a
+
+	vmapPartial: create a new Vector by applying a partial funciton to each element of a Vector.
+	Partial functions can return None, in which case the result is not included in the output.
+	
+	vmapPartial int ["3", "x", "44"] = [3, 44]
+	
+
+	Parameters: ``f: a,  Option b,  v: Vector a``
+
+	Return Type: ``Vector b``
+
+.. wake:function:: def vmapPartial2 (f: a
+
+	vmapPartial2: create a new Vector by applying a partial function up to twice to each element of a Vector.
+	If `f` is very fast, vmapPartial2 is more efficient as it avoids walking the vector twice.
+	
+	vmapPartial2 int ["3", "x", "44"] = [3, 44]
+	
+
+	Parameters: ``f: a,  Option b,  v: Vector a``
+
+	Return Type: ``Vector b``
+
+print.wake
+----------
+.. wake:function:: def format (anyType: a): String
+
+	format: render any type into a printable String
+	
+	format 44        = "44"
+	format "Hello"   = "\"Hello\""
+	format "\n"      = "\"\\n\""
+	format (seq 4)'  = "0, 1, 2, 3, Nil"
+	format pi        = "3.1415926535897931"
+	format (Pass 33) = "Pass 33"
+	format True      = "True"
+	format (_)       = "<source-file.wake:line:column>"
+	
+
+	Parameters: ``anyType: a``
+
+	Return Type: ``String``
+
+.. wake:function:: def getLogLevelName (LogLevel name): String
+
+	getLogLevelName: return the name of the LogLevel
+	
+
+	Parameters: ``LogLevel``
+
+	Return Type: ``String``
+
+.. wake:function:: def makeLogLevel (name: String) (colour: Option Colour): LogLevel
+
+	makeLogLevel: define a new log level
+	
+
+	Parameters: ``name: String,  colour: Option Colour``
+
+	Return Type: ``LogLevel``
+
+.. wake:function:: def makeLogLevel2 (name: String) (colour: Option Colour) (intensity: Option Intensity): LogLevel
+
+	No description for this feature yet.
+
+	Parameters: ``name: String,  colour: Option Colour,  intensity: Option Intensity``
+
+	Return Type: ``LogLevel``
+
+.. wake:function:: def tap (consumerFn: a
+
+	tap: inject a diagnostic into a pipeline
+	Oftern used in conjunction with println and/or format.
+	
+	def foo =
+	"123123"
+	| tap (println "DEBUG; I SAW: {format _}")
+	| int
+	| getOrElse 0
+	
+
+	Parameters: ``consumerFn: a,  b,  value: a``
+
+	Return Type: ``a``
+
+.. wake:function:: def printLevel (LogLevel name): String
+
+	printLevel: print a String on the given LogLevel.
+	
+	# Produce a red hello on stderr
+	def Unit = printLevel logError "hello\n"
+	
+
+	Parameters: ``LogLevel,  outputStr: String``
+
+	Return Type: ``Unit``
+
+.. wake:function:: def printlnLevel (level: LogLevel): String
+
+	printlnLevel: print a String with a newline on the given LogLevel.
+	
+	# Produce a yellow hello on stdout unless run with -q
+	def Unit = printlnLevel logWarning "hello"
+	
+
+	Parameters: ``level: LogLevel,  outputStr: String``
+
+	Return Type: ``Unit``
+
+tree.wake
+---------
+.. wake:function:: def tnew cmp
+
+	Create a new Tree, sorted by cmp.
+	
+
+	Parameters: ``cmp: a,  a,  Order``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def listToTree cmp list
+
+	Convert a List to a Tree.
+	
+
+	Parameters: ``cmp: a,  a,  Order,  list: List a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def listToTreeMulti cmp list
+
+	No description for this feature yet.
+
+	Parameters: ``cmp: a,  a,  Order,  list: List a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def vectorToTreeMulti cmp v
+
+	No description for this feature yet.
+
+	Parameters: ``cmp: a,  a,  Order,  v: Vector a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def vectorToTree cmp v
+
+	Convert a Vector to a Tree.
+	
+
+	Parameters: ``cmp: a,  a,  Order,  v: Vector a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tlen (Tree _ root: Tree a): Integer
+
+	Returns the total length of the Tree.
+	
+
+	Parameters: ``Tree a``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def tempty (Tree _ root: Tree a): Boolean
+
+	Returns True if the Tree is empty, False otherwise.
+	
+
+	Parameters: ``Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def tinsert (y: a) (Tree cmp root: Tree a): Tree a
+
+	Insert y into the tree only if no other keys == y
+	
+
+	Parameters: ``a,  Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tinsertReplace (y: a) (tree: Tree a): Tree a
+
+	Insert y into the tree, removing any existing keys == y
+	
+
+	Parameters: ``y: a,  tree: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tinsertMulti (y: a) (Tree cmp root: Tree a): Tree a
+
+	Insert y into the tree at the lowest rank of keys = y
+	
+
+	Parameters: ``a,  Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tinsertWith (fn: (incoming: a)
+
+	Insert y into the tree, or the value resulting from fn on a collision
+	`y` is passed as the left-hand value of `fn`.
+	
+
+	Parameters: ``fn: incoming: a,  existing: a,  a,  y: a,  tree: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def (a: Tree x) ⊆ (b: Tree x): Boolean
+
+	Test if `a` is a subset of `b` (every element of `a` is also in `b`).
+	Note that the comparison function of `b` is used to determine element
+	equality, if the two differ. See `tsubset` for a prefix form of the function.
+	
+
+	Parameters: ``a: Tree a,  b: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (a: Tree x) ⊇ (b: Tree x): Boolean
+
+	Test if `a` is a superset of `b` (`a` contains every element of `b`).
+	Note that the comparison function of `b` is used to determine element
+	equality, if the two differ.
+	
+
+	Parameters: ``a: Tree a,  b: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (a: Tree x) ⊉ (b: Tree x): Boolean
+
+	Test if `a` is *not* a superset of `b` (`a` is missing some element of `b`).
+	Note that the comparison function of `b` is used to determine element
+	equality, if the two differ.
+	
+
+	Parameters: ``a: Tree a,  b: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (a: Tree x) ⊈ (b: Tree x): Boolean
+
+	Test if `a` is *not* a subset of `b` (some element of `a` does not exist in `b`).
+	Note that the comparison function of `b` is used to determine element
+	equality, if the two differ.
+	
+
+	Parameters: ``a: Tree a,  b: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (a: Tree x) ⊊ (b: Tree x): Boolean
+
+	Test if `a` is a proper subset of `b`.
+	(Not only is every element of `a` is also in `b`, but the two sets aren't equal.)
+	Note that the comparison function of `b` is used to determine element
+	equality, if the two differ.
+	
+
+	Parameters: ``a: Tree a,  b: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def (a: Tree x) ⊋ (b: Tree x): Boolean
+
+	Test if `a` is a proper superset of `b`.
+	(Not only does `a` contain every element `b`, but the two sets aren't equal.)
+	Note that the comparison function of `b` is used to determine element
+	equality, if the two differ.
+	
+
+	Parameters: ``a: Tree a,  b: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def tsubset (a: Tree x) (b: Tree x): Boolean
+
+	Test if `a` is a subset of `b` (every element of `a` is also in `b`).
+	Note that the comparison function of `b` is used to determine element
+	equality, if the two differ.
+	
+
+	Parameters: ``a: Tree a,  b: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def tdelete (y: a) (Tree cmp root: Tree a): Tree a
+
+	Deletes all keys that are equal to y.
+	
+
+	Parameters: ``a,  Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tfoldl f a (Tree _ root)
+
+	Folds from left to right.
+	
+
+	Parameters: ``a,  b,  a,  a,  Tree b``
+
+	Return Type: ``a``
+
+.. wake:function:: def tfoldr f a (Tree _ root)
+
+	Folds from right to left.
+	
+
+	Parameters: ``a,  b,  b,  b,  Tree a``
+
+	Return Type: ``b``
+
+.. wake:function:: def tfoldmap (combineFn: b
+
+	Transform and collapse all values in a `Tree` in parallel.
+	
+	*Parameters:*
+	* `combineFn`: A function which can combine multiple output values into one.
+	This function should be parallel.
+	* `base`: A "seed" value with which to start the fold.  This will be applied
+	as the farthest-left value, before any values derived from `tree` itself.
+	* `transformFn`: A function performing some work to be applied to every
+	element in `tree` in parallel.
+	* `tree`: The values from which the result should be derived.
+	
+
+	Parameters: ``combineFn: a,  a,  a,  base: a,  transformFn: b,  a,  tree: Tree b``
+
+	Return Type: ``a``
+
+.. wake:function:: def tfold f a t
+
+	No description for this feature yet.
+
+	Parameters: ``f: a,  a,  a,  a: a,  t: Tree a``
+
+	Return Type: ``a``
+
+.. wake:function:: def treeToList
+
+	Converts a Tree to a List.
+	
+
+	Parameters: ``Tree a``
+
+	Return Type: ``List a``
+
+.. wake:function:: def tappi f (Tree _ root)
+
+	No description for this feature yet.
+
+	Parameters: ``Integer,  a,  b,  Tree a``
+
+	Return Type: ``Unit``
+
+.. wake:function:: def tat (i: Integer) (Tree _ root: Tree a): Option a
+
+	Extract the i-th ranked element
+	
+
+	Parameters: ``Integer,  Tree a``
+
+	Return Type: ``Option a``
+
+.. wake:function:: def tsplitAt (i: Integer) (Tree cmp root: Tree a): Pair (Tree a) (Tree a)
+
+	Split elements ranked [0,i) and [i,inf) into two trees
+	
+
+	Parameters: ``Integer,  Tree a``
+
+	Return Type: ``Pair (Tree a) (Tree a)``
+
+.. wake:function:: def ttake i t
+
+	No description for this feature yet.
+
+	Parameters: ``i: Integer,  t: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tdrop i t
+
+	No description for this feature yet.
+
+	Parameters: ``i: Integer,  t: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tfind f (Tree _ root)
+
+	Lowest rank element where f x = True  => Option (Pair x rank)
+	
+
+	Parameters: ``a,  Boolean,  Tree a``
+
+	Return Type: ``Option (Pair a Integer)``
+
+.. wake:function:: def tsplitUntil f t
+
+	No description for this feature yet.
+
+	Parameters: ``f: a,  Boolean,  t: Tree a``
+
+	Return Type: ``Pair (Tree a) (Tree a)``
+
+.. wake:function:: def ttakeUntil f t
+
+	No description for this feature yet.
+
+	Parameters: ``f: a,  Boolean,  t: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tdropUntil f t
+
+	No description for this feature yet.
+
+	Parameters: ``f: a,  Boolean,  t: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def texists f t
+
+	Returns True if there exists an x in t where f x = True
+	
+
+	Parameters: ``f: a,  Boolean,  t: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def tforall f t
+
+	No description for this feature yet.
+
+	Parameters: ``f: a,  Boolean,  t: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def tsplit y (Tree cmp root)
+
+	Split tree into those elements <, =, and > y
+	
+
+	Parameters: ``a,  Tree a``
+
+	Return Type: ``Triple (Tree a) (Tree a) (Tree a)``
+
+.. wake:function:: def tsplitBy (f: a
+
+	Split tree into those elements where f x = True and those where f x = False
+	
+
+	Parameters: ``a,  Boolean,  Tree a``
+
+	Return Type: ``Pair (Tree a) (Tree a)``
+
+.. wake:function:: def tfilter (f: a
+
+	Remove all elements x such that f x = False.
+	
+
+	Parameters: ``a,  Boolean,  Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tmin (Tree _ root: Tree a): Option a
+
+	Return the smallest element in the tree.
+	
+
+	Parameters: ``Tree a``
+
+	Return Type: ``Option a``
+
+.. wake:function:: def tmax (Tree _ root: Tree a): Option a
+
+	Return the largest element in the tree.
+	
+
+	Parameters: ``Tree a``
+
+	Return Type: ``Option a``
+
+.. wake:function:: def tlowerGE (y: a) (Tree cmp root: Tree a): Option (Pair a Integer)
+
+	Lowest rank element with x >= y, along with that rank.
+	
+
+	Parameters: ``a,  Tree a``
+
+	Return Type: ``Option (Pair a Integer)``
+
+.. wake:function:: def tlowerGT (y: a) (Tree cmp root: Tree a): Option (Pair a Integer)
+
+	Lowest rank element with x > y, along with that rank.
+	
+
+	Parameters: ``a,  Tree a``
+
+	Return Type: ``Option (Pair a Integer)``
+
+.. wake:function:: def tupperLT (y: a) (Tree cmp root: Tree a): Option (Pair a Integer)
+
+	Highest rank element with x < y, along with that rank.
+	
+
+	Parameters: ``a,  Tree a``
+
+	Return Type: ``Option (Pair a Integer)``
+
+.. wake:function:: def tupperLE (y: a) (Tree cmp root: Tree a): Option (Pair a Integer)
+
+	Highest rank element with x <= y, along with that rank.
+	
+
+	Parameters: ``a,  Tree a``
+
+	Return Type: ``Option (Pair a Integer)``
+
+.. wake:function:: def tequal y (Tree cmp root)
+
+	Extract all elements from the tree which are equal to y
+	=> Pair (matches: List x) (rank: Integer)
+	
+
+	Parameters: ``a,  Tree a``
+
+	Return Type: ``Pair (List a) Integer``
+
+.. wake:function:: def x ∈ y
+
+	Returns True if x is an element of y, False otherwise.
+	
+
+	Parameters: ``x: a,  y: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def x ∉ y
+
+	Returns True if x is NOT an element of y, False otherwise.
+	
+
+	Parameters: ``x: a,  y: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def x ∋ y
+
+	Returns True if x contains y, False otherwise.
+	
+
+	Parameters: ``x: Tree a,  y: a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def x ∌ y
+
+	Returns True if x does NOT contain y, False otherwise.
+	
+
+	Parameters: ``x: Tree a,  y: a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def tcontains (y: a) (t: Tree a): Boolean
+
+	No description for this feature yet.
+
+	Parameters: ``y: a,  t: Tree a``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def tdistinctBy (cmp: a => a => Order) (t: Tree a): Tree a
+
+	Eliminate duplicates, as identified by cmp
+	
+
+	Parameters: ``cmp: a,  a,  Order,  t: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tdistinctRunBy (f: a => a => Boolean) (t: Tree a): Tree a
+
+	Eliminate duplicates, as identified by f
+	
+
+	Parameters: ``f: a,  a,  Boolean,  t: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def a ∪ b
+
+	Returns the union of trees a and b, keeps only values from a if they are equal to values in b.
+	
+
+	Parameters: ``a: Tree a,  b: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tunion (Tree _ aroot: Tree a) (Tree cmp broot: Tree a): Tree a
+
+	Returns the union of two trees, given their roots.
+	
+
+	Parameters: ``Tree a,  Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tunionWith (fn: a
+
+	No description for this feature yet.
+
+	Parameters: ``fn: a,  a,  a,  left: Tree a,  right: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def a ⊎ b
+
+	Union of two trees, keeping equal values of a before equal values of b
+	
+
+	Parameters: ``a: Tree a,  b: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tunionMulti (Tree _ aroot) (Tree cmp broot)
+
+	No description for this feature yet.
+
+	Parameters: ``Tree a,  Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tsubtract (Tree _ aroot: Tree a) (Tree cmp broot: Tree a): Tree a
+
+	Returns the set difference of A and B, that is, a tree containing all elements of A which are not in B.
+	
+
+	Parameters: ``Tree a,  Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def a ∩ b
+
+	Returns a tree containing all elements of A which are also in B.
+	
+
+	Parameters: ``a: Tree a,  b: Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tintersect (Tree _ aroot) (Tree cmp broot)
+
+	No description for this feature yet.
+
+	Parameters: ``Tree a,  Tree a``
+
+	Return Type: ``Tree a``
+
+.. wake:function:: def tintersectWith (fn: a
+
+	No description for this feature yet.
+
+	Parameters: ``fn: a,  a,  a,  left: Tree a,  right: Tree a``
+
+	Return Type: ``Tree a``
+
+types.wake
+----------

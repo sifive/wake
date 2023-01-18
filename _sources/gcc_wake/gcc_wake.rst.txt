@@ -1,0 +1,11 @@
+--------
+gcc_wake
+--------
+
+.. toctree::
+
+
+gcc.wake
+--------
+pkgconfig.wake
+--------------

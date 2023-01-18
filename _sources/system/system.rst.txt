@@ -1,0 +1,831 @@
+------
+system
+------
+
+.. toctree::
+
+
+io.wake
+-------
+.. wake:function:: def read (path: Path): Result String Error
+
+	Read the file contents of a Path
+	
+
+	Parameters: ``path: Path``
+
+	Return Type: ``Result String Error``
+
+.. wake:function:: def write (path: String) (content: String): Result Path Error
+
+	Create all directories and the named file
+	
+
+	Parameters: ``path: String,  content: String``
+
+	Return Type: ``Result Path Error``
+
+.. wake:function:: def writeIn (parent: Path) (mode: Integer) (name: String) (content: String): Result Path Error
+
+	Create a file with the given mode in the specified directory
+	
+
+	Parameters: ``parent: Path,  mode: Integer,  name: String,  content: String``
+
+	Return Type: ``Result Path Error``
+
+.. wake:function:: def installAs (dest: String) (file: Path): Result Path Error
+
+	installAs: copy a file to a specified destination
+	
+
+	Parameters: ``dest: String,  file: Path``
+
+	Return Type: ``Result Path Error``
+
+.. wake:function:: def installIn (toRoot: String) (fromRoot: String) (sourcePath: Path): Result Path Error
+
+	Copy a file from one directory subtree to another
+	installIn "/to" "from"  "from/subdir/file"  => "/to/subdir/file"
+	installIn "/to" "."     "from/subdir/file"  => "/to/from/subdir/file"
+	installIn "/to" "/from" "/from/subdir/file" => "/to/subdir/file"
+	installIn "/to" "/"     "/from/subdir/file" => "/to/from/subdir/file"
+	These fail:
+	installIn "/to" "from"  "subdir/file"
+	installIn "/to" "/from" "/subdir/file"
+	installIn "/to" "from"  "/from/subdir/file"
+	installIn "/to" "/from" "from/subdir/file"
+	
+
+	Parameters: ``toRoot: String,  fromRoot: String,  sourcePath: Path``
+
+	Return Type: ``Result Path Error``
+
+.. wake:function:: def mkdirIn (parent: Path) (mode: Integer) (name: String): Result Path Error
+
+	Create a directory in the parent
+	
+
+	Parameters: ``parent: Path,  mode: Integer,  name: String``
+
+	Return Type: ``Result Path Error``
+
+.. wake:function:: def mkdir (path: String): Result Path Error
+
+	Make all every element in the directory path with mode 0755
+	
+
+	Parameters: ``path: String``
+
+	Return Type: ``Result Path Error``
+
+sources.wake
+------------
+.. wake:data:: topic source: String
+
+	The source topic is used to inform wake about source files.
+	Normally, wake obtains this information from git.
+	However, in a distribution tarball this information is not available.
+	In that situation, provide a manifest.wake which publishes to this topic.
+	Anything published to this topic will be returned by calls to `sources`.
+	
+
+.. wake:function:: def files (dir: String) (regexp: RegExp): List String
+
+	Find files
+	WARNING! Use of this method can make a build unreproducible.
+	Depending on when the method is invoked, the results may vary!
+	This method is ntended to be used by the outputFn of LocalOnly Jobs.
+	
+
+	Parameters: ``dir: String,  regexp: RegExp``
+
+	Return Type: ``List String``
+
+.. wake:function:: def source (file: String): Result Path Error
+
+	No description for this feature yet.
+
+	Parameters: ``file: String``
+
+	Return Type: ``Result Path Error``
+
+.. wake:function:: def claim (file: String): Result Path Error
+
+	Allows claiming of a file so long as the file is within
+	wake's workspace. Keep in mind that if another job
+	produced this file in the same run of wake, claim will
+	fail. Likewise if you claim a file then any job that
+	produces this file will fail. Claim should be thought
+	of as a "virtual" job and wake demands that all paths
+	be produced by exactly one job, virtual or otherwise.
+	
+	For source files please use `source`. For files outside
+	of wake's workspace please use `claimFileAsPath` or
+	`claimFileAsPathIn`. `claim` is good for claiming
+	artifacts of previous builds that should not be rebuilt
+	during this run.
+	
+	Parameters:
+	- `file`: The string giving the path to the file to be claimed
+	
+	Example:
+	```
+	claim "build/my_flow/my_step/previous-output.txt" # Claims the file
+	```
+	
+
+	Parameters: ``file: String``
+
+	Return Type: ``Result Path Error``
+
+.. wake:function:: def sources (dir: String) (filterRegexp: RegExp): Result (List Path) Error
+
+	Find sources files
+	
+
+	Parameters: ``dir: String,  filterRegexp: RegExp``
+
+	Return Type: ``Result (List Path) Error``
+
+.. wake:function:: def claimFileAsPath (existingFile: String) (desiredWorkspacePath: String): Result Path Error
+
+	This API makes it possible to include a non-source file into a wake build.
+	Generally, one should obtain Paths from sources or as the output of Jobs.
+	This API is useful for things like a command-line-supplied input file.
+	
+
+	Parameters: ``existingFile: String,  desiredWorkspacePath: String``
+
+	Return Type: ``Result Path Error``
+
+.. wake:function:: def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (desiredName: String): Result Path Error
+
+	No description for this feature yet.
+
+	Parameters: ``outputDirectory: Path,  existingFile: String,  desiredName: String``
+
+	Return Type: ``Result Path Error``
+
+job.wake
+--------
+.. wake:tuple:: tuple Usage
+
+	No description for this feature yet.
+
+	Parameters: ``Status: Integer,  Runtime: Double,  CPUtime: Double,  MemBytes: Integer,  InBytes: Integer,  OutBytes: Integer``
+
+	Return Type: ``Usage``
+
+.. wake:function:: def getUsageThreads (Usage _ run cpu _ _ _: Usage): Double
+
+	No description for this feature yet.
+
+	Parameters: ``Usage``
+
+	Return Type: ``Double``
+
+.. wake:tuple:: tuple RunnerInput
+
+	RunnerInput is a subset of the fields supplied in the execution Plan
+	
+
+	Parameters: ``Label: String,  Command: List String,  Visible: List Path,  Environment: List String,  Directory: String,  Stdin: String,  Resources: List String,  Prefix: String,  Record: Usage``
+
+	Return Type: ``RunnerInput``
+
+.. wake:tuple:: tuple RunnerOutput
+
+	No description for this feature yet.
+
+	Parameters: ``Inputs: List String,  Outputs: List String,  Usage: Usage``
+
+	Return Type: ``RunnerOutput``
+
+.. wake:function:: def makeRunner name score pre post (Runner _ _ run)
+
+	No description for this feature yet.
+
+	Parameters: ``String,  Plan,  Result Double String,  Result RunnerInput Error,  Pair Result RunnerInput Error a,  Pair Result RunnerOutput Error a,  Result RunnerOutput Error,  Runner``
+
+	Return Type: ``Runner``
+
+.. wake:function:: def getPlanOnce  p
+
+	Convenience accessor methods
+	
+
+	Parameters: ``p: Plan``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def getPlanKeep  p
+
+	No description for this feature yet.
+
+	Parameters: ``p: Plan``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def getPlanShare p
+
+	No description for this feature yet.
+
+	Parameters: ``p: Plan``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def setPlanOnce  v p
+
+	No description for this feature yet.
+
+	Parameters: ``v: Boolean,  p: Plan``
+
+	Return Type: ``Plan``
+
+.. wake:function:: def setPlanKeep  v p
+
+	No description for this feature yet.
+
+	Parameters: ``v: Boolean,  p: Plan``
+
+	Return Type: ``Plan``
+
+.. wake:function:: def setPlanShare v p
+
+	No description for this feature yet.
+
+	Parameters: ``v: Boolean,  p: Plan``
+
+	Return Type: ``Plan``
+
+.. wake:function:: def prependPlanPath (value: String) (plan: Plan): Plan
+
+	Prepend 'value' to the Plan's 'PATH' environment value
+	
+
+	Parameters: ``value: String,  plan: Plan``
+
+	Return Type: ``Plan``
+
+.. wake:function:: def setPlanEnvVar (name: String) (value: String) (plan: Plan): Plan
+
+	Set an environment variable in a Plan
+	
+
+	Parameters: ``name: String,  value: String,  plan: Plan``
+
+	Return Type: ``Plan``
+
+.. wake:function:: def editPlanOnce (f: Boolean
+
+	Helper methods that maintain the invariant that: Share => Keep => Once
+	
+
+	Parameters: ``f: Boolean,  Boolean,  Plan``
+
+	Return Type: ``Plan``
+
+.. wake:function:: def editPlanKeep (f: Boolean
+
+	No description for this feature yet.
+
+	Parameters: ``f: Boolean,  Boolean,  Plan``
+
+	Return Type: ``Plan``
+
+.. wake:function:: def editPlanShare (f: Boolean
+
+	No description for this feature yet.
+
+	Parameters: ``f: Boolean,  Boolean,  Plan``
+
+	Return Type: ``Plan``
+
+.. wake:function:: def getPlanHash (plan: Plan): Integer
+
+	Get a unique hash-code for the job
+	
+
+	Parameters: ``plan: Plan``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def makePlan (label: String) (visible: List Path) (command: String): Plan
+
+	Create a labeled shell plan.
+	
+
+	Parameters: ``label: String,  visible: List Path,  command: String``
+
+	Return Type: ``Plan``
+
+.. wake:function:: def makeExecPlan (cmd: List String) (visible: List Path): Plan
+
+	No description for this feature yet.
+
+	Parameters: ``cmd: List String,  visible: List Path``
+
+	Return Type: ``Plan``
+
+.. wake:function:: def makeShellPlan (script: String) (visible: List Path): Plan
+
+	No description for this feature yet.
+
+	Parameters: ``script: String,  visible: List Path``
+
+	Return Type: ``Plan``
+
+.. wake:data:: topic runner: Runner
+
+	Default runners provided by wake
+	
+
+.. wake:function:: def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs)
+
+	No description for this feature yet.
+
+	Parameters: ``Runner,  Plan``
+
+	Return Type: ``Job``
+
+.. wake:function:: def runJob (p: Plan): Job
+
+	Run the job!
+	
+
+	Parameters: ``p: Plan``
+
+	Return Type: ``Job``
+
+.. wake:function:: def setJobTag (key: String) (value: String) (job: Job): Job
+
+	Set the value of a tag on a Job
+	This is useful for post-build reflection into the database
+	
+
+	Parameters: ``key: String,  value: String,  job: Job``
+
+	Return Type: ``Job``
+
+.. wake:function:: def getJobReport (job: Job): Result Usage Error
+
+	Actual usage of a finished job
+	
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Result Usage Error``
+
+.. wake:function:: def getJobRecord (job: Job): Option Usage
+
+	From database, available the moment a Job exists
+	
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Option Usage``
+
+.. wake:function:: def killJob (job: Job) (signal: Integer): Unit
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job,  signal: Integer``
+
+	Return Type: ``Unit``
+
+.. wake:function:: def getJobStdout  (job: Job): Result String Error
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Result String Error``
+
+.. wake:function:: def getJobStderr  (job: Job): Result String Error
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Result String Error``
+
+.. wake:function:: def getJobInputs (job: Job): Result (List Path) Error
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Result (List Path) Error``
+
+.. wake:function:: def getJobOutputs (job: Job): Result (List Path) Error
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Result (List Path) Error``
+
+.. wake:function:: def getJobFailedInputs (job: Job): Result (List Path) Error
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Result (List Path) Error``
+
+.. wake:function:: def getJobFailedOutputs (job: Job): Result (List Path) Error
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Result (List Path) Error``
+
+.. wake:function:: def getJobId (job: Job): Integer
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Integer``
+
+.. wake:function:: def getJobDescription (job: Job): String
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job``
+
+	Return Type: ``String``
+
+.. wake:function:: def getJobOutput (job: Job): Result Path Error
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Result Path Error``
+
+.. wake:function:: def isJobOk (job: Job): Boolean
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def getJobStatus (job: Job): Status
+
+	No description for this feature yet.
+
+	Parameters: ``job: Job``
+
+	Return Type: ``Status``
+
+.. wake:function:: def wakePath: String
+
+	Implement FUSE-based Runner
+	The FUSE runner on linux supports a few isolation options via resources:
+	- "isolate/user": the Job will appear to run as root
+	- "isolate/host": make the hostname appear to be "build.local"
+	- "isolate/net": disables network access
+	- "isolate/workspace": makes the build appear run in /var/cache/wake
+	... if /var/cache/wake does not exist, a directory 'build/wake' is
+	used relative to where wake has been installed
+	
+
+	Parameters: None
+
+	Return Type: ``String``
+
+.. wake:function:: def rOK: Integer
+
+	No description for this feature yet.
+
+	Parameters: None
+
+	Return Type: ``Integer``
+
+.. wake:function:: def wOK: Integer
+
+	No description for this feature yet.
+
+	Parameters: None
+
+	Return Type: ``Integer``
+
+.. wake:function:: def xOK: Integer
+
+	No description for this feature yet.
+
+	Parameters: None
+
+	Return Type: ``Integer``
+
+.. wake:function:: def access (file: String) (mode: Integer): Boolean
+
+	No description for this feature yet.
+
+	Parameters: ``file: String,  mode: Integer``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def defaultRunner: Runner
+
+	No description for this feature yet.
+
+	Parameters: None
+
+	Return Type: ``Runner``
+
+.. wake:function:: def makeJSONRunnerPlan (rawScript: String) (score: Plan
+
+	make a ``JSONRunnerPlan`` with ``Nil`` and ``(_)`` as defaults for ``ExtraArgs`` and ``Estimate`` respectively
+	rawScript: String; the path to the script to run jobs with
+	score: runJob chooses the runner with the largest score for a Plan
+	
+
+	Parameters: ``rawScript: String,  score: Plan,  Result Double String``
+
+	Return Type: ``JSONRunnerPlan``
+
+.. wake:function:: def makeJSONRunner (plan: JSONRunnerPlan): Runner
+
+	Make a Runner that runs a named script to run jobs
+	plan: JSONRunnerPlan; a tuple containing the arguments for this function
+	
+
+	Parameters: ``plan: JSONRunnerPlan``
+
+	Return Type: ``Runner``
+
+.. wake:function:: def job (cmd: List String) (visible: List Path): Job
+
+	Whenever possible, use 'job' if:
+	cmd can run under FUSE
+	cmd guarantees to produce the same outputs given the same inputs
+	Examples:
+	gcc
+	job only allows cmd access to 'visible', to prevent undeclared dependencies.
+	If you miss declared visible inputs, your build will fail so you can fix it.
+	If you declare too many visible inputs, cmd execution/replay will wait for unnecessary files.
+	
+
+	Parameters: ``cmd: List String,  visible: List Path``
+
+	Return Type: ``Job``
+
+.. wake:function:: def shellJob (script: String) (visible: List Path): Job
+
+	No description for this feature yet.
+
+	Parameters: ``script: String,  visible: List Path``
+
+	Return Type: ``Job``
+
+environment.wake
+----------------
+.. wake:data:: topic path: String
+
+	A topic used to globally add directories to the default PATH of a Plans
+	
+
+.. wake:data:: topic environment: String
+
+	A topic used to globally add variables to the default environment of Plans
+	
+
+.. wake:function:: def getenv (key: String): Option String
+
+	getenv: access environment variables provided to the wake executable
+	Use of this function can lead to unnecessary rebuilds!
+	
+
+	Parameters: ``key: String``
+
+	Return Type: ``Option String``
+
+.. wake:function:: def getEnvironment (key: String) (environment: List String): Option String
+
+	Retrieve the value for 'key' from a KEY=VALUE environment list
+	
+
+	Parameters: ``key: String,  environment: List String``
+
+	Return Type: ``Option String``
+
+.. wake:function:: def unsetEnvironment (key: String) (environment: List String): List String
+
+	Remove a key from a KEY=VALUE environment list
+	
+	makePlan ...
+	| editPlanEnvironment (unsetEnvironment "JAVA_HOME")
+	| ...
+	
+
+	Parameters: ``key: String,  environment: List String``
+
+	Return Type: ``List String``
+
+.. wake:function:: def setEnvironment (key: String) (value: String) (environment: List String): List String
+
+	Set key=value in an environment list, removing all prior values for that key
+	
+	makePlan ...
+	| editPlanEnvironment (setEnvironment "HELLO" "world")
+	| ...
+	
+
+	Parameters: ``key: String,  value: String,  environment: List String``
+
+	Return Type: ``List String``
+
+.. wake:function:: def editEnvironment (key: String) (fn: Option String
+
+	Update a key's value in a KEY=VALUE environment list
+	All prior values for that key are rmeoved
+	Only the first match (if any) is supplied to fn
+	
+
+	Parameters: ``key: String,  fn: Option String,  Option String,  environment: List String``
+
+	Return Type: ``List String``
+
+.. wake:function:: def addEnvironmentPath (path: String) (environment: List String): List String
+
+	Add a component to the PATH in a KEY=VALUE environment
+	
+	makePlan ...
+	| editPlanEnvironment (addEnvironmentPath "/usr/local/bin")
+	| ...
+	
+
+	Parameters: ``path: String,  environment: List String``
+
+	Return Type: ``List String``
+
+.. wake:function:: def addEnvironmentPathOpt (pathopt: Option String) (environment: List String): List String
+
+	Optionally add a component to the PATH in a KEY=VALUE environment
+	
+
+	Parameters: ``pathopt: Option String,  environment: List String``
+
+	Return Type: ``List String``
+
+incremental.wake
+----------------
+.. wake:function:: def runIncrementalJob (stateFileLabel: String) (reusedOutputFilterFn: Path
+
+	This API allows a Job to access those outputs from its last invocation
+	which are accepted by reusedOutputFilterFn. To use this method, you must
+	guarantee that all output contents will be the same whether or not the
+	previous outputs were made available or not. Also, for incremental jobs,
+	all visible files are considered as inputs, since the job might not read
+	all inputs on each run, based on (for example) timestamps.
+	
+
+	Parameters: ``stateFileLabel: String,  reusedOutputFilterFn: Path,  Boolean,  plan: Plan``
+
+	Return Type: ``Job``
+
+path.wake
+---------
+.. wake:function:: def simplify (path: String): String
+
+	Simplify away the ..s and .s in a String
+	
+
+	Parameters: ``path: String``
+
+	Return Type: ``String``
+
+.. wake:function:: def sortPaths (paths: List Path): List Path
+
+	No description for this feature yet.
+
+	Parameters: ``paths: List Path``
+
+	Return Type: ``List Path``
+
+.. wake:function:: def in (dir: String) (path: String): String
+
+	Concatenate two paths
+	join "foo"  "bar"    => "foo/bar"
+	join "foo"  "/bar "  => "/bar"
+	join "/foo" "bar"    => "/foo/bar"
+	join "foo"  "../bar" => "bar"
+	
+
+	Parameters: ``dir: String,  path: String``
+
+	Return Type: ``String``
+
+.. wake:function:: def relative (dir: String) (path: String): String
+
+	Reframe path into a form accesible relative to dir
+	For example:
+	relative "bin" "bin/usr" => "usr"
+	relative "bin" "bin"     => "."
+	relative "bin" "hax"     => "../hax"
+	
+
+	Parameters: ``dir: String,  path: String``
+
+	Return Type: ``String``
+
+.. wake:data:: target whichIn (path: String) (exec: String): String
+
+	Locate an executable in the search path
+	
+
+.. wake:function:: def which (exec: String): String
+
+	No description for this feature yet.
+
+	Parameters: ``exec: String``
+
+	Return Type: ``String``
+
+.. wake:data:: target whichInEnvPath (exec: String): Option String
+
+	Locate an executable in the users env PATH
+	
+
+.. wake:function:: def basename (file: String): String
+
+	Remove any leading directories from `file`.
+	
+	Parameters:
+	- `file`: The filename to simplify
+	
+	Guarantees:
+	- The resulting String contains no '/'s
+	
+	```
+	basename "abc/def"  = "def"
+	basename "abc/def/" = "def"
+	basename "/foo/bar" = "bar"
+	basename "/foo"     = "foo"
+	basename "foo-bar"  = "foo-bar"
+	```
+	
+
+	Parameters: ``file: String``
+
+	Return Type: ``String``
+
+.. wake:function:: def dirname (file: String): String
+
+	Extract the directory name from `file`.
+	
+	Parameters:
+	- `file`: The filename to simplify
+	
+	Guarantees:
+	- The resulting String is non-empty
+	
+	```
+	dirname "foo/bar"  = "foo"
+	dirname "bar"      = "."
+	dirname "/bar"     = "/"
+	dirname "/foo/bar" = /foo"
+	```
+	
+
+	Parameters: ``file: String``
+
+	Return Type: ``String``
+
+.. wake:function:: def isPathDir (path: Path): Boolean
+
+	No description for this feature yet.
+
+	Parameters: ``path: Path``
+
+	Return Type: ``Boolean``
+
+.. wake:function:: def getPathName (path: Path): String
+
+	No description for this feature yet.
+
+	Parameters: ``path: Path``
+
+	Return Type: ``String``
+
+.. wake:function:: def getPathParent (path: Path): Path
+
+	No description for this feature yet.
+
+	Parameters: ``path: Path``
+
+	Return Type: ``Path``
+
+.. wake:function:: def getPathHash (path: Path): String
+
+	No description for this feature yet.
+
+	Parameters: ``path: Path``
+
+	Return Type: ``String``
+
