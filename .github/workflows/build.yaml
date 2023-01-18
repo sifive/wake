@@ -8,6 +8,11 @@ jobs:
       runs-on: ubuntu-latest
       name: Hello Test
       steps:
+        - name: "Clone wake"
+          uses: actions/checkout@v2
+          with:
+            fetch-depth: 0
+
         - name: Hello world
           uses: ./.github/actions/hello/
           id: hello
