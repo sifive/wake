@@ -132,7 +132,7 @@ jobs:
         - name: Upload vsix 
           uses: actions/upload-artifact@v3
           with:
-            name: vscode-stable 
+            name: release 
             path: release/vscode
 
     wasm:
@@ -206,14 +206,13 @@ jobs:
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c 'tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests'
 
         - name: Install alpine
-          run: install -D -t release/alpine wake-*/wake-static_*
+          run: install -D -t release/alpine build/wake-*/wake-static_*
 
         - name: Upload alpine
           uses: actions/upload-artifact@v3
           with:
-            name: alpine 
+            name: release 
             path: release/alpine
-
 
     
     macos_10_15:
