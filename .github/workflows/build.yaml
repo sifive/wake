@@ -193,6 +193,9 @@ jobs:
         - name: Uncompress tarball
           run: tar xvJf build/wake_*.tar.xz -C build
 
+        - name: Set tests as executable
+          run: chmod -R +x build/tests
+
         - name: Build docker image
           run: docker build -f dockerfiles/alpine -t wake-alpine .
 
