@@ -200,7 +200,7 @@ jobs:
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c 'make -C wake-* static' 
 
         - name: Run alpine tests
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c "tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c 'tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests'
 
         - name: Install alpine
           run: install -D -t release/alpine wake-*/wake-static_*
