@@ -91,7 +91,7 @@ jobs:
           run: tar xvJf build/wake_*.tar.xz -C build
 
         - name: Build docker image
-          run: docker build -f dockerfiles/wasm --build-arg EMSDK_VERISON=latest -t wake-wasm .
+          run: docker build -f dockerfiles/wasm --build-arg EMSDK_VERSION=latest -t wake-wasm .
 
         - name: Build vsix
           run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'make -C wake-* vscode'
