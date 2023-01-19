@@ -275,6 +275,56 @@ jobs:
           with:
             name: release 
             path: release/debian_bullseye
+
+    centos_7_6:
+      runs-on: ubuntu-latest
+      needs: tarball
+      name: CentOS Build
+      steps:
+        - name: Create target directories
+          run: mkdir dockerfiles && mkdir -p build/tests && chmod ugo+rwx build
+
+        - name: Download Tarball
+          uses: actions/download-artifact@v3
+          with:
+            name: tarball
+            path: build
+
+        - name: Download Test Artifacts
+          uses: actions/download-artifact@v3
+          with:
+            name: tests
+            path: build/tests
+
+        - name: Download Dockerfiles
+          uses: actions/download-artifact@v3
+          with:
+            name: dockerfiles
+            path: dockerfiles
+
+        - name: Uncompress tarball
+          run: tar xvJf build/wake_*.tar.xz -C build
+
+        - name: Set tests as executable
+          run: chmod -R +x build/tests
+
+        - name: Build docker image
+          run: docker build -f dockerfiles/centos-7.6 -t wake-centos-7.6 .
+
+        - name: Build centos target
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-7.6 /bin/sh -c 'source scl_source enable devtoolset-9 && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz'  
+
+        - name: Run centos tests
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-7.6 /bin/sh -c 'rpm -i x86_64/*.rpm && cd tests && wake runTests'
+
+        - name: Install centos
+          run: install -D -t release/centos_7_6 build/x86_64/*.rpm
+
+        - name: Upload centos
+          uses: actions/upload-artifact@v3
+          with:
+            name: release 
+            path: release/centos_7_6
     
 
     
