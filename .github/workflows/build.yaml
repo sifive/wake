@@ -72,24 +72,30 @@ jobs:
       needs: tarball
       name: VSCode Extension (latest)
       steps: 
+        - name: Create target directories
+          run: mkdir dockerfiles && mkdir build && chmod ugo+rwx build
+
         - name: Download Tarball
           uses: actions/download-artifact@v3
           with:
             name: tarball
+            path: build
 
         - name: Download Dockerfiles
           uses: actions/download-artifact@v3
           with:
             name: dockerfiles
+            path: dockerfiles
+
+        - name: Uncompress tarball
+          run: tar xvJf build/wake_*.tar.xz -C build
 
         - name: Build docker image
-          run: docker build -f wasm --build-arg EMSDK_VERISON=latest -t wake-wasm .
-
-        - name: Create docker build directory and copy tarball
-          run: mkdir build && chmod ugo+rwx build && cp wake_*.tar.xz build
+          run: docker build -f dockerfiles/wasm --build-arg EMSDK_VERISON=latest -t wake-wasm .
 
         - name: Build vsix
-          run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'tar xvJf wake_*.tar.xz && make -C wake-* vscode'
+          run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'make -C wake-* vscode'
+
 
     vscode_stable:
       runs-on: ubuntu-latest
@@ -126,50 +132,85 @@ jobs:
         - name: Upload vsix 
           uses: actions/upload-artifact@v3
           with:
-            name: vscode-extension-stable 
-            path: release/vscode/*.vsix
+            name: vscode-stable 
+            path: release/vscode
 
     wasm:
       runs-on: ubuntu-latest
       needs: tarball
       name: WASM Build
       steps:
+        - name: Create target directories
+          run: mkdir dockerfiles && mkdir build && chmod ugo+rwx build
+
         - name: Download Tarball
           uses: actions/download-artifact@v3
           with:
             name: tarball
+            path: build
 
         - name: Download Dockerfiles
           uses: actions/download-artifact@v3
           with:
             name: dockerfiles
+            path: dockerfiles
+
+        - name: Uncompress tarball
+          run: tar xvJf build/wake_*.tar.xz -C build
 
         - name: Build docker image
-          run: docker build -f wasm -t wake-wasm .
-
-        - name: Create docker build directory and copy tarball
-          run: mkdir build && chmod ugo+rwx build && cp wake_*.tar.xz build
+          run: docker build -f dockerfiles/wasm -t wake-wasm .
 
         - name: Build wasm target
-          run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'tar xvJf wake_*.tar.xz && make -C wake-* wasm'
+          run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'make -C wake-* wasm'
 
-    # alpine:
-    #   runs-on: ubuntu-latest
-    #   needs: tarball
-    #   name: Alpine Build
-    #   steps:
-    #     - name: Download Tarball
-    #       uses: actions/download-artifact@v3
-    #       with:
-    #         name: tarball
-    #
-    #     - name: Download Dockerfiles
-    #       uses: actions/download-artifact@v3
-    #       with:
-    #         name: dockerfiles
-    #
-    #     - name: Build docker image
-    #       run: docker build -f alpine -t wake-alpine .
+    alpine:
+      runs-on: ubuntu-latest
+      needs: tarball
+      name: Alpine Build
+      steps:
+      steps:
+        - name: Create target directories
+          run: mkdir dockerfiles && mkdir -p build/tests && chmod ugo+rwx build
+
+        - name: Download Tarball
+          uses: actions/download-artifact@v3
+          with:
+            name: tarball
+            path: build
+
+        - name: Download Test Artifacts
+          uses: actions/download-artifact@v3
+          with:
+            name: tests
+            path: build/tests
+
+        - name: Download Dockerfiles
+          uses: actions/download-artifact@v3
+          with:
+            name: dockerfiles
+            path: dockerfiles
+
+        - name: Uncompress tarball
+          run: tar xvJf build/wake_*.tar.xz -C build
+
+        - name: Build docker image
+          run: docker build -f dockerfiles/alpine -t wake-alpine .
+
+        - name: Build alpine target
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c 'make -C wake-* static' 
+
+        - name: Run alpine tests
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c "tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
+
+        - name: Install alpine
+          run: install -D -t release/alpine wake-*/wake-static_*
+
+        - name: Upload alpine
+          uses: actions/upload-artifact@v3
+          with:
+            name: alpine 
+            path: release/alpine
 
 
     
