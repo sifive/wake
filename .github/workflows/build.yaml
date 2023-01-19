@@ -246,8 +246,11 @@ jobs:
             name: dockerfiles
             path: dockerfiles
 
+        - name: Create orig file
+        - run: x=(build/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
+
         - name: Uncompress tarball
-          run: tar xvJf build/wake_*.tar.xz -C build
+          run: tar xvJf build/wake_*.orig.tar.xz -C build
 
         - name: Set artifacts as executable
           run: chmod -R +x build/tests # && chomod -R +x build/debian
