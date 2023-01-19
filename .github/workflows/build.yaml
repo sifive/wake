@@ -67,33 +67,33 @@ jobs:
             name: html
             path: scripts/sphinx/build/html
 
-    build_docker_images:
+    vscode_latest:
       runs-on: ubuntu-latest
-      needs: tarball # doesn't actually but keep until we've solved the multi-dep problem
-      name: Build Docker Images
-      steps:
-        - name: Clone wake
-          uses: actions/checkout@v3
+      needs: tarball
+      name: VSCode Extension (latest)
+      steps: 
+        - name: Download Tarball
+          uses: actions/download-artifact@v3
           with:
-            fetch-depth: 0
+            name: tarball
+
+        - name: Download Dockerfiles
+          uses: actions/download-artifact@v3
+          with:
+            name: dockerfiles
 
         - name: Build docker image
-          run: docker build -f .circleci/dockerfiles/wasm -t wake-wasm .
+          run: docker build -f wasm --build-arg EMSDK_VERISON=latest -t wake-wasm .
 
-        - name: Test ls 
-          run: ls 
+        - name: Create docker build directory and copy tarball
+          run: mkdir build && chmod ugo+rwx build && cp wake_*.tar.xz build
 
-        - name: Upload Docker Images
-          uses: actions/upload-artifact@v3
-          with:
-            name: docker-images
-            path: wake-wasm
-
-
+        - name: Build vsix
+          run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'tar xvJf wake_*.tar.xz && make -C wake-* vscode'
 
     vscode_stable:
       runs-on: ubuntu-latest
-      needs: build_docker_images
+      needs: tarball
       name: VSCode Extension (stable)
       steps: 
         - name: Download Tarball
@@ -101,7 +101,7 @@ jobs:
           with:
             name: tarball
 
-        - name: Download Dockerfile
+        - name: Download Dockerfiles
           uses: actions/download-artifact@v3
           with:
             name: dockerfiles
@@ -109,43 +109,39 @@ jobs:
         - name: Build docker image
           run: docker build -f wasm -t wake-wasm .
 
-        - name: Create docker shared build directory
-          run: mkdir build && chmod ugo+rwx build
+        - name: Create docker build directory and copy tarball
+          run: mkdir build && chmod ugo+rwx build && cp wake_*.tar.xz build
 
-        - name: Copy wake resources to build directory
-          run: cp wake_*.tar.xz build
-
-        - name: Build Wake
+        - name: Build vsix
           run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'tar xvJf wake_*.tar.xz && make -C wake-* vscode'
 
         - name: Install vsix
           run: install -D -t release/vscode build/wake-*/extensions/vscode/wake-*.vsix
 
-        - name: Upload build artifacts
+        - name: Upload vsix 
           uses: actions/upload-artifact@v3
           with:
             name: vscode-extension-stable 
             path: release/vscode/*.vsix
-
     
-    
-    build:
-        name: "MacOS build"
+    macos_10_15:
+        name: MacOS build
         runs-on: macos-10.15
 
         steps:
-            - name: "Clone wake"
+            - name: Clone wake
               uses: actions/checkout@v2
               with:
                 fetch-depth: 0
           
-            - name: "Install deps"
+            - name: Install deps
               run: |
                 brew install --cask osxfuse
                 brew install re2 || brew install re2 --head
 
-            - name: "Build wake"
+            - name: Build wake
               run: make all -j3
 
-            - name: "Test wake"
+            - name: Test wake
               run: make test
+
