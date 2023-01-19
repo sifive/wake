@@ -36,36 +36,42 @@ jobs:
           with:
             name: tarball
             path: wake_*.tar.xz
+            retention-days: 1
 
         - name: Upload Dockerfiles 
           uses: actions/upload-artifact@v3
           with:
             name: dockerfiles
             path: .circleci/dockerfiles/
+            retention-days: 1
 
         - name: Upload debian files
           uses: actions/upload-artifact@v3
           with:
             name: debian
             path: debian 
+            retention-days: 1
 
         - name: Upload www files
           uses: actions/upload-artifact@v3
           with:
             name: www
             path: www 
+            retention-days: 1
 
         - name: Upload test artifacts 
           uses: actions/upload-artifact@v3
           with:
             name: tests
             path: tests
+            retention-days: 1
 
         - name: Upload html 
           uses: actions/upload-artifact@v3
           with:
             name: html
             path: scripts/sphinx/build/html
+            retention-days: 1
 
     vscode_latest:
       runs-on: ubuntu-latest
@@ -132,7 +138,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release 
+            name: release/vscode
             path: release/vscode
 
     wasm:
@@ -211,7 +217,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release 
+            name: release/alpine
             path: release/alpine
 
     debian_bullseye:
@@ -273,7 +279,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release 
+            name: release/debian_bullseye
             path: release/debian_bullseye
 
     centos_7_6:
@@ -323,7 +329,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release 
+            name: release/centos_7_6
             path: release/centos_7_6
     
     rocky_8:
@@ -373,7 +379,7 @@ jobs:
         - name: Upload 
           uses: actions/upload-artifact@v3
           with:
-            name: release 
+            name: release/rocky_8
             path: release/rocky_8
 
     ubuntu_18_04:
@@ -435,7 +441,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release 
+            name: release/ubuntu_18_04
             path: release/ubuntu_18_04
 
     ubuntu_22_04:
@@ -497,7 +503,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release 
+            name: release/ubuntu_22_04
             path: release/ubuntu_22_04
 
     
