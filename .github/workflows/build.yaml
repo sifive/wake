@@ -214,6 +214,66 @@ jobs:
             name: release 
             path: release/alpine
 
+    debian_bullseye:
+      runs-on: ubuntu-latest
+      needs: tarball
+      name: Debian Bullseye Build
+      steps:
+        - name: Create target directories
+          run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
+
+        - name: Download Tarball
+          uses: actions/download-artifact@v3
+          with:
+            name: tarball
+            path: build
+
+        - name: Download Debian Artifacts
+          uses: actions/download-artifact@v3
+          with:
+            name: debian
+            path: build/debian
+
+        - name: Download Test Artifacts
+          uses: actions/download-artifact@v3
+          with:
+            name: tests
+            path: build/tests
+
+        - name: Download Dockerfiles
+          uses: actions/download-artifact@v3
+          with:
+            name: dockerfiles
+            path: dockerfiles
+
+        - name: Uncompress tarball
+          run: tar xvJf build/wake_*.tar.xz -C build
+
+        - name: Set artifacts as executable
+          run: chmod -R +x build/tests # && chomod -R +x build/debian
+
+        - name: Merge debian artifacts into tarball artifacts
+          run: cp -a build/debian build/wake-*
+
+        - name: Build docker image
+          run: docker build -f dockerfiles/debian-bullseye -t wake-debian-bullseye .
+
+        - name: Build debian target
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /build/$(ls -d wake-*) wake-debian-bullseye /bin/sh -c 'debuild -us -uc' 
+
+        - name: Run debian tests
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-debian-bullseye /bin/sh -c 'dpkg -i *.deb && cd tests && wake runTests'
+
+        - name: Install debian
+          run: install -D -t release/debian_bullseye build/*.deb build/*.xz build/*.changes build/*.dsc
+
+        - name: Upload debian
+          uses: actions/upload-artifact@v3
+          with:
+            name: release 
+            path: release/debian_bullseye
+    
+
     
     macos_10_15:
         name: MacOS Build
