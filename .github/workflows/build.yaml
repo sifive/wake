@@ -7,7 +7,7 @@ jobs:
     tarball:
       runs-on: ubuntu-latest
       name: Tarball
-      steps: 
+      steps:
         - name: Clone wake
           uses: actions/checkout@v3
           with:
@@ -31,14 +31,14 @@ jobs:
         - name: wake to rst
           run: PATH=$(pwd)/bin:$PATH PYTHONPATH=$(pwd)/scripts python3 scripts/wake2rst.py
 
-        - name: Upload tarball 
+        - name: Upload tarball
           uses: actions/upload-artifact@v3
           with:
             name: tarball
             path: wake_*.tar.xz
             retention-days: 1
 
-        - name: Upload Dockerfiles 
+        - name: Upload Dockerfiles
           uses: actions/upload-artifact@v3
           with:
             name: dockerfiles
@@ -49,35 +49,66 @@ jobs:
           uses: actions/upload-artifact@v3
           with:
             name: debian
-            path: debian 
+            path: debian
             retention-days: 1
 
-        - name: Upload www files
-          uses: actions/upload-artifact@v3
-          with:
-            name: www
-            path: www 
-            retention-days: 1
-
-        - name: Upload test artifacts 
+        - name: Upload test artifacts
           uses: actions/upload-artifact@v3
           with:
             name: tests
             path: tests
             retention-days: 1
 
-        - name: Upload html 
+        - name: Upload index.html
+          uses: actions/upload-artifact@v3
+          with:
+            name: index.html
+            path: www/index.html
+            retention-days: 1
+
+        - name: Upload html
           uses: actions/upload-artifact@v3
           with:
             name: html
             path: scripts/sphinx/build/html
             retention-days: 1
 
+    docs:
+      runs-on: ubuntu-latest
+      needs: tarball
+      name: Docs
+      steps:
+        - name: Download index.html
+          uses: actions/download-artifact@v3
+          with:
+            name: index.html
+
+        - name: Download html
+          uses: actions/download-artifact@v3
+          with:
+            name: html
+
+        - name: Make .nojekyll
+          run: touch .nojekyll
+
+        - name: Upload
+          uses: actions/upload-pages-artifact@v1
+          with:
+            path: .
+
+    # deploy_docs:
+    #   runs-on: ubuntu-latest
+    #   needs: docs
+    #   name: Deploy Docs to GH Pages
+    #   steps:
+    #     - name: Deploy
+    #       uses: actions/deploy-pages
+
     vscode_latest:
       runs-on: ubuntu-latest
       needs: tarball
       name: VSCode Extension (latest)
-      steps: 
+      steps:
         - name: Create target directories
           run: mkdir dockerfiles && mkdir build && chmod ugo+rwx build
 
@@ -107,7 +138,7 @@ jobs:
       runs-on: ubuntu-latest
       needs: tarball
       name: VSCode Extension (stable)
-      steps: 
+      steps:
         - name: Create target directories
           run: mkdir dockerfiles && mkdir build && chmod ugo+rwx build
 
@@ -167,7 +198,7 @@ jobs:
         - name: Build docker image
           run: docker build -f dockerfiles/wasm -t wake-wasm .
 
-        - name: Build 
+        - name: Build
           run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'make -C wake-* wasm'
 
     alpine:
@@ -206,7 +237,7 @@ jobs:
           run: docker build -f dockerfiles/alpine -t wake-alpine .
 
         - name: Build
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c 'make -C wake-* static' 
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c 'make -C wake-* static'
 
         - name: Test
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c 'tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests'
@@ -267,10 +298,10 @@ jobs:
         - name: Build docker image
           run: docker build -f dockerfiles/debian-bullseye -t wake-debian-bullseye .
 
-        - name: Build 
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /$(ls -d build/wake-*) wake-debian-bullseye /bin/sh -c 'debuild -us -uc' 
+        - name: Build
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /$(ls -d build/wake-*) wake-debian-bullseye /bin/sh -c 'debuild -us -uc'
 
-        - name: Test 
+        - name: Test
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-debian-bullseye /bin/sh -c 'dpkg -i *.deb && cd tests && wake runTests'
 
         - name: Install
@@ -318,9 +349,9 @@ jobs:
           run: docker build -f dockerfiles/centos-7.6 -t wake-centos-7.6 .
 
         - name: Build
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-7.6 /bin/sh -c 'source scl_source enable devtoolset-9 && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz'  
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-7.6 /bin/sh -c 'source scl_source enable devtoolset-9 && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz'
 
-        - name: Test 
+        - name: Test
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-7.6 /bin/sh -c 'rpm -i x86_64/*.rpm && cd tests && wake runTests'
 
         - name: Install
@@ -331,7 +362,7 @@ jobs:
           with:
             name: release_centos_7_6
             path: release/centos_7_6
-    
+
     rocky_8:
       runs-on: ubuntu-latest
       needs: tarball
@@ -368,15 +399,15 @@ jobs:
           run: docker build -f dockerfiles/rocky-8 -t wake-rocky-8 .
 
         - name: Build
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-rocky-8 /bin/sh -c 'rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz'  
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-rocky-8 /bin/sh -c 'rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz'
 
-        - name: Test 
+        - name: Test
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-rocky-8 /bin/sh -c 'rpm -i x86_64/*.rpm && cd tests && wake runTests'
 
-        - name: Install 
+        - name: Install
           run: install -D -t release/rocky_8 build/x86_64/*.rpm
 
-        - name: Upload 
+        - name: Upload
           uses: actions/upload-artifact@v3
           with:
             name: release_rocky_8
@@ -430,9 +461,9 @@ jobs:
           run: docker build -f dockerfiles/ubuntu-18.04 -t wake-ubuntu-18.04 .
 
         - name: Build
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /$(ls -d build/wake-*) wake-ubuntu-18.04 /bin/sh -c 'debuild -us -uc' 
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /$(ls -d build/wake-*) wake-ubuntu-18.04 /bin/sh -c 'debuild -us -uc'
 
-        - name: Test 
+        - name: Test
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-ubuntu-18.04 /bin/sh -c 'dpkg -i *.deb && cd tests && wake runTests'
 
         - name: Install
@@ -492,9 +523,9 @@ jobs:
           run: docker build -f dockerfiles/ubuntu-22.04 -t wake-ubuntu-22.04 .
 
         - name: Build
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /$(ls -d build/wake-*) wake-ubuntu-22.04 /bin/sh -c 'debuild -us -uc' 
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /$(ls -d build/wake-*) wake-ubuntu-22.04 /bin/sh -c 'debuild -us -uc'
 
-        - name: Test 
+        - name: Test
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-ubuntu-22.04 /bin/sh -c 'dpkg -i *.deb && cd tests && wake runTests'
 
         - name: Install
@@ -506,7 +537,7 @@ jobs:
             name: release_ubuntu_22_04
             path: release/ubuntu_22_04
 
-    
+
     macos_10_15:
         name: MacOS 10.15 Build
         runs-on: macos-10.15
@@ -516,7 +547,7 @@ jobs:
               uses: actions/checkout@v2
               with:
                 fetch-depth: 0
-          
+
             - name: Install deps
               run: |
                 brew install --cask osxfuse
