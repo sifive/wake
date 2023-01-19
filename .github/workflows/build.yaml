@@ -438,6 +438,68 @@ jobs:
             name: release 
             path: release/ubuntu_18_04
 
+    ubuntu_22_04:
+      runs-on: ubuntu-latest
+      needs: tarball
+      name: Ubuntu 22.04 Build
+      steps:
+        - name: Create target directories
+          run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
+
+        - name: Download Tarball
+          uses: actions/download-artifact@v3
+          with:
+            name: tarball
+            path: build
+
+        - name: Download Debian Artifacts
+          uses: actions/download-artifact@v3
+          with:
+            name: debian
+            path: build/debian
+
+        - name: Download Test Artifacts
+          uses: actions/download-artifact@v3
+          with:
+            name: tests
+            path: build/tests
+
+        - name: Download Dockerfiles
+          uses: actions/download-artifact@v3
+          with:
+            name: dockerfiles
+            path: dockerfiles
+
+        - name: Create orig file
+          run: x=(build/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "build/${y##*/}.orig.tar.xz"
+
+        - name: Uncompress tarball
+          run: tar xvJf build/wake_*.orig.tar.xz -C build
+
+        - name: Set artifacts as executable
+          run: chmod -R +x build/tests
+
+        - name: Merge debian artifacts into tarball artifacts
+          run: cp -a build/debian build/wake-*
+
+        - name: Build docker image
+          run: docker build -f dockerfiles/ubuntu-22.04 -t wake-ubuntu-22.04 .
+
+        - name: Build
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /$(ls -d build/wake-*) wake-ubuntu-22.04 /bin/sh -c 'debuild -us -uc' 
+
+        - name: Test 
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-ubuntu-22.04 /bin/sh -c 'dpkg -i *.deb && cd tests && wake runTests'
+
+        - name: Install
+          run: install -D -t release/ubuntu_22_04 build/*.deb build/*.xz build/*.changes build/*.dsc
+
+        - name: Upload
+          uses: actions/upload-artifact@v3
+          with:
+            name: release 
+            path: release/ubuntu_22_04
+
     
     macos_10_15:
         name: MacOS 10.15 Build
