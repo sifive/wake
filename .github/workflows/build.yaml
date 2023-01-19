@@ -36,7 +36,7 @@ jobs:
   #
     tarball:
       runs-on: ubuntu-latest
-      name: Ubuntu 22.04
+      name: Tarball
       steps: 
         - name: Clone wake
           uses: actions/checkout@v3
@@ -67,6 +67,12 @@ jobs:
             name: tarball
             path: wake_*.tar.xz
 
+        - name: Upload build artifacts
+          uses: actions/upload-artifact@v3
+          with:
+            name: Dockerfile 
+            path: .circleci/dockerfiles/wasm 
+
 
       # - persist_to_workspace:
       #     root: .
@@ -79,27 +85,46 @@ jobs:
       #       - scripts/sphinx/build/html
 
 
-    #
-    # ubuntu_22_04:
-    #   runs-on: ubuntu-latest
-    #   name: Ubuntu 22.04
-    #   steps: 
-    #     - name: Clone wake
-    #       uses: actions/checkout@v2
-    #       with:
-    #         fetch-depth: 0
-    #
-    #     - name: Build docker image
-    #       run: docker build -f ./.circleci/dockerfiles/ubuntu-22.04 -t wake-ubuntu-22.04 .
-    #
-    #     - name: Create docker shared build directory
-    #       run: mkdir ../build && chmod ugo+rwx ../build
-    #
-    #     - name: Copy wake resources to build directory
-    #       run: cp -R ./ ../build
-    #
-    #     - name: Build Wake
-    #       run: docker run -u build --rm --mount type=bind,source=$PWD/../build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-ubuntu-22.04 /bin/sh -c 'make -C tarball'
+
+    vscode_stable:
+      runs-on: ubuntu-latest
+      needs: tarball
+      name: VSCode Extension (stable)
+      steps: 
+        - name: Download Tarball
+          uses: actions/download-artifact@v3
+          with:
+            name: tarball
+
+        - name: Download Dockerfile
+          uses: actions/download-artifact@v3
+          with:
+            name: Dockerfile
+
+        - name: Build docker image
+          run: docker build -f wasm -t wake-wasm .
+
+        - name: Create docker shared build directory
+          run: mkdir build && chmod ugo+rwx build
+
+        - name: Copy wake resources to build directory
+          run: cp wake_*.tar.xz build
+
+        - name: Build Wake
+          run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'tar xvJf wake_*.tar.xz && make -C wake-* vscode'
+
+        - name: Install vsix
+          run: install -D -t release/vscode build/wake-*/extensions/vscode/wake-*.vsix
+
+        - name: Test ls 
+          run: ls release/vscode 
+
+        - name: Upload build artifacts
+          uses: actions/upload-artifact@v3
+          with:
+            name: vscode-extension-stable 
+            path: release/vscode/*.vsix
+
     
     
     build:
