@@ -93,7 +93,7 @@ jobs:
         - name: Build docker image
           run: docker build -f dockerfiles/wasm --build-arg EMSDK_VERSION=latest -t wake-wasm .
 
-        - name: Build vsix
+        - name: Build
           run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'make -C wake-* vscode'
 
 
@@ -123,13 +123,13 @@ jobs:
         - name: Build docker image
           run: docker build -f dockerfiles/wasm -t wake-wasm .
 
-        - name: Build vsix
+        - name: Build
           run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'make -C wake-* vscode'
 
-        - name: Install vsix
+        - name: Install
           run: install -D -t release/vscode build/wake-*/extensions/vscode/wake-*.vsix
 
-        - name: Upload vsix 
+        - name: Upload
           uses: actions/upload-artifact@v3
           with:
             name: release 
@@ -161,7 +161,7 @@ jobs:
         - name: Build docker image
           run: docker build -f dockerfiles/wasm -t wake-wasm .
 
-        - name: Build wasm target
+        - name: Build 
           run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'make -C wake-* wasm'
 
     alpine:
@@ -199,16 +199,16 @@ jobs:
         - name: Build docker image
           run: docker build -f dockerfiles/alpine -t wake-alpine .
 
-        - name: Build alpine target
+        - name: Build
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c 'make -C wake-* static' 
 
-        - name: Run alpine tests
+        - name: Test
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c 'tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests'
 
-        - name: Install alpine
+        - name: Install
           run: install -D -t release/alpine build/wake-*/wake-static_*
 
-        - name: Upload alpine
+        - name: Upload
           uses: actions/upload-artifact@v3
           with:
             name: release 
@@ -253,7 +253,7 @@ jobs:
           run: tar xvJf build/wake_*.orig.tar.xz -C build
 
         - name: Set artifacts as executable
-          run: chmod -R +x build/tests # && chomod -R +x build/debian
+          run: chmod -R +x build/tests
 
         - name: Merge debian artifacts into tarball artifacts
           run: cp -a build/debian build/wake-*
@@ -261,16 +261,16 @@ jobs:
         - name: Build docker image
           run: docker build -f dockerfiles/debian-bullseye -t wake-debian-bullseye .
 
-        - name: Build debian target
+        - name: Build 
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /$(ls -d build/wake-*) wake-debian-bullseye /bin/sh -c 'debuild -us -uc' 
 
-        - name: Run debian tests
+        - name: Test 
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-debian-bullseye /bin/sh -c 'dpkg -i *.deb && cd tests && wake runTests'
 
-        - name: Install debian
+        - name: Install
           run: install -D -t release/debian_bullseye build/*.deb build/*.xz build/*.changes build/*.dsc
 
-        - name: Upload debian
+        - name: Upload
           uses: actions/upload-artifact@v3
           with:
             name: release 
@@ -279,7 +279,7 @@ jobs:
     centos_7_6:
       runs-on: ubuntu-latest
       needs: tarball
-      name: CentOS Build
+      name: CentOS 7.6 Build
       steps:
         - name: Create target directories
           run: mkdir dockerfiles && mkdir -p build/tests && chmod ugo+rwx build
@@ -311,16 +311,16 @@ jobs:
         - name: Build docker image
           run: docker build -f dockerfiles/centos-7.6 -t wake-centos-7.6 .
 
-        - name: Build centos target
+        - name: Build
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-7.6 /bin/sh -c 'source scl_source enable devtoolset-9 && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz'  
 
-        - name: Run centos tests
+        - name: Test 
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-7.6 /bin/sh -c 'rpm -i x86_64/*.rpm && cd tests && wake runTests'
 
-        - name: Install centos
+        - name: Install
           run: install -D -t release/centos_7_6 build/x86_64/*.rpm
 
-        - name: Upload centos
+        - name: Upload
           uses: actions/upload-artifact@v3
           with:
             name: release 
@@ -329,7 +329,7 @@ jobs:
     rocky_8:
       runs-on: ubuntu-latest
       needs: tarball
-      name: Rocky Build
+      name: Rocky 8 Build
       steps:
         - name: Create target directories
           run: mkdir dockerfiles && mkdir -p build/tests && chmod ugo+rwx build
@@ -361,24 +361,86 @@ jobs:
         - name: Build docker image
           run: docker build -f dockerfiles/rocky-8 -t wake-rocky-8 .
 
-        - name: Build rocky target
+        - name: Build
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-rocky-8 /bin/sh -c 'rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz'  
 
-        - name: Run rocky tests
+        - name: Test 
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-rocky-8 /bin/sh -c 'rpm -i x86_64/*.rpm && cd tests && wake runTests'
 
-        - name: Install rocky 
+        - name: Install 
           run: install -D -t release/rocky_8 build/x86_64/*.rpm
 
-        - name: Upload rocky 
+        - name: Upload 
           uses: actions/upload-artifact@v3
           with:
             name: release 
             path: release/rocky_8
 
+    ubuntu_18_04:
+      runs-on: ubuntu-latest
+      needs: tarball
+      name: Ubuntu 18.04 Build
+      steps:
+        - name: Create target directories
+          run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
+
+        - name: Download Tarball
+          uses: actions/download-artifact@v3
+          with:
+            name: tarball
+            path: build
+
+        - name: Download Debian Artifacts
+          uses: actions/download-artifact@v3
+          with:
+            name: debian
+            path: build/debian
+
+        - name: Download Test Artifacts
+          uses: actions/download-artifact@v3
+          with:
+            name: tests
+            path: build/tests
+
+        - name: Download Dockerfiles
+          uses: actions/download-artifact@v3
+          with:
+            name: dockerfiles
+            path: dockerfiles
+
+        - name: Create orig file
+          run: x=(build/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "build/${y##*/}.orig.tar.xz"
+
+        - name: Uncompress tarball
+          run: tar xvJf build/wake_*.orig.tar.xz -C build
+
+        - name: Set artifacts as executable
+          run: chmod -R +x build/tests
+
+        - name: Merge debian artifacts into tarball artifacts
+          run: cp -a build/debian build/wake-*
+
+        - name: Build docker image
+          run: docker build -f dockerfiles/ubuntu-18.04 -t wake-ubuntu-18.04 .
+
+        - name: Build
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /$(ls -d build/wake-*) wake-ubuntu-18.04 /bin/sh -c 'debuild -us -uc' 
+
+        - name: Test 
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-ubuntu-18.04 /bin/sh -c 'dpkg -i *.deb && cd tests && wake runTests'
+
+        - name: Install
+          run: install -D -t release/ubuntu_18_04 build/*.deb build/*.xz build/*.changes build/*.dsc
+
+        - name: Upload
+          uses: actions/upload-artifact@v3
+          with:
+            name: release 
+            path: release/ubuntu_18_04
+
     
     macos_10_15:
-        name: MacOS Build
+        name: MacOS 10.15 Build
         runs-on: macos-10.15
 
         steps:
