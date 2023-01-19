@@ -138,7 +138,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release/vscode
+            name: release_vscode
             path: release/vscode
 
     wasm:
@@ -217,7 +217,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release/alpine
+            name: release_alpine
             path: release/alpine
 
     debian_bullseye:
@@ -279,7 +279,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release/debian_bullseye
+            name: release_debian_bullseye
             path: release/debian_bullseye
 
     centos_7_6:
@@ -329,7 +329,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release/centos_7_6
+            name: release_centos_7_6
             path: release/centos_7_6
     
     rocky_8:
@@ -379,7 +379,7 @@ jobs:
         - name: Upload 
           uses: actions/upload-artifact@v3
           with:
-            name: release/rocky_8
+            name: release_rocky_8
             path: release/rocky_8
 
     ubuntu_18_04:
@@ -441,7 +441,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release/ubuntu_18_04
+            name: release_ubuntu_18_04
             path: release/ubuntu_18_04
 
     ubuntu_22_04:
@@ -503,7 +503,7 @@ jobs:
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release/ubuntu_22_04
+            name: release_ubuntu_22_04
             path: release/ubuntu_22_04
 
     
