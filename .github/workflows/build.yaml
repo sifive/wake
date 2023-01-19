@@ -169,7 +169,6 @@ jobs:
       needs: tarball
       name: Alpine Build
       steps:
-      steps:
         - name: Create target directories
           run: mkdir dockerfiles && mkdir -p build/tests && chmod ugo+rwx build
 
