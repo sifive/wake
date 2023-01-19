@@ -259,7 +259,7 @@ jobs:
           run: docker build -f dockerfiles/debian-bullseye -t wake-debian-bullseye .
 
         - name: Build debian target
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /build/$(ls -d wake-*) wake-debian-bullseye /bin/sh -c 'debuild -us -uc' 
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /$(ls -d build/wake-*) wake-debian-bullseye /bin/sh -c 'debuild -us -uc' 
 
         - name: Run debian tests
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-debian-bullseye /bin/sh -c 'dpkg -i *.deb && cd tests && wake runTests'
