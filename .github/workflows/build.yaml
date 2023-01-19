@@ -247,7 +247,7 @@ jobs:
             path: dockerfiles
 
         - name: Create orig file
-          run: x=(build/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
+          run: x=(build/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "build/${y##*/}.orig.tar.xz"
 
         - name: Uncompress tarball
           run: tar xvJf build/wake_*.orig.tar.xz -C build
