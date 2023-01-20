@@ -1,7 +1,0 @@
-FROM ubuntu:22.04
-
-RUN apt-get update && apt-get install -y build-essential m4 debhelper devscripts git fuse libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config squashfuse
-
-COPY entrypoint.sh /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]

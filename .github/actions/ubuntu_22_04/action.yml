@@ -1,6 +1,0 @@
-# action.yml
-name: 'Ubuntu 22.04'
-description: 'Build for Ubuntu 22.04'
-runs:
-  using: 'docker'
-  image: '../../dockerfiles/ubuntu_22_04/Dockerfile'
