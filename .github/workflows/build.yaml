@@ -620,6 +620,7 @@ jobs:
         # TODO: extract the version number from the tag and insert into file name
         - name: Rename artifacts
           run: |
+            echo "$GITHUB_REF"
             cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-VERSION-1.x86_64.rpm
             cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-VERSION-1.x86_64.rpm
             cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_VERSION-1_amd64.deb
