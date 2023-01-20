@@ -559,12 +559,21 @@ jobs:
       # Only run the 'deploy_docs' job if this workflow was triggered by a push to master
       if: github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == 'master'
 
+      permissions:
+        pages: write
+        id-token: write
+
+      environement:
+        name: github-pages
+        url: ${{ steps.deployment.outputs.page_url }}
+
       runs-on: ubuntu-latest
       needs: docs
       name: Deploy Docs to GH Pages
       steps:
         - name: Deploy
-          uses: actions/deploy-pages
+          id: deployment
+          uses: actions/deploy-pages@v1
 
     release:
       # Only run the 'release' job if this workflow was triggered by the creation of a tag
