@@ -622,6 +622,9 @@ jobs:
           run: |
             echo "$GITHUB_REF"
             echo "$GITHUB_REF_NAME"
+            echo "${{ github.ref }}"
+            echo "${{ github.ref.type }}"
+            echo "${{ github.ref_type }}"
             cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-VERSION-1.x86_64.rpm
             cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-VERSION-1.x86_64.rpm
             cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_VERSION-1_amd64.deb
