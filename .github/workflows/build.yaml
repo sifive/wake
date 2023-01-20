@@ -546,7 +546,7 @@ jobs:
       if: github.event_name == 'push' && github.ref_type == 'tag'
 
       runs-on: ubuntu-latest
-      needs: [tarball, vscode_stable, docker_builds, debian_bullseye, centos_7_6, rocky_8, ubuntu_18_04, ubuntu_22_04]
+      needs: [tarball, vscode_stable, docker_builds, centos_7_6, rocky_8, ubuntu_18_04, ubuntu_22_04]
       name: Create Release
       steps:
         - name: Download Tarball
