@@ -207,108 +207,16 @@ jobs:
             - target: alpine
               dockerfile: alpine
               build_cmd: make -C wake-* static
+              extra_build_flags:
               test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
               install_src_glob: build/wake-*/wake-static_*
-      steps:
-        - name: Create target directories
-          run: mkdir dockerfiles && mkdir -p build/tests && chmod ugo+rwx build
 
-        - name: Download Tarball
-          uses: actions/download-artifact@v3
-          with:
-            name: tarball
-            path: build
-
-        - name: Download Test Artifacts
-          uses: actions/download-artifact@v3
-          with:
-            name: tests
-            path: build/tests
-
-        - name: Download Dockerfiles
-          uses: actions/download-artifact@v3
-          with:
-            name: dockerfiles
-            path: dockerfiles
-
-        - name: Uncompress tarball
-          run: tar xvJf build/wake_*.tar.xz -C build
-
-        - name: Set tests as executable
-          run: chmod -R +x build/tests
-
-        - name: Build docker image
-          run: docker build -f dockerfiles/${{ matrix.dockerfile }} -t wake-${{ matrix.dockerfile }} .
-
-        - name: Build
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.build_cmd }}'
-
-        - name: Test
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.test_cmd }}'
-
-        - name: Install
-          run: install -D -t release/${{ matrix.target }} ${{ matrix.install_src_glob }}
-
-        - name: Upload
-          uses: actions/upload-artifact@v3
-          with:
-            name: release_${{ matrix.target }}
-            path: release/${{ matrix.target }}
-
-    # alpine:
-    #   runs-on: ubuntu-latest
-    #   needs: tarball
-    #   name: Alpine Build
-    #   steps:
-    #     - name: Create target directories
-    #       run: mkdir dockerfiles && mkdir -p build/tests && chmod ugo+rwx build
-    #
-    #     - name: Download Tarball
-    #       uses: actions/download-artifact@v3
-    #       with:
-    #         name: tarball
-    #         path: build
-    #
-    #     - name: Download Test Artifacts
-    #       uses: actions/download-artifact@v3
-    #       with:
-    #         name: tests
-    #         path: build/tests
-    #
-    #     - name: Download Dockerfiles
-    #       uses: actions/download-artifact@v3
-    #       with:
-    #         name: dockerfiles
-    #         path: dockerfiles
-    #
-    #     - name: Uncompress tarball
-    #       run: tar xvJf build/wake_*.tar.xz -C build
-    #
-    #     - name: Set tests as executable
-    #       run: chmod -R +x build/tests
-    #
-    #     - name: Build docker image
-    #       run: docker build -f dockerfiles/alpine -t wake-alpine .
-    #
-    #     - name: Build
-    #       run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c 'make -C wake-* static'
-    #
-    #     - name: Test
-    #       run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c 'tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests'
-    #
-    #     - name: Install
-    #       run: install -D -t release/alpine build/wake-*/wake-static_*
-    #
-    #     - name: Upload
-    #       uses: actions/upload-artifact@v3
-    #       with:
-    #         name: release_alpine
-    #         path: release/alpine
-
-    debian_bullseye:
-      runs-on: ubuntu-latest
-      needs: tarball
-      name: Debian Bullseye Build
+            - target: debian_bullseye
+              dockerfile: debian-bullseye
+              build_cmd: debuild -us -uc
+              extra_build_flags: -w /$(ls -d build/wake-*)
+              test_cmd: dpkg -i *.deb && cd tests && wake runTests
+              install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
       steps:
         - name: Create target directories
           run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
@@ -343,29 +251,29 @@ jobs:
         - name: Uncompress tarball
           run: tar xvJf build/wake_*.orig.tar.xz -C build
 
-        - name: Set artifacts as executable
+        - name: Set tests as executable
           run: chmod -R +x build/tests
 
         - name: Merge debian artifacts into tarball artifacts
           run: cp -a build/debian build/wake-*
 
         - name: Build docker image
-          run: docker build -f dockerfiles/debian-bullseye -t wake-debian-bullseye .
+          run: docker build -f dockerfiles/${{ matrix.dockerfile }} -t wake-${{ matrix.dockerfile }} .
 
         - name: Build
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /$(ls -d build/wake-*) wake-debian-bullseye /bin/sh -c 'debuild -us -uc'
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined ${{ matrix.extra_build_flags }} wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.build_cmd }}'
 
         - name: Test
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-debian-bullseye /bin/sh -c 'dpkg -i *.deb && cd tests && wake runTests'
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.test_cmd }}'
 
         - name: Install
-          run: install -D -t release/debian_bullseye build/*.deb build/*.xz build/*.changes build/*.dsc
+          run: install -D -t release/${{ matrix.target }} ${{ matrix.install_src_glob }}
 
         - name: Upload
           uses: actions/upload-artifact@v3
           with:
-            name: release_debian_bullseye
-            path: release/debian_bullseye
+            name: release_${{ matrix.target }}
+            path: release/${{ matrix.target }}
 
     centos_7_6:
       runs-on: ubuntu-latest
