@@ -201,13 +201,14 @@ jobs:
       runs-on: ubuntu-latest
       needs: tarball
       name: Docker Build
-      matrix:
-        include:
-          - target: alpine
-          - dockerfile: alpine
-          - build_cmd: make -C wake-* static
-          - test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
-          - install_src_glob: build/wake-*/wake-static_*
+      strategy:
+        matrix:
+          include:
+            - target: alpine
+              dockerfile: alpine
+              build_cmd: make -C wake-* static
+              test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
+              install_src_glob: build/wake-*/wake-static_*
       steps:
         - name: Create target directories
           run: mkdir dockerfiles && mkdir -p build/tests && chmod ugo+rwx build
@@ -637,7 +638,7 @@ jobs:
       if: github.event_name == 'push' && github.ref_type == 'tag'
 
       runs-on: ubuntu-latest
-      needs: [tarball, vscode_stable, alpine, debian_bullseye, centos_7_6, rocky_8, ubuntu_18_04, ubuntu_22_04]
+      needs: [tarball, vscode_stable, docker_builds, debian_bullseye, centos_7_6, rocky_8, ubuntu_18_04, ubuntu_22_04]
       name: Create Release
       steps:
         - name: Download Tarball
