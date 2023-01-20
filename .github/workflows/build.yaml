@@ -100,74 +100,6 @@ jobs:
           with:
             path: .
 
-    vscode_latest:
-      runs-on: ubuntu-latest
-      needs: tarball
-      name: VSCode Extension (latest)
-      steps:
-        - name: Create target directories
-          run: mkdir dockerfiles && mkdir build && chmod ugo+rwx build
-
-        - name: Download Tarball
-          uses: actions/download-artifact@v3
-          with:
-            name: tarball
-            path: build
-
-        - name: Download Dockerfiles
-          uses: actions/download-artifact@v3
-          with:
-            name: dockerfiles
-            path: dockerfiles
-
-        - name: Uncompress tarball
-          run: tar xvJf build/wake_*.tar.xz -C build
-
-        - name: Build docker image
-          run: docker build -f dockerfiles/wasm --build-arg EMSDK_VERSION=latest -t wake-wasm .
-
-        - name: Build
-          run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'make -C wake-* vscode'
-
-
-    vscode_stable:
-      runs-on: ubuntu-latest
-      needs: tarball
-      name: VSCode Extension (stable)
-      steps:
-        - name: Create target directories
-          run: mkdir dockerfiles && mkdir build && chmod ugo+rwx build
-
-        - name: Download Tarball
-          uses: actions/download-artifact@v3
-          with:
-            name: tarball
-            path: build
-
-        - name: Download Dockerfiles
-          uses: actions/download-artifact@v3
-          with:
-            name: dockerfiles
-            path: dockerfiles
-
-        - name: Uncompress tarball
-          run: tar xvJf build/wake_*.tar.xz -C build
-
-        - name: Build docker image
-          run: docker build -f dockerfiles/wasm -t wake-wasm .
-
-        - name: Build
-          run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'make -C wake-* vscode'
-
-        - name: Install
-          run: install -D -t release/vscode build/wake-*/extensions/vscode/wake-*.vsix
-
-        - name: Upload
-          uses: actions/upload-artifact@v3
-          with:
-            name: release_vscode
-            path: release/vscode
-
     wasm:
       runs-on: ubuntu-latest
       needs: tarball
@@ -232,19 +164,34 @@ jobs:
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
-            - target: ubuntu_18_04 
+            - target: ubuntu_18_04
               dockerfile: ubuntu-18.04
               build_cmd: debuild -us -uc
               extra_build_flags: -w /$(ls -d build/wake-*)
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
               install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
 
-            - target: ubuntu_22_04 
+            - target: ubuntu_22_04
               dockerfile: ubuntu-22.04
               build_cmd: debuild -us -uc
               extra_build_flags: -w /$(ls -d build/wake-*)
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
               install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
+
+            - target: vscode
+              dockerfile: wasm
+              build_cmd: make -C wake-* vscode
+              extra_build_flags:
+              test_cmd: ls # no-op
+              install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
+
+            - target: vscode_latest
+              dockerfile: wasm
+              build_cmd: make -C wake-* vscode
+              extra_build_flags: --build-arg EMSDK_VERSION=latest
+              test_cmd: ls # no-op
+              install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
+
       steps:
         - name: Create target directories
           run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
@@ -349,7 +296,7 @@ jobs:
       if: github.event_name == 'push' && github.ref_type == 'tag'
 
       runs-on: ubuntu-latest
-      needs: [tarball, vscode_stable, docker_builds]
+      needs: [tarball, docker_builds]
       name: Create Release
       steps:
         - name: Download Tarball
