@@ -138,57 +138,65 @@ jobs:
           include:
             - target: alpine
               dockerfile: alpine
+              extra_docker_build_args:
+              extra_docker_run_args:
               build_cmd: make -C wake-* static
-              extra_build_flags:
               test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
               install_src_glob: build/wake-*/wake-static_*
 
             - target: centos_7_6
               dockerfile: centos-7.6
+              extra_docker_build_args:
+              extra_docker_run_args:
               build_cmd: source scl_source enable devtoolset-9 && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-              extra_build_flags:
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
             - target: debian_bullseye
               dockerfile: debian-bullseye
+              extra_docker_build_args:
+              extra_docker_run_args: -w /$(ls -d build/wake-*)
               build_cmd: debuild -us -uc
-              extra_build_flags: -w /$(ls -d build/wake-*)
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
               install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
 
             - target: rocky_8
               dockerfile: rocky-8
+              extra_docker_build_args:
+              extra_docker_run_args:
               build_cmd: rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-              extra_build_flags:
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
             - target: ubuntu_18_04
               dockerfile: ubuntu-18.04
+              extra_docker_build_args:
+              extra_docker_run_args: -w /$(ls -d build/wake-*)
               build_cmd: debuild -us -uc
-              extra_build_flags: -w /$(ls -d build/wake-*)
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
               install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
 
             - target: ubuntu_22_04
               dockerfile: ubuntu-22.04
+              extra_docker_build_args:
+              extra_docker_run_args: -w /$(ls -d build/wake-*)
               build_cmd: debuild -us -uc
-              extra_build_flags: -w /$(ls -d build/wake-*)
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
               install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
 
             - target: vscode
               dockerfile: wasm
+              extra_docker_build_args:
+              extra_docker_run_args:
               build_cmd: make -C wake-* vscode
-              extra_build_flags:
               test_cmd: ls # no-op
               install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
 
             - target: vscode_latest
               dockerfile: wasm
+              extra_docker_build_args: --build-arg EMSDK_VERSION=latest
+              extra_docker_run_args:
               build_cmd: make -C wake-* vscode
-              extra_build_flags: --build-arg EMSDK_VERSION=latest
               test_cmd: ls # no-op
               install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
 
@@ -233,10 +241,10 @@ jobs:
           run: cp -a build/debian build/wake-*
 
         - name: Build docker image
-          run: docker build -f dockerfiles/${{ matrix.dockerfile }} -t wake-${{ matrix.dockerfile }} .
+          run: docker build -f dockerfiles/${{ matrix.dockerfile }} ${{ matrix.extra_docker_build_args }} -t wake-${{ matrix.dockerfile }} .
 
         - name: Build
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined ${{ matrix.extra_build_flags }} wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.build_cmd }}'
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined ${{ matrix.extra_docker_run_args }} wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.build_cmd }}'
 
         - name: Test
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.test_cmd }}'
