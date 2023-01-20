@@ -630,6 +630,7 @@ jobs:
           uses: marvinpinto/action-automatic-releases@latest
           with:
             draft: true
+            automatic_release_tag: 0.29.2-test
             repo_token: '${{ secrets.GITHUB_TOKEN }}'
             files: |
               tarball/wake_*.tar.xz
