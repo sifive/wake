@@ -563,7 +563,7 @@ jobs:
 
     release:
       # Only run the 'release' job if this workflow was triggered by the creation of a tag
-      #if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+      if: github.event_name == 'push' && github.ref_type == 'tag'
 
       runs-on: ubuntu-latest
       needs: [tarball, vscode_stable, alpine, debian_bullseye, centos_7_6, rocky_8, ubuntu_18_04, ubuntu_22_04]
@@ -617,32 +617,27 @@ jobs:
             name: release_ubuntu_22_04
             path: ubuntu_22_04
 
-        # TODO: extract the version number from the tag and insert into file name
         - name: Rename artifacts
           run: |
-            echo "$GITHUB_REF"
-            echo "$GITHUB_REF_NAME"
-            echo "${{ github.ref }}"
-            echo "${{ github.ref.type }}"
-            echo "${{ github.ref_type }}"
-            cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-VERSION-1.x86_64.rpm
-            cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-VERSION-1.x86_64.rpm
-            cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_VERSION-1_amd64.deb
-            cp ubuntu_18_04/wake_*-1_amd64.deb ubuntu-18-04-wake_VERSION-1_amd64.deb
-            cp ubuntu_22_04/wake_*-1_amd64.deb ubuntu-22-04-wake_VERSION-1_amd64.deb
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG:1}"
+            cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-${VERSION}-1.x86_64.rpm
+            cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-${VERSION}-1.x86_64.rpm
+            cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_${VERSION}-1_amd64.deb
+            cp ubuntu_18_04/wake_*-1_amd64.deb ubuntu-18-04-wake_${VERSION}-1_amd64.deb
+            cp ubuntu_22_04/wake_*-1_amd64.deb ubuntu-22-04-wake_${VERSION}-1_amd64.deb
 
         - name: Create Release
           uses: marvinpinto/action-automatic-releases@latest
           with:
             draft: true
-            automatic_release_tag: 0.29.2-test
             repo_token: '${{ secrets.GITHUB_TOKEN }}'
             files: |
               tarball/wake_*.tar.xz
               vscode/wake-*.vsix
-              centos-7-6-wake-VERSION-1.x86_64.rpm
-              rocky_8-wake-VERSION-1.x86_64.rpm
-              debian-bullseye-wake_VERSION-1_amd64.deb
-              ubuntu-18-04-wake_VERSION-1_amd64.deb
-              ubuntu-22-04-wake_VERSION-1_amd64.deb
+              centos-7-6-wake-${VERSION}-1.x86_64.rpm
+              rocky_8-wake-${VERSION}-1.x86_64.rpm
+              debian-bullseye-wake_${VERSION}-1_amd64.deb
+              ubuntu-18-04-wake_${VERSION}-1_amd64.deb
+              ubuntu-22-04-wake_${VERSION}-1_amd64.deb
 
