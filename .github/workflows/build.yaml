@@ -1,7 +1,10 @@
 name: "Test"
 
 on:
-    pull_request:
+  pull_request:
+  push:
+    tags:
+      - "v*"
 
 jobs:
     tarball:
@@ -36,7 +39,6 @@ jobs:
           with:
             name: tarball
             path: wake_*.tar.xz
-            retention-days: 1
 
         - name: Upload Dockerfiles
           uses: actions/upload-artifact@v3
@@ -558,4 +560,79 @@ jobs:
 
             - name: Test wake
               run: make test
+
+    release:
+      runs-on: ubuntu-latest
+      needs: [tarball, vscode_stable, alpine, debian_bullseye, centos_7_6, rocky_8, ubuntu_18_04, ubuntu_22_04]
+      name: Create Release
+      steps:
+        - name: Download Tarball
+          uses: actions/download-artifact@v3
+          with:
+            name: tarball
+            path: tarball
+
+        - name: Download VSCode
+          uses: actions/download-artifact@v3
+          with:
+            name: release_vscode
+            path: vscode
+
+        - name: Download Alpine
+          uses: actions/download-artifact@v3
+          with:
+            name: release_alpine
+            path: apline
+
+        - name: Download Debian Bullseye
+          uses: actions/download-artifact@v3
+          with:
+            name: release_debian_bullseye
+            path: debian_bullseye
+
+        - name: Download CentOS 7.6
+          uses: actions/download-artifact@v3
+          with:
+            name: release_centos_7_6
+            path: centos_7_6
+
+        - name: Download Rocky 8
+          uses: actions/download-artifact@v3
+          with:
+            name: release_rocky_8
+            path: rocky_8
+
+        - name: Download Ubuntu 18.04
+          uses: actions/download-artifact@v3
+          with:
+            name: release_ubuntu_18_04
+            path: ubuntu_18_04
+
+        - name: Download Ubuntu 22.04
+          uses: actions/download-artifact@v3
+          with:
+            name: release_ubuntu_22_04
+            path: ubuntu_22_04
+
+        # TODO: extract the version number from the tag and insert into file name
+        - name: Rename artifacts
+          run: |
+            cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-VERSION-1.x86_64.rpm
+            cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-VERSION-1.x86_64.rpm
+            cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_VERSION-1_amd64.deb
+            cp ubuntu_18_04/wake_*-1_amd64.deb ubuntu-18-04-wake_VERSION-1_amd64.deb
+            cp ubuntu_22_04/wake_*-1_amd64.deb ubuntu-22-04-wake_VERSION-1_amd64.deb
+
+        - name: Create Release
+          uses: marvinpinto/action-automatic-releases@latest
+          with:
+            draft: true
+            files: |
+              tarball/wake_*.tar.xz
+              vscode/wake-*.vsix
+              centos-7-6-wake-VERSION-1.x86_64.rpm
+              rocky_8-wake-VERSION-1.x86_64.rpm
+              debian-bullseye-wake_VERSION-1_amd64.deb
+              ubuntu-18-04-wake_VERSION-1_amd64.deb
+              ubuntu-22-04-wake_VERSION-1_amd64.deb
 
