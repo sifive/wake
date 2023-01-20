@@ -555,16 +555,16 @@ jobs:
             - name: Test wake
               run: make test
 
-    # deploy_docs:
-    #   # Only run the 'deploy_docs' job if this workflow was triggered by a push to master
-    #   if: github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == 'master'
-    #
-    #   runs-on: ubuntu-latest
-    #   needs: docs
-    #   name: Deploy Docs to GH Pages
-    #   steps:
-    #     - name: Deploy
-    #       uses: actions/deploy-pages
+    deploy_docs:
+      # Only run the 'deploy_docs' job if this workflow was triggered by a push to master
+      if: github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == 'master'
+
+      runs-on: ubuntu-latest
+      needs: docs
+      name: Deploy Docs to GH Pages
+      steps:
+        - name: Deploy
+          uses: actions/deploy-pages
 
     release:
       # Only run the 'release' job if this workflow was triggered by the creation of a tag
