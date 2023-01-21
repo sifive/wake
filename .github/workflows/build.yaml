@@ -187,7 +187,7 @@ jobs:
             - target: vscode
               dockerfile: wasm
               extra_docker_build_args:
-              extra_docker_run_args:
+              extra_docker_run_args: -u build
               build_cmd: make -C wake-* vscode
               test_cmd: ls # no-op
               install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
@@ -195,7 +195,7 @@ jobs:
             - target: vscode_latest
               dockerfile: wasm
               extra_docker_build_args: --build-arg EMSDK_VERSION=latest
-              extra_docker_run_args:
+              extra_docker_run_args: -u build
               build_cmd: make -C wake-* vscode
               test_cmd: ls # no-op
               install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
