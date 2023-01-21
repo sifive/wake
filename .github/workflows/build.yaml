@@ -77,58 +77,6 @@ jobs:
             path: scripts/sphinx/build/html
             retention-days: 1
 
-    docs:
-      runs-on: ubuntu-latest
-      needs: tarball
-      name: Docs
-      steps:
-        - name: Download index.html
-          uses: actions/download-artifact@v3
-          with:
-            name: index.html
-
-        - name: Download html
-          uses: actions/download-artifact@v3
-          with:
-            name: html
-
-        - name: Make .nojekyll
-          run: touch .nojekyll
-
-        - name: Upload
-          uses: actions/upload-pages-artifact@v1
-          with:
-            path: .
-
-    wasm:
-      runs-on: ubuntu-latest
-      needs: tarball
-      name: WASM Build
-      steps:
-        - name: Create target directories
-          run: mkdir dockerfiles && mkdir build && chmod ugo+rwx build
-
-        - name: Download Tarball
-          uses: actions/download-artifact@v3
-          with:
-            name: tarball
-            path: build
-
-        - name: Download Dockerfiles
-          uses: actions/download-artifact@v3
-          with:
-            name: dockerfiles
-            path: dockerfiles
-
-        - name: Uncompress tarball
-          run: tar xvJf build/wake_*.tar.xz -C build
-
-        - name: Build docker image
-          run: docker build -f dockerfiles/wasm -t wake-wasm .
-
-        - name: Build
-          run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'make -C wake-* wasm'
-
     docker_builds:
       runs-on: ubuntu-latest
       needs: tarball
@@ -199,6 +147,17 @@ jobs:
               build_cmd: make -C wake-* vscode
               test_cmd: ls # no-op
               install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
+
+            - target: wasm
+              dockerfile: wasm
+              extra_docker_build_args:
+              extra_docker_run_args: -u build
+              build_cmd: make -C wake-* wasm
+              test_cmd: ls # no-op
+              # TODO: This doesn't fully capture all the wake contents
+              # but that is okay since wake-wasm in still in its infancy
+              # and is not deployed/depended on
+              install_src_glob: build/wake-*/bin/*.wasm*
 
       steps:
         - name: Create target directories
@@ -278,6 +237,29 @@ jobs:
 
             - name: Test wake
               run: make test
+
+    docs:
+      runs-on: ubuntu-latest
+      needs: tarball
+      name: Docs
+      steps:
+        - name: Download index.html
+          uses: actions/download-artifact@v3
+          with:
+            name: index.html
+
+        - name: Download html
+          uses: actions/download-artifact@v3
+          with:
+            name: html
+
+        - name: Make .nojekyll
+          run: touch .nojekyll
+
+        - name: Upload
+          uses: actions/upload-pages-artifact@v1
+          with:
+            path: .
 
     deploy_docs:
       # Only run the 'deploy_docs' job if this workflow was triggered by a push to master
