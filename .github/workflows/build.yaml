@@ -86,23 +86,23 @@ jobs:
           include:
             - target: alpine
               dockerfile: alpine
-              extra_docker_build_args:
-              extra_docker_run_args:
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
               build_cmd: make -C wake-* static
               test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
               install_src_glob: build/wake-*/wake-static_*
 
             - target: centos_7_6
               dockerfile: centos-7.6
-              extra_docker_build_args:
-              extra_docker_run_args:
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
               build_cmd: source scl_source enable devtoolset-9 && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
             - target: debian_bullseye
               dockerfile: debian-bullseye
-              extra_docker_build_args:
+              extra_docker_build_args: ''
               extra_docker_run_args: -w /$(ls -d build/wake-*)
               build_cmd: debuild -us -uc
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
@@ -110,15 +110,15 @@ jobs:
 
             - target: rocky_8
               dockerfile: rocky-8
-              extra_docker_build_args:
-              extra_docker_run_args:
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
               build_cmd: rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
             - target: ubuntu_18_04
               dockerfile: ubuntu-18.04
-              extra_docker_build_args:
+              extra_docker_build_args: ''
               extra_docker_run_args: -w /$(ls -d build/wake-*)
               build_cmd: debuild -us -uc
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
@@ -126,7 +126,7 @@ jobs:
 
             - target: ubuntu_22_04
               dockerfile: ubuntu-22.04
-              extra_docker_build_args:
+              extra_docker_build_args: ''
               extra_docker_run_args: -w /$(ls -d build/wake-*)
               build_cmd: debuild -us -uc
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
@@ -134,7 +134,7 @@ jobs:
 
             - target: vscode
               dockerfile: wasm
-              extra_docker_build_args:
+              extra_docker_build_args: ''
               extra_docker_run_args: -u build
               build_cmd: make -C wake-* vscode
               test_cmd: ls # no-op
@@ -150,7 +150,7 @@ jobs:
 
             - target: wasm
               dockerfile: wasm
-              extra_docker_build_args:
+              extra_docker_build_args: ''
               extra_docker_run_args: -u build
               build_cmd: make -C wake-* wasm
               test_cmd: ls # no-op
@@ -301,11 +301,14 @@ jobs:
             name: release_vscode
             path: vscode
 
+        # We don't actually release/upload wake_static. Wake is unsupported on old versions
+        # of alpine, and releasing a "wake_static" artifact is very misleading and prone to
+        # user error and confusion
         - name: Download Alpine
           uses: actions/download-artifact@v3
           with:
             name: release_alpine
-            path: apline
+            path: alpine
 
         - name: Download Debian Bullseye
           uses: actions/download-artifact@v3
