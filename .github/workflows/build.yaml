@@ -351,7 +351,8 @@ jobs:
             cp ubuntu_22_04/wake_*-1_amd64.deb ubuntu-22-04-wake_${VERSION}-1_amd64.deb
 
         - name: Create Release
-          uses: marvinpinto/action-automatic-releases@latest
+          # v1.2.1 -> 919008cf3f741b179569b7a6fb4d8860689ab7f0
+          uses: marvinpinto/action-automatic-releases@919008cf3f741b179569b7a6fb4d8860689ab7f0
           with:
             draft: true
             repo_token: '${{ secrets.GITHUB_TOKEN }}'
