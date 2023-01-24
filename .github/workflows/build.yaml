@@ -342,7 +342,7 @@ jobs:
 
         - name: Rename artifacts
           run: |
-            TAG="${{ github.ref_name }}"
+            TAG="v1.2.3"
             VERSION="${TAG:1}"
             cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-${VERSION}-1.x86_64.rpm
             cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-${VERSION}-1.x86_64.rpm
