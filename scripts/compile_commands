@@ -1,0 +1,5 @@
+#! /bin/bash
+
+rm .compile_commands/*.json
+EMIT_COMPILE_COMMANDS=1 make
+python3 ./scripts/compile_commands.py

@@ -31,6 +31,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <fstream>
 #include <memory>
 #include <sstream>
@@ -170,8 +171,38 @@ bool push_packaged_stdlib_files(std::vector<std::string> &out, const re2::RE2 &r
 
 #else
 
+struct profile_data {
+  std::chrono::time_point<std::chrono::steady_clock> start{std::chrono::steady_clock::now()};
+  size_t explored{0};
+  bool alerted_user{false};
+};
+
+// TODO : This function should probably be under compat in a files / vfs module
+// Determines if *f* is a directory inside of *dirfd* using the best available method.
+// Sets *failed* to true if unable to successfully determine directory status
+static bool push_files_is_directory(int dirfd, const std::string &path, struct dirent *f,
+                                    bool *failed) {
+  struct stat sbuf;
+
+#if defined(DT_DIR)
+  if (f->d_type != DT_UNKNOWN) {
+    return f->d_type == DT_DIR;
+  }
+#endif
+
+  if (fstatat(dirfd, f->d_name, &sbuf, AT_SYMLINK_NOFOLLOW) != 0) {
+    fprintf(stderr, "Failed to fstatat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
+    *failed = true;
+    return false;
+  }
+
+  return S_ISDIR(sbuf.st_mode);
+}
+
+// Recursively fills *out* with all paths under *dirfd* matching *re*. Automatically
+// skips directories that cannot have source files in them(.git, .build, .fuse).
 static bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd,
-                       const RE2 &re, size_t skip) {
+                       const RE2 &re, size_t skip, struct profile_data *profile) {
   auto dir = fdopendir(dirfd);
   if (!dir) {
     close(dirfd);
@@ -182,49 +213,56 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
   struct dirent *f;
   bool failed = false;
   for (errno = 0; 0 != (f = readdir(dir)); errno = 0) {
-    if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0)))
-      continue;
-    bool recurse;
-    struct stat sbuf;
-#if defined(DT_DIR)
-    if (f->d_type != DT_UNKNOWN) {
-      recurse = f->d_type == DT_DIR;
-    } else {
-#endif
-      if (fstatat(dirfd, f->d_name, &sbuf, AT_SYMLINK_NOFOLLOW) != 0) {
-        fprintf(stderr, "Failed to fstatat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
-        failed = true;
-        recurse = false;
-      } else {
-        recurse = S_ISDIR(sbuf.st_mode);
-      }
-#if defined(DT_DIR)
-    }
-#endif
+    profile->explored++;
+    std::string fdname(f->d_name);
     std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
-    if (recurse) {
-      if (name == ".build" || name == ".fuse" || name == ".git") continue;
-      int fd = openat(dirfd, f->d_name, O_RDONLY);
-      if (fd == -1) {
-        fprintf(stderr, "Failed to openat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
-        failed = true;
-      } else {
-        if (push_files(out, name, fd, re, skip)) failed = true;
-      }
-    } else {
+
+    // Relative directories should never be pushed
+    if (fdname == "." || fdname == "..") continue;
+
+    // These directories should never be pushed
+    if (name == ".build" || name == ".fuse" || name == ".git") continue;
+
+    if (!push_files_is_directory(dirfd, path, f, &failed)) {
+      // Append the current file if it matches the regex
       re2::StringPiece p(name.c_str() + skip, name.size() - skip);
       if (RE2::FullMatch(p, re)) out.emplace_back(std::move(name));
+      continue;
     }
+
+    int fd = openat(dirfd, f->d_name, O_RDONLY);
+    if (fd == -1) {
+      fprintf(stderr, "Failed to openat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
+      failed = true;
+      continue;
+    }
+
+    // Check elapsed time and emit a message if this is taking too long.
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - profile->start).count() >
+        1000) {
+      profile->start = now;
+      profile->alerted_user = true;
+
+      fprintf(stdout,
+              "Finding wake files is taking longer than expected. Kernel file cache may be cold. "
+              "(%ld explored).\r",
+              profile->explored);
+      fflush(stdout);
+    }
+
+    // Recurse & capture any failures
+    if (push_files(out, name, fd, re, skip, profile)) failed = true;
   }
 
   if (errno != 0 && !failed) {
     fprintf(stderr, "Failed to readdir %s: %s\n", path.c_str(), strerror(errno));
-    failed = true;
+    return true;
   }
 
   if (closedir(dir) != 0) {
     fprintf(stderr, "Failed to closedir %s: %s\n", path.c_str(), strerror(errno));
-    failed = true;
+    return true;
   }
 
   return failed;
@@ -234,7 +272,19 @@ bool push_files(std::vector<std::string> &out, const std::string &path, const RE
                 size_t skip) {
   int flags, dirfd = open(path.c_str(), O_RDONLY);
   if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1) fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
-  return dirfd == -1 || push_files(out, path, dirfd, re, skip);
+
+  if (dirfd == -1) {
+    return true;
+  }
+
+  struct profile_data profile;
+  bool ret = push_files(out, path, dirfd, re, skip, &profile);
+
+  if (profile.alerted_user) {
+    fprintf(stdout, "\n");
+  }
+
+  return ret;
 }
 #endif
 
