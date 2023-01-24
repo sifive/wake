@@ -251,9 +251,3 @@ workflows:
             - ubuntu_22_04   # LTS
             - vscode_stable
             - wasm
-      - docs_deploy:
-          requires:
-            - release
-          filters:
-            branches:
-              only: master
