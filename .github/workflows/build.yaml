@@ -283,7 +283,7 @@ jobs:
 
     release:
       # Only run the 'release' job if this workflow was triggered by the creation of a tag
-      # if: github.event_name == 'push' && github.ref_type == 'tag'
+      if: github.event_name == 'push' && github.ref_type == 'tag'
 
       runs-on: ubuntu-latest
       needs: [tarball, docker_builds]
@@ -342,7 +342,7 @@ jobs:
 
         - name: Rename artifacts
           run: |
-            TAG="v1.2.3"
+            TAG="${{ github.ref_name }}"
             VERSION="${TAG:1}"
             cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-${VERSION}-1.x86_64.rpm
             cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-${VERSION}-1.x86_64.rpm
