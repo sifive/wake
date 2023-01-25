@@ -359,9 +359,9 @@ jobs:
             files: |
               tarball/wake_*.tar.xz
               vscode/wake-*.vsix
-              centos-7-6-wake-${VERSION}-1.x86_64.rpm
-              rocky_8-wake-${VERSION}-1.x86_64.rpm
-              debian-bullseye-wake_${VERSION}-1_amd64.deb
-              ubuntu-18-04-wake_${VERSION}-1_amd64.deb
-              ubuntu-22-04-wake_${VERSION}-1_amd64.deb
+              centos-7-6-wake-*-1.x86_64.rpm
+              rocky_8-wake-*-1.x86_64.rpm
+              debian-bullseye-wake_*-1_amd64.deb
+              ubuntu-18-04-wake_*-1_amd64.deb
+              ubuntu-22-04-wake_*-1_amd64.deb
 
