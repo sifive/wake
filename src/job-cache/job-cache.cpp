@@ -119,7 +119,7 @@ static mode_t copy_or_reflink(const char *src, const char *dst, mode_t mode = 06
 
 #else
 
-static void copy_or_reflink(const char *src, const char *dst) {
+static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644) {
   auto src_fd = UniqueFd::open(src, O_RDONLY);
   auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT, 0644);
 
