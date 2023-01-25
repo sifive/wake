@@ -177,7 +177,7 @@ struct AddJobRequest {
   explicit AddJobRequest(const JAST &job_result_json);
 };
 
-class CacheDbImpl;
+struct CacheDbImpl;
 
 class Cache {
  private:

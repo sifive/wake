@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -37,7 +38,7 @@ class trie {
     //       by using a uint32_t and a properly implemented small_vector, you
     //       can get a 4 element small vector for *free* here which would make
     //       this trie entirely in place for the vast vast majority of nodes.
-    std::vector<size_t> child_indexes;
+    std::vector<std::size_t> child_indexes;
     Key key;
     optional<Value> value;
 
