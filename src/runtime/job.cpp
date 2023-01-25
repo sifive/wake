@@ -1369,27 +1369,6 @@ static PRIMFN(prim_job_output) {
   }
 }
 
-/*
-static PRIMTYPE(type_job_kill) {
-  return args.size() == 2 && args[0]->unify(Data::typeJob) && args[1]->unify(Data::typeInteger) &&
-         out->unify(Data::typeUnit);
-}
-
-static PRIMFN(prim_job_kill) {
-  EXPECT(2);
-  JOB(arg0, 0);
-  INTEGER_MPZ(arg1, 1);
-
-  runtime.heap.reserve(reserve_unit());
-
-  if (mpz_cmp_si(arg1, 256) < 0 && mpz_cmp_si(arg1, 0) > 0) {
-    int sig = mpz_get_si(arg1);
-    if ((arg0->state & STATE_FORKED) && !(arg0->state & STATE_MERGED)) kill(arg0->pid, sig);
-  }
-
-  RETURN(claim_unit(runtime.heap));
-}*/
-
 static PRIMTYPE(type_job_tree) {
   TypeVar list;
   TypeVar pair;

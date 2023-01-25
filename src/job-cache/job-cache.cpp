@@ -55,22 +55,6 @@ static void rmdir_no_fail(const char *dir) {
   }
 }
 
-/*
-static UniqueFd lock_file(std::string lock_path, int option) {
-  // We throw out the lock_fd because we don't want to release
-  // the lock until we exit the process.
-  auto lock_fd = UniqueFd::open(lock_path.c_str(), O_CREAT | O_RDWR, 0644);
-  int ret;
-  do {
-    ret = flock(lock_fd.get(), option);
-    if (ret < 0 && errno != EINTR) {
-      log_fatal("flock(%s): %s", lock_path.c_str(), strerror(errno));
-    }
-  } while (errno == EINTR);
-
-  return lock_fd;
-}*/
-
 // This function first attempts to reflink but if that isn't
 // supported by the filesystem it copies instead.
 #ifdef __APPLE__
@@ -123,13 +107,6 @@ static mode_t copy_or_reflink(const char *src, const char *dst, mode_t mode = 06
   name += ".";
   name += rng.unique_name();
 
-  // Here we atomically link by linking and then renaming.
-  // This is to measure how fast we would be with reflinking
-  /*if (link(src, name.c_str()) < 0) {
-    log_fatal("link(%s, %s): %s", src, name.c_str(), strerror(errno));
-  }
-  rename_no_fail(name.c_str(), dst);*/
-
   if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
     if (errno != EINVAL && errno != EOPNOTSUPP) {
       log_fatal("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
@@ -151,6 +128,8 @@ static void copy_or_reflink(const char *src, const char *dst) {
 
 #endif
 
+// This is fairly critical to getting strong concurency.
+// Specifically adding in exponetial back off plus randomization.
 static int wait_handle(void *, int retries) {
   // We don't ever want to wait more than ~4 seconds.
   // If we wait more than ~4 seconds we fail.
@@ -181,10 +160,6 @@ class Database {
  public:
   Database(const Database &) = delete;
   Database(Database &&) = delete;
-  /*Database(Database &&other) {
-    db = other.db;
-    other.db = nullptr;
-  }*/
   Database() = delete;
   ~Database() {
     static int dystroy_counter = 0;
@@ -813,8 +788,6 @@ AddJobRequest::AddJobRequest(const JAST &job_result_json) {
       auto fd = UniqueFd::open(output.source.c_str(), O_RDONLY | O_NOFOLLOW);
       output.hash = do_hash_file(output.source.c_str(), fd.get());
       return output;
-      // output.hash = Hash256::from_hex(output_file.second.get("hash").value);
-      // outputs.emplace_back(std::move(output));
     }));
   }
 
@@ -873,20 +846,13 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
   wcl::optional<MatchingJob> result;
 
   // We want to hold the database lock for as little time as possible
-  {
-    // auto lock = lock_file(wcl::join_paths(dir, "lock"), LOCK_SH);
-    // CacheDbImpl impl(dir);
-    impl->transact.run(
-        [this, &find_request, &result]() { result = impl->matching_jobs.find(find_request); });
-  }
-
-  // TODO: We only need to hold the cache lock for the duration of the
+  impl->transact.run(
+      [this, &find_request, &result]() { result = impl->matching_jobs.find(find_request); });
 
   // Return early if there was no match.
   if (!result) return {};
 
   // We need a tmp directory to put these outputs into
-  // std::string tmp_job_dir = dir + "/tmp_outputs_" + rng.unique_name();
   std::string tmp_job_dir = wcl::join_paths(dir, "tmp_outputs_" + rng.unique_name());
   mkdir_no_fail(tmp_job_dir.c_str());
 
@@ -894,7 +860,6 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
   uint8_t group_id = result->job_id & 0xFF;
   std::string job_dir =
       wcl::join_paths(dir, wcl::to_hex(&group_id), std::to_string(result->job_id));
-  // dir + "/" + wcl::to_hex(&group_id) + "/" + std::to_string(result->job_id) + "/";
 
   // We then hard link each file to a new location atomically.
   // If any of these hard links fail then we fail this read
@@ -1066,34 +1031,3 @@ void Cache::add(const AddJobRequest &add_request) {
 Cache::~Cache() {}
 
 }  // namespace job_cache
-/*
-int main(int argc, char **argv) {
-  // TODO: Add a better CLI
-  if (argc < 2) return 1;
-
-  Cache cache(argv[1]);
-
-  if (argc >= 4) {
-    if (std::string(argv[2]) == "add") {
-      JAST job_result;
-      JAST::parse(argv[3], std::cerr, job_result);
-      AddJobRequest add_request(job_result);
-      cache.add(add_request);
-      return 0;
-    }
-
-    if (std::string(argv[2]) == "read") {
-      JAST job_plan;
-      JAST::parse(argv[3], std::cerr, job_plan);
-      FindJobRequest find_request(job_plan);
-      auto result = cache.read(find_request);
-      JAST out_json(JSON_OBJECT);
-      out_json.add("found", static_cast<bool>(result));
-      if (result) {
-        out_json.add("match", result->to_json());
-      }
-      std::cout << out_json << std::endl;
-      return 0;
-    }
-  }
-}*/
