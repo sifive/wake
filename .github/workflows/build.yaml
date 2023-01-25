@@ -341,13 +341,13 @@ jobs:
             path: ubuntu_22_04
 
         - name: Rename artifacts
-          run: >
-            TAG="${{ github.ref_name }}" &&
-            VERSION="${TAG:1}" &&
-            cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-${VERSION}-1.x86_64.rpm &&
-            cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-${VERSION}-1.x86_64.rpm &&
-            cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_${VERSION}-1_amd64.deb &&
-            cp ubuntu_18_04/wake_*-1_amd64.deb ubuntu-18-04-wake_${VERSION}-1_amd64.deb &&
+          run: |
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG:1}"
+            cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-${VERSION}-1.x86_64.rpm
+            cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-${VERSION}-1.x86_64.rpm
+            cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_${VERSION}-1_amd64.deb
+            cp ubuntu_18_04/wake_*-1_amd64.deb ubuntu-18-04-wake_${VERSION}-1_amd64.deb
             cp ubuntu_22_04/wake_*-1_amd64.deb ubuntu-22-04-wake_${VERSION}-1_amd64.deb
 
         - name: Create Release
@@ -359,9 +359,9 @@ jobs:
             files: |
               tarball/wake_*.tar.xz
               vscode/wake-*.vsix
-              centos-7-6-wake-${VERSION}-1.x86_64.rpm
-              rocky_8-wake-${VERSION}-1.x86_64.rpm
-              debian-bullseye-wake_${VERSION}-1_amd64.deb
-              ubuntu-18-04-wake_${VERSION}-1_amd64.deb
-              ubuntu-22-04-wake_${VERSION}-1_amd64.deb
+              centos-7-6-wake-*-1.x86_64.rpm
+              rocky_8-wake-*-1.x86_64.rpm
+              debian-bullseye-wake_*-1_amd64.deb
+              ubuntu-18-04-wake_*-1_amd64.deb
+              ubuntu-22-04-wake_*-1_amd64.deb
 
