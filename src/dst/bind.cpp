@@ -1166,8 +1166,9 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
 
         std::size_t at_pos = qualified.find("@");
         if (at_pos == std::string::npos) {
-          printf("unqualified ref: %s\n", qualified.c_str());
+          continue;
         }
+
         unqualified_to_qualified.insert({qualified.substr(0, at_pos), qualified});
       }
 
@@ -1180,8 +1181,9 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
 
         std::size_t at_pos = qualified.find("@");
         if (at_pos == std::string::npos) {
-          printf("unqualified ref: %s\n", qualified.c_str());
+          continue;
         }
+
         unqualified_to_qualified.insert({qualified.substr(0, at_pos), qualified});
       }
 
