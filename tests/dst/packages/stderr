@@ -24,7 +24,11 @@ test3.wake:7:[6-9]: package-local type 'Pkg1' also defined at test.wake:38:[13-1
 test.wake:38:[13-16]: package-local type 'Pkg1' also defined at test3.wake:7:[6-9]
 test3.wake:9:[7-10]: package-local topic 'pkg1' also defined at test.wake:40:[14-17]
 test.wake:40:[14-17]: package-local topic 'pkg1' also defined at test3.wake:9:[7-10]
-test.wake:51:[26-31]: (warning) unused import of 'unused@some_package'
+test.wake:9:[18-26]: (warning) unused import of 'Pair@wake'; consider removing.
+test.wake:11:[18-24]: (warning) unused import of 'binary +@wake'; consider removing.
+test.wake:15:[18-20]: (warning) unused import of 'map@wake'; consider removing.
+test.wake:11:[18-24]: (warning) unused import of 'unary +@wake'; consider removing.
+test.wake:51:[26-31]: (warning) unused import of 'unused@some_package'; consider removing.
 test.wake:27:[5-8]: (warning) unused top-level definition of 'bug2'; consider removing or renaming to _bug2
 test2.wake:7:[21-25]: (warning) unused top-level definition of 'Glob1'; consider removing or renaming to _Glob1
 test2.wake:4:[12-16]: (warning) unused top-level definition of 'glob1'; consider removing or renaming to _glob1

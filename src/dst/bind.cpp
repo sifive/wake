@@ -1263,9 +1263,8 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
           continue;
         }
 
-        WARNING(import.second.second, "unused import of '" << import.first
-                                                           << "'; consider removing. ("
-                                                           << import.second.first << ")");
+        WARNING(import.second.second,
+                "unused import of '" << import.first << "'; consider removing.");
       }
     }
   }
