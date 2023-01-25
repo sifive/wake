@@ -1158,39 +1158,47 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
       std::string filename = "";
 
       for (auto &import : file.content->imports.defs) {
-        filename = import.second.fragment.location().filename;
-        imports.insert({import.second.qualified, {0, import.second.fragment.location()}});
+        const std::string &qualified = import.second.qualified;
+        const Location &location = import.second.fragment.location();
 
-        std::size_t at_pos = import.second.qualified.find("@");
-        unqualified_to_qualified.insert(
-            {import.second.qualified.substr(0, at_pos), import.second.qualified});
+        filename = location.filename;
+        imports.insert({qualified, {0, location}});
+
+        std::size_t at_pos = qualified.find("@");
+        if (at_pos == std::string::npos) {
+          printf("unqualified ref: %s\n", qualified.c_str());
+        }
+        unqualified_to_qualified.insert({qualified.substr(0, at_pos), qualified});
       }
 
       for (auto &import : file.content->imports.topics) {
-        filename = import.second.fragment.location().filename;
-        imports.insert({import.second.qualified, {0, import.second.fragment.location()}});
+        const std::string &qualified = import.second.qualified;
+        const Location &location = import.second.fragment.location();
 
-        std::size_t at_pos = import.second.qualified.find("@");
-        unqualified_to_qualified.insert(
-            {import.second.qualified.substr(0, at_pos), import.second.qualified});
+        filename = location.filename;
+        imports.insert({qualified, {0, location}});
+
+        std::size_t at_pos = qualified.find("@");
+        if (at_pos == std::string::npos) {
+          printf("unqualified ref: %s\n", qualified.c_str());
+        }
+        unqualified_to_qualified.insert({qualified.substr(0, at_pos), qualified});
       }
 
-      for (auto &import : file.content->imports.import_all) {
-        filename = import.second.location().filename;
-        printf("fex: %s: %s\n", filename.c_str(), import.first.c_str());
-
-        imports.insert({"_@" + import.first, {0, import.second.location()}});
-
-        for (auto &bind : gbinding.defs) {
-          size_t at_pkg = bind.name.find("@" + import.first);
-          if (at_pkg != std::string::npos) {
-            unqualified_to_qualified.insert({bind.name.substr(0, at_pkg), bind.name});
-          }
-        }
+      // File doesn't have any import for us to verify
+      if (imports.empty()) {
+        continue;
       }
 
       // TODO: file.content->imports.types are not currently
       // being checked as there isn't a good way to get the edges from a type
+
+      // TODO: 'all' imports are not currently being check as the boundry is tricky to pin
+      // down. The following process is close and can be used for future reference
+      // - Collect all 'all' imports as an '_@package' import in imports map
+      // - Any time a 'x@package' is used increase the use count of '_@package'
+      // - Certain features like publish don't resolve to a package so some use and
+      //     upkeep of unqualified_to_qualified is required.
 
       std::vector<std::string> resolved_defs;
 
@@ -1200,37 +1208,18 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
         }
       }
 
-      for (auto g : file.local.defs) {
-        // TODO: what should actually be added to resolved_defs here??
-        resolved_defs.push_back(g.first + "@" + package.first);
-      }
-
-      for (auto g : file.local.topics) {
-        // TODO: what should actually be added to resolved_defs here??
-        resolved_defs.push_back(g.first + "@" + package.first);
-      }
-
       for (auto &publish : file.pubs) {
         // If the publish was an imported publish, mark it as used
         auto qual_it = unqualified_to_qualified.find(publish.first);
         if (qual_it == unqualified_to_qualified.end()) {
-          printf("fex: cannot qualify %s\n", publish.first.c_str());
           continue;
         }
 
-        // Mark import all as used
-        size_t at = qual_it->second.find("@");
-        std::string pkg = qual_it->second.substr(at);
-        auto pkg_import_it = imports.find("_" + pkg);
-        if (pkg_import_it != imports.end()) {
-          pkg_import_it->second.first++;
-        }
-
-        // Mark import as used
         auto import_it = imports.find(qual_it->second);
         if (import_it == imports.end()) {
           continue;
         }
+
         import_it->second.first++;
       }
 
@@ -1241,19 +1230,11 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
           continue;
         }
 
-        // Mark import all as used
-        size_t at = qual_it->second.find("@");
-        std::string pkg = qual_it->second.substr(at);
-        auto pkg_import_it = imports.find("_" + pkg);
-        if (pkg_import_it != imports.end()) {
-          pkg_import_it->second.first++;
-        }
-
-        // Mark import as used
         auto import_it = imports.find(qual_it->second);
         if (import_it == imports.end()) {
           continue;
         }
+
         import_it->second.first++;
       }
 
@@ -1267,19 +1248,13 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
         for (const auto &used_id : bound_def.edges) {
           auto &used_def = gbinding.defs[used_id];
 
-          // Mark import all as used
-          size_t at = used_def.name.find("@");
-          std::string pkg = used_def.name.substr(at);
-          auto pkg_import_it = imports.find("_" + pkg);
-          if (pkg_import_it != imports.end()) {
-            pkg_import_it->second.first++;
-          }
-
           // Mark import as used
           auto import_it = imports.find(used_def.name);
-          if (import_it != imports.end()) {
-            import_it->second.first++;
+          if (import_it == imports.end()) {
+            continue;
           }
+
+          import_it->second.first++;
         }
       }
 
@@ -1288,16 +1263,10 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
           continue;
         }
 
-        WARNING(import.second.second,
-                "unused import of '" << import.first << "'; consider removing.");
+        WARNING(import.second.second, "unused import of '" << import.first
+                                                           << "'; consider removing. ("
+                                                           << import.second.first << ")");
       }
-
-      // TODO: track unused import_all imports (from x import _)
-      //  This should be achievable by:
-      //    1. looping over f.content->imports.import_all
-      //    2. storing the package name
-      //    3. counting the edges of all things from that package
-      //    4. if count = 0 then unused
     }
   }
 
