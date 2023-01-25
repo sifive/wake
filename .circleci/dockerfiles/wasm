@@ -1,6 +1,8 @@
-FROM emscripten/emsdk:latest
+ARG EMSDK_VERSION=3.1.29
 
-RUN apt-get update && apt-get install -y build-essential devscripts git fuse libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config squashfuse npm
+FROM emscripten/emsdk:$EMSDK_VERSION
+
+RUN apt-get update && apt-get install -y build-essential devscripts git fuse libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config squashfuse
 
 RUN useradd -m -d /build build
 

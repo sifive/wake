@@ -1,26 +1,367 @@
 name: "Test"
 
 on:
-    pull_request:
+  pull_request:
+  push:
+    branches:
+      - master
+    tags:
+      - "v*"
 
 jobs:
-    build:
-        name: "MacOS build"
+    tarball:
+      runs-on: ubuntu-latest
+      name: Tarball
+      steps:
+        - name: Clone wake
+          uses: actions/checkout@v3
+          with:
+            fetch-depth: 0
+
+        - name: Install Deps
+          run: sudo apt-get update && sudo apt-get install -y build-essential fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx clang-format-12
+
+        - name: Check Formatting
+          run: clang-format-12 --style=file --Werror -n $(./scripts/which_clang_files all)
+
+        - name: Build Tarball
+          run: make tarball
+
+        - name: Run Tests
+          run: make test && make unittest
+
+        - name: Generate Docs
+          run: mkdir www && ./bin/wake --no-workspace --html > www/index.html
+
+        - name: wake to rst
+          run: PATH=$(pwd)/bin:$PATH PYTHONPATH=$(pwd)/scripts python3 scripts/wake2rst.py
+
+        - name: Upload tarball
+          uses: actions/upload-artifact@v3
+          with:
+            name: tarball
+            path: wake_*.tar.xz
+
+        - name: Upload Dockerfiles
+          uses: actions/upload-artifact@v3
+          with:
+            name: dockerfiles
+            path: .circleci/dockerfiles/
+            retention-days: 1
+
+        - name: Upload debian files
+          uses: actions/upload-artifact@v3
+          with:
+            name: debian
+            path: debian
+            retention-days: 1
+
+        - name: Upload test artifacts
+          uses: actions/upload-artifact@v3
+          with:
+            name: tests
+            path: tests
+            retention-days: 1
+
+        - name: Upload index.html
+          uses: actions/upload-artifact@v3
+          with:
+            name: index.html
+            path: www/index.html
+            retention-days: 1
+
+        - name: Upload html
+          uses: actions/upload-artifact@v3
+          with:
+            name: html
+            path: scripts/sphinx/build/html
+            retention-days: 1
+
+    docker_builds:
+      runs-on: ubuntu-latest
+      needs: tarball
+      name: Docker Build (${{ matrix.target }})
+      strategy:
+        matrix:
+          include:
+            - target: alpine
+              dockerfile: alpine
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
+              build_cmd: make -C wake-* static
+              test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
+              install_src_glob: build/wake-*/wake-static_*
+
+            - target: centos_7_6
+              dockerfile: centos-7.6
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
+              build_cmd: source scl_source enable devtoolset-9 && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
+              install_src_glob: build/x86_64/*.rpm
+
+            - target: debian_bullseye
+              dockerfile: debian-bullseye
+              extra_docker_build_args: ''
+              extra_docker_run_args: -w /$(ls -d build/wake-*)
+              build_cmd: debuild -us -uc
+              test_cmd: dpkg -i *.deb && cd tests && wake runTests
+              install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
+
+            - target: rocky_8
+              dockerfile: rocky-8
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
+              build_cmd: rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
+              install_src_glob: build/x86_64/*.rpm
+
+            - target: ubuntu_18_04
+              dockerfile: ubuntu-18.04
+              extra_docker_build_args: ''
+              extra_docker_run_args: -w /$(ls -d build/wake-*)
+              build_cmd: debuild -us -uc
+              test_cmd: dpkg -i *.deb && cd tests && wake runTests
+              install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
+
+            - target: ubuntu_22_04
+              dockerfile: ubuntu-22.04
+              extra_docker_build_args: ''
+              extra_docker_run_args: -w /$(ls -d build/wake-*)
+              build_cmd: debuild -us -uc
+              test_cmd: dpkg -i *.deb && cd tests && wake runTests
+              install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
+
+            - target: vscode
+              dockerfile: wasm
+              extra_docker_build_args: ''
+              extra_docker_run_args: -u build
+              build_cmd: make -C wake-* vscode
+              test_cmd: ls # no-op
+              install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
+
+            - target: vscode_latest
+              dockerfile: wasm
+              extra_docker_build_args: --build-arg EMSDK_VERSION=latest
+              extra_docker_run_args: -u build
+              build_cmd: make -C wake-* vscode
+              test_cmd: ls # no-op
+              install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
+
+            - target: wasm
+              dockerfile: wasm
+              extra_docker_build_args: ''
+              extra_docker_run_args: -u build
+              build_cmd: make -C wake-* wasm
+              test_cmd: ls # no-op
+              # TODO: This doesn't fully capture all the wake contents
+              # but that is okay since wake-wasm in still in its infancy
+              # and is not deployed/depended on
+              install_src_glob: build/wake-*/bin/*.wasm*
+
+      steps:
+        - name: Create target directories
+          run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
+
+        - name: Download Tarball
+          uses: actions/download-artifact@v3
+          with:
+            name: tarball
+            path: build
+
+        - name: Download Debian Artifacts
+          uses: actions/download-artifact@v3
+          with:
+            name: debian
+            path: build/debian
+
+        - name: Download Test Artifacts
+          uses: actions/download-artifact@v3
+          with:
+            name: tests
+            path: build/tests
+
+        - name: Download Dockerfiles
+          uses: actions/download-artifact@v3
+          with:
+            name: dockerfiles
+            path: dockerfiles
+
+        - name: Create orig file
+          run: x=(build/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "build/${y##*/}.orig.tar.xz"
+
+        - name: Uncompress tarball
+          run: tar xvJf build/wake_*.orig.tar.xz -C build
+
+        - name: Set tests as executable
+          run: chmod -R +x build/tests
+
+        - name: Merge debian artifacts into tarball artifacts
+          run: cp -a build/debian build/wake-*
+
+        - name: Build docker image
+          run: docker build -f dockerfiles/${{ matrix.dockerfile }} ${{ matrix.extra_docker_build_args }} -t wake-${{ matrix.dockerfile }} .
+
+        - name: Build
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined ${{ matrix.extra_docker_run_args }} wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.build_cmd }}'
+
+        - name: Test
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.test_cmd }}'
+
+        - name: Install
+          run: install -D -t release/${{ matrix.target }} ${{ matrix.install_src_glob }}
+
+        - name: Upload
+          uses: actions/upload-artifact@v3
+          with:
+            name: release_${{ matrix.target }}
+            path: release/${{ matrix.target }}
+
+    macos_10_15:
+        name: MacOS 10.15 Build
         runs-on: macos-10.15
 
         steps:
-            - name: "Clone wake"
+            - name: Clone wake
               uses: actions/checkout@v2
               with:
                 fetch-depth: 0
 
-            - name: "Install deps"
+            - name: Install deps
               run: |
                 brew install --cask osxfuse
                 brew install re2 || brew install re2 --head
 
-            - name: "Build wake"
+            - name: Build wake
               run: make all -j3
 
-            - name: "Test wake"
+            - name: Test wake
               run: make test
+
+    docs:
+      runs-on: ubuntu-latest
+      needs: tarball
+      name: Docs
+      steps:
+        - name: Download index.html
+          uses: actions/download-artifact@v3
+          with:
+            name: index.html
+
+        - name: Download html
+          uses: actions/download-artifact@v3
+          with:
+            name: html
+
+        - name: Make .nojekyll
+          run: touch .nojekyll
+
+        - name: Upload
+          uses: actions/upload-pages-artifact@v1
+          with:
+            path: .
+
+    deploy_docs:
+      # Only run the 'deploy_docs' job if this workflow was triggered by a push to master
+      if: github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == 'master'
+
+      permissions:
+        pages: write
+        id-token: write
+
+      environment:
+        name: github-pages
+        url: ${{ steps.deployment.outputs.page_url }}
+
+      runs-on: ubuntu-latest
+      needs: docs
+      name: Deploy Docs to GH Pages
+      steps:
+        - name: Deploy
+          id: deployment
+          uses: actions/deploy-pages@v1
+
+    release:
+      # Only run the 'release' job if this workflow was triggered by the creation of a tag
+      if: github.event_name == 'push' && github.ref_type == 'tag'
+
+      runs-on: ubuntu-latest
+      needs: [tarball, docker_builds]
+      name: Create Release
+      steps:
+        - name: Download Tarball
+          uses: actions/download-artifact@v3
+          with:
+            name: tarball
+            path: tarball
+
+        - name: Download VSCode
+          uses: actions/download-artifact@v3
+          with:
+            name: release_vscode
+            path: vscode
+
+        # We don't actually release/upload wake_static. Wake is unsupported on old versions
+        # of alpine, and releasing a "wake_static" artifact is very misleading and prone to
+        # user error and confusion
+        - name: Download Alpine
+          uses: actions/download-artifact@v3
+          with:
+            name: release_alpine
+            path: alpine
+
+        - name: Download Debian Bullseye
+          uses: actions/download-artifact@v3
+          with:
+            name: release_debian_bullseye
+            path: debian_bullseye
+
+        - name: Download CentOS 7.6
+          uses: actions/download-artifact@v3
+          with:
+            name: release_centos_7_6
+            path: centos_7_6
+
+        - name: Download Rocky 8
+          uses: actions/download-artifact@v3
+          with:
+            name: release_rocky_8
+            path: rocky_8
+
+        - name: Download Ubuntu 18.04
+          uses: actions/download-artifact@v3
+          with:
+            name: release_ubuntu_18_04
+            path: ubuntu_18_04
+
+        - name: Download Ubuntu 22.04
+          uses: actions/download-artifact@v3
+          with:
+            name: release_ubuntu_22_04
+            path: ubuntu_22_04
+
+        - name: Rename artifacts
+          run: |
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG:1}"
+            cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-${VERSION}-1.x86_64.rpm
+            cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-${VERSION}-1.x86_64.rpm
+            cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_${VERSION}-1_amd64.deb
+            cp ubuntu_18_04/wake_*-1_amd64.deb ubuntu-18-04-wake_${VERSION}-1_amd64.deb
+            cp ubuntu_22_04/wake_*-1_amd64.deb ubuntu-22-04-wake_${VERSION}-1_amd64.deb
+
+        - name: Create Release
+          # v1.2.1 -> 919008cf3f741b179569b7a6fb4d8860689ab7f0
+          uses: marvinpinto/action-automatic-releases@919008cf3f741b179569b7a6fb4d8860689ab7f0
+          with:
+            draft: true
+            repo_token: '${{ secrets.GITHUB_TOKEN }}'
+            files: |
+              tarball/wake_*.tar.xz
+              vscode/wake-*.vsix
+              centos-7-6-wake-*-1.x86_64.rpm
+              rocky_8-wake-*-1.x86_64.rpm
+              debian-bullseye-wake_*-1_amd64.deb
+              ubuntu-18-04-wake_*-1_amd64.deb
+              ubuntu-22-04-wake_*-1_amd64.deb
+
