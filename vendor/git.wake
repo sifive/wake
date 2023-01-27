@@ -62,20 +62,20 @@ def buildOn Unit = match (subscribe releaseOn)
 #       ^^^
 # which breaks node's version requiement and is considered invalid
 #
-# Capture the parts and insert '-post-' between the version and the commit. 
+# Capture the parts and insert '-plus-' between the version and the commit. 
 # Do nothing if the version is already safe.
 def mk_node_semver_safe v =
-    def unsafe_version_regex = `(v?[0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-(.*)`
-    #                           ^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^  ^^^^
-    #                           |                          |        |
-    #                           |                          |        | The "rest", everything after the '-' after the commit number
-    #                           |                          | The number of commits since the tagged version, surrounded by '-'
-    #                           | Matches the version tag, which should be 3 numbers separated by '.' with an optional leading 'v'
+    def unsafe_version_regex = `^(v?[0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-(.*)`
+    #                            ^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^  ^^^^
+    #                            |                          |        |
+    #                            |                          |        | The "rest", everything after the '-' after the commit number
+    #                            |                          | The number of commits since the tagged version, surrounded by '-'
+    #                            | Matches the version tag, which should be 3 numbers separated by '.' with an optional leading 'v'
     require True = matches unsafe_version_regex  v
     else v
 
     match (extract unsafe_version_regex v)
         version, commit, rest, Nil =
-            (version, "-post-", commit, "-", rest,)
+            (version, "-plus-", commit, "-", rest,)
             | cat
         _ = v
