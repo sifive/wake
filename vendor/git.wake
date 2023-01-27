@@ -21,6 +21,7 @@ def buildAs Unit = match (subscribe releaseAs)
     version, Nil = Pass version
     _ =
         def cmdline = which "git", "describe", "--tags", "--dirty", Nil
+
         require Pass stdout =
             makeExecPlan cmdline Nil
             | setPlanKeep False
@@ -29,6 +30,7 @@ def buildAs Unit = match (subscribe releaseAs)
             | runJob
             | getJobStdout
         stdout
+        | mk_node_semver_safe
         | replace `^v|\n.*` ''
         | replace `-([0-9]{1,3})-` '.\1+'
         | replace `-` '~'
@@ -51,3 +53,29 @@ def buildOn Unit = match (subscribe releaseOn)
             | runJob
             | getJobStdout
         Pass (replace `\n.*` '' stdout)
+
+# Process the version when the version number and commit count are adjacent.
+# v0.15.0-4-g6efe8e9
+#       ^^^
+# Without intervention this becomes
+# v0.15.0.4-g6efe8e9
+#       ^^^
+# which breaks node's version requiement and is considered invalid
+#
+# Capture the parts and insert '-plus-' between the version and the commit. 
+# Do nothing if the version is already safe.
+def mk_node_semver_safe v =
+    def unsafe_version_regex = `^(v?[0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-(.*)`
+    #                            ^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^  ^^^^
+    #                            |                          |        |
+    #                            |                          |        | The "rest", everything after the '-' after the commit number
+    #                            |                          | The number of commits since the tagged version, surrounded by '-'
+    #                            | Matches the version tag, which should be 3 numbers separated by '.' with an optional leading 'v'
+    require True = matches unsafe_version_regex  v
+    else v
+
+    match (extract unsafe_version_regex v)
+        version, commit, rest, Nil =
+            (version, "-plus-", commit, "-", rest,)
+            | cat
+        _ = v
