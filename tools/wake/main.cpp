@@ -562,7 +562,7 @@ int main(int argc, char **argv) {
 
   if (noparse) return 0;
 
-  FILE* user_warn = stdout;
+  FILE *user_warn = stdout;
   if (quiet) {
     user_warn = fopen("/dev/null", "w");
   }
