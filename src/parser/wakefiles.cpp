@@ -175,6 +175,7 @@ struct profile_data {
   std::chrono::time_point<std::chrono::steady_clock> start{std::chrono::steady_clock::now()};
   size_t explored{0};
   bool alerted_user{false};
+  FILE *dest{stdout};
 };
 
 // TODO : This function should probably be under compat in a files / vfs module
@@ -244,11 +245,11 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
       profile->start = now;
       profile->alerted_user = true;
 
-      fprintf(stdout,
+      fprintf(profile->dest,
               "Finding wake files is taking longer than expected. Kernel file cache may be cold. "
               "(%ld explored).\r",
               profile->explored);
-      fflush(stdout);
+      fflush(profile->dest);
     }
 
     // Recurse & capture any failures
@@ -268,8 +269,8 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
   return failed;
 }
 
-bool push_files(std::vector<std::string> &out, const std::string &path, const RE2 &re,
-                size_t skip) {
+bool push_files(std::vector<std::string> &out, const std::string &path, const RE2 &re, size_t skip,
+                FILE *user_warning_dest) {
   int flags, dirfd = open(path.c_str(), O_RDONLY);
   if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1) fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
 
@@ -278,10 +279,12 @@ bool push_files(std::vector<std::string> &out, const std::string &path, const RE
   }
 
   struct profile_data profile;
+  profile.dest = user_warning_dest;
+
   bool ret = push_files(out, path, dirfd, re, skip, &profile);
 
   if (profile.alerted_user) {
-    fprintf(stdout, "\n");
+    fprintf(profile.dest, "\n");
   }
 
   return ret;
@@ -507,7 +510,8 @@ static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wake
 }
 
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose,
-                                            const std::string &libdir, const std::string &workdir) {
+                                            const std::string &libdir, const std::string &workdir,
+                                            FILE *user_warning_dest) {
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
@@ -529,14 +533,14 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
       if (push_packaged_stdlib_files(libfiles, exp, 0)) ok = false;
     }
 #else
-    if (push_files(libfiles, libdir, exp, 0)) ok = false;
+    if (push_files(libfiles, libdir, exp, 0, user_warning_dest)) ok = false;
 #endif
     std::sort(libfiles.begin(), libfiles.end());
     libfiles = filter_wakefiles(std::move(libfiles), libdir, verbose);
   }
 
   if (workspace) {
-    if (push_files(workfiles, workdir, exp, 0)) ok = false;
+    if (push_files(workfiles, workdir, exp, 0, user_warning_dest)) ok = false;
     std::sort(workfiles.begin(), workfiles.end());
     workfiles = filter_wakefiles(std::move(workfiles), workdir, verbose);
   }

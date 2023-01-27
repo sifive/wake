@@ -62,7 +62,7 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
   comments.clear();
 
   bool enumok = true;
-  auto allFiles = find_all_wakefiles(enumok, true, false, absLibDir, absWorkDir);
+  auto allFiles = find_all_wakefiles(enumok, true, false, absLibDir, absWorkDir, stdout);
 
   std::map<std::string, std::vector<Diagnostic>> diagnostics;
   LSPReporter lspReporter(diagnostics, allFiles);

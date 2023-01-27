@@ -562,13 +562,23 @@ int main(int argc, char **argv) {
 
   if (noparse) return 0;
 
+  FILE* user_warn = stdout;
+  if (quiet) {
+    user_warn = fopen("/dev/null", "w");
+  }
+
   bool enumok = true;
   std::string libdir = make_canonical(find_execpath() + "/../share/wake/lib");
-  auto wakefilenames = find_all_wakefiles(enumok, workspace, verbose, libdir, ".");
+  auto wakefilenames =
+      find_all_wakefiles(enumok, workspace, verbose, libdir, ".", quiet ? stdout : stderr);
   if (!enumok) {
     if (verbose) std::cerr << "Workspace wake file enumeration failed" << std::endl;
     // Try to run the build anyway; if wake files are missing, it will fail later
     // The unreadable location might be irrelevant to the build
+  }
+
+  if (quiet) {
+    fclose(user_warn);
   }
 
   Profile tree;
@@ -595,8 +605,10 @@ int main(int argc, char **argv) {
 
   for (size_t i = 0; i < wakefilenames.size(); i++) {
     auto &wakefile = wakefilenames[i];
+
     auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
+    if (!quiet &&
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
       std::cout << "Scanning " << i + 1 << "/" << wakefilenames.size()
                 << " wake files. Kernel file cache may be cold.\r" << std::flush;
       start = now;
@@ -632,7 +644,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (alerted_slow_cache) {
+  if (!quiet && alerted_slow_cache) {
     std::cout << "Scanning " << wakefilenames.size() << "/" << wakefilenames.size()
               << " wake files. Kernel file cache may be cold." << std::endl;
   }
