@@ -20,7 +20,28 @@ topic releaseAs: String
 def buildAs Unit = match (subscribe releaseAs)
     version, Nil = Pass version
     _ =
+        # Process the version when the version number and commit count are adjacent.
+        # v0.15.0-4-g6efe8e9
+        #       ^^^
+        # Without intervention this becomes
+        # v0.15.0.4-g6efe8e9
+        #       ^^^
+        # which breaks node's version requiement and is considered invalid
+        #
+        # Capture the two halves 'v0.15.0', '4-g6efe8e9' and insert '-safe-' in the middle
+        # Do nothing if the version is already safe.
+        def mk_node_semver_safe v =
+            require True = matches `.+[0-9]-[0-9].+` v
+            else v
+
+            match (extract `(.+[0-9])-([0-9].+)` v)
+                left, right, Nil =
+                    (left,"-safe-", right,)
+                    | cat
+                _ = v
+
         def cmdline = which "git", "describe", "--tags", "--dirty", Nil
+
         require Pass stdout =
             makeExecPlan cmdline Nil
             | setPlanKeep False
@@ -29,6 +50,7 @@ def buildAs Unit = match (subscribe releaseAs)
             | runJob
             | getJobStdout
         stdout
+        | mk_node_semver_safe
         | replace `^v|\n.*` ''
         | replace `-([0-9]{1,3})-` '.\1+'
         | replace `-` '~'
