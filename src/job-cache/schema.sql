@@ -48,8 +48,6 @@ create table if not exists input_files(
   hash          text    not null,
   job           job_id  not null references jobs(job_id) on delete cascade);
 create index if not exists input_file_by_job on input_files(job);
---create index if not exists input_file on input_files(path, hash);
-
 
 -- We also need to know about directories that have been read
 -- in some way. For instance if a file fails to be read in
@@ -64,7 +62,6 @@ create table if not exists input_dirs(
   hash         text    not null,
   job          job_id  not null references jobs(job_id) on delete cascade);
 create index if not exists input_dir_by_job on input_dirs(job);
---create index if not exists input_dir on input_dirs(path, hash);
 
 -- We don't record where a wake job writes an output file
 -- only where the file is placed within the sandbox. Each
@@ -79,7 +76,6 @@ create table if not exists output_files(
   mode           integer not null,
   job            job_id  not null references jobs(job_id) on delete cascade);
 create index if not exists output_file_by_job on output_files(job);
---create index if not exists output_file on output_files(path, hash);
 create index if not exists find_file on output_files(hash);
 
 commit transaction;

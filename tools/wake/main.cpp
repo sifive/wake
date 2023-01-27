@@ -428,9 +428,12 @@ int main(int argc, char **argv) {
   }
 
   // Open the job-cache if it exists
-  // TODO: Use an env-var to create it it conditionally
-  auto cache = std::make_unique<job_cache::Cache>("./.job-cache");
-  set_job_cache(cache.get());
+  std::unique_ptr<job_cache::Cache> cache;
+  const char *job_cache_dir = getenv("WAKE_EXPERIMENTAL_JOB_CACHE");
+  if (job_cache_dir != nullptr) {
+    cache = std::make_unique<job_cache::Cache>(job_cache_dir);
+    set_job_cache(cache.get());
+  }
 
   // If the user asked to list all files we *would* clean.
   // This is the same as asking for all output files.

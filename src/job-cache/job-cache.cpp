@@ -60,7 +60,7 @@ static void rmdir_no_fail(const char *dir) {
 #ifdef __APPLE__
 
 static void copy(int src_fd, int dst_fd) {
-  // TODO: Actully make this work. APFS supports reflinking so
+  // TODO: Actually make this work. APFS supports reflinking so
   //       it should be possible to do this correctly
 }
 
@@ -200,36 +200,18 @@ class Database {
       log_fatal("error: %s", sqlite3_errmsg(db));
     }
 
-    // std::cerr << "Got here" << std::endl;
-
-    // If we happen to open the db as read only we need to fail.
-    // TODO: Why would this happen?
-    // if (sqlite3_db_readonly(db, 0)) {
-    // log_fatal("error: cache.db is read-only");
-    //}
-
     if (sqlite3_busy_handler(db, wait_handle, nullptr)) {
       log_fatal("error: failed to set sqlite3_busy_handler: %s", sqlite3_errmsg(db));
     }
 
     char *fail = nullptr;
-    // uint64_t wait = 128;
-    // std::random_device rd;
-    // do {
+
     int ret = sqlite3_exec(db, cache_schema, nullptr, nullptr, &fail);
-    /*if (ret == SQLITE_BUSY) {
-      // Sleep with exponetial backoff and add in a random offset
-      // to avoid syncing
-      usleep(wait + (rd() & (wait - 1)));
-      wait <<= 1;
-    }*/
-    // std::cerr << "busy: " << fail << std::endl;
-    //} while (ret == SQLITE_BUSY);
-    // std::cerr << "finished!" << std::endl;
+
     if (ret == SQLITE_BUSY) {
-      log_info(
+      log_fatal(
           "warning: It appears another process is holding the database open, check `ps` for "
-          "suspended job-cache instances");
+          "suspended wake instances");
     }
     if (ret != SQLITE_OK) {
       log_fatal("error: failed init stmt: %s: %s", fail, sqlite3_errmsg(db));
@@ -317,12 +299,12 @@ class PreparedStatement {
 
   void reset() {
     int ret;
-    // do {
+
     ret = sqlite3_reset(query_stmt);
     if (ret == SQLITE_LOCKED) {
-      log_fatal("error: it seems we're hitting this return code somehow");
+      log_fatal("error: sqlite3_reset: SQLITE_LOCKED");
     }
-    //} while (ret == SQLITE_BUSY);
+
     if (ret != SQLITE_OK) {
       log_fatal("error: %s; sqlite3_reset: %s", why.c_str(), sqlite3_errmsg(db->get()));
     }
@@ -334,9 +316,7 @@ class PreparedStatement {
 
   int step() {
     int ret;
-    // do {
     ret = sqlite3_step(query_stmt);
-    //} while (ret == SQLITE_BUSY);
     if (ret != SQLITE_DONE && ret != SQLITE_ROW) {
       log_fatal("error: %s; sqlite3_step: %s", why.c_str(), sqlite3_errmsg(db->get()));
     }
@@ -344,7 +324,7 @@ class PreparedStatement {
   }
 };
 
-// Database and JSON classes
+// Database classes
 class InputFiles {
  private:
   PreparedStatement add_input_file;
@@ -787,7 +767,8 @@ AddJobRequest::AddJobRequest(const JAST &job_result_json) {
       OutputFile output;
       output.source = output_file.second.get("src").value;
       output.path = output_file.second.get("path").value;
-      auto fd = UniqueFd::open(output.source.c_str(), O_RDONLY | O_NOFOLLOW);
+      // TODO: This does not work on symlinks right now.
+      auto fd = UniqueFd::open(output.source.c_str(), O_RDONLY);
       output.hash = do_hash_file(output.source.c_str(), fd.get());
       return output;
     }));
@@ -978,10 +959,6 @@ void Cache::add(const AddJobRequest &add_request) {
   // Start a transaction so that a job is never without its files.
   int64_t job_id;
   {
-    // auto lock = lock_file(wcl::join_paths(dir, "lock"), LOCK_EX);
-    // TOOD: Right now we open the database here, we should just leave the connection to the
-    // database open in the Cache object instead.
-    // CacheDbImpl impl(dir);
     impl->transact.run([this, &modes, &add_request, &job_id]() {
       job_id = impl->jobs.insert(add_request.cwd, add_request.command_line, add_request.envrionment,
                                  add_request.stdin_str, add_request.bloom);
@@ -1016,7 +993,6 @@ void Cache::add(const AddJobRequest &add_request) {
       // will eventully be deleted.
     });
   }
-  // TODO: release the lock here
 
   // Finally we make sure the group directory exits and then
   // atomically rename the temp job into place which completes
