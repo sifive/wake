@@ -309,8 +309,8 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
           "mem" :-> JInteger mem,
           "ibytes" :-> JInteger ibytes,
           "obytes" :-> JInteger obytes,
-          "stdout" :-> JString stdout, # TODO: Figure out how to get the stdout
-          "stderr" :-> JString stderr, # TODO: Figure out how to get the stderr
+          "stdout" :-> JString stdout,
+          "stderr" :-> JString stderr,
         )
 
         # We put this in a def so that it does not block the return below.
@@ -641,7 +641,7 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
           Some "1" = Unit
           _        = fn f
       def outFile = replace `\.in\.json$` ".out.json" inFile
-      def json = parseJSONFile (Path outFile "badhash") # TODO: Fix this?
+      def json = parseJSONFile (Path outFile "BadHash")
       def _ = unlink inFile
       match json
         Fail f = Fail f

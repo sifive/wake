@@ -759,7 +759,9 @@ AddJobRequest::AddJobRequest(const JAST &job_result_json) {
   // TODO: I hate this loop but its the fastest path to a demo.
   //       we need to figure out a path add things to the cache
   //       only after the files have been hashed so we don't
-  //       need this loop.
+  //       need this loop. Since this job was just run, wake
+  //       will eventually hash all these files so the fact
+  //       that we have to re-hash them here is a shame.
   std::vector<std::future<OutputFile>> future_outputs;
 
   // Read the output files which requires kicking off a hash
@@ -774,7 +776,7 @@ AddJobRequest::AddJobRequest(const JAST &job_result_json) {
       OutputFile output;
       output.source = output_file.second.get("src").value;
       output.path = output_file.second.get("path").value;
-      // TODO: This does not work on symlinks right now.
+      // TODO: This does not work on symlinks or directories right now.
       auto fd = UniqueFd::open(output.source.c_str(), O_RDONLY);
       output.hash = do_hash_file(output.source.c_str(), fd.get());
       return output;
