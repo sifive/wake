@@ -18,4 +18,4 @@ from wake import _
 
 target jobCacheLib variant =
     require Pass schemaSql = source "src/job-cache/schema.sql"
-    src here variant (json, gopt, sqlite3, blake2, wcl, util,) Nil (schemaSql,)
+    src here variant (json, gopt, blake2, wcl, util,) (sqlite3,) (schemaSql,)

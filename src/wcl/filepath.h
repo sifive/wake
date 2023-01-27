@@ -116,17 +116,17 @@ inline std::string join_paths(std::string a, const std::string& b) {
   if (a.back() == '/') {
     if (b.front() == '/') {
       a.insert(a.end(), b.begin() + 1, b.end());
-    } else {
-      a += b;
+      return a;
     }
-  } else {
-    if (b.front() == '/') {
-      a += b;
-    } else {
-      a += '/';
-      a += b;
-    }
+    a += b;
+    return a;
   }
+  if (b.front() == '/') {
+    a += b;
+    return a;
+  }
+  a += '/';
+  a += b;
 
   return a;
 }
