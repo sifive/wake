@@ -69,7 +69,14 @@ static void copy(int src_fd, int dst_fd) {
 #include <linux/fs.h>
 
 // This function just uses `copy_file_range` to make
-// an efficent copy
+// an efficent copy. It is however not atomic because
+// we have to `fstat` before we call `copy_file_range`.
+// This means that if an external party decides to mutate
+// the file (espeically changing its size) then this function
+// will not work as intended. External parties *are* allowed to
+// unlink this file but they're not allowed to modify it in any
+// other way or else this function will race with that external
+// modification.
 static void copy(int src_fd, int dst_fd) {
   struct stat buf;
   // There's a race here between the fstat and the copy_file_range
