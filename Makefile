@@ -6,7 +6,7 @@ CC	:= cc -std=c11
 CXX	:= c++
 CXX_VERSION := -std=c++14
 CFLAGS	:= -Wall -Wno-format-security -O2 -DVERSION=$(VERSION)
-LDFLAGS	:=
+LDFLAGS	:= -lpthread
 DESTDIR ?= /usr/local
 
 LOCAL_CFLAGS :=	-Ivendor -Isrc
