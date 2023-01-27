@@ -77,43 +77,7 @@ struct MatchingJob {
   std::vector<std::string> input_dirs;
   JobOutputInfo output_info;
 
-  JAST to_json() const {
-    JAST out(JSON_OBJECT);
-    JAST output_files_json(JSON_ARRAY);
-    JAST input_files_json(JSON_ARRAY);
-    JAST input_dirs_json(JSON_ARRAY);
-
-    // List the output files
-    for (const auto &output_file : output_files) {
-      // TODO: It's a shame we're throwing the hash out here :(
-      output_files_json.add(output_file.path);
-    }
-
-    // List the input files
-    for (const auto &input_file : input_files) {
-      input_files_json.add(input_file);
-    }
-
-    // List the input dirs
-    for (const auto &input_dir : input_dirs) {
-      input_dirs_json.add(input_dir);
-    }
-
-    // Add all the fields
-    out.add("output_files", std::move(output_files_json));
-    out.add("input_files", std::move(input_files_json));
-    out.add("input_dirs", std::move(input_dirs_json));
-    out.add("stdout", output_info.stdout_str);
-    out.add("stderr", output_info.stderr_str);
-    out.add("status", output_info.ret_code);
-    out.add("runtime", output_info.runtime);
-    out.add("cputime", output_info.cputime);
-    out.add("mem", static_cast<long long>(output_info.mem));
-    out.add("ibytes", static_cast<long long>(output_info.ibytes));
-    out.add("obytes", static_cast<long long>(output_info.obytes));
-
-    return out;
-  }
+  JAST to_json() const;
 };
 
 struct FindJobRequest {
