@@ -570,7 +570,7 @@ int main(int argc, char **argv) {
   bool enumok = true;
   std::string libdir = make_canonical(find_execpath() + "/../share/wake/lib");
   auto wakefilenames =
-      find_all_wakefiles(enumok, workspace, verbose, libdir, ".", quiet ? stdout : stderr);
+      find_all_wakefiles(enumok, workspace, verbose, libdir, ".", user_warn);
   if (!enumok) {
     if (verbose) std::cerr << "Workspace wake file enumeration failed" << std::endl;
     // Try to run the build anyway; if wake files are missing, it will fail later
