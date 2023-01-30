@@ -2,40 +2,34 @@
 
 The following describes the steps for creating a new release of Wake and publishing the artifacts to GitHub.
 
-1. Pick a release branch to release from, e.g. `v0.15`. The `v0.15` release branch will contain all the point releases such as `v0.15.0`, `v0.15.1`, etc.
+1. Update to the lastest version of `master`
 +
 [source,shell]
 ----
-$ git checkout v0.15
+$ git checkout master
+$ git pull origin master
 ----
 
-2. Make sure the branch is up to date with GitHub.
-+
-[source,shell]
-----
-$ git pull
-----
-
-3. Create a branch from the release branch to contain the last set of changes for the release, e.g. `release-0.15.3`.
+2. Create a branch to update the release info, e.g. `release-0.15.3`.
 +
 [source,shell]
 ----
 $ git checkout -b release-0.15.3
 ----
 
-4. If the release will add to or otherwise change the public exports of the `wake` package interface, (re)generate the versioned package.
-   If it doesn't, go to step 7.
+3. If the release will add to or otherwise change the public exports of the `wake` package interface, (re)generate the versioned package.
+   If it doesn't, go to step 6.
 +
 [source,shell]
 ----
 $ ./bin/wake --in wake --export-api v0_15_wake > share/wake/lib/versions/v0_15.wake
 ----
 
-5. Open the previous versioned package in a text editor.
+4. Open the previous versioned package in a text editor.
    If the export lines export from `wake` rather than the current versioned package, change each of them to export from that current package instead.
    For example, `from wake export type binary ; =>` should become `from v0_15_wake export type binary ; =>`.
 
-6. Commit the changes to the versioned package(s).
+5. Commit the changes to the versioned package(s).
 +
 [source,shell]
 ----
@@ -43,19 +37,19 @@ $ git add share/wake/lib/versions/v0_14.wake share/wake/lib/versions/v0_15.wake
 $ git commit -m "Pin the 0.15 public API."
 ----
 
-7. Open `debian/changelog.in` in a text editor.
+6. Open `debian/changelog.in` in a text editor.
    Check to see whether the top-most release note corresponds to the previous release or whether it is a placeholder for the next release.
-   If you see the previous release's version number in the release note second from the top, then the top-most release note is a placeholder for the next release. In this case, go to step 6.
-   If instead it looks like the top-most release _is_ the previous release, then go to step 5.
+   If you see the previous release's version number in the release note second from the top, then the top-most release note is a placeholder for the next release. In this case, go to step 5.
+   If instead it looks like the top-most release _is_ the previous release, then go to step 4.
 
-8. Create a copy of the top-most release note immediately below it.
+7. Create a copy of the top-most release note immediately below it.
    In the second instance, replace the `@VERSION@` string with the actual version number of the previous release.
 
-9. Update the top-most release note to contain the actual release information.
+8. Update the top-most release note to contain the actual release information.
    Update the text to describe the release itself.
    Update the author, email, and the release date to match the actual release information.
 
-10. Commit the changes to `changelog.in`.
+9. Commit the changes to `changelog.in`.
 +
 [source,shell]
 ----
@@ -63,7 +57,26 @@ $ git add debian/changelog.in
 $ git commit -m "Set release date."
 ----
 
-11. Create a tag with the version string you want to use, e.g. `v0.15.3`, and push the tag to GitHub. It is important that this happens before pushing the branch and opening a pull request in order for the build CI job to correctly identify the branch as being a tag.
+10. Push the branch to GitHub.
++
+[source,shell]
+----
+$ git push origin release-0.15.3
+----
+
+11. Open a pull request on GitHub. Make sure you set the base branch to `master`.
+
+12. Merge the release into master after CI passses and PR is approved.
+
+13. Checkout master and update to the release commit
++
+[source,shell]
+----
+$ git checkout master
+$ git pull origin master
+----
+
+14. Create a tag with the version string you want to use, e.g. `v0.15.3`, and push the tag to GitHub.
 +
 [source,shell]
 ----
@@ -71,24 +84,8 @@ $ git tag v0.15.3
 $ git push origin v0.15.3
 ----
 
-12. Push the branch to GitHub.
-+
-[source,shell]
-----
-$ git push origin release-0.15.3
-----
-
-13. Open a pull request on GitHub. Make sure you set the base branch to the release branch (e.g. `v0.15`), not `master`.
-
-14. Wait for the CI jobs to pass.
-    Double check that the build artifacts corresponding to the distribution-specific releases look correct.
-    One thing to look for is whether CI correctly associated the tag name with the pull request build.
-    If it did not work correctly, then you'll see a file name with the previous version tag along with part of the Git commit hash, e.g. `wake_0.15.2.4+g28fb3f8.tar.xz`
-
-15. Assuming everything has passed, merge the pull request.
-
-16. Take the artifacts from the CI build and upload them to the GitHub release and MS marketplace.
-    The `scripts/fetch` utility can help download and rename the packages.
+15. After the tagged is pushed, the release workflow will automatically generate a GitHub draft release.
+    Wait for the release to be created then download the vsix artifact and upload it to the MS marketplace
     The update link is here: https://marketplace.visualstudio.com/manage/publishers/sifive
 
-17. Finally, update the release on GitHub with the release information.
+16. Finalize the release copy and publish.
