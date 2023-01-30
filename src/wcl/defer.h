@@ -17,26 +17,32 @@
 
 #pragma once
 
+#include <functional>
+
+#include "optional.h"
+
+// NOTE: defer requires a dynamic memory allocation,
+//       a non-trivial amount of indirection, and
+//       vtable accesses. Prefer using only on
+//       expensive resources like file IO.
 namespace wcl {
-template <class F>
 class defer {
  private:
-  F f;
-  bool moved = false;
+  wcl::optional<std::function<void()>> f;
 
  public:
   defer(const defer&) = delete;
-  defer(defer&& d) : f(std::move(d.f)) { d.moved = true; }
-  defer(F&& f) : f(std::move(f)) {}
-  defer(const F& f) : f(f) {}
+  defer(defer&& d) = default;
+  template <class F>
+  defer(F&& f) : f(std::forward<F>(f)) {}
   ~defer() {
-    if (!moved) f();
+    if (f) (*f)();
   }
 };
 
 template <class F>
-auto make_defer(F&& f) -> defer<F> {
-  return defer<F>(f);
+defer make_defer(F&& f) {
+  return defer(std::forward<F>(f));
 }
 
 }  // namespace wcl
