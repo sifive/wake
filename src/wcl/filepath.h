@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include <string>
 
 namespace wcl {
@@ -100,12 +102,36 @@ class filepath_range {
   filepath_iterator end() const { return filepath_iterator(str, str.size()); }
 };
 
-filepath_range make_filepath_range(const std::string& str) { return filepath_range(str); }
+inline filepath_range make_filepath_range(const std::string& str) { return filepath_range(str); }
 
-filepath_range make_filepath_range(std::string&& str) { return filepath_range(std::move(str)); }
+inline filepath_range make_filepath_range(std::string&& str) {
+  return filepath_range(std::move(str));
+}
 
-filepath_range_ref make_filepath_range_ref(const std::string& str) {
+inline filepath_range_ref make_filepath_range_ref(const std::string& str) {
   return filepath_range_ref(str);
+}
+
+inline std::string join_paths(std::string a, const std::string& b) {
+  if (a.back() != '/') a += '/';
+  auto begin = b.begin();
+  if (*begin == '/') ++begin;
+  a.insert(a.end(), begin, b.end());
+  return a;
+}
+
+inline std::string join_paths(std::string a, const std::string& b, const std::string& c) {
+  return join_paths(join_paths(a, b), c);
+}
+
+inline std::string join_paths(std::string a, const std::string& b, const std::string& c,
+                              const std::string& d) {
+  return join_paths(join_paths(join_paths(a, b), c), d);
+}
+
+inline std::string join_paths(std::string a, const std::string& b, const std::string& c,
+                              const std::string& d, const std::string& e) {
+  return join_paths(join_paths(join_paths(join_paths(a, b), c), d), e);
 }
 
 }  // namespace wcl

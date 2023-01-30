@@ -18,4 +18,4 @@ package build_wake
 from wake import _
 
 target dst variant =
-    src here variant (types, parser, util, Nil) (re2, Nil)
+    src here variant (types, parser, util, Nil) (re2, Nil) Nil

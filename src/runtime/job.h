@@ -21,6 +21,8 @@
 #include <memory>
 #include <string>
 
+#include "job-cache/job-cache.h"
+
 struct Database;
 struct Runtime;
 
@@ -62,5 +64,7 @@ struct JobTable {
   bool wait(Runtime &runtime);
   static bool exit_now();
 };
+
+void set_job_cache(job_cache::Cache *cache);
 
 #endif

@@ -18,4 +18,4 @@ package build_wake
 from wake import _
 
 target util variant =
-    src here variant (compat, Nil) (whereami, siphash, Nil)
+    src here variant (compat, Nil) (whereami, siphash, Nil) Nil
