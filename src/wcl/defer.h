@@ -20,19 +20,17 @@
 namespace wcl {
 template <class F>
 class defer {
-private:
+ private:
   F f;
   bool moved = false;
 
-public:
+ public:
   defer(const defer&) = delete;
-  defer(defer&& d) : f(std::move(d.f)) {
-    d.moved = true;
-  }
+  defer(defer&& d) : f(std::move(d.f)) { d.moved = true; }
   defer(F&& f) : f(std::move(f)) {}
   defer(const F& f) : f(f) {}
   ~defer() {
-    if(!moved) f();
+    if (!moved) f();
   }
 };
 
@@ -41,4 +39,4 @@ auto make_defer(F&& f) -> defer<F> {
   return defer<F>(f);
 }
 
-}
+}  // namespace wcl
