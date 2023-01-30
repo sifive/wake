@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <wcl/defer.h>
 
 #include <algorithm>
 #include <chrono>
@@ -563,8 +564,10 @@ int main(int argc, char **argv) {
   if (noparse) return 0;
 
   FILE *user_warn = stdout;
+  wcl::opt_defer user_warn_defer;
   if (quiet) {
     user_warn = fopen("/dev/null", "w");
+    user_warn_defer = wcl::make_opt_defer([&]() { fclose(user_warn); });
   }
 
   bool enumok = true;
@@ -574,10 +577,6 @@ int main(int argc, char **argv) {
     if (verbose) std::cerr << "Workspace wake file enumeration failed" << std::endl;
     // Try to run the build anyway; if wake files are missing, it will fail later
     // The unreadable location might be irrelevant to the build
-  }
-
-  if (quiet) {
-    fclose(user_warn);
   }
 
   Profile tree;
