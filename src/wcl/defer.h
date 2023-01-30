@@ -21,28 +21,60 @@
 
 #include "optional.h"
 
-// NOTE: defer requires a dynamic memory allocation,
-//       a non-trivial amount of indirection, and
-//       vtable accesses. Prefer using only on
-//       expensive resources like file IO.
 namespace wcl {
+
+// NOTE: defer is much faster and cheaper than
+//       opt_defer, allowing fully blown inlining,
+//       but it does not allow default construction
+//       which makes it clunky to use in conditional
+//       cases. You can still however use it often
+//       by setting defer unconditionally and then
+//       conditionally nullifying it.
+template <class F>
 class defer {
  private:
-  wcl::optional<std::function<void()>> f;
+  wcl::optional<F> f;
 
  public:
+  defer() = delete;
   defer(const defer&) = delete;
-  defer(defer&& d) = default;
-  template <class F>
-  defer(F&& f) : f(std::forward<F>(f)) {}
+  defer(defer&&) = default;
+  defer(F&& f) : f(wcl::inplace_t{}, std::move(f)) {}
+  defer(const F& f) : f(wcl::inplace_t{}, f) {}
+
+  void nullify() { f = {}; }
+
   ~defer() {
     if (f) (*f)();
   }
 };
 
 template <class F>
-defer make_defer(F&& f) {
+defer<F> make_defer(F&& f) {
   return defer(std::forward<F>(f));
+}
+
+// NOTE: opt_defer requires a dynamic memory allocation,
+//       a non-trivial amount of indirection, and
+//       vtable accesses. Prefer using only on
+//       expensive resources like file IO.
+class opt_defer {
+ private:
+  wcl::optional<std::function<void()>> f;
+
+ public:
+  opt_defer(const opt_defer&) = delete;
+  opt_defer(opt_defer&& d) = default;
+  template <class F>
+  opt_defer(F&& f) : f(wcl::inplace_t{}, std::forward<F>(f)) {}
+  ~opt_defer() {
+    if (f) (*f)();
+  }
+};
+
+template <class F>
+opt_defer make_opt_defer(F&& f) {
+  return opt_defer(std::forward<F>(f));
 }
 
 }  // namespace wcl
