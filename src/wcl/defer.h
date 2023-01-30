@@ -39,8 +39,8 @@ class defer {
   defer() = delete;
   defer(const defer&) = delete;
   defer(defer&&) = default;
-  defer(F&& f) : f(wcl::inplace_t{}, std::move(f)) {}
-  defer(const F& f) : f(wcl::inplace_t{}, f) {}
+  defer(F&& f) : f(wcl::in_place_t{}, std::move(f)) {}
+  defer(const F& f) : f(wcl::in_place_t{}, f) {}
 
   void nullify() { f = {}; }
 
@@ -51,7 +51,7 @@ class defer {
 
 template <class F>
 defer<F> make_defer(F&& f) {
-  return defer(std::forward<F>(f));
+  return defer<F>(std::forward<F>(f));
 }
 
 // NOTE: opt_defer requires a dynamic memory allocation,
@@ -63,10 +63,12 @@ class opt_defer {
   wcl::optional<std::function<void()>> f;
 
  public:
+  opt_defer() = default;
   opt_defer(const opt_defer&) = delete;
   opt_defer(opt_defer&& d) = default;
+  opt_defer& operator=(opt_defer&&) = default;
   template <class F>
-  opt_defer(F&& f) : f(wcl::inplace_t{}, std::forward<F>(f)) {}
+  opt_defer(F&& f) : f(wcl::in_place_t{}, std::forward<F>(f)) {}
   ~opt_defer() {
     if (f) (*f)();
   }
