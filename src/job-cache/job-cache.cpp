@@ -62,6 +62,7 @@ static void rmdir_no_fail(const char *dir) {
 static void copy(int src_fd, int dst_fd) {
   // TODO: Actually make this work. APFS supports reflinking so
   //       it should be possible to do this correctly
+  assert(false);
 }
 
 #elif __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 27
@@ -92,6 +93,7 @@ static void copy(int src_fd, int dst_fd) {
 #else
 static void copy(int src_fd, int dst_fd) {
   // TODO: Write a fallback. This should only be needed for centos7.6
+  assert(false);
 }
 #endif
 
