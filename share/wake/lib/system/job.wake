@@ -202,6 +202,7 @@ export def localRunner: Runner =
     if plan.getPlanLocalOnly then Pass 1.0 else Fail "cannot detect outputs"
   Runner "local" score doit
 
+# TODO: Delete these once new json API is added to wake repo
 def jField (jvalue: JValue) (key: String) =
   require JObject obj = jvalue
   else failWithError "not an object"

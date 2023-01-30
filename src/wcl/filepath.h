@@ -113,21 +113,10 @@ inline filepath_range_ref make_filepath_range_ref(const std::string& str) {
 }
 
 inline std::string join_paths(std::string a, const std::string& b) {
-  if (a.back() == '/') {
-    if (b.front() == '/') {
-      a.insert(a.end(), b.begin() + 1, b.end());
-      return a;
-    }
-    a += b;
-    return a;
-  }
-  if (b.front() == '/') {
-    a += b;
-    return a;
-  }
-  a += '/';
-  a += b;
-
+  if (a.back() != '/') a += '/';
+  auto begin = b.begin();
+  if (*begin == '/') ++begin;
+  a.insert(a.end(), begin, b.end());
   return a;
 }
 
