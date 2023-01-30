@@ -157,7 +157,7 @@ bool push_files(int ok, char *files, std::vector<std::string> &out, const re2::R
 }
 
 bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2 &re,
-                size_t skip) {
+                size_t skip, FILE * /* warn_dest*/) {
   int ok;
   char *files = vscode_getfiles(path.c_str(), &ok);
   return push_files(ok, files, out, re, skip);
@@ -528,7 +528,7 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
     });
     // clang-format on
     if (isNode) {
-      if (push_files(libfiles, libdir, exp, 0)) ok = false;
+      if (push_files(libfiles, libdir, exp, 0, user_warning_dest)) ok = false;
     } else {
       if (push_packaged_stdlib_files(libfiles, exp, 0)) ok = false;
     }
