@@ -859,7 +859,7 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
     dirs[parent] += ":";
   }
 
-  // Now actully perform those hashes
+  // Now actually perform those hashes
   for (auto dir : dirs) {
     dir_hashes[dir.first] = Hash256::blake2b(dir.second);
   }
