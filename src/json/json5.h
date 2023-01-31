@@ -75,7 +75,7 @@ struct JAST {
 
   // Add a child to a JObject
   JAST &add(std::string key, SymbolJSON kind, std::string &&value);
-  JAST &add(std::string key, bool value) {
+  JAST &add_bool(std::string key, bool value) {
     if (value)
       return add(std::move(key), JSON_TRUE, "true");
     else

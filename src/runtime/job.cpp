@@ -1684,7 +1684,7 @@ static PRIMFN(prim_job_cache_read) {
   // If nothing is found return a simple error message
   if (!result) {
     JAST out_json(JSON_OBJECT);
-    out_json.add("found", static_cast<bool>(false));
+    out_json.add_bool("found", static_cast<bool>(false));
     std::stringstream result_json_stream;
     result_json_stream << out_json;
     std::string s = result_json_stream.str();
@@ -1696,7 +1696,7 @@ static PRIMFN(prim_job_cache_read) {
   // If a job is found however we need to return some information about it
   JAST jast_result = result->to_json();
   JAST out_json(JSON_OBJECT);
-  out_json.add("found", static_cast<bool>(result));
+  out_json.add_bool("found", static_cast<bool>(result));
   out_json.add("match", result->to_json());
 
   // Because I'm very lazy however we also return a string and not a JValue.
