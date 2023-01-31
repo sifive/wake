@@ -80,6 +80,15 @@ struct JobReflection {
   std::vector<JobTag> tags;
 };
 
+struct JobOutput {
+  long job;
+  std::string label;
+  std::string directory;
+  std::vector<std::string> commandline;
+  std::vector<std::string> environment;
+  std::vector<std::pair<std::string, int>> outputs;
+};
+
 struct JobEdge {
   long user;
   long used;
@@ -164,6 +173,8 @@ struct Database {
 
   std::vector<JobReflection> get_job_visualization() const;
   std::vector<FileAccess> get_file_accesses() const;
+
+  std::vector<JobOutput> failed_output() const;
 };
 
 #endif
