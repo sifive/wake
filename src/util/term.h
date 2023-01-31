@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef COLOUR_H
-#define COLOUR_H
+#ifndef TERM_H
+#define TERM_H
 
 #define TERM_DEFAULT 0
 
@@ -36,5 +36,10 @@ bool term_init(bool tty_);
 const char *term_colour(int code);
 const char *term_intensity(int code);
 const char *term_normal();
+
+const char *term_cuu1();
+const char *term_cr();
+const char *term_ed();
+bool term_tty();
 
 #endif

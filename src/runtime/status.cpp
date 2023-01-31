@@ -43,7 +43,7 @@
 
 #include "compat/sigwinch.h"
 #include "job.h"
-#include "util/colour.h"
+#include "util/term.h"
 
 // How often is the status updated (should be a multiple of 2 for budget=0)
 #define REFRESH_HZ 6
@@ -58,40 +58,9 @@ static volatile bool refresh_needed = false;
 static volatile bool spinner_update = false;
 static volatile bool resize_detected = false;
 
-static bool tty = false;
-static int rows = 0, cols = 0;
-static const char *cuu1;
-static const char *cr;
-static const char *ed;
-static const char *sgr0;
 static int used = 0;
 static int ticks = 0;
-
-static bool missing_termfn(const char *s) { return !s || s == (const char *)-1; }
-
-static const char *wrap_termfn(const char *s) {
-  if (missing_termfn(s)) return "";
-  return s;
-}
-
-const char *term_colour(int code) {
-  static char setaf_lit[] = "setaf";
-  if (!sgr0) return "";
-  char *format = tigetstr(setaf_lit);
-  if (missing_termfn(format)) return "";
-  return wrap_termfn(tparm(format, code));
-}
-
-const char *term_intensity(int code) {
-  static char dim_lit[] = "dim";
-  static char bold_lit[] = "bold";
-  if (!sgr0) return "";
-  if (code == 1) return wrap_termfn(tigetstr(dim_lit));
-  if (code == 2) return wrap_termfn(tigetstr(bold_lit));
-  return "";
-}
-
-const char *term_normal() { return sgr0 ? sgr0 : ""; }
+static int rows = 0, cols = 0;
 
 static void write_all(int fd, const char *data, size_t len) {
   ssize_t got;
@@ -105,11 +74,11 @@ static void write_all(int fd, const char *data, size_t len) {
 static void write_all_str(int fd, const char *data) { write_all(fd, data, strlen(data)); }
 
 static void status_clear() {
-  if (tty && used) {
+  if (term_tty() && used) {
     std::stringstream os;
-    for (; used; --used) os << cuu1;
-    os << cr;
-    os << ed;
+    for (; used; --used) os << term_cuu1();
+    os << term_cr();
+    os << term_ed();
     std::string s = os.str();
     write_all(2, s.data(), s.size());
   }
@@ -139,7 +108,7 @@ static void status_redraw(bool idle) {
   int total = status_state.jobs.size();
   int rows3 = rows / 3;
   int overall = status_state.remain > 0 ? 1 : 0;
-  if (tty && rows3 >= 2 + overall && cols > 16)
+  if (term_tty() && rows3 >= 2 + overall && cols > 16)
     for (auto &x : status_state.jobs) {
       // Silence wake-internal messages like '<hash>'
       std::string msg_prefix = "'<";
@@ -195,7 +164,7 @@ static void status_redraw(bool idle) {
       }
     }
 
-  if (tty && rows3 > 0 && cols > 6 && status_state.remain > 0) {
+  if (term_tty() && rows3 > 0 && cols > 6 && status_state.remain > 0) {
     std::stringstream eta;
     long seconds = lround(status_state.remain);
     if (seconds > 3600) {
@@ -252,7 +221,7 @@ static void status_redraw(bool idle) {
       ticks = (ticks + spinner_update) & 3;
     }
     ++used;
-  } else if (tty && !idle) {
+  } else if (term_tty() && !idle) {
     os << std::string(std::max(cols - 2, 0), ' ') << "/-\\|"[ticks] << std::endl;
     ticks = (ticks + spinner_update) & 3;
     ++used;
@@ -275,46 +244,8 @@ static void handle_SIGWINCH(int sig) {
   resize_detected = true;
 }
 
-bool term_init(bool tty_) {
-  tty = tty_;
-
-  if (tty) {
-    if (isatty(1) != 1) tty = false;
-    if (isatty(2) != 1) tty = false;
-  }
-
-  if (tty) {
-    int eret;
-    int ret = setupterm(0, 2, &eret);
-    if (ret != OK) tty = false;
-  }
-
-  if (tty) {
-    // tigetstr function argument is (char*) on some platforms, so we need this hack:
-    static char cuu1_lit[] = "cuu1";
-    static char cr_lit[] = "cr";
-    static char ed_lit[] = "ed";
-    static char lines_lit[] = "lines";
-    static char cols_lit[] = "cols";
-    static char sgr0_lit[] = "sgr0";
-    cuu1 = tigetstr(cuu1_lit);  // cursor up one row
-    cr = tigetstr(cr_lit);      // return to first column
-    ed = tigetstr(ed_lit);      // erase to bottom of display
-    rows = tigetnum(lines_lit);
-    cols = tigetnum(cols_lit);
-    if (missing_termfn(cuu1)) tty = false;
-    if (missing_termfn(cr)) tty = false;
-    if (missing_termfn(ed)) tty = false;
-    if (cols < 0 || rows < 0) tty = false;
-    sgr0 = tigetstr(sgr0_lit);  // optional
-    if (missing_termfn(sgr0)) sgr0 = nullptr;
-  }
-
-  return tty;
-}
-
 void status_init() {
-  if (tty) {
+  if (term_tty()) {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
 
@@ -391,7 +322,7 @@ void status_refresh(bool idle) {
 
 void status_finish() {
   status_clear();
-  if (tty) {
+  if (term_tty()) {
     struct itimerval timer;
     memset(&timer, 0, sizeof(timer));
     setitimer(ITIMER_REAL, &timer, 0);
@@ -420,10 +351,5 @@ void status_finish() {}
 void status_set_colour(const char *name, int colour) {}
 void status_set_fd(const char *name, int fd) {}
 void status_set_bulk_fd(int fd, const char *streams) {}
-
-const char *term_colour(int code) { return ""; }
-const char *term_normal() { return ""; }
-const char *term_normal(int code) { return ""; }
-bool term_init(bool tty) { return true; }
 
 #endif

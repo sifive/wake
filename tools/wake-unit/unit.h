@@ -26,7 +26,7 @@
 #include <vector>
 
 #include "json/json5.h"
-#include "util/colour.h"
+#include "util/term.h"
 
 // Represents an error message to display to the user
 struct ErrorMessage {
