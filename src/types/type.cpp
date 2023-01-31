@@ -26,9 +26,9 @@
 #include <sstream>
 
 #include "parser/lexer.h"
-#include "util/colour.h"
 #include "util/diagnostic.h"
 #include "util/fragment.h"
+#include "util/term.h"
 
 static int globalClock = 0;
 static int globalEpoch = 1;  // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars

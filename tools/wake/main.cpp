@@ -57,11 +57,11 @@
 #include "timeline.h"
 #include "types/data.h"
 #include "types/sums.h"
-#include "util/colour.h"
 #include "util/diagnostic.h"
 #include "util/execpath.h"
 #include "util/file.h"
 #include "util/shell.h"
+#include "util/term.h"
 
 #ifndef VERSION
 #include "version.h"

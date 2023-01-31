@@ -31,9 +31,9 @@
 #include "parser/lexer.h"
 #include "tuple.h"
 #include "types/type.h"
-#include "util/colour.h"
 #include "util/hash.h"
 #include "util/sfinae.h"
+#include "util/term.h"
 
 void FormatState::resume() {
   stack.emplace_back(current.value, current.precedence, current.state + 1);

@@ -20,8 +20,8 @@
 #include <cstring>
 #include <set>
 
-#include "util/colour.h"
 #include "util/diagnostic.h"
+#include "util/term.h"
 
 DiagnosticReporter* reporter;
 
