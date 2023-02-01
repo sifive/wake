@@ -33,7 +33,7 @@ and it always appears there.
 
 For stdout, the following table should be read top to bottom considering the command line arguments you've passed to wake.
 If you match a line in the table, stop!
-This is what will appear on the console as you watch wake execute:
+This is what will appear on the console as you watch wake execute, and what is sent to wake's stdout:
 
 Flag               | logDebug | logInfo | logEcho | logReport | logWarning | logError | logNever | mkLogLevel "foo" Green|
 --------------------------------------------------------------------------------------------------------------------------
