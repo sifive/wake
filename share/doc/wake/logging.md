@@ -35,18 +35,17 @@ For stdout, the following table should be read top to bottom considering the com
 If you match a line in the table, stop!
 This is what will appear on the console as you watch wake execute, and what is sent to wake's stdout:
 
-Flag               | logDebug | logInfo | logEcho | logReport | logWarning | logError | logNever | mkLogLevel "foo" Green|
---------------------------------------------------------------------------------------------------------------------------
-Color on Console   |  Blue    |  Dim    |  default| Magenta   |  Yellow    |   Red    |          |   Green        |          
---------------------------------------------------------------------------------------------------------------------
---fd:1="foo"       |          |         |         |           |            |          |          |         x       |
---fd:1="foo,info"  |          |    x    |         |           |            |          |          |         x       |
---no-execute       |          |         |         |           |            |    x     |          |                 |
---debug            |      x   |    x    |    x    |     x     |      x     |    x     |          |                 |
---verbose          |          |    x    |    x    |     x     |      x     |    x     |          |                 |
---quiet            |          |         |         |           |            |    x     |          |                 |
---no-tty           |          |         |    x    |     x     |      x     |    x     |          |                 |
-(default)          |          |         |         |     x     |      x     |    x     |          |                 |
+|Flag               | logDebug | logInfo | logEcho | logReport | logWarning | logError | logNever | mkLogLevel "foo" Green|
+|-------------------|----------|---------|---------|-----------|------------|----------|----------|----------------------
+|Color on Console   |  Blue    |  Dim    |  default| Magenta   |  Yellow    |   Red    |          |   Green         |          
+|--fd:1="foo"       |          |         |         |           |            |          |          |         x       |
+|--fd:1="foo,info"  |          |    x    |         |           |            |          |          |         x       |
+|--no-execute       |          |         |         |           |            |    x     |          |                 |
+|--debug            |      x   |    x    |    x    |     x     |      x     |    x     |          |                 |
+|--verbose          |          |    x    |    x    |     x     |      x     |    x     |          |                 |
+|--quiet            |          |         |         |           |            |    x     |          |                 |
+|--no-tty           |          |         |    x    |     x     |      x     |    x     |          |                 |
+|(default)          |          |         |         |     x     |      x     |    x     |          |                 |
 
 `println` and `print` go to `logReport`. You can make print statements that go to other levels with `printlnLevel` or `printLevel`.
 These statements are *not* saved to the wake database, no matter which `stream` they are sent to.
