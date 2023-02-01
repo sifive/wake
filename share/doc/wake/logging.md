@@ -14,7 +14,7 @@ We call this which `stream` each goes to (we often refer to a `stream` as a `log
 Regardless of which `stream` you direct the `Job`'s `Stderr` and `Stdout`,
 `wake` will store all the text in its database,
 discarding the information about the `stream` it was destined for at the time it was stored.
-It will however know whether it came from the `Job`'s stdin/stdout.
+It will however know whether it came from the `Job`'s stderr/stdout.
 
 So what's the difference between the different streams?
 What you see on your console when you run wake.
