@@ -96,7 +96,7 @@ export def logReport: LogLevel =
 export def logEcho: LogLevel =
     makeLogLevel "echo" None
 
-# logInfo: logged to stdout when run with -v (Dim)
+# logInfo: logged to stdout when run with -v (Dim version of default console color)
 export def logInfo: LogLevel =
     makeLogLevel2 "info" None (Some Dim)
 
