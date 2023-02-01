@@ -6,7 +6,7 @@ for commented code.
 
 ## How Logging works on Wake Execution commands
 
-Every `Job` run by wake will have its own stdout and stderr,
+Every `Job` run by wake tracks its own stdout and stderr,
 and when the underlying process prints to stdout or stderr,
 it will go to the `Job`-specific stdout and stderr,
 not the stdout and stderr of the `wake` process itself.
