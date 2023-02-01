@@ -8,7 +8,7 @@ for commented code.
 
 Every `Job` run by wake will have its own stdout and stderr, and when the underlying process prints to stdout or stderr, it will go the `Job`-specific stdout and stderr, not the stdout and stderr of the `wake` process itself.
 
-When writing your wake code, you can control where each goes with `setPlanStderr` and `setPlanStdout` before you `runJob`.
+When writing your wake code, you can control whether these `Job`-specific stdout and stderr are also printed to `wake`'s own stdout, stderr, or other arbitrary file descriptors. These can be controlled with `setPlanStderr` and `setPlanStdout` before you `runJob`.
 We call this which `stream` each goes to (we often refer to a `stream` as a `logLevel`).
 
 Regardless of which `stream` you direct the `Job`'s `Stderr` and `Stdout`,
