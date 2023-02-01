@@ -9,24 +9,24 @@ for commented code.
 Every `Job` run by wake will have its own stdout and stderr, and when the underlying process prints to stdout or stderr, it will go the `Job`-specific stdout and stderr, not the stdout and stderr of the `wake` process itself.
 
 When writing your wake code, you can control whether these `Job`-specific stdout and stderr are also printed to `wake`'s own stdout, stderr, or other arbitrary file descriptors. These can be controlled with `setPlanStderr` and `setPlanStdout` before you `runJob`.
-We call this which `stream` each goes to (we often refer to a `stream` as a `logLevel`).
+We call this which _logger_ each goes to (we often refer to a _logger_ as a `logLevel`).
 
-Regardless of which `stream` you direct the `Job`'s `Stderr` and `Stdout`,
+Regardless of to which logger you direct the `Job`'s `Stderr` and `Stdout`,
 `wake` will store all the text in its database,
-discarding the information about the `stream` it was destined for at the time it was stored.
+discarding the information about the logger it was destined for at the time it was stored.
 It will however know whether it came from the `Job`'s stderr/stdout.
 
-So what's the difference between the different streams?
+So what's the difference between the different loggers?
 What you see on your console when you run wake.
 It controls *what* you see (depending on the command line flags) and what it looks like (what color it is).
 It also controls which *actual* stream it is going to coming out of `wake`
 (stderr or stdout, or other file descriptors 3-5).
 
-There are a number of built in streams in wake which all start with `log...`.
-You can also make your own stream using `mkLogLevel`.
+There are a number of built in loggers in wake which all start with `log...`.
+You can also make your own logger using `mkLogLevel`.
 You can use this to customize the color you want it to be shown as,
-or (more commonly) to grab output from a `Job` for passing to another `Job`,
-consuming within your wake program, or redirecting outside of wake using shell redirect.
+or (more commonly) to grab output from a `Job` for consuming within your wake program,
+or redirecting outside of wake using shell redirect.
 
 Unless overridden with `--fd:2=...` the *only* thing that ever appears on stderr coming out of wake is `logError`,
 and it always appears there.
@@ -55,10 +55,11 @@ of these mechanisms.
 
 ## How Logging works on Wake Database Commands
 
-Confusingly, the command line arguments in the database alias with those when executing, but they have different behavior.
+The `--verbose` command line argument has a different functionalilty when used with data base commands (`--last`, `-o`, `--failed`, etc).
 
-Running `wake <database command> --verbose` will show ALL of stdout and stdin from all `Job`s, regardless of what wake
-stream they were directed to. Running a database command without `--verbose` will show NO stdout or stdin from any `Job`.
+Running `wake <database command> --verbose` will show ALL of stdout and stdin from all `Job`s,
+regardless of what logger they were directed to.
+Running a database command without `--verbose` will show NO stdout or stdin from any `Job`.
 
 Recall that results of `print` or `println` are not stored in the database, so will never be revealed with any combination
 of flags.
