@@ -46,7 +46,6 @@ This is what will appear on the console as you watch wake execute, and what is s
 |Color on Console   |  Blue    |  Dim    |  default| Magenta   |  Yellow    |   Red    |          |   Green         |          
 |--fd:1="foo"       |          |         |         |           |            |          |          |         x       |
 |--fd:1="foo,info"  |          |    x    |         |           |            |          |          |         x       |
-|--no-execute       |          |         |         |           |            |    x     |          |                 |
 |--debug            |      x   |    x    |    x    |     x     |      x     |    x     |          |                 |
 |--verbose          |          |    x    |    x    |     x     |      x     |    x     |          |                 |
 |--quiet            |          |         |         |           |            |    x     |          |                 |
