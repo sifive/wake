@@ -9,7 +9,7 @@ for commented code.
 Every `Job` will emit a stderr and a stdout.
 
 When writing your wake code, you can control where each goes with `setPlanStderr` and `setPlanStdout` before you `runJob`.
-We call this which `stream` each goes to (we often refer to each `stream` as a `logLevel`).
+We call this which `stream` each goes to (we often refer to a `stream` as a `logLevel`).
 
 Regardless of which `stream` you direct the `Job`'s `Stderr` and `Stdout`,
 `wake` will store all the text in its database,
