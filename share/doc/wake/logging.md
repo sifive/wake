@@ -11,7 +11,10 @@ and when the underlying process prints to stdout or stderr,
 it will go the `Job`-specific stdout and stderr,
 not the stdout and stderr of the `wake` process itself.
 
-When writing your wake code, you can control whether these `Job`-specific stdout and stderr are also printed to `wake`'s own stdout, stderr, or other arbitrary file descriptors. These can be controlled with `setPlanStderr` and `setPlanStdout` before you `runJob`.
+When writing your wake code,
+you can control whether these `Job`-specific stdout and stderr are also printed to `wake`'s own stdout,
+stderr, or other arbitrary file descriptors.
+These can be controlled with `setPlanStderr` and `setPlanStdout` before you `runJob`.
 We call this which _logger_ each goes to (wake code often refers to a _logger_ as a `logLevel`).
 
 Regardless of to which logger you direct the `Job`'s `Stderr` and `Stdout`,
