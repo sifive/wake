@@ -6,7 +6,7 @@ for commented code.
 
 ## How Logging works on Wake Execution commands
 
-Every `Job` will emit a stdin and a stdout.
+Every `Job` will emit a stderr and a stdout.
 
 When writing your wake code, you can control where each goes with `setPlanStderr` and `setPlanStdout` before you `runJob`.
 We call this which `stream` each goes to (we often refer to each `stream` as a `logLevel`).
