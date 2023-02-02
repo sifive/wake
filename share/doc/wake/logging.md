@@ -74,7 +74,7 @@ When writing your wake code,
 you can control which loggers these `Job`-specific stdout, stderr, and echo are sent to.
 This will influence whether they appear on the `wake` process's own stdout,
 stderr, or other arbitrary file descriptors.
-These can be controlled with `setPlanStderr`, `setPlanStdout`, and `setPlanEcho` before you `runJob`.
+These can be controlled with `setPlanStdout`, `setPlanStderr`, and `setPlanEcho` before you `runJob`.
 These default to `logInfo`, `logError`, and `logEcho`, respectively.
 
 Regardless of to which logger you direct the `Job`'s `Stderr`, `Stdout`, and `Echo`,
