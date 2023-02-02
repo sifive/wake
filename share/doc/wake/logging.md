@@ -37,11 +37,8 @@ It also controls which *actual* stream it is going to coming out of `wake`
 
 There are a number of built in loggers in wake which all start with `log...`.
 You can also make your own logger using `mkLogLevel`.
-You can use this to customize the color you want it to be shown as,
-or (more commonly) to grab output from a `Job` for consuming within your wake program,
-or redirecting outside of wake using shell redirect.
-
-
+You can use this to customize the color you want it to be shown as (if at all),
+and giving more fine-grained control over which wake output streamit should go to.
 
 For stdout, the following table should be read top to bottom considering the command line arguments you've passed to wake.
 If you match a line in the table, stop!
