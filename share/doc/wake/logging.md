@@ -6,9 +6,9 @@ for commented code.
 
 ## Things that Might Appear on Output Streams
 
-* the stdout and stderr of executed Jobs (default to logInfo and logError, respectively)
-* The command line ('echo') of executed Jobs (default to logEcho)
-* The results of calling print/println (default to logInfo)
+* the stdout and stderr of executed Jobs (default to logInfo and logError, respectively, control with setPlanStdout, setPlanStderr)
+* The command line ('echo') of executed Jobs (default to logEcho, control with setPlanEcho)
+* The results of calling print/println (default to logInfo, control with printLevel, printlnLevel)
 * The pass/fail results of ____. (default to ...?)
 
 ## How Logging works on Wake Execution commands
