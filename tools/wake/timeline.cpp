@@ -62,7 +62,7 @@ void write_job_reflections(std::ostream &os, const std::vector<JobReflection> &j
         out_stream << write.first;
       }
       if (write.second == 2) {
-        out_stream << write.first;
+        err_stream << write.first;
       }
     }
 
