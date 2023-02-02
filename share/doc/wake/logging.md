@@ -4,6 +4,13 @@ This article gives a high level overview of how wake logging works.
 Check out [print.wake](https://github.com/sifive/wake/blob/master/share/wake/lib/core/print.wake)
 for commented code.
 
+## Things that Might Appear on Output Streams
+
+* the stdout and stderr of executed Jobs (default to logInfo and logError, respectively)
+* The command line ('echo') of executed Jobs (default to logEcho)
+* The results of calling print/println (default to logInfo)
+* The pass/fail results of ____. (default to ...?)
+
 ## How Logging works on Wake Execution commands
 
 Every `Job` run by wake tracks its own stdout and stderr,
@@ -34,8 +41,7 @@ You can use this to customize the color you want it to be shown as,
 or (more commonly) to grab output from a `Job` for consuming within your wake program,
 or redirecting outside of wake using shell redirect.
 
-Unless overridden with `--fd:2=...` the *only* thing that ever appears on stderr coming out of wake is `logError`,
-and it always appears there.
+
 
 For stdout, the following table should be read top to bottom considering the command line arguments you've passed to wake.
 If you match a line in the table, stop!
@@ -51,6 +57,9 @@ This is what will appear on the console as you watch wake execute, and what is s
 |--quiet            |          |         |         |           |            |    x     |          |                 |
 |--no-tty           |          |         |    x    |     x     |      x     |    x     |          |                 |
 |(default)          |          |         |         |     x     |      x     |    x     |          |                 |
+
+Unless overridden with `--fd:2=...` the *only* thing that ever appears on stderr coming out of wake is `logError`,
+and it always appears there.
 
 `println` and `print` go to `logReport`. You can make print statements that go to other levels with `printlnLevel` or `printLevel`.
 These statements are *not* saved to the wake database, no matter which `stream` they are sent to.
