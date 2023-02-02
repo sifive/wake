@@ -54,8 +54,20 @@ void write_job_reflections(std::ostream &os, const std::vector<JobReflection> &j
     job_json.add("wake_start", jobReflection.wake_start.as_int64());
 
     job_json.add("wake_cmdline", jobReflection.wake_cmdline.c_str());
-    job_json.add("stdout_payload", jobReflection.stdout_payload.c_str());
-    job_json.add("stderr_payload", jobReflection.stderr_payload.c_str());
+
+    std::string out_stream;
+    std::string err_stream;
+    for (auto &write : jobReflection.std_writes) {
+      if (write.second == 1) {
+        out_stream += write.first;
+      }
+      if (write.second == 2) {
+        err_stream += write.first;
+      }
+    }
+
+    job_json.add("stdout_payload", out_stream.c_str());
+    job_json.add("stderr_payload", err_stream.c_str());
 
     std::stringstream usage;
     usage << "status: " << jobReflection.usage.status << "<br>"

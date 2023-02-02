@@ -51,7 +51,7 @@ static std::string describe_hash(const std::string &hash, bool verbose, bool sta
   return hash.substr(0, SHORT_HASH);
 }
 
-static void describe_human(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
+static void describe_metadata(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
   for (auto &job : jobs) {
     std::cout << "Job " << job.job;
     if (!job.label.empty()) std::cout << " (" << job.label << ")";
@@ -87,14 +87,34 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug, b
       std::cout << "Stack:";
       indent("  ", job.stack);
     }
-    if (!job.stdout_payload.empty()) {
-      std::cout << "Stdout:";
-      indent("  ", job.stdout_payload);
+
+    std::vector<std::string> stdout_writes;
+    std::vector<std::string> stderr_writes;
+    for (auto &write : job.std_writes) {
+      if (write.second == 1) {
+        stdout_writes.push_back(write.first);
+      }
+      if (write.second == 2) {
+        stderr_writes.push_back(write.first);
+      }
     }
-    if (!job.stderr_payload.empty()) {
-      std::cout << "Stderr:";
-      indent("  ", job.stderr_payload);
+
+    if (verbose) {
+      if (!stdout_writes.empty()) {
+        std::cout << "Stdout:";
+        for (std::string write : stdout_writes) {
+          indent("  ", write);
+        }
+      }
+
+      if (!stderr_writes.empty()) {
+        std::cout << "Stderr:";
+        for (std::string write : stderr_writes) {
+          indent("  ", write);
+        }
+      }
     }
+
     if (!job.tags.empty()) {
       std::cout << "Tags:" << std::endl;
       for (auto &x : job.tags) {
@@ -151,14 +171,32 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
       std::cout << "# Stack:";
       indent("#   ", job.stack);
     }
-    if (!job.stdout_payload.empty()) {
+
+    std::vector<std::string> stdout_writes;
+    std::vector<std::string> stderr_writes;
+    for (auto &write : job.std_writes) {
+      if (write.second == 1) {
+        stdout_writes.push_back(write.first);
+      }
+      if (write.second == 2) {
+        stderr_writes.push_back(write.first);
+      }
+    }
+
+    if (!stdout_writes.empty()) {
       std::cout << "# Stdout:";
-      indent("#   ", job.stdout_payload);
+      for (std::string write : stdout_writes) {
+        indent("#   ", write);
+      }
     }
-    if (!job.stderr_payload.empty()) {
+
+    if (!stderr_writes.empty()) {
       std::cout << "# Stderr:";
-      indent("#   ", job.stderr_payload);
+      for (std::string write : stderr_writes) {
+        indent("#   ", write);
+      }
     }
+
     if (!job.tags.empty()) {
       std::cout << "# Tags:" << std::endl;
       for (auto &x : job.tags) {
@@ -169,16 +207,49 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
   }
 }
 
-void describe(const std::vector<JobReflection> &jobs, bool script, bool debug, bool verbose,
-              const char *taguri) {
-  if (taguri) {
-    for (auto &job : jobs)
-      for (auto &tag : job.tags)
-        if (tag.uri == taguri) std::cout << tag.content << std::endl;
-  } else if (script) {
-    describe_shell(jobs, debug, verbose);
-  } else {
-    describe_human(jobs, debug, verbose);
+void describe_human(const std::vector<JobReflection> &jobs) {
+  for (auto &job : jobs) {
+    std::cout << "\n# " << job.label << "(" << job.job << ")\n$ ";
+    for (auto &cmd_part : job.commandline) {
+      std::cout << cmd_part << " ";  // # TODO: don't output trailing space
+    }
+    std::cout << "\n\n";
+
+    // We have to use our speical stream for the output of the program
+    for (auto &log_line : job.std_writes) {
+      std::cout << log_line.first;
+    }
+  }
+}
+
+void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy) {
+  switch (policy.type) {
+    case DescribePolicy::SCRIPT: {
+      describe_shell(jobs, true, true);
+      break;
+    }
+    case DescribePolicy::HUMAN: {
+      describe_human(jobs);
+      break;
+    }
+    case DescribePolicy::TAG_URI: {
+      for (auto &job : jobs)
+        for (auto &tag : job.tags)
+          if (tag.uri == policy.tag_uri) std::cout << tag.content << std::endl;
+      break;
+    }
+    case DescribePolicy::METADATA: {
+      describe_metadata(jobs, false, false);
+      break;
+    }
+    case DescribePolicy::DEBUG: {
+      describe_metadata(jobs, true, false);
+      break;
+    }
+    case DescribePolicy::VERBOSE: {
+      describe_metadata(jobs, false, true);
+      break;
+    }
   }
 }
 

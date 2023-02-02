@@ -30,6 +30,7 @@
 #include <iostream>
 #include <set>
 #include <sstream>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "status.h"
@@ -89,6 +90,7 @@ struct Database::detail {
   sqlite3_stmt *remove_all_jobs;
   sqlite3_stmt *get_unhashed_file_paths;
   sqlite3_stmt *insert_unhashed_file;
+  sqlite3_stmt *get_interleaved_output;
 
   long run_id;
   detail(bool debugdb_)
@@ -132,7 +134,8 @@ struct Database::detail {
         get_all_tags(0),
         get_edges(0),
         get_job_visualization(0),
-        get_file_access(0) {}
+        get_file_access(0),
+        get_interleaved_output(0) {}
 };
 
 static void close_db(Database::detail *imp) {
@@ -462,6 +465,11 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   const char *sql_remove_all_jobs = "delete from jobs";
   const char *sql_get_unhashed_file_paths = "select path from unhashed_files";
   const char *sql_insert_unhashed_file = "insert into unhashed_files(job_id, path) values(?, ?)";
+  const char *sql_get_interleaved_output =
+      "select l.output, l.descriptor"
+      " from log l"
+      " where l.job_id = ?"
+      " order by l.seconds";
 
 #define PREPARE(sql, member)                                                                     \
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);                                   \
@@ -515,6 +523,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_remove_all_jobs, remove_all_jobs);
   PREPARE(sql_get_unhashed_file_paths, get_unhashed_file_paths);
   PREPARE(sql_insert_unhashed_file, insert_unhashed_file);
+  PREPARE(sql_get_interleaved_output, get_interleaved_output);
 
   return "";
 }
@@ -577,6 +586,7 @@ void Database::close() {
   FINALIZE(remove_all_jobs);
   FINALIZE(get_unhashed_file_paths);
   FINALIZE(insert_unhashed_file);
+  FINALIZE(get_interleaved_output);
 
   close_db(imp.get());
 }
@@ -1144,7 +1154,7 @@ std::string Time::as_string() const {
   return buf;
 }
 
-static JobReflection find_one(const Database *db, sqlite3_stmt *query, bool verbose) {
+static JobReflection find_one(const Database *db, sqlite3_stmt *query) {
   const char *why = "Could not describe job";
   JobReflection desc;
   // grab flat values
@@ -1167,43 +1177,45 @@ static JobReflection find_one(const Database *db, sqlite3_stmt *query, bool verb
   desc.usage.ibytes = sqlite3_column_int64(query, 16);
   desc.usage.obytes = sqlite3_column_int64(query, 17);
   if (desc.stdin_file.empty()) desc.stdin_file = "/dev/null";
-  if (verbose) {
-    desc.stdout_payload = db->get_output(desc.job, 1);
-    desc.stderr_payload = db->get_output(desc.job, 2);
-    // visible
-    bind_integer(why, db->imp->get_tree, 1, desc.job);
-    bind_integer(why, db->imp->get_tree, 2, VISIBLE);
-    while (sqlite3_step(db->imp->get_tree) == SQLITE_ROW)
-      desc.visible.emplace_back(rip_column(db->imp->get_tree, 0), rip_column(db->imp->get_tree, 1));
-    finish_stmt(why, db->imp->get_tree, db->imp->debugdb);
-    // tags
-    bind_integer(why, db->imp->get_tags, 1, desc.job);
-    while (sqlite3_step(db->imp->get_tags) == SQLITE_ROW)
-      desc.tags.emplace_back(sqlite3_column_int64(db->imp->get_tags, 0),
-                             rip_column(db->imp->get_tags, 1), rip_column(db->imp->get_tags, 2));
-    finish_stmt(why, db->imp->get_tags, db->imp->debugdb);
-  }
+
+  desc.std_writes = db->get_interleaved_output(desc.job);
+
+  // visible
+  bind_integer(why, db->imp->get_tree, 1, desc.job);
+  bind_integer(why, db->imp->get_tree, 2, VISIBLE);
+  while (sqlite3_step(db->imp->get_tree) == SQLITE_ROW)
+    desc.visible.emplace_back(rip_column(db->imp->get_tree, 0), rip_column(db->imp->get_tree, 1));
+  finish_stmt(why, db->imp->get_tree, db->imp->debugdb);
+  // tags
+  bind_integer(why, db->imp->get_tags, 1, desc.job);
+  while (sqlite3_step(db->imp->get_tags) == SQLITE_ROW)
+    desc.tags.emplace_back(sqlite3_column_int64(db->imp->get_tags, 0),
+                           rip_column(db->imp->get_tags, 1), rip_column(db->imp->get_tags, 2));
+  finish_stmt(why, db->imp->get_tags, db->imp->debugdb);
+
   // inputs
   bind_integer(why, db->imp->get_tree, 1, desc.job);
   bind_integer(why, db->imp->get_tree, 2, INPUT);
   while (sqlite3_step(db->imp->get_tree) == SQLITE_ROW)
     desc.inputs.emplace_back(rip_column(db->imp->get_tree, 0), rip_column(db->imp->get_tree, 1));
   finish_stmt(why, db->imp->get_tree, db->imp->debugdb);
+
   // outputs
   bind_integer(why, db->imp->get_tree, 1, desc.job);
   bind_integer(why, db->imp->get_tree, 2, OUTPUT);
   while (sqlite3_step(db->imp->get_tree) == SQLITE_ROW)
     desc.outputs.emplace_back(rip_column(db->imp->get_tree, 0), rip_column(db->imp->get_tree, 1));
   finish_stmt(why, db->imp->get_tree, db->imp->debugdb);
+
   return desc;
 }
 
-static std::vector<JobReflection> find_all(const Database *db, sqlite3_stmt *query, bool verbose) {
+static std::vector<JobReflection> find_all(const Database *db, sqlite3_stmt *query) {
   const char *why = "Could not explain file";
   std::vector<JobReflection> out;
 
   db->begin_txn();
-  while (sqlite3_step(query) == SQLITE_ROW) out.emplace_back(find_one(db, query, verbose));
+  while (sqlite3_step(query) == SQLITE_ROW) out.emplace_back(find_one(db, query));
   finish_stmt(why, query, db->imp->debugdb);
   db->end_txn();
 
@@ -1246,25 +1258,21 @@ static std::vector<FileAccess> get_all_file_accesses(const Database *db, sqlite3
   return out;
 }
 
-std::vector<JobReflection> Database::failed(bool verbose) {
-  return find_all(this, imp->find_failed, verbose);
-}
+std::vector<JobReflection> Database::failed() { return find_all(this, imp->find_failed); }
 
-std::vector<JobReflection> Database::last(bool verbose) {
-  return find_all(this, imp->find_last, verbose);
-}
+std::vector<JobReflection> Database::last() { return find_all(this, imp->find_last); }
 
-std::vector<JobReflection> Database::explain(long job, bool verbose) {
+std::vector<JobReflection> Database::explain(long job) {
   const char *why = "Could not bind args";
   bind_integer(why, imp->find_job, 1, job);
-  return find_all(this, imp->find_job, verbose);
+  return find_all(this, imp->find_job);
 }
 
-std::vector<JobReflection> Database::explain(const std::string &file, int use, bool verbose) {
+std::vector<JobReflection> Database::explain(const std::string &file, int use) {
   const char *why = "Could not bind args";
   bind_string(why, imp->find_owner, 1, file);
   bind_integer(why, imp->find_owner, 2, use);
-  return find_all(this, imp->find_owner, verbose);
+  return find_all(this, imp->find_owner);
 }
 
 std::vector<JobEdge> Database::get_edges() {
@@ -1287,8 +1295,22 @@ std::vector<JobTag> Database::get_tags() {
   return out;
 }
 
+std::vector<std::pair<std::string, int>> Database::get_interleaved_output(long job_id) const {
+  std::vector<std::pair<std::string, int>> out;
+
+  const char *why = "Could not bind args";
+  bind_integer(why, imp->get_interleaved_output, 1, job_id);
+  while (sqlite3_step(imp->get_interleaved_output) == SQLITE_ROW) {
+    out.emplace_back(rip_column(imp->get_interleaved_output, 0),
+                     sqlite3_column_int(imp->get_interleaved_output, 1));
+  }
+  finish_stmt(why, imp->get_interleaved_output, imp->debugdb);
+
+  return out;
+}
+
 std::vector<JobReflection> Database::get_job_visualization() const {
-  return find_all(this, imp->get_job_visualization, true);
+  return find_all(this, imp->get_job_visualization);
 }
 
 std::vector<FileAccess> Database::get_file_accesses() const {

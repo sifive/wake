@@ -104,6 +104,7 @@ void print_help(const char *argv0) {
     << "    --last     -l    Report recorded meta-data for all jobs run by last build"   << std::endl
     << "    --failed   -f    Report recorded meta-data for jobs which failed last build" << std::endl
     << "    --verbose  -v    Report recorded standard output and error of matching jobs" << std::endl
+    << "    --metadata       Report recorded metadata without output of matching jobs"   << std::endl
     << "    --debug    -d    Report recorded stack frame of matching jobs"               << std::endl
     << "    --script   -s    Format reported jobs as an executable shell script"         << std::endl
     << "    --timeline       Print the timeline of wake jobs as HTML"                    << std::endl
@@ -176,6 +177,7 @@ int main(int argc, char **argv) {
     {0, "lsp", GOPT_ARGUMENT_FORBIDDEN},
     {'f', "failed", GOPT_ARGUMENT_FORBIDDEN},
     {'s', "script", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "metadata", GOPT_ARGUMENT_FORBIDDEN},
     {0, "init", GOPT_ARGUMENT_REQUIRED},
     {0, "version", GOPT_ARGUMENT_FORBIDDEN},
     {'g', "globals", GOPT_ARGUMENT_FORBIDDEN},
@@ -224,6 +226,7 @@ int main(int argc, char **argv) {
   bool lsp = arg(options, "lsp")->count;
   bool failed = arg(options, "failed")->count;
   bool script = arg(options, "script")->count;
+  bool metadata = arg(options, "metadata")->count;
   bool version = arg(options, "version")->count;
   bool html = arg(options, "html")->count;
   bool global = arg(options, "globals")->count;
@@ -527,33 +530,53 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  DescribePolicy policy = DescribePolicy::human();
+
+  if (tag) {
+    policy = DescribePolicy::tag_url(tag);
+  }
+
+  if (script) {
+    policy = DescribePolicy::script();
+  }
+
+  if (metadata) {
+    policy = DescribePolicy::metadata();
+  }
+
+  if (debug) {
+    policy = DescribePolicy::debug();
+  }
+
+  if (verbose) {
+    policy = DescribePolicy::verbose();
+  }
+
   if (job) {
-    auto hits = db.explain(std::atol(job), verbose || tag);
-    describe(hits, script, debug, verbose, tag);
+    auto hits = db.explain(std::atol(job));
+    describe(hits, policy);
     if (hits.empty())
       std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
   }
 
   if (input) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1, verbose || tag), script, debug,
-               verbose, tag);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1), policy);
     }
   }
 
   if (output) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2, verbose || tag), script, debug,
-               verbose, tag);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2), policy);
     }
   }
 
   if (last) {
-    describe(db.last(verbose || tag), script, debug, verbose, tag);
+    describe(db.last(), policy);
   }
 
   if (failed) {
-    describe(db.failed(verbose || tag), script, debug, verbose, tag);
+    describe(db.failed(), policy);
   }
 
   if (tagdag) {
