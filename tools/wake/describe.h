@@ -23,9 +23,27 @@
 #include "json/json5.h"
 #include "runtime/database.h"
 
-void describe_failed(const std::vector<JobOutput> &jobs);
-void describe(const std::vector<JobReflection> &jobs, bool script, bool debug, bool verbose,
-              const char *tag);
+struct DescribePolicy {
+  enum type { TAG_URI, SCRIPT, HUMAN, METADATA, DEBUG, VERBOSE } type;
+  union {
+    const char *tag_uri;
+  };
+
+  static DescribePolicy tag_url(const char *tag_uri) {
+    return {.type = TAG_URI, .tag_uri = tag_uri};
+  }
+  static DescribePolicy script() { return {.type = SCRIPT}; }
+
+  static DescribePolicy human() { return {.type = HUMAN}; }
+
+  static DescribePolicy metadata() { return {.type = METADATA}; }
+
+  static DescribePolicy debug() { return {.type = DEBUG}; }
+
+  static DescribePolicy verbose() { return {.type = VERBOSE}; }
+};
+
+void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy);
 JAST create_tagdag(Database &db, const std::string &tag);
 
 #endif

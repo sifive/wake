@@ -71,22 +71,13 @@ struct JobReflection {
   Time endtime;
   Time wake_start;
   std::string wake_cmdline;
-  std::string stdout_payload;
-  std::string stderr_payload;
+  // List of interleaved writes to stdout and stderr
+  std::vector<std::pair<std::string, int>> std_writes;
   Usage usage;
   std::vector<FileReflection> visible;
   std::vector<FileReflection> inputs;
   std::vector<FileReflection> outputs;
   std::vector<JobTag> tags;
-};
-
-struct JobOutput {
-  long job;
-  std::string label;
-  std::string directory;
-  std::vector<std::string> commandline;
-  std::vector<std::string> environment;
-  std::vector<std::pair<std::string, int>> outputs;
 };
 
 struct JobEdge {
@@ -160,13 +151,13 @@ struct Database {
 
   std::string get_hash(const std::string &file, long modified);
 
-  std::vector<JobReflection> explain(long job, bool verbose);
+  std::vector<JobReflection> explain(long job);
 
-  std::vector<JobReflection> explain(const std::string &file, int use, bool verbose);
+  std::vector<JobReflection> explain(const std::string &file, int use);
 
-  std::vector<JobReflection> failed(bool verbose);
+  std::vector<JobReflection> failed();
 
-  std::vector<JobReflection> last(bool verbose);
+  std::vector<JobReflection> last();
 
   std::vector<JobEdge> get_edges();
   std::vector<JobTag> get_tags();
@@ -174,7 +165,7 @@ struct Database {
   std::vector<JobReflection> get_job_visualization() const;
   std::vector<FileAccess> get_file_accesses() const;
 
-  std::vector<JobOutput> failed_output() const;
+  std::vector<std::pair<std::string, int>> get_interleaved_output(long job_id) const;
 };
 
 #endif
