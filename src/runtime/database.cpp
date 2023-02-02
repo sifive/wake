@@ -90,7 +90,6 @@ struct Database::detail {
   sqlite3_stmt *remove_all_jobs;
   sqlite3_stmt *get_unhashed_file_paths;
   sqlite3_stmt *insert_unhashed_file;
-  sqlite3_stmt *find_failed_outputs;
   sqlite3_stmt *get_interleaved_output;
 
   long run_id;
@@ -136,7 +135,6 @@ struct Database::detail {
         get_edges(0),
         get_job_visualization(0),
         get_file_access(0),
-        find_failed_outputs(0),
         get_interleaved_output(0) {}
 };
 
@@ -467,12 +465,6 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   const char *sql_remove_all_jobs = "delete from jobs";
   const char *sql_get_unhashed_file_paths = "select path from unhashed_files";
   const char *sql_insert_unhashed_file = "insert into unhashed_files(job_id, path) values(?, ?)";
-  const char *sql_find_failed_outputs =
-      "select j.job_id, j.label, j.directory, j.commandline, j.environment, l.output, l.descriptor"
-      " from jobs j left join stats s on j.stat_id=s.stat_id join log l on j.job_id=l.job_id"
-      " where s.status <> 0"
-      " order by j.job_id, l.seconds";
-
   const char *sql_get_interleaved_output =
       "select l.output, l.descriptor"
       " from log l"
@@ -531,7 +523,6 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_remove_all_jobs, remove_all_jobs);
   PREPARE(sql_get_unhashed_file_paths, get_unhashed_file_paths);
   PREPARE(sql_insert_unhashed_file, insert_unhashed_file);
-  PREPARE(sql_find_failed_outputs, find_failed_outputs);
   PREPARE(sql_get_interleaved_output, get_interleaved_output);
 
   return "";
@@ -595,7 +586,6 @@ void Database::close() {
   FINALIZE(remove_all_jobs);
   FINALIZE(get_unhashed_file_paths);
   FINALIZE(insert_unhashed_file);
-  FINALIZE(find_failed_outputs);
   FINALIZE(get_interleaved_output);
 
   close_db(imp.get());
