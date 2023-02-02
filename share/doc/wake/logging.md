@@ -48,7 +48,7 @@ Unless overridden with `--stderr=...` the *only* thing that ever appears on stde
 and it always appears there.
 
 The additional command line arguments `--fd:3`, `--fd:4`, `--fd:5` can be used to output to file descriptors 3, 4, 5.
-These must be opened. One example shell command would be, for some wake code that had `mkLogLevel "foo"`:
+One example shell command would be, for some wake code that had `mkLogLevel "foo"`:
 
 ```
 wake --fd3="foo" mywakecode 3&>foo.txt
