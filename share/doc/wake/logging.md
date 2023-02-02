@@ -71,7 +71,7 @@ not the stdout and stderr of the `wake` process itself.
 Every `Job` also has an "echo", which is the command that the job is executing.
 
 When writing your wake code,
-you can control which logger these `Job`-specific stdout, stderr, and echo are sent to.
+you can control which loggers these `Job`-specific stdout, stderr, and echo are sent to.
 This will influence whether they appear on the `wake` process's own stdout,
 stderr, or other arbitrary file descriptors.
 These can be controlled with `setPlanStderr`, `setPlanStdout`, and `setPlanEcho` before you `runJob`.
