@@ -99,17 +99,19 @@ static void describe_metadata(const std::vector<JobReflection> &jobs, bool debug
       }
     }
 
-    if (!stdout_writes.empty()) {
-      std::cout << "Stdout:";
-      for (std::string write : stdout_writes) {
-        indent("  ", write);
+    if (verbose) {
+      if (!stdout_writes.empty()) {
+        std::cout << "Stdout:";
+        for (std::string write : stdout_writes) {
+          indent("  ", write);
+        }
       }
-    }
 
-    if (!stderr_writes.empty()) {
-      std::cout << "Stderr:";
-      for (std::string write : stderr_writes) {
-        indent("  ", write);
+      if (!stderr_writes.empty()) {
+        std::cout << "Stderr:";
+        for (std::string write : stderr_writes) {
+          indent("  ", write);
+        }
       }
     }
 
@@ -226,29 +228,29 @@ void describe_human(const std::vector<JobReflection> &jobs) {
 
 void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy) {
   switch (policy.type) {
-    case policy.SCRIPT: {
+    case DescribePolicy::SCRIPT: {
       describe_shell(jobs, true, true);
       break;
     }
-    case policy.HUMAN: {
+    case DescribePolicy::HUMAN: {
       describe_human(jobs);
       break;
     }
-    case policy.TAG_URI: {
+    case DescribePolicy::TAG_URI: {
       for (auto &job : jobs)
         for (auto &tag : job.tags)
           if (tag.uri == policy.tag_uri) std::cout << tag.content << std::endl;
       break;
     }
-    case policy.METADATA: {
+    case DescribePolicy::METADATA: {
       describe_metadata(jobs, false, false);
       break;
     }
-    case policy.DEBUG: {
+    case DescribePolicy::DEBUG: {
       describe_metadata(jobs, true, false);
       break;
     }
-    case policy.VERBOSE: {
+    case DescribePolicy::VERBOSE: {
       describe_metadata(jobs, false, true);
       break;
     }
