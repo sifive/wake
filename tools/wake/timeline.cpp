@@ -57,7 +57,7 @@ void write_job_reflections(std::ostream &os, const std::vector<JobReflection> &j
 
     std::stringstream out_stream;
     std::stringstream err_stream;
-    for (auto& write : jobReflection.std_writes) {
+    for (auto &write : jobReflection.std_writes) {
       if (write.second == 1) {
         out_stream << write.first;
       }

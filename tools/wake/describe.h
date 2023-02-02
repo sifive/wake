@@ -30,17 +30,18 @@ struct DescribePolicy {
   };
 
   static DescribePolicy tag_url(const char *tag_uri) {
-    return {.type = TAG_URI, .tag_uri = tag_uri};
+    return DescribePolicy{.type = TAG_URI, .tag_uri = tag_uri};
   }
-  static DescribePolicy script() { return {.type = SCRIPT}; }
 
-  static DescribePolicy human() { return {.type = HUMAN}; }
+  static DescribePolicy script() { return DescribePolicy{.type = SCRIPT}; }
 
-  static DescribePolicy metadata() { return {.type = METADATA}; }
+  static DescribePolicy human() { return DescribePolicy{.type = HUMAN}; }
 
-  static DescribePolicy debug() { return {.type = DEBUG}; }
+  static DescribePolicy metadata() { return DescribePolicy{.type = METADATA}; }
 
-  static DescribePolicy verbose() { return {.type = VERBOSE}; }
+  static DescribePolicy debug() { return DescribePolicy{.type = DEBUG}; }
+
+  static DescribePolicy verbose() { return DescribePolicy{.type = VERBOSE}; }
 };
 
 void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy);
