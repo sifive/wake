@@ -215,14 +215,10 @@ void describe_human(const std::vector<JobReflection> &jobs) {
     }
     std::cout << "\n\n";
 
-    std::cout << "================================================\n" << std::endl;
-
     // We have to use our speical stream for the output of the program
     for (auto &log_line : job.std_writes) {
       std::cout << log_line.first;
     }
-
-    std::cout << "------------------------------------------------\n" << std::endl;
   }
 }
 
