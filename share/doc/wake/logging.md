@@ -51,7 +51,7 @@ The additional command line arguments `--fd:3`, `--fd:4`, `--fd:5` can be used t
 These must be opened. One example shell command would be, for some wake code that had `mkLogLevel "foo"`:
 
 ```
-wake --fd3="foo" 3&>foo.txt
+wake --fd3="foo" mywakecode 3&>foo.txt
 ```
 
 These can be concatenated with commas and include the normal log levels, so to capture both `mkLogLevel "foo"` and `logInfo` to a file:
