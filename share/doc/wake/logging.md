@@ -8,7 +8,7 @@ for commented code.
 ## Loggers & Log Levels
 
 Wake has a concept of loggers,
-to which bytes can be written during wake execution by various sources.
+to which text can be written during wake execution by various sources.
 A logger combines a string log level (e.g. "error", "info", "my_custom_level")
 and a display format (color and intensity).
 There can be multiple loggers with the same log level, though this is
@@ -21,10 +21,10 @@ not a common use case.
 
 ## Using & Creating Loggers
 
-`wake` has a number of built in loggers in wake which all start with `log...`.
+`wake` has a number of built in loggers in which all start with `log...`.
 You can also make your own logger using `mkLogLevel`.
-You can use this to customize the color you want it to be shown as (if at all),
-and giving more fine-grained control over which wake output stream it should go to.
+You can use this to customize the color you want it to be shown as (if at all)
+and give more fine-grained control over which wake output stream it should go to.
 
 
 | wake `def`        | Color/Intensity | log level |
@@ -41,14 +41,19 @@ and giving more fine-grained control over which wake output stream it should go 
 
 ## Directing Logger Output
 
-Based on command line flags and its log level, each logger's output will be directed to
-zero or more of wake's outputs streams.
-Depending on the logger's color control and command line flags, additional formatting can be applied.
+Based on command line flags and its log level,
+each logger's output will be directed to zero or more of wake's outputs streams.
+Depending on the logger's color control and command line flags,
+additional formatting can be applied.
 
-For stdout, the following table should be read top to bottom considering the command line arguments you've passed to wake.
+For `wake`'s own stdout, the logger's color & intensity are used to apply
+additionaly formatting to the output before displaying it.
+
+For understanding which streams will appear on wake's stdout,
+the following table should be read top to bottom considering the command line arguments you've passed to wake.
 If you match a line in the table, stop!
-This is what will appear on the console as you watch wake execute, and what is sent to wake's stdout:
-
+This is what will appear on the console as you watch wake execute,
+i.e. what is sent to ``wake`'s stdout:
 
 | log level         | "debug"  | "info"  | "echo"  | "report"  | "warning"  | "error"  | "null"  |  "foo" |
 |-------------------|----------|---------|---------|-----------|------------|----------|---------|--------|
@@ -66,16 +71,16 @@ Unless overridden with `--stderr=...` the *only* thing that ever appears on stde
 outputs with log level "error" (e.g. `logError`) and it always appears there.
 
 The additional command line arguments `--fd:3`, `--fd:4`, `--fd:5` can be used to output to file descriptors 3, 4, 5.
-These must be opened. One example shell command would be, for a wake code that had `mkLogLevel "foo"`:
+One example shell command would be, for some wake code that had `mkLogLevel "foo"`:
 
 ```
-wake --fd3="foo" 3&>foo.txt
+wake --fd:3="foo" mywakecode 3>foo.txt
 ```
 
 These can be concatenated with commas and include the normal log levels, so to capture both `mkLogLevel "foo"` and `logInfo` to a file:
 
 ```
-wake --fd3="foo,info" 3&>foo.txt
+wake --fd:3="foo,info" mywakecode 3>foo.txt
 ```
 
 ## What Gets Sent To Loggers
@@ -89,10 +94,10 @@ not the stdout and stderr of the `wake` process itself.
 Every `Job` also has an "echo", which is the command that the job is executing.
 
 When writing your wake code,
-you can control which logger these `Job`-specific stdout, stderr, and echo are sent to.
+you can control which loggers these `Job`-specific stdout, stderr, and echo are sent to.
 This will influence whether they appear on the `wake` process's own stdout,
 stderr, or other arbitrary file descriptors.
-These can be controlled with `setPlanStderr`, `setPlanStdout`, and `setPlanEcho` before you `runJob`.
+These can be controlled with `setPlanStdout`, `setPlanStderr`, and `setPlanEcho` before you `runJob`.
 These default to `logInfo`, `logError`, and `logEcho`, respectively.
 
 Regardless of to which logger you direct the `Job`'s `Stderr`, `Stdout`, and `Echo`,
@@ -113,7 +118,7 @@ wake's `stdout` unless `--quiet` is set.
 This is outside of the logger mechanism, so it is not possible to redirect this within wake
 code or with command line flags.
 
-Similarly, the "spinner" and progress bar is always sent to wake's `stdout` unless `--no-tty`
+Similarly, the progress bar is always sent to wake's `stdout` unless `--no-tty`
 or `--quiet` is set.
 
 ## What is Displayed to user on Wake Database Commands
