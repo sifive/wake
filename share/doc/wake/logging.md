@@ -47,7 +47,7 @@ Depending on the logger's color control and command line flags,
 additional formatting can be applied.
 
 For `wake`'s own stdout, the logger's color & intensity are used to apply
-additionaly formatting to the output before displaying it.
+additional formatting to the output before displaying it.
 
 For understanding which streams will appear on wake's stdout,
 the following table should be read top to bottom considering the command line arguments you've passed to wake.
@@ -68,7 +68,7 @@ i.e. what is sent to ``wake`'s stdout:
 <sup>*</sup> `--no-tty` also prevents any coloring from being applied.
 
 Unless overridden with `--stderr=...` the *only* thing that ever appears on stderr coming out of wake is logger
-outputs with log level "error" (e.g. `logError`) and it always appears there.
+outputs with log level "error" (e.g. `logError`).
 
 The additional command line arguments `--fd:3`, `--fd:4`, `--fd:5` can be used to output to file descriptors 3, 4, 5.
 One example shell command would be, for some wake code that had `mkLogLevel "foo"`:
@@ -80,7 +80,7 @@ wake --fd:3="foo" mywakecode 3>foo.txt
 These can be concatenated with commas and include the normal log levels, so to capture both `mkLogLevel "foo"` and `logInfo` to a file:
 
 ```
-wake --fd:3="foo,info" mywakecode 3>foo.txt
+wake --fd:3="foo,info" mywakecode 3>foo_and_info.txt
 ```
 
 ## What Gets Sent To Loggers
@@ -91,32 +91,32 @@ Every `Job` run by wake tracks its own stdout and stderr,
 and when the underlying process prints to stdout or stderr,
 it will go to the `Job`-specific stdout and stderr,
 not the stdout and stderr of the `wake` process itself.
-Every `Job` also has an "echo", which is the command that the job is executing.
 
 When writing your wake code,
-you can control which loggers these `Job`-specific stdout, stderr, and echo are sent to.
+you can control which loggers these `Job`-specific stdout and stderr are sent to.
 This will influence whether they appear on the `wake` process's own stdout,
 stderr, or other arbitrary file descriptors.
-These can be controlled with `setPlanStdout`, `setPlanStderr`, and `setPlanEcho` before you `runJob`.
-These default to `logInfo`, `logError`, and `logEcho`, respectively.
+These can be controlled with `setPlanStdout`, `setPlanStderr` before you `runJob`.
+These default to `logInfo` and `logError` respectively.
 
-Regardless of to which logger you direct the `Job`'s `Stderr`, `Stdout`, and `Echo`,
+Regardless of to which logger you direct the `Job`'s `Stderr` and `Stdout`,
 `wake` will store all the text in its database,
 discarding the information about the logger it was destined for at the time it was stored.
-It will however know whether it came from the `Job`'s stderr/stdout/echo.
-
+It will however know whether it came from the `Job`'s stderr/stdout.
 
 ### Other Things that Appear on Wake's Output Streams During Execution
 
-We have already covered the stdout, stderr, and echo of executed `Job`s.
+In addition to stdout and stderr, each executing `Job` will send the command
+it is executing to a logger. The logger it is sent to by defalt is `logEcho`,
+and this can be overridden with `setPlanEcho`.
 
 The results of calling `print`/`println` within `wake` code are sent to `logReport` by default.
 To send them somewhere else, use `printLevel`, `printlnLevel` instead.
 
 The final output of whatever wake function or expression is called is always directed to
 wake's `stdout` unless `--quiet` is set.
-This is outside of the logger mechanism, so it is not possible to redirect this within wake
-code or with command line flags.
+This is outside of the logger mechanism,
+so it is not possible to redirect this within wake code or with command line flags.
 
 Similarly, the progress bar is always sent to wake's `stdout` unless `--no-tty`
 or `--quiet` is set.
@@ -125,10 +125,21 @@ or `--quiet` is set.
 
 The `--verbose` command line argument has a different functionality when used with data base commands (`--last`, `-o`, `--failed`, etc).
 
-Running `wake <database command> --verbose` will show ALL of stdout and stdin from all `Job`s,
+Running `wake <database command> --verbose` will show ALL of stdout and stdin from the relevant `Job`s,
 regardless of what logger they were directed to.
 Running a database command without `--verbose` will show NO stdout or stdin from any `Job`.
 The command executed will always be displayed regardless of command line arguments.
 
 Other things that are observed on stdout from executing wake (the results of `print` or `println`, etc)
 are not stored in the database, so will never be revealed with any combination of flags on database commands.
+
+## Consideration for `printLevel` vs `setPlanStdout`
+
+When writing wake code where one wants to see a `Job`'s stderr/stdout
+regardless of whether that job executes in a given `wake` execution
+(e.g. a job which collects and reports passing test results),
+it is better to  `setPlanStdout logNever`, then explicitly `getJobStdout` and
+send the result to a `printLevel`.
+This is because the `Job`'s stdout is only sent to the logger if it actually executes
+(vs its outputs being retrieved from cache),
+whereas the `println` is dependent on just the wake execution.
