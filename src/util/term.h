@@ -39,14 +39,9 @@
 //
 class FdBuf : public std::streambuf {
  private:
-  // static constexpr size_t buf_size = 512;
-  // char* end = nullptr;
   int fd;
-  // We use a static thread_local,
-  // char buf[buf_size];
 
  public:
-  // FdBuf(int fd_) : end(buf), fd(fd_) {}
   FdBuf(int fd_) : fd(fd_) {}
   virtual ~FdBuf() override { sync(); }
   virtual int sync() override;
