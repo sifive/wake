@@ -57,7 +57,7 @@ wake --fd:3="foo" mywakecode 3>foo.txt
 These can be concatenated with commas and include the normal log levels, so to capture both `mkLogLevel "foo"` and `logInfo` to a file:
 
 ```
-wake --fd3="foo,info" 3&>foo.txt
+wake --fd:3="foo,info" mywakecode 3>foo.txt
 ```
 
 ## What Gets Sent To Loggers
