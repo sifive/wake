@@ -8,7 +8,7 @@ for commented code.
 ## Loggers
 
 Wake has a concept of loggers,
-to which bytes can be written during wake execution by various sources.
+to which text can be written during wake execution by various sources.
 Based on command line flags, each logger's output will be directed to
 zero or more of `wake`'s own output streams, possibly with additional formatting applied.
 The wake codebase and standard libraries often refer to a _logger_ as a `logLevel`.
