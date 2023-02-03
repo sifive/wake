@@ -39,6 +39,7 @@ PASSED:
   shell_escape_nominal
   shell_escape_spaces
   shell_escape_special
+  term_basic_foreground_colors
   trie_basic
   trie_basic_const
   trie_char

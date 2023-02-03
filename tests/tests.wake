@@ -151,20 +151,26 @@ export def runUnitTests _: Result Unit Error =
         testJob.getJobStderr
         | rmap removeCarriageReturns
 
+    require Pass _ = match testJob.isJobOk
+        True  = Pass Unit
+        False =
+            def _ = println jobStderr
+            Fail (makeError "Test failed ({format testJob.getJobStatus}). See above for details")
+
     require Pass _ = match expectedStderr
         Some x if x ==* jobStderr = Pass Unit
         None = Pass Unit
-        Some _ = Fail (makeError "Unexpected standard error '{replace `\n` "\\\\n" jobStderr}'")
+        Some _ =
+            def _ = println jobStderr
+            Fail (makeError "Unexpected standard error. See above for details")
 
-    require Pass _ = match expectedStdout
+    match expectedStdout
         Some x if x ==* jobStdout = Pass Unit
         None = Pass Unit
-        _ = Fail (makeError "Unexpected standard output '{replace `\n` "\\\\n" jobStdout}'")
+        _ =
+            def _ = println jobStdout
+            Fail (makeError "Unexpected standard output. See above for details")
 
-    match testJob.isJobOk
-        True  = Pass Unit
-        False =
-            Fail (makeError "Test failed ({format testJob.getJobStatus}) with '{replace `\n.*` "" jobStderr}'")
 
 def runTest (testScript: Path): Result Unit Error =
     def shouldPass =
