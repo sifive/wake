@@ -123,12 +123,21 @@ or `--quiet` is set.
 
 ## What is Displayed to user on Wake Database Commands
 
-The `--verbose` command line argument has a different functionality when used with data base commands (`--last`, `-o`, `--failed`, etc).
+The `--verbse` and `--metadata` flags impact what is shown per-job by the database
+(`--last, --failed, --job`, etc) commands.
+They do not impact which `Job`s information is shown for.
 
-Running `wake <database command> --verbose` will show ALL of stdout and stdin from the relevant `Job`s,
-regardless of what logger they were directed to.
-Running a database command without `--verbose` will show NO stdout or stdin from any `Job`.
-The command executed will always be displayed regardless of command line arguments.
+The default behavior is to show stdout and stderr for each `Job`
+in an approximation to how they would be shown while executing the `Job`,
+without a lot of "clutter" (aka metadata).
+No information about the logger the stdout/stderr were destined for during execution
+is recorded in the database and thus the colors setings of the logger for stdout
+during execution are not used to influence the displayed output for database commands.
+
+Using the `--metadata` flag will show a more "database" view of the output,
+without showing each `Job`'s stdout or stderr.
+
+Using the `--verbose` flag will show the database output as well as each `Job`'s stdout and stderr.
 
 Other things that are observed on stdout from executing wake (the results of `print` or `println`, etc)
 are not stored in the database, so will never be revealed with any combination of flags on database commands.
@@ -142,4 +151,4 @@ it is better to  `setPlanStdout logNever`, then explicitly `getJobStdout` and
 send the result to a `printLevel`.
 This is because the `Job`'s stdout is only sent to the logger if it actually executes
 (vs its outputs being retrieved from cache),
-whereas the `println` is dependent on just the wake execution.
+whereas the `printLevel` is dependent on just the wake execution.
