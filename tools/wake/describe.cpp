@@ -32,6 +32,7 @@
 #include "runtime/database.h"
 #include "util/execpath.h"
 #include "util/shell.h"
+#include "util/term.h"
 
 #define SHORT_HASH 8
 
@@ -208,16 +209,19 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
 }
 
 void describe_human(const std::vector<JobReflection> &jobs) {
+  TermInfoBuf tbuf(std::cout.rdbuf());
+  std::ostream out(&tbuf);
   for (auto &job : jobs) {
-    std::cout << "\n# " << job.label << "(" << job.job << ")\n$ ";
+    out << term_colour(TERM_GREEN) << "\n\n# " << job.label << "(" << job.job << ")\n";
+    out << term_normal() << "$ " << term_colour(TERM_CYAN);
     for (auto &cmd_part : job.commandline) {
-      std::cout << cmd_part << " ";  // # TODO: don't output trailing space
+      out << cmd_part << " ";  // # TODO: don't output trailing space
     }
-    std::cout << "\n\n";
+    out << "\n\n\n" << term_normal();
 
     // We have to use our speical stream for the output of the program
     for (auto &log_line : job.std_writes) {
-      std::cout << log_line.first;
+      out << log_line.first;
     }
   }
 }

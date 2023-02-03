@@ -18,4 +18,4 @@ package build_wake
 from wake import _
 
 target runtime variant =
-    src here variant (optimizer, dst, types, json, util, Nil) (gmp, sqlite3, re2, ncurses, jobCacheLib, Nil) Nil
+    src here variant (optimizer, dst, types, json, util, Nil) (util, gmp, sqlite3, re2, ncurses, jobCacheLib, Nil) Nil

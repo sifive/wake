@@ -38,6 +38,7 @@
 #include "types/type.h"
 #include "utf8proc/utf8proc.h"
 #include "util/shell.h"
+#include "util/term.h"
 #include "util/unlink.h"
 #include "value.h"
 
@@ -616,6 +617,22 @@ static PRIMFN(prim_shell_str) {
   RETURN(String::alloc(runtime.heap, shell_escape(str->c_str())));
 }
 
+static PRIMTYPE(type_filter_term_codes) {
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeString);
+}
+
+static PRIMFN(prim_filter_term_codes) {
+  EXPECT(1);
+  STRING(str, 0);
+
+  std::stringstream ss;
+  TermInfoBuf tinfo(ss.rdbuf(), /*dumb*/ true);
+  std::ostream out(&tinfo);
+  out << str->as_str();
+
+  RETURN(String::alloc(runtime.heap, ss.str()));
+}
+
 void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "strlen", prim_strlen, type_strlen, PRIM_PURE);
   prim_register(pmap, "vcat", prim_vcat, type_vcat, PRIM_PURE);
@@ -637,6 +654,8 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "str2bin", prim_str2bin, type_str2code, PRIM_PURE);
   prim_register(pmap, "uname", prim_uname, type_uname, PRIM_PURE);
   prim_register(pmap, "shell_str", prim_shell_str, type_shell_str, PRIM_PURE);
+  prim_register(pmap, "filter_term_codes", prim_filter_term_codes, type_filter_term_codes,
+                PRIM_PURE);
   prim_register(pmap, "colour", prim_colour, type_colour, PRIM_IMPURE);
   prim_register(pmap, "print", prim_print, type_print, PRIM_IMPURE);
   prim_register(pmap, "mkdir", prim_mkdir, type_mkdir, PRIM_IMPURE);
