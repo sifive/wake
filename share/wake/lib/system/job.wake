@@ -483,8 +483,16 @@ def mapPath = match _
     Fail e = Fail e
     Pass l = findFailFn treeOk l
 
-export def getJobStdout  (job: Job): Result String Error = stdio job 1
-export def getJobStderr  (job: Job): Result String Error = stdio job 2
+export def getJobStdoutRaw  (job: Job): Result String Error = stdio job 1
+export def getJobStderrRaw  (job: Job): Result String Error = stdio job 2
+
+export def getJobStdout  (job: Job): Result String Error =
+    require Pass stdout = getJobStdoutRaw job
+    Pass (stdout | filterTerminalCodes)
+export def getJobStderr  (job: Job): Result String Error =
+    require Pass stderr = getJobStderrRaw job
+    Pass (stderr | filterTerminalCodes)
+
 export def getJobInputs (job: Job): Result (List Path) Error =
     tree job 1
     | guardPath job

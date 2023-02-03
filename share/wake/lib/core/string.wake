@@ -120,6 +120,10 @@ export def strOctal: Integer => String =
     def p n integerToFormat = prim "str"
     p 8
 
+export def filterTerminalCodes (str: String): String =
+    def p s = prim "filter_term_codes"
+    p str
+
 # int: convert a String into an Integer with the usual prefixes.
 #
 # The base used for the conversion depends on the prefix:

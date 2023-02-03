@@ -230,20 +230,28 @@ def runTest (testScript: Path): Result Unit Error =
         testJob.getJobStderr
         | rmap (replace `\r` "")
 
-    require Pass _ = match expectedStderr
-        Some x if x ==* jobStderr = Pass Unit
-        None = Pass Unit
-        Some _ = Fail (makeError "Unexpected standard error '{replace `\n` "\\\\n" jobStderr}'")
-
-    require Pass _ = match expectedStdout
-        Some x if x ==* jobStdout = Pass Unit
-        None = Pass Unit
-        _ = Fail (makeError "Unexpected standard output '{replace `\n` "\\\\n" jobStdout}'")
-
-    match shouldPass testJob.isJobOk
+    require Pass _ = match shouldPass testJob.isJobOk
         True  True  = Pass Unit
         False False = Pass Unit
         True  False =
             Fail (makeError "Test failed ({format testJob.getJobStatus}) with '{replace `\n.*` "" jobStderr}'")
         False True  =
             Fail (makeError "Test should not have passed with '{replace `\n.*` "" jobStderr}'")
+            # def _ = println jobStderr
+            # Fail (makeError "Test failed ({format testJob.getJobStatus}). See above for details")
+
+    require Pass _ = match expectedStderr
+        Some x if x ==* jobStderr = Pass Unit
+        None = Pass Unit
+        Some _ =
+            # TODO: use diff prim to compare jobStderr with expectedStderr
+            def _ = cat (testName, "\n", jobStderr,) | println
+            Fail (makeError "Unexpected standard error. See above for details")
+
+    match expectedStdout
+        Some x if x ==* jobStdout = Pass Unit
+        None = Pass Unit
+        _ =
+            # TODO: use diff prim to compare jobStdout with expectedStdout
+            def _ = cat (testName, "\n", jobStdout,) | println
+            Fail (makeError "Unexpected standard output. See above for details")
