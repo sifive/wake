@@ -115,9 +115,10 @@ void TermInfoBuf::output_codes() {
       case 34:
       case 35:
       case 36:
-      case 37:
+      case 37: {
         putstr(term_colour(output_codes[0] - 30));
         return;
+      }
       case 40:
       case 41:
       case 42:
@@ -326,30 +327,20 @@ int TermInfoBuf::overflow(int c) {
 }
 
 int FdBuf::overflow(int c) {
-  // if (end == buf + buf_size) sync();
   if (c == EOF) {
     return EOF;
   }
-  //*end++ = c;
+
   char ch = c;
-  write(fd, &ch, sizeof(ch));
+  ssize_t r = write(fd, &ch, sizeof(ch));
+  if (r == -1) {
+    // TODO(jake): what should be done here?
+  }
+
   return c;
 }
 
-int FdBuf::sync() {
-  /*const char* iter = buf;
-  do {
-    int num_wrote = write(fd, iter, end - iter);
-    if (num_wrote < 0) {
-      if (errno != EINTR) continue;
-      return num_wrote;
-    }
-    if (num_wrote == 0) break;
-    iter += num_wrote;
-  } while(iter < end);
-  end = buf;*/
-  return fsync(fd);
-}
+int FdBuf::sync() { return fsync(fd); }
 
 static bool tty = false;
 static const char *cuu1;
@@ -411,42 +402,47 @@ const char *term_intensity(int code) {
 
 const char *term_normal() { return sgr0 ? sgr0 : ""; }
 
-bool term_init(bool tty_) {
+bool term_init(bool tty_, bool skip_atty) {
   tty = tty_;
 
-  if (tty) {
-    if (isatty(1) != 1) tty = false;
-    if (isatty(2) != 1) tty = false;
+  if (!tty) {
+    return false;
   }
 
-  if (tty) {
-    int eret;
-    int ret = setupterm(0, 2, &eret);
-    if (ret != OK) tty = false;
+  if (!skip_atty && (isatty(1) != 1 || isatty(2) != 1)) {
+    return false;
   }
 
-  if (tty) {
-    // tigetstr function argument is (char*) on some platforms, so we need this hack:
-    static char cuu1_lit[] = "cuu1";
-    static char cr_lit[] = "cr";
-    static char ed_lit[] = "ed";
-    static char lines_lit[] = "lines";
-    static char cols_lit[] = "cols";
-    static char sgr0_lit[] = "sgr0";
-    cuu1 = tigetstr(cuu1_lit);  // cursor up one row
-    cr = tigetstr(cr_lit);      // return to first column
-    ed = tigetstr(ed_lit);      // erase to bottom of display
-    int rows = tigetnum(lines_lit);
-    int cols = tigetnum(cols_lit);
-    if (missing_termfn(cuu1)) tty = false;
-    if (missing_termfn(cr)) tty = false;
-    if (missing_termfn(ed)) tty = false;
-    if (cols < 0 || rows < 0) tty = false;
-    sgr0 = tigetstr(sgr0_lit);  // optional
-    if (missing_termfn(sgr0)) sgr0 = nullptr;
+  int eret;
+  int ret = setupterm(0, 2, &eret);
+  if (ret != OK) {
+    return false;
   }
 
-  return tty;
+  // tigetstr function argument is (char*) on some platforms, so we need this hack:
+  static char cuu1_lit[] = "cuu1";
+  static char cr_lit[] = "cr";
+  static char ed_lit[] = "ed";
+  static char lines_lit[] = "lines";
+  static char cols_lit[] = "cols";
+  static char sgr0_lit[] = "sgr0";
+  cuu1 = tigetstr(cuu1_lit);  // cursor up one row
+  cr = tigetstr(cr_lit);      // return to first column
+  ed = tigetstr(ed_lit);      // erase to bottom of display
+  int rows = tigetnum(lines_lit);
+  int cols = tigetnum(cols_lit);
+  sgr0 = tigetstr(sgr0_lit);  // optional
+  if (missing_termfn(sgr0)) sgr0 = nullptr;
+
+  if (missing_termfn(cuu1) || missing_termfn(cr) || missing_termfn(ed)) {
+    return false;
+  }
+
+  if (cols < 0 || rows < 0) {
+    return false;
+  }
+
+  return true;
 }
 
 const char *term_cuu1() { return cuu1; }
@@ -462,7 +458,7 @@ bool term_tty() { return tty; }
 const char *term_colour(int code) { return ""; }
 const char *term_normal() { return ""; }
 const char *term_normal(int code) { return ""; }
-bool term_init(bool tty) { return true; }
+bool term_init(bool tty, bool skip_atty) { return true; }
 
 const char *term_cuu1() { return ""; }
 

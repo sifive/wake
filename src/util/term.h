@@ -101,7 +101,7 @@ class TermInfoBuf : public std::streambuf {
   virtual int overflow(int c) override;
 };
 
-bool term_init(bool tty_);
+bool term_init(bool tty_, bool skip_atty = false);
 
 const char *term_normal();
 const char *term_colour(int code);

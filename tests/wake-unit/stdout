@@ -39,7 +39,27 @@ PASSED:
   shell_escape_nominal
   shell_escape_spaces
   shell_escape_special
+  term_basic_background_colors
+  term_basic_background_colors_dumb
+  term_basic_bold_background_colors
+  term_basic_bold_background_colors_dumb
+  term_basic_bold_foreground_colors
+  term_basic_bold_foreground_colors_dumb
+  term_basic_controls
+  term_basic_controls_dumb
   term_basic_foreground_colors
+  term_basic_foreground_colors_dumb
+  term_basic_ignores
+  term_basic_intense_background_colors
+  term_basic_intense_foreground_colors
+  term_basic_resets
+  term_basic_resets_dumb
+  term_dumb_gcc_smoke_test
+  term_gcc_smoke_test
+  term_rich_background_colors
+  term_rich_background_colors_dumb
+  term_rich_foreground_colors
+  term_rich_foreground_colors_dumb
   trie_basic
   trie_basic_const
   trie_char
