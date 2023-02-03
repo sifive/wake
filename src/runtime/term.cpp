@@ -29,6 +29,7 @@
 #include <unistd.h>
 
 #include <cstring>
+#include <iostream>
 #include <set>
 #include <sstream>
 
@@ -267,12 +268,6 @@ int TermInfoBuf::overflow(int c) {
       }
       break;
     case State::esc_state:
-      // TODO: Add other things to this state,
-      // specifically all the escape sequences we
-      // we want to ignore. There should be two
-      // cases, one character cases and two character
-      // cases. For the two character case we'll need
-      // an extra case.
       if (c == '[') {
         state = State::num_state;
         break;
@@ -332,10 +327,13 @@ int FdBuf::overflow(int c) {
   }
 
   char ch = c;
-  ssize_t r = write(fd, &ch, sizeof(ch));
-  if (r == -1) {
-    // TODO(jake): what should be done here?
-  }
+  do {
+    ssize_t r = write(fd, &ch, sizeof(ch));
+    if (r == -1 && errno != EINTR) {
+      std::cerr << "Failed to write character" << std::endl;
+      exit(1);
+    }
+  } while (errno != EINTR);
 
   return c;
 }
@@ -402,6 +400,7 @@ const char *term_intensity(int code) {
 
 const char *term_normal() { return sgr0 ? sgr0 : ""; }
 
+// TODO: reconsider using skip_atty once full color support is ready
 bool term_init(bool tty_, bool skip_atty) {
   tty = tty_;
 
