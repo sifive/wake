@@ -405,44 +405,39 @@ const char *term_normal() { return sgr0 ? sgr0 : ""; }
 bool term_init(bool tty_, bool skip_atty) {
   tty = tty_;
 
-  if (!tty) {
-    return false;
+  if (tty && !skip_atty) {
+    if (isatty(1) != 1) tty = false;
+    if (isatty(2) != 1) tty = false;
   }
 
-  if (!skip_atty && (isatty(1) != 1 || isatty(2) != 1)) {
-    return false;
+  if (tty) {
+    int eret;
+    int ret = setupterm(0, 2, &eret);
+    if (ret != OK) tty = false;
   }
 
-  int eret;
-  int ret = setupterm(0, 2, &eret);
-  if (ret != OK) {
-    return false;
+  if (tty) {
+    // tigetstr function argument is (char*) on some platforms, so we need this hack:
+    static char cuu1_lit[] = "cuu1";
+    static char cr_lit[] = "cr";
+    static char ed_lit[] = "ed";
+    static char lines_lit[] = "lines";
+    static char cols_lit[] = "cols";
+    static char sgr0_lit[] = "sgr0";
+    cuu1 = tigetstr(cuu1_lit);  // cursor up one row
+    cr = tigetstr(cr_lit);      // return to first column
+    ed = tigetstr(ed_lit);      // erase to bottom of display
+    int rows = tigetnum(lines_lit);
+    int cols = tigetnum(cols_lit);
+    if (missing_termfn(cuu1)) tty = false;
+    if (missing_termfn(cr)) tty = false;
+    if (missing_termfn(ed)) tty = false;
+    if (cols < 0 || rows < 0) tty = false;
+    sgr0 = tigetstr(sgr0_lit);  // optional
+    if (missing_termfn(sgr0)) sgr0 = nullptr;
   }
 
-  // tigetstr function argument is (char*) on some platforms, so we need this hack:
-  static char cuu1_lit[] = "cuu1";
-  static char cr_lit[] = "cr";
-  static char ed_lit[] = "ed";
-  static char lines_lit[] = "lines";
-  static char cols_lit[] = "cols";
-  static char sgr0_lit[] = "sgr0";
-  cuu1 = tigetstr(cuu1_lit);  // cursor up one row
-  cr = tigetstr(cr_lit);      // return to first column
-  ed = tigetstr(ed_lit);      // erase to bottom of display
-  int rows = tigetnum(lines_lit);
-  int cols = tigetnum(cols_lit);
-  sgr0 = tigetstr(sgr0_lit);  // optional
-  if (missing_termfn(sgr0)) sgr0 = nullptr;
-
-  if (missing_termfn(cuu1) || missing_termfn(cr) || missing_termfn(ed)) {
-    return false;
-  }
-
-  if (cols < 0 || rows < 0) {
-    return false;
-  }
-
-  return true;
+  return tty;
 }
 
 const char *term_cuu1() { return cuu1; }
