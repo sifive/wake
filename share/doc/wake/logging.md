@@ -43,8 +43,6 @@ and give more fine-grained control over which wake output stream it should go to
 
 Based on command line flags and its log level,
 each logger's output will be directed to zero or more of wake's outputs streams.
-Depending on the logger's color control and command line flags,
-additional formatting can be applied.
 
 For `wake`'s own stdout, the logger's color & intensity are used to apply
 additional formatting to the output before displaying it.
@@ -55,20 +53,20 @@ If you match a line in the table, stop!
 This is what will appear on the console as you watch wake execute,
 i.e. what is sent to ``wake`'s stdout:
 
-| log level         | "debug"  | "info"  | "echo"  | "report"  | "warning"  | "error"  | "null"  |  "foo" |
-|-------------------|----------|---------|---------|-----------|------------|----------|---------|--------|
-|--stdout="foo"     |          |         |         |           |            |          |         |    x   |
-|--stdout="foo,info" |         |    x    |         |           |            |          |         |    x   |
-|--debug            |      x   |    x    |    x    |     x     |      x     |    x     |         |        |
-|--verbose          |          |    x    |    x    |     x     |      x     |    x     |         |        |
-|--quiet            |          |         |         |           |            |    x     |         |        |
-|--no-tty<sup>*</sup>|         |         |    x    |     x     |      x     |    x     |         |        |
-|(default)          |          |         |         |     x     |      x     |    x     |         |        |
+| log level           | "debug"  | "info"  | "echo"  | "report"  | "warning"  | "error"  | "null"  |  "foo" |
+|---------------------|----------|---------|---------|-----------|------------|----------|---------|--------|
+|--stdout="foo"       |          |         |         |           |            |          |         |    x   |
+|--stdout="foo,info"  |          |    x    |         |           |            |          |         |    x   |
+|--debug              |      x   |    x    |    x    |     x     |      x     |    x     |         |        |
+|--verbose            |          |    x    |    x    |     x     |      x     |    x     |         |        |
+|--quiet              |          |         |         |           |            |    x     |         |        |
+|--no-tty<sup>*</sup> |          |         |    x    |     x     |      x     |    x     |         |        |
+|(default)            |          |         |         |     x     |      x     |    x     |         |        |
 
 <sup>*</sup> `--no-tty` also prevents any coloring from being applied.
 
-Unless overridden with `--stderr=...` the *only* thing that ever appears on stderr coming out of wake is logger
-outputs with log level "error" (e.g. `logError`).
+Unless overridden with `--stderr=...` the *only* thing that ever appears on wake's stderr is outputs from loggers
+with log level "error" (e.g. `logError`).
 
 The additional command line arguments `--fd:3`, `--fd:4`, `--fd:5` can be used to output to file descriptors 3, 4, 5.
 One example shell command would be, for some wake code that had `mkLogLevel "foo"`:
