@@ -230,7 +230,7 @@ static void write_num(std::streambuf &buf, int x) {
 // In case we have to back up from the num_state to default_state,
 // we put all previous characters. This happens if at some point
 // we have to flush all thus-far collected numbers because the
-// escape code is invalid. There is some special edge case handeling
+// escape code is invalid. There is some special edge case handling
 // of `cur_code == 0` that has to be accounted for.
 //
 // If the lexer encounters a leading 0 on a number, it should
