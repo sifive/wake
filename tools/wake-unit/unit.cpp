@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
       return 1;
     }
   }
-  term_init(true);
+  term_init(true, true);
   TestLogger logger;
   std::set<std::string> failed_tests;
   std::set<std::string> passing_tests;

@@ -41,6 +41,7 @@ export def path: String =
 # Add PATH to the default environment
 publish environment =
     "PATH={path}",
+    "TERM=xterm-256color",
     Nil
 
 # Inject command-line specified path entries
