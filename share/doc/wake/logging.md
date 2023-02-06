@@ -11,8 +11,8 @@ Wake has a concept of loggers,
 to which text can be written during wake execution by various sources.
 A logger combines a string log level (e.g. "error", "info", "my_custom_level")
 and a display format (color and intensity).
-There can be multiple loggers with the same log level, though this is
-not a common use case.
+There can be multiple loggers with the same log level,
+though colors may not display as expected.
 
 |Term Used In this Document | What wake code/libraries call it |
 ----------------------------|----------------------------------|
