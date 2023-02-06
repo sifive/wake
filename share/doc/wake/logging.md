@@ -97,7 +97,7 @@ stderr, or other arbitrary file descriptors.
 These can be controlled with `setPlanStdout`, `setPlanStderr` before you `runJob`.
 These default to `logInfo` and `logError` respectively.
 
-Regardless of to which logger you direct the `Job`'s `Stderr` and `Stdout`,
+Regardless of the logger to which you direct the `Job`'s `Stderr` and `Stdout`,
 `wake` will store all the text in its database,
 discarding the information about the logger it was destined for at the time it was stored.
 It will however know whether it came from the `Job`'s stderr/stdout.
