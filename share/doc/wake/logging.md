@@ -65,8 +65,9 @@ i.e. what is sent to ``wake`'s stdout:
 
 <sup>*</sup> `--no-tty` also prevents any coloring from being applied.
 
-Unless overridden with `--stderr=...` the only logger output that ever appears on wake's stderr is outputs from loggers
-with log level "error" (e.g. `logError`).
+Unless overridden with `--stderr=...`,
+the only logger output that ever appears on wake's stderr is outputs from loggers with log level "error"
+(e.g. `logError`).
 
 The additional command line arguments `--fd:3`, `--fd:4`, `--fd:5` can be used to output to file descriptors 3, 4, 5.
 One example shell command would be, for some wake code that had `mkLogLevel "foo"`:
