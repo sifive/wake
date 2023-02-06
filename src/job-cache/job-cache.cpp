@@ -910,7 +910,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
     std::string cur_file = wcl::join_paths(job_dir, hash_name);
     std::string tmp_file = wcl::join_paths(tmp_job_dir, hash_name);
     int ret = link(cur_file.c_str(), tmp_file.c_str());
-    if (ret < 0) {
+    if (ret < 0 && errno != EEXIST) {
       success = false;
       break;
     }

@@ -244,7 +244,11 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput _label cmd vis env dir stdin _ _ _ _) =
+<<<<<<< HEAD
+    Pass (RunnerInput _label cmd vis env dir stdin _ prefix _ _) =
+=======
+    Pass (RunnerInput label cmd vis env dir stdin _ prefix _ _) =
+>>>>>>> b91dc480 (stashing)
         def mkVisJson (Path path hash) =
           JObject ("path" :-> JString path, "hash" :-> JString hash,)
         def jobCacheVisible = JArray (map mkVisJson vis)
@@ -268,6 +272,8 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
 
         require False = cacheHit
         else
+          def _ = write ".cache-hit/read.{prefix}.json" "//{label}\n{jobCacheJsonIn}"
+          def _ = write ".cache-hit/out.{prefix}.json" "//{label}\n{cacheResult}"
           require Pass match_info = jField jobCacheJsonOut "match"
           require Pass status = jField match_info "status" | jInteger
           require Pass runtime = jField match_info "runtime" | jDouble
@@ -283,6 +289,8 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
           def predict = Usage status runtime cputime mem ibytes obytes
           def _ = virtual job stdout stderr status runtime cputime mem ibytes obytes
           Pass (RunnerOutput inputs outputs predict)
+
+        def _ = write ".cache-misses/read.{prefix}.json" "//{label}\n{jobCacheJsonIn}"
 
         # Now we need to run the job
         require Pass (RunnerOutput inputs outputs useage) = baseDoIt job runnerInput
@@ -321,6 +329,7 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
         # itself is not blocked by writing to the cache. This allows us to tolorate a lot
         # of slow down on cache writing.
         def _ =
+            def _ = write ".cache-misses/write.{prefix}.json" "//{label}\n{jobCacheAddJson}"
             job_cache_add jobCacheAddJson
 
         Pass (RunnerOutput (map getPathName vis) outputs useage)
