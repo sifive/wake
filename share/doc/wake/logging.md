@@ -36,8 +36,8 @@ and give more fine-grained control over which wake output stream it should go to
 | logWarning        |    Yellow       | "warning" |
 | logError          |     Red         | "error"   |
 | logNever          |     N/A         | "null"    |
-| mkLogLevel "foo" Green |  Green     | "foo"     |
-| mkLogLevel "foo"  Bright Green | Bright Green   | "foo"      |
+| mkLogLevel "foo" (Some Green) |  Green     | "foo"     |
+| mkLogLevel2 "foo" (Some Green) (Some Bright) | Bright Green   | "foo"      |
 
 ## Directing Logger Output
 
