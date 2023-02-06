@@ -97,7 +97,7 @@ void print_help(const char *argv0) {
     << "    --exec -x  EXPR  Execute expression EXPR instead of a target function"       << std::endl
     << "    --stdout   EXPR  Send specified log levels to stdout (FD 1)"                 << std::endl
     << "    --stderr   EXPR  Send specified log levels to stderr (FD 2)"                 << std::endl
-    << "    --fd:3     EXPR  Send specified log levels to FD 3. Same for 4, 5."          << std::endl
+    << "    --fd:3     EXPR  Send specified log levels to FD 3. Same for --fd:4, --fd:5" << std::endl
     << std::endl
     << "  Database commands:" << std::endl
     << "    --init      DIR  Create or replace a wake.db in the specified directory"     << std::endl
