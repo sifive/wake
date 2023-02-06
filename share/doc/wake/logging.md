@@ -121,9 +121,9 @@ or `--quiet` is set.
 
 ## What is Displayed to user on Wake Database Commands
 
-The `--verbose` and `--metadata` flags impact what is shown per-job by the database
-(`--last, --failed, --job`, etc) commands.
-They do not impact which `Job`s information is shown for.
+When used with a database command (`--last, --failed, --job`, etc),
+the `--verbose` and `--metadata` flags impact what is shown per-job by the database.
+They do not impact the selection of the `Job`s for which that information will be shown.
 
 The default behavior is to show stdout and stderr for each `Job`
 in an approximation to how they would be shown while executing the `Job`,
