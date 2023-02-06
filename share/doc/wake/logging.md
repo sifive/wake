@@ -141,13 +141,17 @@ Using the `--verbose` flag will show the database output as well as each `Job`'s
 Other things that are observed on stdout from executing wake (the results of `print` or `println`, etc)
 are not stored in the database, so will never be revealed with any combination of flags on database commands.
 
-## Consideration for `printLevel` vs `setPlanStdout`
+## Considerations for `printlnLevel` vs `setPlanStdout`
 
 When writing wake code where one wants to see a `Job`'s stderr/stdout
 regardless of whether that job executes in a given `wake` execution
 (e.g. a job which collects and reports passing test results),
 it is better to  `setPlanStdout logNever`, then explicitly `getJobStdout` and
-send the result to a `printLevel`.
+send the result to a `printlnLevel`.
 This is because the `Job`'s stdout is only sent to the logger if it actually executes
 (vs its outputs being retrieved from cache),
 whereas the `printLevel` is dependent on just the wake execution.
+However, `setJobStdout` may still be preferred in some cases over `println`/`printlnLevel`,
+because the latter will only print the entire output after the `Job` has finished,
+while `setPlanStdout` allows it to be streamed line-by-line as it's printed by the `Job`.
+
