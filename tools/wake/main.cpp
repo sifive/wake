@@ -623,12 +623,17 @@ int main(int argc, char **argv) {
   wakefiles.reserve(wakefilenames.size());
 
   bool alerted_slow_cache = false;
+  // While the slow cache alert is helpful, its also flakey.
+  // In order to support automated flows better we only emit it when
+  // a terminal is being used, which is a good indicator of a human
+  // using wake rather than an automated flow.
+  bool is_stdout_tty = isatty(1);
 
   for (size_t i = 0; i < wakefilenames.size(); i++) {
     auto &wakefile = wakefilenames[i];
 
     auto now = std::chrono::steady_clock::now();
-    if (!quiet &&
+    if (!quiet && is_stdout_tty &&
         std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
       std::cout << "Scanning " << i + 1 << "/" << wakefilenames.size()
                 << " wake files. Kernel file cache may be cold.\r" << std::flush;
@@ -665,7 +670,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (!quiet && alerted_slow_cache) {
+  if (!quiet && alerted_slow_cache && is_stdout_tty) {
     std::cout << "Scanning " << wakefilenames.size() << "/" << wakefilenames.size()
               << " wake files. Kernel file cache may be cold." << std::endl;
   }
