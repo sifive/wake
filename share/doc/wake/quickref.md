@@ -63,11 +63,17 @@ the wake.db directory and below.
         a + b
     ```
 
-* `|`, `.`, and `→`
+* `|`, `.`
     * the pipe character feeds an argument to a function, like in shell scripts.
-    * `a 0 (b 1 2 (c 3 d))` becomes `d | c 3 | b 1 2 | a 0`
-    * `.` is similar, but is used to make calls look like OOP
-    * `length string` would become `string.length`
+        * `a 0 (b 1 2 (c 3 d))` becomes `d | c 3 | b 1 2 | a 0`
+    * `.` is similar, but is used to make calls look like OOP if there is only one argument:
+        * `length string` would become `string.length`
+    * In other words, these three are all equivalent:
+        * `length string`
+        * `string.length`
+        * `string | length`
+
+* `→`
     * wake fully supports Unicode. A common use of this is in creating a Pair object
     * `a → b` is the same as `Pair a b`
     * Be aware that there other supported Unicode functions.
