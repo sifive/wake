@@ -80,27 +80,27 @@ export def makeLogLevel2 (name: String) (colour: Option Colour) (intensity: Opti
 
 # The standard logging levels used in wake
 
-# logError: logged to stderr by default
+# logError: logged to stdout and stderr by default (Red)
 export def logError: LogLevel =
     makeLogLevel "error" (Some Red)
 
-# logWarning: logged to stdout unless run with -q
+# logWarning: logged to stdout unless run with -q (Yellow)
 export def logWarning: LogLevel =
     makeLogLevel "warning" (Some Yellow)
 
-# logReport: logged to stdout unless run with -q
+# logReport: logged to stdout unless run with -q (Magenta)
 export def logReport: LogLevel =
     makeLogLevel "report" (Some Magenta)
 
-# logEcho: logged to stdout when run with -v
+# logEcho: logged to stdout when run with -v (default console color)
 export def logEcho: LogLevel =
     makeLogLevel "echo" None
 
-# logInfo: logged to stdout when run with -v
+# logInfo: logged to stdout when run with -v (Dim version of default console color)
 export def logInfo: LogLevel =
     makeLogLevel2 "info" None (Some Dim)
 
-# logDebug: logged to stdout on debug
+# logDebug: logged to stdout when run with -d (Blue)
 export def logDebug: LogLevel =
     makeLogLevel "debug" (Some Blue)
 
