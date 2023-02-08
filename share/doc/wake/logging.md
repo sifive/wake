@@ -117,8 +117,7 @@ wake's `stdout` unless `--quiet` is set.
 This is outside of the logger mechanism,
 so it is not possible to redirect this within wake code or with command line flags.
 
-Similarly, the progress bar is always sent to wake's `stdout` unless `--no-tty`
-or `--quiet` is set.
+Similarly, the progress bar is always sent to wake's `stdout` unless `--no-tty` is set.
 
 ## What is Displayed to user on Wake Database Commands
 
