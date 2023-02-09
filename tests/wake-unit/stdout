@@ -54,12 +54,17 @@ PASSED:
   term_basic_intense_foreground_colors
   term_basic_resets
   term_basic_resets_dumb
+  term_dumb_fuzz
   term_dumb_gcc_smoke_test
+  term_dumb_git_smoke_test
+  term_dumb_unicode_smoke_test
   term_gcc_smoke_test
+  term_git_smoke_test
   term_rich_background_colors
   term_rich_background_colors_dumb
   term_rich_foreground_colors
   term_rich_foreground_colors_dumb
+  term_unicode_smoke_test
   trie_basic
   trie_basic_const
   trie_char

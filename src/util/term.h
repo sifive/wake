@@ -61,7 +61,18 @@ class FdBuf : public std::streambuf {
 // to it as we go.
 class TermInfoBuf : public std::streambuf {
  private:
-  enum class State { default_state, esc_state, ignore_state, num_state };
+  enum class State {
+    default_state,
+    esc_state,
+    ignore_state,
+    control_seq_state,
+    unicode2_state,
+    unicode3_state,
+    unicode4_state,
+    control_seq_ignore_state,
+    os_command_ignore_state,
+    os_command_ignore_st_state
+  };
 
   State state = State::default_state;
   int cur_code = -1;

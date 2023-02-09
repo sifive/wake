@@ -14,8 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 #include "util/term.h"
+
+#include <wcl/xoshiro_256.h>
+
+#include <random>
 
 #include "unit.h"
 
@@ -383,4 +386,251 @@ TEST(term_dumb_gcc_smoke_test) {
   CONVERTS_TO_DUMB(
       "\033[01m\033[Ktools/wake-unit/unit.h:146:95:\033[m\033[K \033[01;31m\033[Kerror:",
       "tools/wake-unit/unit.h:146:95: error:");
+}
+
+TEST(term_git_smoke_test) {
+  CONVERTS_TO("\033[?1h\033=\r2023-02-08 12:31:48 -0600\033[m\r\n\r\033[K\033[?1l\033>",
+              "2023-02-08 12:31:48 -0600\033(B\033[m\n");
+}
+
+TEST(term_dumb_git_smoke_test) {
+  CONVERTS_TO_DUMB("\033[?1h\033=\r2023-02-08 12:31:48 -0600\033[m\r\n\r\033[K\033[?1l\033>",
+                   "2023-02-08 12:31:48 -0600\n");
+}
+
+TEST(term_unicode_smoke_test) {
+  // Unicode should be ignored even if there's an escape sequence
+  // or other special character embeded inside
+  // CONVERTS_TO("\xC0\r", "\xC0\r");
+  CONVERTS_TO("\xC0\033", "\xC0\033");
+
+  CONVERTS_TO("\xE0\x80\r", "\xE0\x80\r");
+  CONVERTS_TO("\xE0\x80\033", "\xE0\x80\033");
+
+  CONVERTS_TO("\xF0\x80\x80\r", "\xF0\x80\x80\r");
+  CONVERTS_TO("\xF0\x80\x80\033", "\xF0\x80\x80\033");
+
+  // However if we go just one more we'll fall out of the unicode states
+  // and special characters should be removed
+  CONVERTS_TO("\xF0\x80\x80\x80\r", "\xF0\x80\x80\x80");
+}
+
+TEST(term_dumb_unicode_smoke_test) {
+  // Unicode should be ignored even if there's an escape sequence
+  // or other special character embeded inside
+  CONVERTS_TO_DUMB("\xC0\r", "\xC0\r");
+  CONVERTS_TO_DUMB("\xC0\033", "\xC0\033");
+
+  CONVERTS_TO_DUMB("\xE0\x80\r", "\xE0\x80\r");
+  CONVERTS_TO_DUMB("\xE0\x80\033", "\xE0\x80\033");
+
+  CONVERTS_TO_DUMB("\xF0\x80\x80\r", "\xF0\x80\x80\r");
+  CONVERTS_TO_DUMB("\xF0\x80\x80\033", "\xF0\x80\x80\033");
+
+  // However if we go just one more we'll fall out of the unicode states
+  // and special characters should be removed
+  CONVERTS_TO_DUMB("\xF0\xFF\xFF\xFF\r", "\xF0\xFF\xFF\xFF");
+}
+
+std::pair<std::string, std::string> random_ignored_control_seq(wcl::xoshiro_256& rng) {
+  std::string out = "\033[";
+  std::uniform_int_distribution<int> param_byte_count(0, 10);
+  std::uniform_int_distribution<int> intermediate_byte_count(0, 50);
+  std::uniform_int_distribution<int> final_byte_dist(0x40, 0x7E);
+  std::uniform_int_distribution<int> param_byte_dist(0x30, 0x3F);
+  std::uniform_int_distribution<int> intermediate_byte_dist(0x20, 0x2F);
+
+  int pb_count = param_byte_count(rng);
+  for (int i = 0; i < pb_count; ++i) {
+    out += char(param_byte_dist(rng));
+  }
+
+  int ib_count = intermediate_byte_count(rng);
+  for (int i = 0; i < ib_count; ++i) {
+    out += char(intermediate_byte_dist(rng));
+  }
+
+  // pick the final byte but avoid `m` just in case it becomes valid
+  char final_byte = final_byte_dist(rng);
+  if (final_byte == 'm') final_byte++;
+  out += final_byte;
+
+  return {std::move(out), ""};
+}
+
+std::pair<std::string, std::string> random_valued_control_seq(wcl::xoshiro_256& rng) {
+  static std::vector<int> single_codes = {
+      0,  1,  2,  4,  7,  21, 24, 27, 30, 31, 32, 33, 34,  35,  36,  37,  40,  41,  42,  43,
+      44, 45, 46, 47, 90, 91, 92, 93, 94, 95, 96, 97, 100, 101, 102, 103, 104, 105, 106, 107};
+  static std::vector<int> double_codes = {30, 31, 32,  33,  34,  35,  36,  37,  40,  41, 42,
+                                          43, 44, 45,  46,  47,  90,  91,  92,  93,  94, 95,
+                                          96, 97, 100, 101, 102, 103, 104, 105, 106, 107};
+
+  std::uniform_int_distribution<int> case_picker(0, 4);
+  std::uniform_int_distribution<int> single_code_picker(0, single_codes.size() - 1);
+  std::uniform_int_distribution<int> double_code_picker(0, double_codes.size() - 1);
+  std::uniform_int_distribution<int> color_picker(0, 255);
+  switch (case_picker(rng)) {
+    case 0:
+      return {"\033[m", ""};
+    case 1:
+      return {"\033[" + std::to_string(single_codes[single_code_picker(rng)]) + "m", ""};
+    case 2:
+      return {"\033[1;" + std::to_string(double_codes[double_code_picker(rng)]) + "m", ""};
+    case 3:
+      return {"\033[38;5;" + std::to_string(color_picker(rng)) + "m", ""};
+    case 4:
+      return {"\033[48;5;" + std::to_string(color_picker(rng)) + "m", ""};
+  }
+
+  return {"", ""};
+}
+
+std::pair<std::string, std::string> random_ignored_command(wcl::xoshiro_256& rng) {
+  static std::string starts = "]_P^";
+
+  std::uniform_int_distribution<int> start_picker(0, starts.size() - 1);
+  std::uniform_int_distribution<int> rand_byte(0, 255);
+  int length = rand_byte(rng);
+  std::string out = "\033";
+  out += starts[start_picker(rng)];
+  for (int i = 0; i < length; ++i) {
+    char c = char(rand_byte(rng));
+    if (c == 0x7 || c == '\033' || c == '\\') continue;
+    out += c;
+  }
+  if (rand_byte(rng) & 1) {
+    out += char(0x7);
+  } else {
+    out += "\033\\";
+  }
+
+  return {std::move(out), ""};
+}
+
+std::pair<std::string, std::string> random_single_character_command(wcl::xoshiro_256& rng) {
+  std::vector<char> cmds = {'\r', '\n', 0x7, 0x8, 0x5, 0xF, 0xE, 0xC, 0xB};
+  std::uniform_int_distribution<int> cmd_picker(0, cmds.size() - 1);
+  char cmd = cmds[cmd_picker(rng)];
+  std::string out;
+  out += cmd;
+  // We return newlines for VT and FF
+  if (cmd == '\n' || cmd == 0xC || cmd == 0xB) {
+    return {std::move(out), "\n"};
+  }
+  return {std::move(out), ""};
+}
+
+std::pair<std::string, std::string> random_two_character_command(wcl::xoshiro_256& rng) {
+  std::string cmds = "6789=>Fclmno|}~";
+  std::uniform_int_distribution<int> cmd_picker(0, cmds.size() - 1);
+  std::string out = "\033";
+  out += cmds[cmd_picker(rng)];
+  return {std::move(out), ""};
+}
+
+std::pair<std::string, std::string> random_three_character_command(wcl::xoshiro_256& rng) {
+  std::string cmds = " #%()*+-./";
+  std::uniform_int_distribution<int> cmd_picker(0, cmds.size() - 1);
+  std::uniform_int_distribution<int> rand_byte(0, 255);
+  std::string out = "\033";
+  out += cmds[cmd_picker(rng)];
+  out += char(rand_byte(rng));
+  return {std::move(out), ""};
+}
+
+inline char fix(uint8_t byte, uint8_t set, uint8_t unset) {
+  byte &= ~unset;
+  byte |= set;
+  return char(byte);
+}
+
+inline char ascii_mods(char c) {
+  // Avoid sending single character commands
+  if (c <= 0xF) return ' ';
+  if (c == '\033') return ' ';
+  return c;
+}
+
+void append_random_utf8_char(std::string& out, wcl::xoshiro_256& rng) {
+  std::uniform_int_distribution<int> length_dist(1, 4);
+  std::uniform_int_distribution<uint8_t> rand_byte(0, 255);
+  int length = length_dist(rng);
+  uint8_t unset0 = 0x80;
+  uint8_t unset1 = 0x40;
+  uint8_t set1 = 0x80;
+  uint8_t unset2 = 0x20;
+  uint8_t set2 = 0xC0;
+  uint8_t unset3 = 0x10;
+  uint8_t set3 = 0xE0;
+  uint8_t unset4 = 0x8;
+  uint8_t set4 = 0xF0;
+  switch (length) {
+    case 1:
+      // if we get a line feed or a vertical tab, we want
+      // to convert it to a newline so we avoid generating
+      // those here and let another function generate them
+      // instead.
+      out += ascii_mods(fix(rand_byte(rng), 0, unset0));
+      return;
+    case 2:
+      out += fix(rand_byte(rng), set2, unset2);
+      out += fix(rand_byte(rng), set1, unset1);
+      return;
+    case 3:
+      out += fix(rand_byte(rng), set3, unset3);
+      out += fix(rand_byte(rng), set1, unset1);
+      out += fix(rand_byte(rng), set1, unset1);
+      return;
+    case 4:
+      out += fix(rand_byte(rng), set4, unset4);
+      out += fix(rand_byte(rng), set1, unset1);
+      out += fix(rand_byte(rng), set1, unset1);
+      out += fix(rand_byte(rng), set1, unset1);
+      return;
+  }
+}
+
+std::pair<std::string, std::string> random_unicode_string(wcl::xoshiro_256& rng) {
+  std::uniform_int_distribution<int> length_dist(0, 50);
+  int length = length_dist(rng);
+  std::string out;
+  for (int i = 0; i < length; ++i) {
+    append_random_utf8_char(out, rng);
+  }
+
+  // copy output now so that it is only copied once
+  std::string copy = out;
+  return {std::move(out), std::move(copy)};
+}
+
+TEST(term_dumb_fuzz) {
+  std::vector<std::pair<std::string, std::string> (*)(wcl::xoshiro_256 & rng)> funcs = {
+      random_ignored_control_seq,   random_valued_control_seq,
+      random_ignored_command,       random_single_character_command,
+      random_two_character_command, random_three_character_command,
+      random_unicode_string};
+  uint64_t seedV = 0xdeadbeefdeadbeef;
+  std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> seed = {seedV, seedV, seedV, seedV};
+  wcl::xoshiro_256 rng(seed);
+  std::uniform_int_distribution<int> func_picker(0, funcs.size() - 1);
+  std::uniform_int_distribution<int> length_dist(0, 50);
+
+  for (int i = 0; i < 10000; ++i) {
+    int length = length_dist(rng);
+    std::string input, expected;
+    std::string functions;
+    for (int j = 0; j < length; ++j) {
+      int idx = func_picker(rng);
+      functions += std::to_string(idx);
+      auto func = funcs[idx];
+      auto p = func(rng);
+      input += p.first;
+      expected += p.second;
+    }
+
+    // Now we just hope they're equal!
+    CONVERTS_TO_DUMB(input, expected)
+        << "\ninput = " << json_escape(input) << "\nfunctions = " << functions << "\n";
+  }
 }
