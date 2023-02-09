@@ -668,6 +668,19 @@ static std::string pretty_cmd(const std::string &x) {
 
 #ifdef __APPLE__
 
+// MacOS doesn't have ptsname_r and thus needs to fall back to
+// regular pipes
+static void create_pipe(int io[2]) {
+  if (pipe(io) == -1) {
+    std::cerr << "failed to create pipe" << std::endl;
+    exit(1);
+  }
+}
+
+static void create_io_stream(int io[2]) { create_pipe(io); }
+
+#else
+
 // Create a psuedoterminal by setting
 // io[0] to the parent fd, and io[1] to
 // the child fd. Prints an error and fails
@@ -706,18 +719,6 @@ static void create_psuedoterminal(int io[2]) {
 }
 
 static void create_io_stream(int io[2]) { create_psuedoterminal(io); }
-
-#else
-// MacOS doesn't have ptsname_r and thus needs to fall back to
-// regular pipes
-static void create_pipe(int io[2]) {
-  if (pipe(io) == -1) {
-    std::cerr << "failed to create pipe" << std::endl;
-    exit(1);
-  }
-}
-
-static void create_io_stream(int io[2]) { create_pipe(io); }
 
 #endif
 
