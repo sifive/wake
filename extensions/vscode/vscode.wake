@@ -93,8 +93,11 @@ export def vscode _: Result Path Error =
         sources here `lsp-server/.*`
     require Pass syntaxSources =
         sources here `syntaxes/.*`
+    require Pass vsceStdin =
+        source "{@here}/vsce-stdin"
 
     def vsceFiles =
+        vsceStdin,
         jsFile,
         packageJSON,
         stdlibJSON,
@@ -113,6 +116,7 @@ export def vscode _: Result Path Error =
     require Pass outputs =
         makeExecPlan (npx, "@vscode/vsce@2.15.0", "package", Nil) vsceFiles
         | editPlanEnvironment (addEnvironmentPath emsdkBinDir)
+        | setPlanStdin (relative @here vsceStdin.getPathName)
         | setPlanDirectory here
         | runJob
         | getJobOutputs
