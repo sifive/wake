@@ -254,6 +254,11 @@ void TermInfoBuf::flush_nums() {
 
 int TermInfoBuf::sync() { return buf.pubsync(); }
 
+static inline bool isIgnoredSingleByteCommand(char c) {
+  // CR, BEL, BS, ENQ, SI, SO
+  return c == '\r' || c == 0x7 || c == 0x8 || c == 0x5 || c == 0xF || c == 0xE;
+}
+
 int TermInfoBuf::overflow(int c) {
   static const char tcis[] = " #%()*+-./";
   static std::set<char> two_character_ignore_starters(tcis, tcis + sizeof(tcis));
@@ -263,33 +268,99 @@ int TermInfoBuf::overflow(int c) {
     case State::default_state:
       if (c == '\033') {
         state = State::esc_state;
-      } else {
-        put(c);
+        break;
       }
+      // form feed and vertical tab are an alternative to newline, regularize it
+      if (c == 0xC || c == 0xB) {
+        put('\n');
+        break;
+      }
+
+      // We want to ignore characters like BEL, CR, etc...
+      if (isIgnoredSingleByteCommand(c)) {
+        break;
+      }
+      // Check for unicode continuations. It's worth
+      // noting that this makes TermInfoBuf incompaitable
+      // with extended ansi.
+      if ((c & 0xE0) == 0xC0) {
+        state = State::unicode2_state;
+        put(c);
+        break;
+      }
+      if ((c & 0xF0) == 0xE0) {
+        state = State::unicode3_state;
+        put(c);
+        break;
+      }
+      if ((c & 0xF8) == 0xF0) {
+        state = State::unicode4_state;
+        put(c);
+        break;
+      }
+
+      // In this case we've hit a standard ANSI byte and we don't have to do anything special!
+      put(c);
+      break;
+    case State::unicode2_state:
+      state = State::default_state;
+      put(c);
+      break;
+    case State::unicode3_state:
+      state = State::unicode2_state;
+      put(c);
+      break;
+    case State::unicode4_state:
+      state = State::unicode3_state;
+      put(c);
       break;
     case State::esc_state:
       if (c == '[') {
-        state = State::num_state;
+        state = State::control_seq_state;
         break;
       }
-      // We ignore anything unrecognized, but
-      // we may need to ignore two characters as well.
-      // TODO: There are a few longer xterm escape sequences
-      // that have longer leading characters. This
-      // implementation will currently incorrectly render
-      // those. They don't seem to see any wide spread use
-      // however.
+      // We treat several types of console commands the same way
+      if (c == ']' || c == '_' || c == 'P' || c == '^') {
+        state = State::os_command_ignore_state;
+        break;
+      }
+      // There are
       if (two_character_ignore_starters.count(c)) {
         state = State::ignore_state;
         break;
-      } else {
-        state = State::default_state;
       }
+      // If we're not in a longer escape sequence, or a two-character
+      // escape sequence, we must be in a 1-character escape sequence
+      // and we can ignore this character.
+      state = State::default_state;
       break;
     case State::ignore_state:
       state = State::default_state;
       break;
-    case State::num_state:
+    case State::os_command_ignore_state:
+      // os commands are ended by either
+      // BEL or ST where BEL = 0x7 and ST = ESC '\'
+      if (c == 0x7) {
+        state = State::default_state;
+      }
+      if (c == '\033') {
+        state = State::os_command_ignore_st_state;
+      }
+      break;
+    case State::os_command_ignore_st_state:
+      if (c == '\\') {
+        state = State::default_state;
+      } else {
+        state = State::os_command_ignore_state;
+      }
+      break;
+    case State::control_seq_ignore_state:
+      // control sequences are terminated by a byte in this range.
+      if (c >= 0x40 && c <= 0x7E) {
+        state = State::default_state;
+      }
+      break;
+    case State::control_seq_state:
       // Push the code if a ';' is seen
       if (c == ';') {
         next_code();
@@ -303,11 +374,18 @@ int TermInfoBuf::overflow(int c) {
         break;
       }
 
-      // Sometimes an escape sequence will end in a way we don't
+      // control sequences are terminated by a byte in this range.
+      if (c >= 0x40 && c <= 0x7E) {
+        clear_codes();
+        state = State::default_state;
+        break;
+      }
+
+      // Sometimes a control sequence will end in a way we don't
       // recognize, in that case, ignore the escape sequence.
       if (!isdigit(c)) {
         clear_codes();
-        state = State::default_state;
+        state = State::control_seq_ignore_state;
         break;
       }
 

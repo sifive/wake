@@ -197,9 +197,32 @@ struct TestLogger {
     err->test_name = test_name;
     err->file = file;
     err->line = line;
-    err->predicate_error << "Expected:\n\t" << term_colour(TERM_MAGENTA) << json_escape(expected);
+    err->predicate_error << "Expected:\n\t"
+                         << "(" << expected.size() << ")" << term_colour(TERM_MAGENTA) << '"'
+                         << json_escape(expected) << '"';
     err->predicate_error << term_normal() << "\nBut got:\n\t";
-    err->predicate_error << term_colour(TERM_MAGENTA) << json_escape(actual);
+    err->predicate_error << "(" << actual.size() << ")" << term_colour(TERM_MAGENTA) << '"'
+                         << json_escape(actual) << '"';
+    err->predicate_error << term_normal() << std::endl;
+    return fail(*err, assert);
+  }
+
+  TestStream expect_equal(bool assert, const char* expected_, std::string actual,
+                          const char* expected_str, const char* actual_str, int line,
+                          const char* file) {
+    std::string expected = expected_;
+    if (expected == actual) return TestStream(nullptr, nullptr);
+    errors.emplace_back(new ErrorMessage);
+    auto& err = errors.back();
+    err->test_name = test_name;
+    err->file = file;
+    err->line = line;
+    err->predicate_error << "Expected:\n\t"
+                         << "(" << expected.size() << ")" << term_colour(TERM_MAGENTA) << '"'
+                         << json_escape(expected) << '"';
+    err->predicate_error << term_normal() << "\nBut got:\n\t";
+    err->predicate_error << "(" << actual.size() << ")" << term_colour(TERM_MAGENTA) << '"'
+                         << json_escape(actual) << '"';
     err->predicate_error << term_normal() << std::endl;
     return fail(*err, assert);
   }
