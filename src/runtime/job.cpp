@@ -666,6 +666,8 @@ static std::string pretty_cmd(const std::string &x) {
   return out.str();
 }
 
+#ifdef __APPLE__
+
 // Create a psuedoterminal by setting
 // io[0] to the parent fd, and io[1] to
 // the child fd. Prints an error and fails
@@ -703,6 +705,22 @@ static void create_psuedoterminal(int io[2]) {
   io[1] = child_term_fd;
 }
 
+static void create_io_stream(int io[2]) { create_psuedoterminal(io); }
+
+#else
+// MacOS doesn't have ptsname_r and thus needs to fall back to
+// regular pipes
+static void create_pipe(int io[2]) {
+  if (pipe(io) == -1) {
+    std::cerr << "failed to create pipe" << std::endl;
+    exit(1);
+  }
+}
+
+static void create_io_stream(int io[2]) { create_pipe(io); }
+
+#endif
+
 static void launch(JobTable *jobtable) {
   // Note: We schedule jobs whenever we are under CPU quota, without considering if the
   // new job will cause us to exceed the quota. This is necessary, for two reasons:
@@ -728,25 +746,25 @@ static void launch(JobTable *jobtable) {
     std::shared_ptr<JobEntry> entry =
         std::make_shared<JobEntry>(jobtable->imp.get(), std::move(task.job));
 
-    int pt_stdout[2];
-    int pt_stderr[2];
-    create_psuedoterminal(pt_stdout);
-    create_psuedoterminal(pt_stderr);
+    int stdout_stream[2];
+    int stderr_stream[2];
+    create_io_stream(stdout_stream);
+    create_io_stream(stderr_stream);
 
     int flags;
-    if ((flags = fcntl(pt_stdout[0], F_GETFD, 0)) != -1)
-      fcntl(pt_stdout[0], F_SETFD, flags | FD_CLOEXEC);
-    if ((flags = fcntl(pt_stderr[0], F_GETFD, 0)) != -1)
-      fcntl(pt_stderr[0], F_SETFD, flags | FD_CLOEXEC);
-    jobtable->imp->poll.add(entry->pipe_stdout = pt_stdout[0]);
-    jobtable->imp->poll.add(entry->pipe_stderr = pt_stderr[0]);
-    jobtable->imp->pipes[pt_stdout[0]] = entry;
-    jobtable->imp->pipes[pt_stderr[0]] = entry;
+    if ((flags = fcntl(stdout_stream[0], F_GETFD, 0)) != -1)
+      fcntl(stdout_stream[0], F_SETFD, flags | FD_CLOEXEC);
+    if ((flags = fcntl(stderr_stream[0], F_GETFD, 0)) != -1)
+      fcntl(stderr_stream[0], F_SETFD, flags | FD_CLOEXEC);
+    jobtable->imp->poll.add(entry->pipe_stdout = stdout_stream[0]);
+    jobtable->imp->poll.add(entry->pipe_stderr = stderr_stream[0]);
+    jobtable->imp->pipes[stdout_stream[0]] = entry;
+    jobtable->imp->pipes[stderr_stream[0]] = entry;
     clock_gettime(CLOCK_REALTIME, &entry->job->start);
     std::stringstream prelude;
     prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
             << (task.stdin_file.empty() ? "/dev/null" : task.stdin_file.c_str()) << '\0'
-            << std::to_string(pt_stdout[1]) << '\0' << std::to_string(pt_stderr[1]) << '\0'
+            << std::to_string(stdout_stream[1]) << '\0' << std::to_string(stderr_stream[1]) << '\0'
             << task.dir << '\0';
     std::string shim = prelude.str() + task.cmdline;
     auto cmdline = split_null(shim);
@@ -765,8 +783,8 @@ static void launch(JobTable *jobtable) {
     jobtable->imp->pidmap[pid] = entry;
     entry->job->pid = entry->pid = pid;
     entry->job->state |= STATE_FORKED;
-    close(pt_stdout[1]);
-    close(pt_stderr[1]);
+    close(stdout_stream[1]);
+    close(stderr_stream[1]);
     bool indirect = *entry->job->cmdline != task.cmdline;
     double predict = entry->job->predict.status == 0 ? entry->job->predict.runtime : 0;
     std::string pretty = pretty_cmd(entry->job->cmdline->as_str());
