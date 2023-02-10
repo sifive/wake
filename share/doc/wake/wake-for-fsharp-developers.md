@@ -84,8 +84,6 @@ export def area (shape: Shape) =
         Rectangle length width = length *. width
 ```
 
-Note that in F#, recursive functions require the `rec` keyword, whereas in Wake, recursive functions require no special keyword.
-
 ## Piping
 
 F#
