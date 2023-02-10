@@ -116,8 +116,9 @@ export def vscode _: Result Path Error =
     require Pass outputs =
         makeExecPlan (npx, "@vscode/vsce@2.15.0", "package", Nil) vsceFiles
         | editPlanEnvironment (addEnvironmentPath emsdkBinDir)
-        | setPlanStdin (relative @here vsceStdin.getPathName)
         | setPlanDirectory here
+        | setPlanStdin (relative @here vsceStdin.getPathName)
+        | setIsAtty True
         | runJob
         | getJobOutputs
 

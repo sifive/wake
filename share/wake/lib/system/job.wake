@@ -37,6 +37,7 @@ export tuple RunnerInput =
   export Resources:   List String
   export Prefix:      String        # a unique prefix for this job
   export Record:      Usage         # previous resource usage
+  export IsAtty:      Boolean       # should job run in psuedoterminal
 
 export tuple RunnerOutput =
   export Inputs:  List String
@@ -93,6 +94,7 @@ tuple Plan =
   export Usage:        Usage        # User-supplied usage prediction; overruled by database statistics (if any)
   export FnInputs:     (List String => List String) # Modify the Runner's reported inputs  (files read)
   export FnOutputs:    (List String => List String) # Modify the Runner's reported outputs (files created)
+  export IsAtty:       Boolean      # Should job run in psuedoterminal
 
 def isOnce: Persistence => Boolean = match _
   ReRun = False
@@ -153,7 +155,7 @@ export def editPlanShare (f: Boolean => Boolean): Plan => Plan =
 # Get a unique hash-code for the job
 export def getPlanHash (plan: Plan): Integer =
   def signature cmd env dir stdin = prim "hash"
-  def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ = plan
+  def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ _ = plan
   signature cmd env dir stdin
 
 # The criteria which determine if Job execution can be skipped:
@@ -176,7 +178,7 @@ export def makePlan (label: String) (visible: List Path) (command: String): Plan
 # Set reasonable defaults for all Plan arguments
 def id x = x
 export def makeExecPlan (cmd: List String) (visible: List Path): Plan =
-  Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share False Nil (\_ True) defaultUsage id id
+  Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share False Nil (\_ True) defaultUsage id id False
 
 export def makeShellPlan (script: String) (visible: List Path): Plan =
   makeExecPlan (which "dash", "-c", script, Nil) visible
@@ -186,15 +188,15 @@ def defaultUsage = Usage 0 0.0 1.0 0 0 0
 # This runner does not detect inputs/outputs on it's own
 # You must use Fn{Inputs,Outputs} to fill in this information
 export def localRunner: Runner =
-  def launch job dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
+  def launch job dir stdin env cmd status runtime cputime membytes ibytes obytes isatty = prim "job_launch"
   def badlaunch job error = prim "job_fail_launch"
   def doit job = match _
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput _ cmd vis env dir stdin _ _ predict) =
+    Pass (RunnerInput _ cmd vis env dir stdin _ _ predict isatty) =
         def Usage status runtime cputime mem in out = predict
-        def _ = launch job dir stdin env.implode cmd.implode status runtime cputime mem in out
+        def _ = launch job dir stdin env.implode cmd.implode status runtime cputime mem in out (if isatty then 1 else 0)
         match (getJobReality job)
           Pass reality = Pass (RunnerOutput (map getPathName vis) Nil reality)
           Fail f = Fail f
@@ -242,7 +244,7 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput _label cmd vis env dir stdin _ _ _) =
+    Pass (RunnerInput _label cmd vis env dir stdin _ _ _ _) =
         def mkVisJson (Path path hash) =
           JObject ("path" :-> JString path, "hash" :-> JString hash,)
         def jobCacheVisible = JArray (map mkVisJson vis)
@@ -332,7 +334,7 @@ export def virtualRunner: Runner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput _ _ vis _ _ _ _ _ predict) =
+    Pass (RunnerInput _ _ vis _ _ _ _ _ predict _) =
         def Usage status runtime cputime mem in out = predict
         def _ = virtual job "" "" status runtime cputime mem in out # sets predict+reality
         match (getJobReality job)
@@ -343,7 +345,7 @@ export def virtualRunner: Runner =
 def pid = prim "pid"
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
-def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo stdout stderr label: Job =
+def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo stdout stderr label isatty: Job =
   def create label dir stdin env cmd signature visible keep echo stdout stderr = prim "job_create"
   def finish job inputs outputs all_outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
   def badfinish job error = prim "job_fail_finish"
@@ -356,7 +358,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
     def job = create label dir stdin env.implode cmd.implode hash visStrings.implode (if keep then 1 else 0) echo stdout stderr
     def prefix = "{str pid}.{str (getJobId job)}"
     def usage = getJobRecord job | getOrElse uusage
-    def output = run job (Pass (RunnerInput label cmd vis env dir stdin res prefix usage))
+    def output = run job (Pass (RunnerInput label cmd vis env dir stdin res prefix usage isatty))
     def final _ = match output
       Fail e =
         badfinish job e
@@ -384,20 +386,20 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
       Pair Nil      last = confirm False last (build Unit)
 
 # Only run if the first four arguments differ
-target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run echo stdout stderr label =
-  runAlways cmd env dir stdin res usage finputs foutputs vis keep run echo stdout stderr label
+target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run echo stdout stderr label isatty =
+  runAlways cmd env dir stdin res usage finputs foutputs vis keep run echo stdout stderr label isatty
 
 # Default runners provided by wake
 export topic runner: Runner
 publish runner = localRunner, defaultRunner, Nil
 
-def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) (LogLevel stderr) =
+def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) (LogLevel stderr) isatty =
   if isOnce pers
-  then runOnce   cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run echo stdout stderr label
-  else runAlways cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run echo stdout stderr label
+  then runOnce   cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run echo stdout stderr label isatty
+  else runAlways cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run echo stdout stderr label isatty
 
-export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs) =
-  runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run echo stdout stderr
+export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs isatty) =
+  runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run echo stdout stderr isatty
 
 data RunnerOption =
   Accept (score: Double) (runnerFn: Job => Result RunnerInput Error => Result RunnerOutput Error)
@@ -405,7 +407,7 @@ data RunnerOption =
 
 # Run the job!
 export def runJob (p: Plan): Job = match p
-  Plan label cmd vis env dir stdin stdout stderr echo pers _lo res rf usage finputs foutputs =
+  Plan label cmd vis env dir stdin stdout stderr echo pers _lo res rf usage finputs foutputs isatty =
     # Transform the 'List Runner' into 'List RunnerOption'
     def qualify runner = match runner
       Runner name _ _ if ! rf runner = Reject "{name}: rejected by Plan"
@@ -419,7 +421,7 @@ export def runJob (p: Plan): Job = match p
       (Accept score fn) (Pair bests _bestr) =
         if score >. bests then Pair score (Some fn) else acc
     match (opts | foldl best (Pair 0.0 None) | getPairSecond)
-      Some r = runJobImp label cmd env dir stdin res usage finputs foutputs vis pers r echo stdout stderr
+      Some r = runJobImp label cmd env dir stdin res usage finputs foutputs vis pers r echo stdout stderr isatty
       None =
         def create label dir stdin env cmd signature visible keep echo stdout stderr = prim "job_create"
         def badfinish job e = prim "job_fail_finish"
@@ -598,7 +600,7 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
   def pre = match _
     Fail f = Pair (Fail f) ""
     _ if ! ok = Pair (Fail (makeError "Runner {script} is not executable")) ""
-    Pass (RunnerInput label command visible environment directory stdin res prefix record) =
+    Pass (RunnerInput label command visible environment directory stdin res prefix record isatty) =
         def Usage status runtime cputime membytes inbytes outbytes = record
         def pmkdir m p = prim "mkdir"
         def pwrite m p d = prim "write"
@@ -637,7 +639,7 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
             Pass inFile =
               def outFile = "{build}/{prefix}.out.json"
               def cmd = script, "-I", "-p", inFile, "-o", outFile, extraArgs
-              def proxy = RunnerInput label cmd Nil (extraEnv ++ environment) "." "" Nil prefix (estimate record)
+              def proxy = RunnerInput label cmd Nil (extraEnv ++ environment) "." "" Nil prefix (estimate record) isatty
               Pair (Pass proxy) inFile
   def post = match _
     Pair (Fail f) _ = Fail f

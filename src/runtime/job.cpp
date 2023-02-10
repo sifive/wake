@@ -238,13 +238,15 @@ struct Task {
   std::string stdin_file;
   std::string environ;
   std::string cmdline;
+  bool is_atty;
   Task(RootPointer<Job> &&job_, const std::string &dir_, const std::string &stdin_file_,
-       const std::string &environ_, const std::string &cmdline_)
+       const std::string &environ_, const std::string &cmdline_, bool is_atty_)
       : job(std::move(job_)),
         dir(dir_),
         stdin_file(stdin_file_),
         environ(environ_),
-        cmdline(cmdline_) {}
+        cmdline(cmdline_),
+        is_atty(is_atty_) {}
 };
 
 static bool operator<(const std::unique_ptr<Task> &x, const std::unique_ptr<Task> &y) {
@@ -666,10 +668,6 @@ static std::string pretty_cmd(const std::string &x) {
   return out.str();
 }
 
-#ifdef __APPLE__
-
-// MacOS doesn't have ptsname_r and thus needs to fall back to
-// regular pipes
 static void create_pipe(int io[2]) {
   if (pipe(io) == -1) {
     std::cerr << "failed to create pipe" << std::endl;
@@ -677,7 +675,11 @@ static void create_pipe(int io[2]) {
   }
 }
 
-static void create_io_stream(int io[2]) { create_pipe(io); }
+#ifdef __APPLE__
+
+// MacOS doesn't have ptsname_r and thus needs to fall back to
+// regular pipes
+static void create_psuedoterminal(int io[2]) { create_pipe(io); }
 
 #else
 
@@ -718,8 +720,6 @@ static void create_psuedoterminal(int io[2]) {
   io[1] = child_term_fd;
 }
 
-static void create_io_stream(int io[2]) { create_psuedoterminal(io); }
-
 #endif
 
 static void launch(JobTable *jobtable) {
@@ -749,8 +749,13 @@ static void launch(JobTable *jobtable) {
 
     int stdout_stream[2];
     int stderr_stream[2];
-    create_io_stream(stdout_stream);
-    create_io_stream(stderr_stream);
+    if (task.is_atty) {
+      create_psuedoterminal(stdout_stream);
+      create_psuedoterminal(stderr_stream);
+    } else {
+      create_pipe(stdout_stream);
+      create_pipe(stderr_stream);
+    }
 
     int flags;
     if ((flags = fcntl(stdout_stream[0], F_GETFD, 0)) != -1)
@@ -1135,22 +1140,24 @@ static PRIMFN(prim_job_fail_finish) {
 }
 
 static PRIMTYPE(type_job_launch) {
-  return args.size() == 11 && args[0]->unify(Data::typeJob) && args[1]->unify(Data::typeString) &&
+  return args.size() == 12 && args[0]->unify(Data::typeJob) && args[1]->unify(Data::typeString) &&
          args[2]->unify(Data::typeString) && args[3]->unify(Data::typeString) &&
          args[4]->unify(Data::typeString) && args[5]->unify(Data::typeInteger) &&
          args[6]->unify(Data::typeDouble) && args[7]->unify(Data::typeDouble) &&
          args[8]->unify(Data::typeInteger) && args[9]->unify(Data::typeInteger) &&
-         args[10]->unify(Data::typeInteger) && out->unify(Data::typeUnit);
+         args[10]->unify(Data::typeInteger) && args[11]->unify(Data::typeInteger) &&
+         out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_job_launch) {
   JobTable *jobtable = static_cast<JobTable *>(data);
-  EXPECT(11);
+  EXPECT(12);
   JOB(job, 0);
   STRING(dir, 1);
   STRING(stdin_file, 2);
   STRING(env, 3);
   STRING(cmd, 4);
+  INTEGER_MPZ(is_atty, 11)
 
   runtime.heap.reserve(reserve_unit());
   parse_usage(&job->predict, args + 5, runtime, scope);
@@ -1160,7 +1167,7 @@ static PRIMFN(prim_job_launch) {
 
   auto &heap = jobtable->imp->pending;
   heap.emplace_back(new Task(runtime.heap.root(job), dir->as_str(), stdin_file->as_str(),
-                             env->as_str(), cmd->as_str()));
+                             env->as_str(), cmd->as_str(), mpz_cmp_si(is_atty, 0) != 0));
   std::push_heap(heap.begin(), heap.end());
 
   // If a scheduled job claims a longer critical path, we need to adjust the total path time
