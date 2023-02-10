@@ -421,6 +421,7 @@ static void handle_SIGCHLD(int sig) {
 
 static void handle_exit(int sig) {
   (void)sig;
+  std::cerr << "exiting from sig: " << sig << std::endl;
   exit_asap = true;
 }
 
