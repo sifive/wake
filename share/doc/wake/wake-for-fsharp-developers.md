@@ -1,8 +1,6 @@
 # Wake for F# developers
 
-F# and Wake are both ML-dialects, so they share very similar heritages as far as programming languages go. The major difference is that F# is intended to be a general-purpose programming language and is multi-paradigm since it also supports imperative and OOP programming, whereas Wake is intended to be a programming language to support a build system and does not support the imperative or OOP programming paradigms. However, while simple, the Wake programming language is rather powerful.
-
-In many cases, the difference between F# and Wake are syntactical only. Below is a collection of comparisons to ease the transition between the two.
+F# and Wake are both ML-dialects, so they share very similar heritages as far as programming languages go. The major differences are that F# supports OOP and imperative programming, while Wake does not, and that Wake is a build system on top of being a programming langauge. In many cases, the difference between the functional parts of F# and Wake are syntactical only. Below is a collection of comparisons to ease the transition between the two.
 
 ## Definitions
 
@@ -72,8 +70,8 @@ F#
 ```fsharp
 let rec area shape =
     match shape with
-    | Circle radius             -> radius * radius
-    | Square side               -> area (Rectangle (side, side))
+    | Circle radius -> System.Math.PI * radius * radius
+    | Square side -> area (Rectangle (side, side))
     | Rectangle (length, width) -> length * width
 ```
 
@@ -81,8 +79,8 @@ Wake
 ```wake
 export def area (shape: Shape) =
     match shape
-        Circle radius          = pi *. (radius ^. 2.0)
-        Square side            = area (Rectangle side side)
+        Circle radius = pi *. (radius ^. 2.0)
+        Square side = area (Rectangle side side)
         Rectangle length width = length *. width
 ```
 
@@ -114,7 +112,7 @@ F#
 type Name = {First: string; Last: string}
 
 // This is a value of type `Name`
-{First: "John"; Last: "Smith"}
+let name = {First: "John"; Last: "Smith"}
 
 // This is a record with a generic type parameter
 type Person<'T> = {Name: Name; JobFunction: 'T}
@@ -124,16 +122,16 @@ Wake
 ```wake
 # This is a tuple
 export tuple Name =
-    First: String
-    Last: String
+    export First: String
+    export Last: String
 
 # This a value of type `Name`
 export def name = Name "John" "Smith"
 
 # This is a tuple with a type parameter
 export tuple Person a =
-    Name: Name
-    JobFunction: a
+    export Name: Name
+    export JobFunction: a
 
 # This is a value of type `Person Integer`
 export def person = Person (Name "John" "Smith") 4
