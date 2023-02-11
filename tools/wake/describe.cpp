@@ -214,10 +214,11 @@ void describe_human(const std::vector<JobReflection> &jobs) {
   for (auto &job : jobs) {
     out << term_colour(TERM_GREEN) << "\n\n# " << job.label << "(" << job.job << ")\n";
     out << term_normal() << "$ " << term_colour(TERM_CYAN);
-    for (auto &cmd_part : job.commandline) {
-      out << cmd_part << " ";  // # TODO: don't output trailing space
+    for (size_t i = 0; i < job.commandline.size() - 1; i++) {
+      const auto &cmd_part = job.commandline[i];
+      out << cmd_part << " ";
     }
-    out << "\n\n\n" << term_normal();
+    out << job.commandline.back() << "\n\n\n" << term_normal();
 
     // We have to use our speical stream for the output of the program
     for (auto &log_line : job.std_writes) {
