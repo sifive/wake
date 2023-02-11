@@ -222,7 +222,7 @@ void describe_human(const std::vector<JobReflection> &jobs) {
         out << " ";
       }
     }
-    out << job.commandline.back() << "\n\n\n" << term_normal();
+    out << "\n\n\n" << term_normal();
 
     // We have to use our speical stream for the output of the program
     for (auto &log_line : job.std_writes) {
