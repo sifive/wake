@@ -118,7 +118,7 @@ export def vscode _: Result Path Error =
         | editPlanEnvironment (addEnvironmentPath emsdkBinDir)
         | setPlanDirectory here
         | setPlanStdin (relative @here vsceStdin.getPathName)
-        | setIsAtty True
+        | setPlanIsAtty True
         | runJob
         | getJobOutputs
 
