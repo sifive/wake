@@ -238,13 +238,15 @@ struct Task {
   std::string stdin_file;
   std::string environ;
   std::string cmdline;
+  bool is_atty;
   Task(RootPointer<Job> &&job_, const std::string &dir_, const std::string &stdin_file_,
-       const std::string &environ_, const std::string &cmdline_)
+       const std::string &environ_, const std::string &cmdline_, bool is_atty_)
       : job(std::move(job_)),
         dir(dir_),
         stdin_file(stdin_file_),
         environ(environ_),
-        cmdline(cmdline_) {}
+        cmdline(cmdline_),
+        is_atty(is_atty_) {}
 };
 
 static bool operator<(const std::unique_ptr<Task> &x, const std::unique_ptr<Task> &y) {
@@ -666,6 +668,60 @@ static std::string pretty_cmd(const std::string &x) {
   return out.str();
 }
 
+static void create_pipe(int io[2]) {
+  if (pipe(io) == -1) {
+    std::cerr << "failed to create pipe" << std::endl;
+    exit(1);
+  }
+}
+
+#ifdef __APPLE__
+
+// MacOS doesn't have ptsname_r and thus needs to fall back to
+// regular pipes
+static void create_psuedoterminal(int io[2]) { create_pipe(io); }
+
+#else
+
+// Create a psuedoterminal by setting
+// io[0] to the parent fd, and io[1] to
+// the child fd. Prints an error and fails
+// if an error occurs for some reason.
+// Both the parent and the bidirectional but
+// this function is intended to repalce calling
+// `pipe` so you might instead only read from
+// the parent and write to the child.
+static void create_psuedoterminal(int io[2]) {
+  // Create a psuedo-terminal
+  int parent_term_fd = open("/dev/ptmx", O_RDWR);
+  if (parent_term_fd == -1) {
+    std::cerr << "open failed to open new psuedo-terminal" << std::endl;
+    exit(1);
+  }
+  if (grantpt(parent_term_fd) != 0) {
+    std::cerr << "grantpt failed" << std::endl;
+    exit(1);
+  }
+  if (unlockpt(parent_term_fd)) {
+    std::cerr << "unlockpt failed" << std::endl;
+    exit(1);
+  }
+  char child_term_name[80];
+  if (ptsname_r(parent_term_fd, child_term_name, sizeof(child_term_name)) != 0) {
+    std::cerr << "ptsname_r failed" << std::endl;
+    exit(1);
+  }
+  int child_term_fd = open(child_term_name, O_RDWR);
+  if (child_term_fd == -1) {
+    std::cerr << "open failed to open child end of psuedo-terminal" << std::endl;
+    exit(1);
+  }
+  io[0] = parent_term_fd;
+  io[1] = child_term_fd;
+}
+
+#endif
+
 static void launch(JobTable *jobtable) {
   // Note: We schedule jobs whenever we are under CPU quota, without considering if the
   // new job will cause us to exceed the quota. This is necessary, for two reasons:
@@ -691,26 +747,30 @@ static void launch(JobTable *jobtable) {
     std::shared_ptr<JobEntry> entry =
         std::make_shared<JobEntry>(jobtable->imp.get(), std::move(task.job));
 
-    int pipe_stdout[2];
-    int pipe_stderr[2];
-    if (pipe(pipe_stdout) == -1 || pipe(pipe_stderr) == -1) {
-      perror("pipe");
-      exit(1);
+    int stdout_stream[2];
+    int stderr_stream[2];
+    if (task.is_atty) {
+      create_psuedoterminal(stdout_stream);
+      create_psuedoterminal(stderr_stream);
+    } else {
+      create_pipe(stdout_stream);
+      create_pipe(stderr_stream);
     }
+
     int flags;
-    if ((flags = fcntl(pipe_stdout[0], F_GETFD, 0)) != -1)
-      fcntl(pipe_stdout[0], F_SETFD, flags | FD_CLOEXEC);
-    if ((flags = fcntl(pipe_stderr[0], F_GETFD, 0)) != -1)
-      fcntl(pipe_stderr[0], F_SETFD, flags | FD_CLOEXEC);
-    jobtable->imp->poll.add(entry->pipe_stdout = pipe_stdout[0]);
-    jobtable->imp->poll.add(entry->pipe_stderr = pipe_stderr[0]);
-    jobtable->imp->pipes[pipe_stdout[0]] = entry;
-    jobtable->imp->pipes[pipe_stderr[0]] = entry;
+    if ((flags = fcntl(stdout_stream[0], F_GETFD, 0)) != -1)
+      fcntl(stdout_stream[0], F_SETFD, flags | FD_CLOEXEC);
+    if ((flags = fcntl(stderr_stream[0], F_GETFD, 0)) != -1)
+      fcntl(stderr_stream[0], F_SETFD, flags | FD_CLOEXEC);
+    jobtable->imp->poll.add(entry->pipe_stdout = stdout_stream[0]);
+    jobtable->imp->poll.add(entry->pipe_stderr = stderr_stream[0]);
+    jobtable->imp->pipes[stdout_stream[0]] = entry;
+    jobtable->imp->pipes[stderr_stream[0]] = entry;
     clock_gettime(CLOCK_REALTIME, &entry->job->start);
     std::stringstream prelude;
     prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
             << (task.stdin_file.empty() ? "/dev/null" : task.stdin_file.c_str()) << '\0'
-            << std::to_string(pipe_stdout[1]) << '\0' << std::to_string(pipe_stderr[1]) << '\0'
+            << std::to_string(stdout_stream[1]) << '\0' << std::to_string(stderr_stream[1]) << '\0'
             << task.dir << '\0';
     std::string shim = prelude.str() + task.cmdline;
     auto cmdline = split_null(shim);
@@ -729,8 +789,8 @@ static void launch(JobTable *jobtable) {
     jobtable->imp->pidmap[pid] = entry;
     entry->job->pid = entry->pid = pid;
     entry->job->state |= STATE_FORKED;
-    close(pipe_stdout[1]);
-    close(pipe_stderr[1]);
+    close(stdout_stream[1]);
+    close(stderr_stream[1]);
     bool indirect = *entry->job->cmdline != task.cmdline;
     double predict = entry->job->predict.status == 0 ? entry->job->predict.runtime : 0;
     std::string pretty = pretty_cmd(entry->job->cmdline->as_str());
@@ -1080,22 +1140,24 @@ static PRIMFN(prim_job_fail_finish) {
 }
 
 static PRIMTYPE(type_job_launch) {
-  return args.size() == 11 && args[0]->unify(Data::typeJob) && args[1]->unify(Data::typeString) &&
+  return args.size() == 12 && args[0]->unify(Data::typeJob) && args[1]->unify(Data::typeString) &&
          args[2]->unify(Data::typeString) && args[3]->unify(Data::typeString) &&
          args[4]->unify(Data::typeString) && args[5]->unify(Data::typeInteger) &&
          args[6]->unify(Data::typeDouble) && args[7]->unify(Data::typeDouble) &&
          args[8]->unify(Data::typeInteger) && args[9]->unify(Data::typeInteger) &&
-         args[10]->unify(Data::typeInteger) && out->unify(Data::typeUnit);
+         args[10]->unify(Data::typeInteger) && args[11]->unify(Data::typeInteger) &&
+         out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_job_launch) {
   JobTable *jobtable = static_cast<JobTable *>(data);
-  EXPECT(11);
+  EXPECT(12);
   JOB(job, 0);
   STRING(dir, 1);
   STRING(stdin_file, 2);
   STRING(env, 3);
   STRING(cmd, 4);
+  INTEGER_MPZ(is_atty, 11)
 
   runtime.heap.reserve(reserve_unit());
   parse_usage(&job->predict, args + 5, runtime, scope);
@@ -1105,7 +1167,7 @@ static PRIMFN(prim_job_launch) {
 
   auto &heap = jobtable->imp->pending;
   heap.emplace_back(new Task(runtime.heap.root(job), dir->as_str(), stdin_file->as_str(),
-                             env->as_str(), cmd->as_str()));
+                             env->as_str(), cmd->as_str(), mpz_cmp_si(is_atty, 0) != 0));
   std::push_heap(heap.begin(), heap.end());
 
   // If a scheduled job claims a longer critical path, we need to adjust the total path time

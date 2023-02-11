@@ -39,7 +39,6 @@ static std::string convert_color_dumb(std::string str) {
 }
 
 #define CONVERTS_TO(x, y) EXPECT_EQUAL(y, convert_color(x))
-
 #define CONVERTS_TO_DUMB(x, y) EXPECT_EQUAL(y, convert_color_dumb(x))
 
 TEST(term_basic_foreground_colors) {

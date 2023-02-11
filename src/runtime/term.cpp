@@ -407,11 +407,15 @@ int FdBuf::overflow(int c) {
   char ch = c;
   do {
     ssize_t r = write(fd, &ch, sizeof(ch));
-    if (r == -1 && errno != EINTR) {
+    if (r == 1) {
+      break;
+    }
+
+    if (errno != EINTR) {
       std::cerr << "Failed to write character" << std::endl;
       exit(1);
     }
-  } while (errno != EINTR);
+  } while (errno == EINTR);
 
   return c;
 }
@@ -526,6 +530,19 @@ const char *term_ed() { return ed; }
 bool term_tty() { return tty; }
 
 #else
+
+void TermInfoBuf::clear_codes() {}
+void TermInfoBuf::put(char) {}
+void TermInfoBuf::putstr(const char *) {}
+void TermInfoBuf::update_code(char) {}
+void TermInfoBuf::next_code() {}
+void TermInfoBuf::output_codes() {}
+void TermInfoBuf::flush_nums() {}
+int TermInfoBuf::sync() { return -1; }
+int TermInfoBuf::overflow(int) { return -1; }
+
+int FdBuf::overflow(int) { return -1; }
+int FdBuf::sync() { return -1; }
 
 const char *term_colour(int code) { return ""; }
 const char *term_normal() { return ""; }

@@ -71,8 +71,6 @@ static void write_all(int fd, const char *data, size_t len) {
   }
 }
 
-static void write_all_str(int fd, const char *data) { write_all(fd, data, strlen(data)); }
-
 static void status_clear() {
   if (term_tty() && used) {
     std::stringstream os;
@@ -249,6 +247,11 @@ void status_init() {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
 
+    static char lines_lit[] = "lines";
+    static char cols_lit[] = "cols";
+    rows = tigetnum(lines_lit);
+    cols = tigetnum(cols_lit);
+
     // watch for resize events
     sa.sa_handler = handle_SIGWINCH;
     sa.sa_flags = SA_RESTART;  // we don't interrupt the main loop for this
@@ -299,16 +302,26 @@ void status_set_bulk_fd(int fd, const char *streams) {
 
 void status_write(const char *name, const char *data, int len) {
   StreamSettings s = settings[name];
+  FdBuf buf(s.fd);
+  TermInfoBuf tbuf(&buf, true);
+  std::ostream raw(&buf);
+  std::ostream term(&tbuf);
   if (s.fd != -1) {
     status_clear();
     if (s.istty && s.colour != TERM_DEFAULT) {
       int colour = s.colour % 8;
       int intensity = s.colour / 16;
-      if (colour != TERM_DEFAULT) write_all_str(s.fd, term_colour(colour));
-      if (intensity != TERM_DEFAULT) write_all_str(s.fd, term_intensity(intensity));
+      if (colour != TERM_DEFAULT) {
+        raw << term_colour(colour);
+      }
+      if (intensity != TERM_DEFAULT) {
+        raw << term_intensity(intensity);
+      }
     }
-    write_all(s.fd, data, len);
-    if (s.istty && s.colour != TERM_DEFAULT) write_all_str(s.fd, term_normal());
+    term.write(data, len);
+    if (s.istty && s.colour != TERM_DEFAULT) {
+      raw << term_normal();
+    }
     refresh_needed = true;
   }
 }
