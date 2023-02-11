@@ -214,9 +214,13 @@ void describe_human(const std::vector<JobReflection> &jobs) {
   for (auto &job : jobs) {
     out << term_colour(TERM_GREEN) << "\n\n# " << job.label << "(" << job.job << ")\n";
     out << term_normal() << "$ " << term_colour(TERM_CYAN);
-    for (size_t i = 0; i < job.commandline.size() - 1; i++) {
+    for (size_t i = 0; i < job.commandline.size(); i++) {
       const auto &cmd_part = job.commandline[i];
-      out << cmd_part << " ";
+      out << cmd_part;
+
+      if (i != job.commandline.size() - 1) {
+        out << " ";
+      }
     }
     out << job.commandline.back() << "\n\n\n" << term_normal();
 
