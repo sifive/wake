@@ -101,18 +101,20 @@ void print_help(const char *argv0) {
     << std::endl
     << "  Database commands:" << std::endl
     << "    --init      DIR  Create or replace a wake.db in the specified directory"     << std::endl
-    << "    --input  -i FILE Report recorded meta-data for jobs which read FILES"        << std::endl
-    << "    --output -o FILE Report recorded meta-data for jobs which wrote FILES"       << std::endl
-    << "    --job       JOB  Report recorded meta-data for the specified job id"         << std::endl
-    << "    --last     -l    Report recorded meta-data for all jobs run by last build"   << std::endl
-    << "    --failed   -f    Report recorded meta-data for jobs which failed last build" << std::endl
-    << "    --verbose  -v    Report recorded standard output and error of matching jobs" << std::endl
-    << "    --metadata       Report recorded metadata without output of matching jobs"   << std::endl
-    << "    --debug    -d    Report recorded stack frame of matching jobs"               << std::endl
-    << "    --script   -s    Format reported jobs as an executable shell script"         << std::endl
     << "    --timeline       Print the timeline of wake jobs as HTML"                    << std::endl
-    << "    --clean          Delete all job outputs"                                     << std::endl
     << "    --list-outputs   List all job outputs"                                       << std::endl
+    << "    --clean          Delete all job outputs"                                     << std::endl
+    << "    --input  -i FILE Capture jobs which read FILES"                              << std::endl
+    << "    --output -o FILE Capture jobs which wrote FILES"                             << std::endl
+    << "    --job       JOB  Captre the job with the specified job id"                   << std::endl
+    << "    --last     -l    See --last-used"                                            << std::endl
+    << "    --last-used      Capture all jobs used by last build. Regardless of cache"   << std::endl
+    << "    --last-executed  Capture all jobs executed by the last build. Skips cache"   << std::endl
+    << "    --failed   -f    Capture jobs which failed last build"                       << std::endl
+    << "    --verbose  -v    Report metadata, stdout and stderr of captured jobs"        << std::endl
+    << "    --metadata       Report metadata of captured jobs"                           << std::endl
+    << "    --debug    -d    Report stack frame of captured jobs"                        << std::endl
+    << "    --script   -s    Format captured jobs as an executable shell script"         << std::endl
     << std::endl
     << "  Help functions:" << std::endl
     << "    --version        Print the version of wake on standard output"               << std::endl
@@ -177,6 +179,8 @@ int main(int argc, char **argv) {
     {'i', "input", GOPT_ARGUMENT_FORBIDDEN},
     {'o', "output", GOPT_ARGUMENT_FORBIDDEN},
     {'l', "last", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "last-used", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "last-executed", GOPT_ARGUMENT_FORBIDDEN},
     {0, "lsp", GOPT_ARGUMENT_FORBIDDEN},
     {'f', "failed", GOPT_ARGUMENT_FORBIDDEN},
     {'s', "script", GOPT_ARGUMENT_FORBIDDEN},
@@ -226,6 +230,8 @@ int main(int argc, char **argv) {
   bool input = arg(options, "input")->count;
   bool output = arg(options, "output")->count;
   bool last = arg(options, "last")->count;
+  bool last_use = last || arg(options, "last-used")->count;
+  bool last_exe = arg(options, "last-executed")->count;
   bool lsp = arg(options, "lsp")->count;
   bool failed = arg(options, "failed")->count;
   bool script = arg(options, "script")->count;
@@ -391,11 +397,12 @@ int main(int argc, char **argv) {
   }
 
   // Arguments are forbidden with these options
-  bool noargs = init || job || last || failed || tagdag || html || global || exports || api || exec;
+  bool noargs = init || job || last_use || last_exe || failed || tagdag || html || global ||
+                exports || api || exec;
   bool targets = argc == 1 && !noargs;
 
   bool nodb = init;
-  bool noparse = nodb || job || output || input || last || failed || tagdag;
+  bool noparse = nodb || job || output || input || last_use || last_exe || failed || tagdag;
   bool notype = noparse || parse;
   bool noexecute = notype || html || tcheck || dumpssa || global || exports || api || targets;
 
@@ -574,8 +581,12 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (last) {
-    describe(db.last(), policy);
+  if (last_use) {
+    describe(db.last_use(), policy);
+  }
+
+  if (last_exe) {
+    describe(db.last_exe(), policy);
   }
 
   if (failed) {
