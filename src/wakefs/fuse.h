@@ -84,4 +84,7 @@ bool json_as_struct(const std::string &json, json_args &result);
 
 bool run_in_fuse(fuse_args &args, int &retcode, std::string &result_json);
 
+int execve_wrapper(const std::vector<std::string> &command,
+                   const std::vector<std::string> &environment);
+
 #endif
