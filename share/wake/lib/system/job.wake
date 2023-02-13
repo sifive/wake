@@ -244,11 +244,7 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-<<<<<<< HEAD
-    Pass (RunnerInput _label cmd vis env dir stdin _ prefix _ _) =
-=======
     Pass (RunnerInput label cmd vis env dir stdin _ prefix _ _) =
->>>>>>> b91dc480 (stashing)
         def mkVisJson (Path path hash) =
           JObject ("path" :-> JString path, "hash" :-> JString hash,)
         def jobCacheVisible = JArray (map mkVisJson vis)
