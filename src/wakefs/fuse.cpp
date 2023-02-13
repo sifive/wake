@@ -27,6 +27,8 @@
 #include <limits.h>
 #include <signal.h>
 #include <string.h>
+#include <sys/mount.h>
+#include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -79,8 +81,8 @@ bool json_as_struct(const std::string &json, json_args &result) {
   return true;
 }
 
-static int execve_wrapper(const std::vector<std::string> &command,
-                          const std::vector<std::string> &environment) {
+int execve_wrapper(const std::vector<std::string> &command,
+                   const std::vector<std::string> &environment) {
   std::vector<const char *> cmd_args;
   for (auto &s : command) cmd_args.push_back(s.c_str());
   cmd_args.push_back(0);
@@ -127,6 +129,32 @@ static bool collect_result_metadata(const std::string daemon_output, const struc
   return !result_ss.fail();
 }
 
+static void exec_in_pidns(pidns_args *nsargs) {
+  size_t stack_size = 1024 * 1024;
+  uint8_t *child_stack = (uint8_t *)malloc(stack_size) + stack_size;
+
+  // Create a new thread in a PID namespace, calling pidns_init.
+  pid_t child_pid = clone(pidns_init, child_stack, CLONE_NEWPID | SIGCHLD, nsargs);
+  if (child_pid == -1) {
+    std::cerr << "clone " << nsargs->command[0] << ": " << strerror(errno) << std::endl;
+    exit(1);
+  }
+
+  // While we wait, the subdir_live_file for the fuse daemon will be held open.
+  int status = 1;
+  if (waitpid(child_pid, &status, 0) == -1) {
+    std::cerr << "waitpid (clone) " << nsargs->command[0] << std::endl;
+    exit(1);
+  }
+
+  if (WIFEXITED(status)) {
+    exit(WEXITSTATUS(status));
+  } else {
+    exit(-WTERMSIG(status));
+  }
+  // 'child_stack' would be deallocated by now.
+}
+
 bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   if (0 != chdir(args.working_dir.c_str())) {
     std::cerr << "chdir " << args.working_dir << ": " << strerror(errno) << std::endl;
@@ -148,6 +176,8 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
       exit(1);
 
     if (!do_mounts(args.mount_ops, args.daemon.mount_subdir, envs_from_mounts)) exit(1);
+
+    prctl(PR_SET_NAME, "wb-mount-ns", 0, 0, 0);
 #endif
 
     if (chdir(args.command_running_dir.c_str()) != 0) {
@@ -185,8 +215,13 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
       }
     }
 
+#ifdef __linux__
+    pidns_args nsargs = {command, args.environment};
+    exec_in_pidns(&nsargs);
+#else
     int err = execve_wrapper(command, args.environment);
     std::cerr << "execve " << command[0] << ": " << strerror(err) << std::endl;
+#endif
     exit(1);
   }
 

@@ -459,4 +459,48 @@ bool setup_user_namespaces(int id_user, int id_group, bool isolate_network,
   return true;
 }
 
+int pidns_init(void *arg) {
+  // We should be in a new PID namespace now, label the process in 'ps'.
+  prctl(PR_SET_NAME, "wb-pid-ns", 0, 0, 0);
+
+  // A fresh mount of procfs over the previous namespace's /proc.
+  // which we can only do as we're already in a mount namespace.
+  // Note that this is not a bind mount of an existing /proc.
+  // The new procfs will have the correct data for the new PID namespace, rather
+  // than leaking process ids from the exterior namespace.
+  int err = mount("proc", "/proc", "proc", 0, NULL);
+  if (err == -1) {
+    std::cerr << "mount pidns proc" << strerror(err) << std::endl;
+    exit(1);
+  }
+
+  pid_t pid = fork();
+  if (pid == 0) {
+    // Execute the user-specified command.
+    pidns_args *args = (pidns_args *)arg;
+    err = execve_wrapper(args->command, args->environment);
+    std::cerr << "execve " << args->command[0] << ": " << strerror(err) << std::endl;
+    exit(1);
+  }
+
+  // Wait for child processes, we are init(1) in this PID namespace.
+  int status;
+  while ((pid = waitpid(-1, &status, 0)) != 0) {
+    if (pid == -1) {
+      if (errno == ECHILD) {
+        break;  // all children have terminated
+      } else {
+        std::cerr << "waitpid: " << strerror(errno) << std::endl;
+        exit(errno);
+      }
+    }
+  }
+
+  if (WIFEXITED(status)) {
+    status = WEXITSTATUS(status);
+  } else {
+    status = -WTERMSIG(status);
+  }
+  exit(status);
+}
 #endif

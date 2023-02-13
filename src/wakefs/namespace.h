@@ -38,6 +38,13 @@ bool setup_user_namespaces(int id_user, int id_group, bool isolate_network,
 bool do_mounts(const std::vector<mount_op> &mount_ops, const std::string &fuse_mount_path,
                std::vector<std::string> &environments);
 
+struct pidns_args {
+  const std::vector<std::string> &command;
+  const std::vector<std::string> &environment;
+};
+
+int pidns_init(void *arg);
+
 #endif
 
 #endif
