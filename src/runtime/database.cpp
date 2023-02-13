@@ -71,7 +71,8 @@ struct Database::detail {
   sqlite3_stmt *delete_prior;
   sqlite3_stmt *find_job;
   sqlite3_stmt *find_owner;
-  sqlite3_stmt *find_last;
+  sqlite3_stmt *find_last_exe;
+  sqlite3_stmt *find_last_use;
   sqlite3_stmt *find_failed;
   sqlite3_stmt *fetch_hash;
   sqlite3_stmt *delete_jobs;
@@ -121,7 +122,8 @@ struct Database::detail {
         delete_prior(0),
         find_job(0),
         find_owner(0),
-        find_last(0),
+        find_last_exe(0),
+        find_last_use(0),
         find_failed(0),
         fetch_hash(0),
         delete_jobs(0),
@@ -388,12 +390,19 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "j.run_id=r.run_id"
       " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id order by "
       "j.job_id";
-  const char *sql_find_last =
+  const char *sql_find_last_exe =
       "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
       "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
       "s.membytes, s.ibytes, s.obytes"
       " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
       " where j.run_id==(select max(run_id) from jobs) and substr(cast(commandline as text),1,1) "
+      "<> '<' order by j.job_id";
+  const char *sql_find_last_use =
+      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
+      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
+      "s.membytes, s.ibytes, s.obytes"
+      " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
+      " where j.use_id==(select max(run_id) from jobs) and substr(cast(commandline as text),1,1) "
       "<> '<' order by j.job_id";
   const char *sql_find_failed =
       "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
@@ -504,7 +513,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_delete_prior, delete_prior);
   PREPARE(sql_find_job, find_job);
   PREPARE(sql_find_owner, find_owner);
-  PREPARE(sql_find_last, find_last);
+  PREPARE(sql_find_last_exe, find_last_exe);
+  PREPARE(sql_find_last_use, find_last_use);
   PREPARE(sql_find_failed, find_failed);
   PREPARE(sql_fetch_hash, fetch_hash);
   PREPARE(sql_delete_jobs, delete_jobs);
@@ -567,7 +577,8 @@ void Database::close() {
   FINALIZE(delete_prior);
   FINALIZE(find_job);
   FINALIZE(find_owner);
-  FINALIZE(find_last);
+  FINALIZE(find_last_exe);
+  FINALIZE(find_last_use);
   FINALIZE(find_failed);
   FINALIZE(fetch_hash);
   FINALIZE(delete_jobs);
@@ -1260,7 +1271,9 @@ static std::vector<FileAccess> get_all_file_accesses(const Database *db, sqlite3
 
 std::vector<JobReflection> Database::failed() { return find_all(this, imp->find_failed); }
 
-std::vector<JobReflection> Database::last() { return find_all(this, imp->find_last); }
+std::vector<JobReflection> Database::last_exe() { return find_all(this, imp->find_last_exe); }
+
+std::vector<JobReflection> Database::last_use() { return find_all(this, imp->find_last_use); }
 
 std::vector<JobReflection> Database::explain(long job) {
   const char *why = "Could not bind args";

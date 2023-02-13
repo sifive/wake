@@ -157,7 +157,8 @@ struct Database {
 
   std::vector<JobReflection> failed();
 
-  std::vector<JobReflection> last();
+  std::vector<JobReflection> last_exe();
+  std::vector<JobReflection> last_use();
 
   std::vector<JobEdge> get_edges();
   std::vector<JobTag> get_tags();
