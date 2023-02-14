@@ -43,7 +43,7 @@ static void mkdir_no_fail(const char *dir) {
 
 // Ensures the given file has been deleted
 static void unlink_no_fail(const char *file) {
-  if (unlink(file) < 0) {
+  if (unlink(file) < 0 && errno != ENOENT) {
     log_fatal("unlink(%s): %s", file, strerror(errno));
   }
 }
@@ -110,11 +110,6 @@ static mode_t copy_or_reflink(const char *src, const char *dst, mode_t mode = 06
     log_fatal("fstat(%s): %s", src, strerror(errno));
   }
   auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT, mode);
-
-  static wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
-  std::string name = dst;
-  name += ".";
-  name += rng.unique_name();
 
   if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
     if (errno != EINVAL && errno != EOPNOTSUPP) {
@@ -764,6 +759,9 @@ AddJobRequest::AddJobRequest(const JAST &job_result_json) {
   //       need this loop. Since this job was just run, wake
   //       will eventually hash all these files so the fact
   //       that we have to re-hash them here is a shame.
+  // TODO: It is incorrect to do this all async without signal
+  //       handling being done correctly.
+  // TODO: This code does not handle directories or symlinks correctly
   std::vector<std::future<OutputFile>> future_outputs;
 
   // Read the output files which requires kicking off a hash
@@ -999,7 +997,7 @@ void Cache::add(const AddJobRequest &add_request) {
   mkdir_no_fail(tmp_job_dir.c_str());
 
   // Copy the output files into the temp dir
-  // TOOD: Make this async
+  // TOOD: I think this doesn't handle output directories correctly. Fix that.
   std::unordered_map<void *, mode_t> modes;
   for (const auto &output_file : add_request.outputs) {
     // TODO(jake): See if this file already exists somewhere
@@ -1031,6 +1029,7 @@ void Cache::add(const AddJobRequest &add_request) {
       }
 
       // Output Files
+      // TODO: Handle output directories correctly here
       for (const auto &output_file : add_request.outputs) {
         mode_t mode = modes[(void *)&output_file];
         if (!mode) mode = 0644;

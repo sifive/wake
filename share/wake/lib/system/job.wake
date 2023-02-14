@@ -154,9 +154,12 @@ export def editPlanShare (f: Boolean => Boolean): Plan => Plan =
 
 # Get a unique hash-code for the job
 export def getPlanHash (plan: Plan): Integer =
-  def signature cmd env dir stdin = prim "hash"
+  def hash_str str = prim "hash_str"
   def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ _ = plan
-  signature cmd env dir stdin
+  def sig = cat (implode cmd, "\0\0", implode env, "\0\0", dir, "\0\0", stdin,)
+  require Some out = intbase 16 (hash_str sig)
+  else unreachable "hash_str returned a non-hex string!!!"
+  out
 
 # The criteria which determine if Job execution can be skipped:
 #   Once  is True and a matching job was run by this wake invocation
@@ -233,6 +236,7 @@ def jArray (fn: Result JValue Error => Result a Error) = match _
   Pass (JArray arr) = map (fn _.Pass) arr | findFail
   Fail err          = Fail err
   _                 = failWithError "not an array"
+
 
 export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
   def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
