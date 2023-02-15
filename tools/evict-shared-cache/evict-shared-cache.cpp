@@ -36,7 +36,6 @@ void print_help(const char* argv0) {
      << "  --policy POLICY  Evict using POLICY"           << std::endl
      << "  --help   -h      Print this message and exit"  << std::endl
      << "Commands (read from stdin):" << std::endl
-     << "  init             Initialize the shared cache database with eviction status tables" << std::endl
      << "  write JOB_ID     JOB_ID was written into the shared cache" << std::endl
      << "  read JOB_ID      JOB_ID was read from the shared cache" << std::endl
      << "Available Policies:" << std::endl
@@ -95,15 +94,14 @@ int main(int argc, char** argv) {
   // TODO: Implement the following structure
 
   // while stdin and stdout open
-  //   read byte from stdin
+  //   read chunk from stdin
   //   if byte not null
   //     append to command buffer
   //     continue
   //   else
   //     parse command buffer into json
   //     convert json command into relevant Policy funtion call
-  //     convert return from policy into json
-  //     serialize json into stdout terminated with null
+  //     maybe send an ack back
 
   exit(EXIT_SUCCESS);
 }
