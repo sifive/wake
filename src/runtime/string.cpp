@@ -29,6 +29,7 @@
 #include <fstream>
 #include <sstream>
 
+#include "blake2/blake2.h"
 #include "gc.h"
 #include "json/utf8.h"
 #include "prim.h"
@@ -41,6 +42,7 @@
 #include "util/term.h"
 #include "util/unlink.h"
 #include "value.h"
+#include "wcl/xoshiro_256.h"
 
 static PRIMFN(prim_vcat) {
   (void)data;
@@ -633,6 +635,28 @@ static PRIMFN(prim_filter_term_codes) {
   RETURN(String::alloc(runtime.heap, ss.str()));
 }
 
+static PRIMTYPE(type_hash_str) {
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeString);
+}
+
+static void blake2b(const std::string &str, uint64_t (*out)[4]) {
+  blake2b_state S;
+  blake2b_init(&S, sizeof(*out));
+  blake2b_update(&S, reinterpret_cast<const uint8_t *>(str.data()), str.size());
+  blake2b_final(&S, reinterpret_cast<uint8_t *>(*out), sizeof(*out));
+}
+
+static PRIMFN(prim_hash_str) {
+  EXPECT(1);
+  STRING(str, 0);
+
+  uint64_t hash[4];
+  blake2b(str->as_str(), &hash);
+  auto hex = wcl::to_hex(&hash);
+
+  RETURN(String::alloc(runtime.heap, std::move(hex)));
+}
+
 void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "strlen", prim_strlen, type_strlen, PRIM_PURE);
   prim_register(pmap, "vcat", prim_vcat, type_vcat, PRIM_PURE);
@@ -656,6 +680,7 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "shell_str", prim_shell_str, type_shell_str, PRIM_PURE);
   prim_register(pmap, "filter_term_codes", prim_filter_term_codes, type_filter_term_codes,
                 PRIM_PURE);
+  prim_register(pmap, "hash_str", prim_hash_str, type_hash_str, PRIM_PURE);
   prim_register(pmap, "colour", prim_colour, type_colour, PRIM_IMPURE);
   prim_register(pmap, "print", prim_print, type_print, PRIM_IMPURE);
   prim_register(pmap, "mkdir", prim_mkdir, type_mkdir, PRIM_IMPURE);

@@ -155,7 +155,7 @@ export def integerToUnicode (codepoint: Integer): String =
     p codepoint
 
 # unicodeToInteger: convert the first codepoint in a String to an Integer.
-# 
+#
 #   unicodeToInteger "A" = 65
 #   unicodeToInteger "a" = 97
 #   unicodeToInteger "0123" = 48
@@ -166,7 +166,7 @@ export def unicodeToInteger (firstCharacterToConvert: String): Integer =
     def p x = prim "str2code"
     p firstCharacterToConvert
 
-# integerToByte: convert an Integer into a String using raw binary. 
+# integerToByte: convert an Integer into a String using raw binary.
 # WARNING: For 128 <= byte <= 255, this function creates invalid UTF-8 / Unicode.
 # Instead of calling this function, you probably meant to call integerToUnicode.
 # For byte < 0 or byte > 255, returns "".
@@ -319,3 +319,7 @@ export def (x: String) ==* (y: String): Boolean =
 # Returns True if x is not equal to y, in UTF-8 representation.
 export def (x: String) !=* (y: String): Boolean =
     isNE (x <=>* y)
+
+export def hashString (x: String): String =
+    def hashStr x = prim "hash_str"
+    hashStr x
