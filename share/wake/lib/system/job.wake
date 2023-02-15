@@ -154,10 +154,9 @@ export def editPlanShare (f: Boolean => Boolean): Plan => Plan =
 
 # Get a unique hash-code for the job
 export def getPlanHash (plan: Plan): Integer =
-  def hash_str str = prim "hash_str"
   def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ _ = plan
   def sig = cat (implode cmd, "\0\0", implode env, "\0\0", dir, "\0\0", stdin,)
-  require Some out = intbase 16 (hash_str sig)
+  require Some out = intbase 16 (hashString sig)
   else unreachable "hash_str returned a non-hex string!!!"
   out
 
@@ -270,10 +269,18 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
         require Pass (JBoolean cacheHit) = jField jobCacheJsonOut "found"
         else failWithError "job-cache returned unexpected json schema"
 
+        def isDebugOn =
+          require Some value = getenv "DEBUG_WAKE_SHARED_CACHE"
+          else False
+          value ==~ "1"
+
         require False = cacheHit
         else
-          def _ = write ".cache-hit/read.{prefix}.json" "//{label}\n{jobCacheJsonIn}"
-          def _ = write ".cache-hit/out.{prefix}.json" "//{label}\n{cacheResult}"
+          def _ =
+            require True = isDebugOn
+            def _ = write ".cache-hit/read.{prefix}.json" "//{label}\n{jobCacheJsonIn}"
+            def _ = write ".cache-hit/out.{prefix}.json" "//{label}\n{cacheResult}"
+            True
           require Pass match_info = jField jobCacheJsonOut "match"
           require Pass status = jField match_info "status" | jInteger
           require Pass runtime = jField match_info "runtime" | jDouble
@@ -290,7 +297,10 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
           def _ = virtual job stdout stderr status runtime cputime mem ibytes obytes
           Pass (RunnerOutput inputs outputs predict)
 
-        def _ = write ".cache-misses/read.{prefix}.json" "//{label}\n{jobCacheJsonIn}"
+        def _ =
+          require True = isDebugOn
+          def _ = write ".cache-misses/read.{prefix}.json" "//{label}\n{jobCacheJsonIn}"
+          True
 
         # Now we need to run the job
         require Pass (RunnerOutput inputs outputs useage) = baseDoIt job runnerInput
@@ -329,7 +339,10 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
         # itself is not blocked by writing to the cache. This allows us to tolorate a lot
         # of slow down on cache writing.
         def _ =
-            def _ = write ".cache-misses/write.{prefix}.json" "//{label}\n{jobCacheAddJson}"
+            def _ =
+              require True = isDebugOn
+              def _ = write ".cache-misses/write.{prefix}.json" "//{label}\n{jobCacheAddJson}"
+              True
             job_cache_add jobCacheAddJson
 
         Pass (RunnerOutput (map getPathName vis) outputs useage)
