@@ -83,9 +83,8 @@ static void rmdir_no_fail(const char *dir) {
   }
 }
 
-// This function first attempts to reflink but if that isn't
-// supported by the filesystem it copies instead.
-#ifdef __APPLE__
+// For apple and emscripten fallback on a dumb slow implementation
+#if defined(__APPLE__) || defined(__EMSCRIPTEN__)
 
 static void copy(int src_fd, int dst_fd) {
   FdBuf src(src_fd);
@@ -113,6 +112,7 @@ static void copy(int src_fd, int dst_fd) {
   }
 }
 
+// For modern linux use copy_file_range
 #elif __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 27
 
 #include <linux/fs.h>
@@ -138,6 +138,7 @@ static void copy(int src_fd, int dst_fd) {
   }
 }
 
+// For older linux distros use Linux's sendfile
 #else
 
 #include <sys/sendfile.h>
@@ -150,16 +151,24 @@ static void copy(int src_fd, int dst_fd) {
 // unlink this file but they're not allowed to modify it in any
 // other way or else this function will race with that external
 // modification.
+
 static void copy(int src_fd, int dst_fd) {
   struct stat buf = {};
   // There's a race here between the fstat and the copy_file_range
   if (fstat(src_fd, &buf) < 0) {
     log_fatal("fstat(src_fd = %d): %s", src_fd, strerror(errno));
   }
-  if (sendfile(src_fd, dst_fd, nullptr, buf.st_size) < 0) {
-    log_fatal("copy_file_range(src_fd = %d, NULL, dst_fd = %d, size = %d, 0): %s", src_fd, dst_fd,
-              buf.st_size, strerror(errno));
-  }
+  off_t idx = 0;
+  size_t size = buf.st_size;
+  do {
+    intptr_t written = sendfile(dst_fd, src_fd, &idx, size);
+    if (written < 0) {
+      log_fatal("sendfile(src_fd = %d, NULL, dst_fd = %d, size = %d, 0): %s", src_fd, dst_fd,
+                buf.st_size, strerror(errno));
+    }
+    idx = written;
+    size -= written;
+  } while (size != 0);
 }
 #endif
 
@@ -169,12 +178,12 @@ static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644
   auto src_fd = UniqueFd::open(src, O_RDONLY);
   auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT, mode);
 
-  if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
-    if (errno != EINVAL && errno != EOPNOTSUPP && errno != EXDEV) {
-      log_fatal("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
-    }
-    copy(src_fd.get(), dst_fd.get());
-  }
+  // if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
+  //  if (errno != EINVAL && errno != EOPNOTSUPP && errno != EXDEV) {
+  //    log_fatal("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
+  //  }
+  copy(src_fd.get(), dst_fd.get());
+  //}
 }
 
 #else
