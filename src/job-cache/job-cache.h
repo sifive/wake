@@ -122,7 +122,6 @@ struct OutputDirectory {
   mode_t mode;
 };
 
-// TODO: Add mode to avoid having to fstat again
 struct OutputSymlink {
   std::string value;
   std::string path;
@@ -138,7 +137,6 @@ struct AddJobRequest {
   std::vector<InputFile> inputs;
   std::vector<InputDir> directories;
   std::vector<OutputFile> outputs;
-  // TODO: Add mode to avoid having to fstat again
   std::vector<OutputDirectory> output_dirs;
   std::vector<OutputSymlink> output_symlinks;
   std::string stdout_str;

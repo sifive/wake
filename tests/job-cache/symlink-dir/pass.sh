@@ -22,3 +22,7 @@ if [ -d ".cache-misses" ]; then
   echo "Found a cache miss"
   exit 1
 fi
+
+# Cleanup
+rm -rf ./bar
+rm test.txt

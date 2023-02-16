@@ -901,9 +901,8 @@ AddJobRequest::AddJobRequest(const JAST &job_result_json) {
   //       need this loop. Since this job was just run, wake
   //       will eventually hash all these files so the fact
   //       that we have to re-hash them here is a shame.
-  // TODO: This code does not handle directories or symlinks correctly
   // TODO: Use aio_read and do these hashes online and interleaveed
-  //       so that the IO can be in parallel despite the hasing being
+  //       so that the IO can be in parallel despite the hashing being
   //       serial.s. It would also be nice to figure out how to do
   //       the hashing in parallel if we can't avoid it completely.
   // Read the output files which requires kicking off a hash
@@ -1106,10 +1105,10 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
 
   if (success) {
     // First output all the directories (assumed to be sorted by length).
-    // This ensures that all directories are already made witht the
+    // This ensures that all directories are already made with the
     // expected mode.
     for (const auto &output_dir : result->output_dirs) {
-      // Rewrite the path based on the avliable rewrites
+      // Rewrite the path based on the available rewrites
       auto pair = rewite_path(output_dir.path);
 
       // First make all the needed directories
@@ -1122,7 +1121,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
       const auto &sandbox_destination = std::get<1>(to_copy);
       mode_t mode = std::get<2>(to_copy);
 
-      // Rewrite the path based on the avliable rewrites
+      // Rewrite the path based on the available rewrites
       auto pair = rewite_path(sandbox_destination);
 
       // First make all the needed directories in case the output
@@ -1137,7 +1136,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
 
     // Now create all the symlinks
     for (const auto &output_symlink : result->output_symlinks) {
-      // Rewrite the path based on the avliable rewrites
+      // Rewrite the path based on the available rewrites
       auto pair = rewite_path(output_symlink.path);
 
       // First make all the needed directories in case the output
@@ -1163,6 +1162,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
 
   // The MatchingJob is currently using sandbox paths.
   // We need to redirect those sandbox paths to non-sandbox paths
+  // here we redirect the output files.
   for (auto &output_file : result->output_files) {
     std::vector<std::string> output_path_vec = split_path(output_file.path);
     auto pair = find_request.dir_redirects.find_max(output_path_vec.begin(), output_path_vec.end());
@@ -1171,6 +1171,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
     output_file.path = wcl::join_paths(*pair.first, rel_path);
   }
 
+  // Similarly, we need to redirect the output directories.
   for (auto &output_dir : result->output_dirs) {
     std::vector<std::string> output_path_vec = split_path(output_dir.path);
     auto pair = find_request.dir_redirects.find_max(output_path_vec.begin(), output_path_vec.end());
@@ -1179,6 +1180,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
     output_dir.path = wcl::join_paths(*pair.first, rel_path);
   }
 
+  // Ditto but for output symlinks
   for (auto &output_symlink : result->output_symlinks) {
     std::vector<std::string> output_path_vec = split_path(output_symlink.path);
     auto pair = find_request.dir_redirects.find_max(output_path_vec.begin(), output_path_vec.end());
@@ -1187,6 +1189,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
     output_symlink.path = wcl::join_paths(*pair.first, rel_path);
   }
 
+  // Ditto but for the input files
   for (auto &input_file : result->input_files) {
     std::vector<std::string> path_vec = split_path(input_file);
     auto pair = find_request.dir_redirects.find_max(path_vec.begin(), path_vec.end());
@@ -1195,6 +1198,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
     input_file = wcl::join_paths(*pair.first, rel_path);
   }
 
+  // Finally, same thing but for the output directories.
   for (auto &input_dir : result->input_dirs) {
     std::vector<std::string> path_vec = split_path(input_dir);
     auto pair = find_request.dir_redirects.find_max(path_vec.begin(), path_vec.end());

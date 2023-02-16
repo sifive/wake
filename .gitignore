@@ -39,8 +39,3 @@ compile_commands.json
 *.swp
 *.swo
 *.swn
-/tests/job-cache/symlink-dir/bar/
-tests/job-cache/symlink-dir/test.txt
-tests/job-cache/basic-fetch/test.txt
-tests/job-cache/dup-output/test1.txt
-tests/job-cache/dup-output/test2.txt
