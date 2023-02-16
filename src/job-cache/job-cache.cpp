@@ -178,12 +178,12 @@ static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644
   auto src_fd = UniqueFd::open(src, O_RDONLY);
   auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT, mode);
 
-  // if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
-  //  if (errno != EINVAL && errno != EOPNOTSUPP && errno != EXDEV) {
-  //    log_fatal("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
-  //  }
-  copy(src_fd.get(), dst_fd.get());
-  //}
+  if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
+    if (errno != EINVAL && errno != EOPNOTSUPP && errno != EXDEV) {
+      log_fatal("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
+    }
+    copy(src_fd.get(), dst_fd.get());
+  }
 }
 
 #else
