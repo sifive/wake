@@ -68,7 +68,6 @@ create index if not exists input_dir_by_job on input_dirs(job);
 -- seperate sandbox will provide a distinct remapping of
 -- these items. The blobs of these hashes will also
 -- be stored on disk.
--- TODO(jake): Add mode
 create table if not exists output_files(
   output_file_id integer primary key autoincrement,
   path           text    not null,
@@ -77,6 +76,24 @@ create table if not exists output_files(
   job            job_id  not null references jobs(job_id) on delete cascade);
 create index if not exists output_file_by_job on output_files(job);
 create index if not exists find_file on output_files(hash);
+
+-- Similar to output_files but for directories. The mode is the only
+-- content of a directory.
+create table if not exists output_dirs(
+  output_dir_id integer primary key autoincrement,
+  path           text    not null,
+  mode           integer not null,
+  job            job_id  not null references jobs(job_id) on delete cascade);
+create index if not exists output_dir_by_job on output_dirs(job);
+
+-- Similar to output_files but for symlinks.
+-- `value` is the result of running `readlink` on this.
+create table if not exists output_symlinks(
+  output_dir_id integer primary key autoincrement,
+  path           text    not null,
+  value          text    not null,
+  job            job_id  not null references jobs(job_id) on delete cascade);
+create index if not exists output_symlink_by_job on output_symlinks(job);
 
 commit transaction;
 --)"

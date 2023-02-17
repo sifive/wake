@@ -24,41 +24,37 @@
 
 #pragma once
 
-#include <errno.h>
-#include <fcntl.h>
-#include <json/json5.h>
-#include <sqlite3.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/file.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <util/execpath.h>
-#include <util/mkdir_parents.h>
-#include <wcl/filepath.h>
-#include <wcl/trie.h>
-#include <wcl/xoshiro_256.h>
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
 
-#include <algorithm>
-#include <future>
-#include <iostream>
+#include <json/json5.h>
+#include <sys/stat.h>
+#include <wcl/optional.h>
+#include <wcl/trie.h>
+
 #include <map>
-#include <random>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <vector>
 
 #include "bloom.h"
-#include "logging.h"
+#include "hash.h"
 
 namespace job_cache {
 
 struct CachedOutputFile {
   std::string path;
   Hash256 hash;
+  mode_t mode;
+};
+
+struct CachedOutputSymlink {
+  std::string path;
+  std::string value;
+};
+
+struct CachedOutputDir {
+  std::string path;
   mode_t mode;
 };
 
@@ -73,6 +69,8 @@ struct JobOutputInfo {
 struct MatchingJob {
   int64_t job_id;
   std::vector<CachedOutputFile> output_files;
+  std::vector<CachedOutputSymlink> output_symlinks;
+  std::vector<CachedOutputDir> output_dirs;
   std::vector<std::string> input_files;
   std::vector<std::string> input_dirs;
   JobOutputInfo output_info;
@@ -116,6 +114,17 @@ struct OutputFile {
   std::string source;
   std::string path;
   Hash256 hash;
+  mode_t mode;
+};
+
+struct OutputDirectory {
+  std::string path;
+  mode_t mode;
+};
+
+struct OutputSymlink {
+  std::string value;
+  std::string path;
 };
 
 struct AddJobRequest {
@@ -128,6 +137,8 @@ struct AddJobRequest {
   std::vector<InputFile> inputs;
   std::vector<InputDir> directories;
   std::vector<OutputFile> outputs;
+  std::vector<OutputDirectory> output_dirs;
+  std::vector<OutputSymlink> output_symlinks;
   std::string stdout_str;
   std::string stderr_str;
   int ret_code;

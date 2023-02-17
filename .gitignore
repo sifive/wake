@@ -2,7 +2,9 @@ manifest.wake
 *.o
 .build
 .fuse*
-/.job-cache
+.cache-hit
+.cache-misses
+.job-cache
 compile_commands.json
 /.compile_commands
 /.vscode/*.log
