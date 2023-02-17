@@ -20,6 +20,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <string.h>
+#include <unistd.h>
 
 #include <iostream>
 #include <memory>
@@ -30,7 +31,7 @@
 
 void print_help(const char* argv0) {
   // clang-format off
-  std::cout << std::endl
+  std::cerr << std::endl
      << "Usage: " << argv0 << " [OPTIONS]" << std::endl
      << "  --cache  DIR     Evict from shared cache DIR"  << std::endl
      << "  --policy POLICY  Evict using POLICY"           << std::endl
@@ -49,9 +50,48 @@ std::unique_ptr<EvictionPolicy> make_policy(const char* argv0, const char* polic
     return std::make_unique<NilEvictionPolicy>();
   }
 
-  std::cout << "Unknown policy: " << policy << std::endl;
+  std::cerr << "Unknown policy: " << policy << std::endl;
   print_help(argv0);
   exit(EXIT_FAILURE);
+}
+
+std::string read_command() {
+  std::string command = "";
+
+  // TODO: no idea if this is the right condition
+  while (std::cin.good() && std::cout.good()) {
+    uint8_t buffer[4096] = {};
+    ssize_t count = read(0, static_cast<void*>(buffer), 4096);
+
+    // Nothing new to process
+    if (count == 0) {
+      continue;
+    }
+
+    // An error occured during read
+    if (count < 0) {
+      std::cout << "Failed to read from stdin: " << strerror(errno) << std::endl;
+      exit(EXIT_FAILURE);
+    }
+
+    for (ssize_t i = 0; i < count; i++) {
+      char c = buffer[i];
+      if (c != '\0') {
+        command += c;
+        continue;
+      }
+
+      if (c != i - 1) {
+        std::cerr << "Multiple commands in one read. Trailing command will be dropped."
+                  << std::endl;
+      }
+
+      return command;
+    }
+  }
+
+  // stdin or stdout where closed. Exit cleanly
+  exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char** argv) {
@@ -77,13 +117,13 @@ int main(int argc, char** argv) {
   }
 
   if (!cache) {
-    std::cout << "Cache directory not specified" << std::endl;
+    std::cerr << "Cache directory not specified" << std::endl;
     print_help(argv[0]);
     exit(EXIT_FAILURE);
   }
 
   if (!policy_name) {
-    std::cout << "Eviction policy not specified" << std::endl;
+    std::cerr << "Eviction policy not specified" << std::endl;
     print_help(argv[0]);
     exit(EXIT_FAILURE);
   }
@@ -91,17 +131,46 @@ int main(int argc, char** argv) {
   std::unique_ptr<EvictionPolicy> policy = make_policy(argv[0], policy_name);
   policy->init();
 
-  // TODO: Implement the following structure
+  std::string command = "";
 
-  // while stdin and stdout open
-  //   read chunk from stdin
-  //   if byte not null
-  //     append to command buffer
-  //     continue
-  //   else
-  //     parse command buffer into json
-  //     convert json command into relevant Policy funtion call
-  //     maybe send an ack back
+  // TODO: no idea if this is the right condition
+  while (std::cin.good() && std::cout.good()) {
+    uint8_t buffer[4096] = {};
+    ssize_t count = read(0, static_cast<void*>(buffer), 4096);
+
+    // Nothing new to process
+    if (count == 0) {
+      continue;
+    }
+
+    // An error occured during read
+    if (count < 0) {
+      std::cout << "Failed to read from stdin: " << strerror(errno) << std::endl;
+      exit(EXIT_FAILURE);
+    }
+
+    for (ssize_t i = 0; i < count; i++) {
+      char c = buffer[i];
+      if (c != '\0') {
+        command += c;
+        continue;
+      }
+
+      if (c != i - 1) {
+        std::cerr << "Command split over one read" << std::endl;
+      }
+
+      std::cout << "fex: " << command << std::endl;
+      command = "";
+    }
+  }
+
+  while (true) {
+    const std::string cmd = read_command();
+    // parse command buffer into json
+    // convert json command into relevant Policy funtion call
+    // maybe send an ack back
+  }
 
   exit(EXIT_SUCCESS);
 }
