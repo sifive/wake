@@ -44,6 +44,7 @@
 #include "json/json5.h"
 #include "util/mkdir_parents.h"
 
+
 // Location in the parent namespace to base the new root on.
 static const std::string root_mount_prefix = "/tmp/.wakebox-mount";
 
@@ -502,5 +503,31 @@ int pidns_init(void *arg) {
     status = -WTERMSIG(status);
   }
   exit(status);
+}
+
+void exec_in_pidns(pidns_args *nsargs) {
+  size_t stack_size = 1024 * 1024;
+  uint8_t *child_stack = (uint8_t *)malloc(stack_size) + stack_size;
+
+  // Create a new thread in a PID namespace, calling pidns_init.
+  pid_t child_pid = clone(pidns_init, child_stack, CLONE_NEWPID | SIGCHLD, nsargs);
+  if (child_pid == -1) {
+    std::cerr << "clone " << nsargs->command[0] << ": " << strerror(errno) << std::endl;
+    exit(1);
+  }
+
+  // While we wait, the subdir_live_file for the fuse daemon will be held open.
+  int status = 1;
+  if (waitpid(child_pid, &status, 0) == -1) {
+    std::cerr << "waitpid (clone) " << nsargs->command[0] << std::endl;
+    exit(1);
+  }
+
+  if (WIFEXITED(status)) {
+    exit(WEXITSTATUS(status));
+  } else {
+    exit(-WTERMSIG(status));
+  }
+  // 'child_stack' would be deallocated by now.
 }
 #endif
