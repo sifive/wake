@@ -1163,7 +1163,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
   // The MatchingJob is currently using sandbox paths.
   // We need to redirect those sandbox paths to non-sandbox paths
   // here we redirect the output files.
-  auto redirect_path = [&find_request](std::string& path) {
+  auto redirect_path = [&find_request](std::string &path) {
     std::vector<std::string> output_path_vec = split_path(path);
     auto pair = find_request.dir_redirects.find_max(output_path_vec.begin(), output_path_vec.end());
     if (!pair.first) return;
