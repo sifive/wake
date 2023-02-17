@@ -6,13 +6,13 @@ fi
 
 set -e
 WAKE="${1:+$1/wake}"
-echo "first rm wake.db"
+echo "first rm wake.db" 1>2
 rm wake.db || true
 rm -rf .cache-hit || true
 rm -rf .cache-misses || true
 rm -rf .job-cache || true
 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test
-echo "second rm wake.db"
+echo "second rm wake.db" 1>2
 rm wake.db
 rm -rf .cache-misses
 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test
