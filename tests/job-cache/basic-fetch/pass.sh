@@ -23,5 +23,10 @@ if [ -d ".cache-misses" ]; then
   exit 1
 fi
 
+# Verify correct bits
+cat some-input.txt >> test.txt && cat some-input.txt >> test_gold.txt
+diff test.txt test_gold.txt
+
 # Cleanup
 rm test.txt
+rm test_gold.txt

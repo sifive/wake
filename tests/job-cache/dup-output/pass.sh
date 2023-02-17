@@ -23,6 +23,10 @@ if [ -d ".cache-misses" ]; then
   exit 1
 fi
 
+# Verif
+echo foobar | diff - test1.txt
+echo foobar | diff - test2.txt
+
 # Cleanup
 rm test1.txt
 rm test2.txt

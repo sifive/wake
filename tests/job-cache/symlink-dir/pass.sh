@@ -23,6 +23,10 @@ if [ -d ".cache-misses" ]; then
   exit 1
 fi
 
+# Verify
+echo foo | diff - test.txt
+diff $(readlink bar/baz.txt) test.txt
+
 # Cleanup
 rm -rf ./bar
 rm test.txt

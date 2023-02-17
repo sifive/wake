@@ -1163,48 +1163,32 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
   // The MatchingJob is currently using sandbox paths.
   // We need to redirect those sandbox paths to non-sandbox paths
   // here we redirect the output files.
+  auto redirect_path = [&find_request](std::string& path) {
+    std::vector<std::string> output_path_vec = split_path(path);
+    auto pair = find_request.dir_redirects.find_max(output_path_vec.begin(), output_path_vec.end());
+    if (!pair.first) return;
+    std::string rel_path = join('/', pair.second, output_path_vec.end());
+    path = wcl::join_paths(*pair.first, rel_path);
+  };
+
   for (auto &output_file : result->output_files) {
-    std::vector<std::string> output_path_vec = split_path(output_file.path);
-    auto pair = find_request.dir_redirects.find_max(output_path_vec.begin(), output_path_vec.end());
-    if (!pair.first) continue;
-    std::string rel_path = join('/', pair.second, output_path_vec.end());
-    output_file.path = wcl::join_paths(*pair.first, rel_path);
+    redirect_path(output_file.path);
   }
 
-  // Similarly, we need to redirect the output directories.
   for (auto &output_dir : result->output_dirs) {
-    std::vector<std::string> output_path_vec = split_path(output_dir.path);
-    auto pair = find_request.dir_redirects.find_max(output_path_vec.begin(), output_path_vec.end());
-    if (!pair.first) continue;
-    std::string rel_path = join('/', pair.second, output_path_vec.end());
-    output_dir.path = wcl::join_paths(*pair.first, rel_path);
+    redirect_path(output_dir.path);
   }
 
-  // Ditto but for output symlinks
   for (auto &output_symlink : result->output_symlinks) {
-    std::vector<std::string> output_path_vec = split_path(output_symlink.path);
-    auto pair = find_request.dir_redirects.find_max(output_path_vec.begin(), output_path_vec.end());
-    if (!pair.first) continue;
-    std::string rel_path = join('/', pair.second, output_path_vec.end());
-    output_symlink.path = wcl::join_paths(*pair.first, rel_path);
+    redirect_path(output_symlink.path);
   }
 
-  // Ditto but for the input files
   for (auto &input_file : result->input_files) {
-    std::vector<std::string> path_vec = split_path(input_file);
-    auto pair = find_request.dir_redirects.find_max(path_vec.begin(), path_vec.end());
-    if (!pair.first) continue;
-    std::string rel_path = join('/', pair.second, path_vec.end());
-    input_file = wcl::join_paths(*pair.first, rel_path);
+    redirect_path(input_file);
   }
 
-  // Finally, same thing but for the output directories.
   for (auto &input_dir : result->input_dirs) {
-    std::vector<std::string> path_vec = split_path(input_dir);
-    auto pair = find_request.dir_redirects.find_max(path_vec.begin(), path_vec.end());
-    if (!pair.first) continue;
-    std::string rel_path = join('/', pair.second, path_vec.end());
-    input_dir = wcl::join_paths(*pair.first, rel_path);
+    redirect_path(input_dir);
   }
 
   // TODO: We should really return a different thing here
