@@ -154,8 +154,9 @@ export def editPlanShare (f: Boolean => Boolean): Plan => Plan =
 
 # Get a unique hash-code for the job
 export def getPlanHash (plan: Plan): Integer =
-  def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ _ = plan
-  def sig = cat (implode cmd, "\0\0", implode env, "\0\0", dir, "\0\0", stdin,)
+  def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ isAtty = plan
+  def isAttyStr = if isAtty then "true" else "false"
+  def sig = cat (isAttyStr, "\0\0", implode cmd, "\0\0", implode env, "\0\0", dir, "\0\0", stdin,)
   require Some out = intbase 16 (hashString sig)
   else unreachable "hash_str returned a non-hex string!!!"
   out
@@ -368,16 +369,16 @@ def pid = prim "pid"
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
 def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo stdout stderr label isatty: Job =
-  def create label dir stdin env cmd signature visible keep echo stdout stderr = prim "job_create"
+  def create label dir stdin env cmd signature visible keep echo stdout stderr isatty = prim "job_create"
   def finish job inputs outputs all_outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
   def badfinish job error = prim "job_fail_finish"
-  def cache dir stdin env cmd signature visible = prim "job_cache"
+  def cache dir stdin env cmd signature visible isatty = prim "job_cache"
   def signature cmd res fni fno keep = prim "hash"
   def hash = signature cmd res finputs foutputs keep
   def build Unit =
     def visStrings =
       map getPathName vis
-    def job = create label dir stdin env.implode cmd.implode hash visStrings.implode (if keep then 1 else 0) echo stdout stderr
+    def job = create label dir stdin env.implode cmd.implode hash visStrings.implode (if keep then 1 else 0) echo stdout stderr (if isatty then 1 else 0)
     def prefix = "{str pid}.{str (getJobId job)}"
     def usage = getJobRecord job | getOrElse uusage
     def output = run job (Pass (RunnerInput label cmd vis env dir stdin res prefix usage isatty))
@@ -403,7 +404,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
     job
   match keep
     False = build Unit
-    True  = match (cache dir stdin env.implode cmd.implode hash (map getPathName vis).implode)
+    True  = match (cache dir stdin env.implode cmd.implode hash (map getPathName vis).implode (if isatty then 1 else 0))
       Pair (job, _) last = confirm True  last job
       Pair Nil      last = confirm False last (build Unit)
 
@@ -445,10 +446,10 @@ export def runJob (p: Plan): Job = match p
     match (opts | foldl best (Pair 0.0 None) | getPairSecond)
       Some r = runJobImp label cmd env dir stdin res usage finputs foutputs vis pers r echo stdout stderr isatty
       None =
-        def create label dir stdin env cmd signature visible keep echo stdout stderr = prim "job_create"
+        def create label dir stdin env cmd signature visible keep echo stdout stderr isatty = prim "job_create"
         def badfinish job e = prim "job_fail_finish"
         def badlaunch job e = prim "job_fail_launch"
-        def job = create label dir stdin env.implode cmd.implode 0 "" 0 "echo" "info" "error"
+        def job = create label dir stdin env.implode cmd.implode 0 "" 0 "echo" "info" "error" (if isatty then 1 else 0)
         def error =
           def pretty = match _
             Accept _ _ = ""

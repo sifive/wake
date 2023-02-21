@@ -36,7 +36,7 @@
 #include "status.h"
 
 // Increment every time the database schema changes
-#define SCHEMA_VERSION "5"
+#define SCHEMA_VERSION "6"
 
 #define VISIBLE 0
 #define INPUT 1
@@ -225,7 +225,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "  starttime   integer not null default 0,"
       "  endtime     integer not null default 0,"
       "  keep        integer not null default 0,"
-      "  stale       integer not null default 0);"  // 0=false, 1=true
+      "  stale       integer not null default 0,"   // 0=false, 1=true
+      "  is_atty     integer not null default 0);"  // 0=false, 1=true
       "create index if not exists job on jobs(directory, commandline, environment, stdin, "
       "signature, keep, job_id, stat_id);"
       "create index if not exists jobstats on jobs(stat_id);"
@@ -331,8 +332,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       " from stats where stat_id=?";
   const char *sql_insert_job =
       "insert into jobs(run_id, use_id, label, directory, commandline, environment, stdin, "
-      "signature, stack)"
-      " values(?, ?1, ?, ?, ?, ?, ?, ?, ?)";
+      "signature, stack, is_atty)"
+      " values(?, ?1, ?, ?, ?, ?, ?, ?, ?, ?)";
   const char *sql_insert_tree =
       "insert into filetree(access, job_id, file_id)"
       " values(?, ?, (select file_id from files where path=?))";
@@ -368,14 +369,16 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "t2.job_id<>?2)";
   const char *sql_find_prior =
       "select job_id, stat_id from jobs where "
-      "directory=? and commandline=? and environment=? and stdin=? and signature=? and keep=1 and "
+      "directory=? and commandline=? and environment=? and stdin=? and signature=? and is_atty=? "
+      "and keep=1 and "
       "stale=0";
   const char *sql_update_prior = "update jobs set use_id=? where job_id=?";
   const char *sql_delete_prior =
       "delete from jobs where use_id<>?1 and job_id in"
       " (select j2.job_id from jobs j1, jobs j2"
       "  where j1.job_id=?2 and j1.directory=j2.directory and j1.commandline=j2.commandline"
-      "  and j1.environment=j2.environment and j1.stdin=j2.stdin and j2.job_id<>?2)";
+      "  and j1.environment=j2.environment and j1.stdin=j2.stdin and j1.is_atty=j2.is_atty and "
+      "j2.job_id<>?2)";
   const char *sql_find_job =
       "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
       "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
@@ -776,8 +779,8 @@ void Database::end_txn() const {
 // Fortunately, updating use_id is the only side-effect and it does not affect reuse_job.
 Usage Database::reuse_job(const std::string &directory, const std::string &environment,
                           const std::string &commandline, const std::string &stdin_file,
-                          uint64_t signature, const std::string &visible, bool check, long &job,
-                          std::vector<FileReflection> &files, double *pathtime) {
+                          uint64_t signature, bool is_atty, const std::string &visible, bool check,
+                          long &job, std::vector<FileReflection> &files, double *pathtime) {
   Usage out;
   long stat_id;
 
@@ -788,6 +791,7 @@ Usage Database::reuse_job(const std::string &directory, const std::string &envir
   bind_blob(why, imp->find_prior, 3, environment);
   bind_string(why, imp->find_prior, 4, stdin_file);
   bind_integer(why, imp->find_prior, 5, signature);
+  bind_integer(why, imp->find_prior, 6, is_atty);
   out.found = sqlite3_step(imp->find_prior) == SQLITE_ROW;
   if (out.found) {
     job = sqlite3_column_int64(imp->find_prior, 0);
@@ -889,7 +893,7 @@ Usage Database::predict_job(uint64_t hashcode, double *pathtime) {
 void Database::insert_job(const std::string &directory, const std::string &commandline,
                           const std::string &environment, const std::string &stdin_file,
                           uint64_t signature, const std::string &label, const std::string &stack,
-                          const std::string &visible, long *job) {
+                          bool is_atty, const std::string &visible, long *job) {
   const char *why = "Could not insert a job";
   begin_txn();
   bind_integer(why, imp->insert_job, 1, imp->run_id);
@@ -900,6 +904,7 @@ void Database::insert_job(const std::string &directory, const std::string &comma
   bind_string(why, imp->insert_job, 6, stdin_file);
   bind_integer(why, imp->insert_job, 7, signature);
   bind_blob(why, imp->insert_job, 8, stack);
+  bind_integer(why, imp->insert_job, 9, is_atty);
   single_step(why, imp->insert_job, imp->debugdb);
   *job = sqlite3_last_insert_rowid(imp->db);
   const char *tok = visible.c_str();
