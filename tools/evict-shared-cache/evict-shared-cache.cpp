@@ -19,11 +19,14 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 #include "eviction-policy.h"
 #include "gopt/gopt-arg.h"
@@ -55,44 +58,70 @@ std::unique_ptr<EvictionPolicy> make_policy(const char* argv0, const char* polic
   exit(EXIT_FAILURE);
 }
 
-std::string read_command() {
-  std::string command = "";
+bool stdstreams_still_open() {
+  int status = fcntl(STDIN_FILENO, F_GETFD);
 
-  // TODO: no idea if this is the right condition
-  while (std::cin.good() && std::cout.good()) {
-    uint8_t buffer[4096] = {};
-    ssize_t count = read(0, static_cast<void*>(buffer), 4096);
-
-    // Nothing new to process
-    if (count == 0) {
-      continue;
-    }
-
-    // An error occured during read
-    if (count < 0) {
-      std::cout << "Failed to read from stdin: " << strerror(errno) << std::endl;
-      exit(EXIT_FAILURE);
-    }
-
-    for (ssize_t i = 0; i < count; i++) {
-      char c = buffer[i];
-      if (c != '\0') {
-        command += c;
-        continue;
-      }
-
-      if (c != i - 1) {
-        std::cerr << "Multiple commands in one read. Trailing command will be dropped."
-                  << std::endl;
-      }
-
-      return command;
-    }
+  if (status == -1 && errno == EBADF) {
+    return false;
   }
 
-  // stdin or stdout where closed. Exit cleanly
-  exit(EXIT_SUCCESS);
+  status = fcntl(STDOUT_FILENO, F_GETFD);
+
+  if (status == -1 && errno == EBADF) {
+    return false;
+  }
+
+  return true;
 }
+
+struct CommandParser {
+  std::string command_buff = "";
+
+  std::vector<std::string> read_commands() {
+    std::vector<std::string> commands = {};
+    while (stdstreams_still_open()) {
+      uint8_t buffer[4096] = {};
+
+      ssize_t count = read(STDIN_FILENO, static_cast<void*>(buffer), 4096);
+
+      // Nothing new to process, yield control
+      if (count == 0) {
+        return commands;
+      }
+
+      // An error occured during read
+      if (count < 0) {
+        std::cerr << "Failed to read from stdin: " << strerror(errno) << std::endl;
+        exit(EXIT_FAILURE);
+      }
+
+      // do the stuff
+      uint8_t* iter = buffer;
+      uint8_t* buffer_end = buffer + count;
+      while (iter < buffer_end) {
+        auto end = std::find(iter, buffer_end, 0);
+        command_buff.append(iter, end);
+        if (end != buffer_end) {
+          commands.emplace_back(std::move(command_buff));
+          command_buff = "";
+        }
+        iter = end + 1;
+      }
+
+      // last read consumed the buffer, yield control
+      if (count < 4096) {
+        return commands;
+      }
+
+      // yield if 100 commands have been buffered up without yielding
+      if (commands.size() > 100) {
+        return commands;
+      }
+    }
+    // stdin or stdout were closed. Exit cleanly
+    exit(EXIT_SUCCESS);
+  }
+};
 
 int main(int argc, char** argv) {
   // clang-format off
@@ -131,42 +160,12 @@ int main(int argc, char** argv) {
   std::unique_ptr<EvictionPolicy> policy = make_policy(argv[0], policy_name);
   policy->init();
 
-  std::string command = "";
-
-  // TODO: no idea if this is the right condition
-  while (std::cin.good() && std::cout.good()) {
-    uint8_t buffer[4096] = {};
-    ssize_t count = read(0, static_cast<void*>(buffer), 4096);
-
-    // Nothing new to process
-    if (count == 0) {
-      continue;
-    }
-
-    // An error occured during read
-    if (count < 0) {
-      std::cout << "Failed to read from stdin: " << strerror(errno) << std::endl;
-      exit(EXIT_FAILURE);
-    }
-
-    for (ssize_t i = 0; i < count; i++) {
-      char c = buffer[i];
-      if (c != '\0') {
-        command += c;
-        continue;
-      }
-
-      if (c != i - 1) {
-        std::cerr << "Command split over one read" << std::endl;
-      }
-
-      std::cout << "fex: " << command << std::endl;
-      command = "";
-    }
-  }
-
+  CommandParser cmd_parser;
   while (true) {
-    const std::string cmd = read_command();
+    const std::vector<std::string> cmd = cmd_parser.read_commands();
+    for (const auto& c : cmd) {
+      std::cerr << "cmd: " << c << std::endl;
+    }
     // parse command buffer into json
     // convert json command into relevant Policy funtion call
     // maybe send an ack back
