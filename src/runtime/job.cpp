@@ -1241,18 +1241,18 @@ static PRIMFN(prim_job_virtual) {
 }
 
 static PRIMTYPE(type_job_create) {
-  return args.size() == 11 && args[0]->unify(Data::typeString) &&
+  return args.size() == 12 && args[0]->unify(Data::typeString) &&
          args[1]->unify(Data::typeString) && args[2]->unify(Data::typeString) &&
          args[3]->unify(Data::typeString) && args[4]->unify(Data::typeString) &&
          args[5]->unify(Data::typeInteger) && args[6]->unify(Data::typeString) &&
          args[7]->unify(Data::typeInteger) && args[8]->unify(Data::typeString) &&
          args[9]->unify(Data::typeString) && args[10]->unify(Data::typeString) &&
-         out->unify(Data::typeJob);
+         args[11]->unify(Data::typeInteger) && out->unify(Data::typeJob);
 }
 
 static PRIMFN(prim_job_create) {
   JobTable *jobtable = static_cast<JobTable *>(data);
-  EXPECT(11);
+  EXPECT(12);
   STRING(label, 0);
   STRING(dir, 1);
   STRING(stdin_file, 2);
@@ -1264,6 +1264,7 @@ static PRIMFN(prim_job_create) {
   STRING(echo, 8);
   STRING(stream_out, 9);
   STRING(stream_err, 10);
+  INTEGER_MPZ(is_atty, 11);
 
   Hash hash;
   REQUIRE(mpz_sizeinbase(signature, 2) <= 8 * sizeof(hash.data));
@@ -1279,7 +1280,8 @@ static PRIMFN(prim_job_create) {
   for (auto &x : scope->stack_trace()) stack << x << std::endl;
 
   out->db->insert_job(dir->as_str(), cmd->as_str(), env->as_str(), stdin_file->as_str(),
-                      hash.data[0], label->as_str(), stack.str(), visible->as_str(), &out->job);
+                      hash.data[0], label->as_str(), stack.str(), mpz_cmp_si(is_atty, 0) != 0,
+                      visible->as_str(), &out->job);
 
   RETURN(out);
 }
@@ -1314,20 +1316,22 @@ static PRIMTYPE(type_job_cache) {
   jlist[0].unify(Data::typeJob);
   pair[0].unify(jlist);
   pair[1].unify(plist);
-  return args.size() == 6 && args[0]->unify(Data::typeString) && args[1]->unify(Data::typeString) &&
+  return args.size() == 7 && args[0]->unify(Data::typeString) && args[1]->unify(Data::typeString) &&
          args[2]->unify(Data::typeString) && args[3]->unify(Data::typeString) &&
-         args[4]->unify(Data::typeInteger) && args[5]->unify(Data::typeString) && out->unify(pair);
+         args[4]->unify(Data::typeInteger) && args[5]->unify(Data::typeString) &&
+         args[6]->unify(Data::typeInteger) && out->unify(pair);
 }
 
 static PRIMFN(prim_job_cache) {
   JobTable *jobtable = static_cast<JobTable *>(data);
-  EXPECT(6);
+  EXPECT(7);
   STRING(dir, 0);
   STRING(stdin_file, 1);
   STRING(env, 2);
   STRING(cmd, 3);
   INTEGER_MPZ(signature, 4);
   STRING(visible, 5);
+  INTEGER_MPZ(is_atty, 6);
 
   Hash hash;
   REQUIRE(mpz_sizeinbase(signature, 2) <= 8 * sizeof(hash.data));
@@ -1337,9 +1341,9 @@ static PRIMFN(prim_job_cache) {
   long job;
   double pathtime;
   std::vector<FileReflection> files;
-  Usage reuse = jobtable->imp->db->reuse_job(dir->as_str(), env->as_str(), cmd->as_str(),
-                                             stdin_file->as_str(), hash.data[0], visible->as_str(),
-                                             jobtable->imp->check, job, files, &pathtime);
+  Usage reuse = jobtable->imp->db->reuse_job(
+      dir->as_str(), env->as_str(), cmd->as_str(), stdin_file->as_str(), hash.data[0],
+      mpz_cmp_si(is_atty, 0) != 0, visible->as_str(), jobtable->imp->check, job, files, &pathtime);
 
   size_t need = reserve_tuple2() + reserve_tree(files) + reserve_list(1) + Job::reserve();
   runtime.heap.reserve(need);
