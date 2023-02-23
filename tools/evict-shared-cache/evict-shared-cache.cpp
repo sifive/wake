@@ -28,6 +28,7 @@
 #include <memory>
 #include <vector>
 
+#include "command.h"
 #include "eviction-policy.h"
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
@@ -162,13 +163,25 @@ int main(int argc, char** argv) {
 
   CommandParser cmd_parser;
   while (true) {
-    const std::vector<std::string> cmd = cmd_parser.read_commands();
-    for (const auto& c : cmd) {
-      std::cerr << "cmd: " << c << std::endl;
+    const std::vector<std::string> cmds = cmd_parser.read_commands();
+    for (const auto& c : cmds) {
+      Command cmd;
+      if (!Command::parse(c, cmd)) {
+        exit(EXIT_FAILURE);
+      }
+
+      switch (cmd.type) {
+        case CommandType::Read:
+          policy->read(cmd.job_id);
+          break;
+        case CommandType::Write:
+          policy->write(cmd.job_id);
+          break;
+        default:
+          std::cerr << "Unhandled command type" << std::endl;
+          exit(EXIT_FAILURE);
+      }
     }
-    // parse command buffer into json
-    // convert json command into relevant Policy funtion call
-    // maybe send an ack back
   }
 
   exit(EXIT_SUCCESS);
