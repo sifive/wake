@@ -1183,17 +1183,18 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
 
       for (auto &import : file.content->imports.topics) {
         const std::string &qualified = import.second.qualified;
+        const std::string &topic_qualified = "topic " + import.second.qualified;
         const Location &location = import.second.fragment.location();
 
         filename = location.filename;
-        imports.insert({qualified, {0, location}});
+        imports.insert({topic_qualified, {0, location}});
 
         std::size_t at_pos = qualified.find("@");
         if (at_pos == std::string::npos) {
           continue;
         }
 
-        unqualified_to_qualified.insert({qualified.substr(0, at_pos), qualified});
+        unqualified_to_qualified.insert({qualified.substr(0, at_pos), topic_qualified});
       }
 
       // File doesn't have any import for us to verify
@@ -1220,7 +1221,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
       }
 
       for (auto &publish : file.pubs) {
-        // If the publish was an imported publish, mark it as used
+        // Publishing to an imported topic should mark the topic as used
         auto qual_it = unqualified_to_qualified.find(publish.first);
         if (qual_it == unqualified_to_qualified.end()) {
           continue;

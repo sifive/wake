@@ -26,6 +26,7 @@ test3.wake:9:[7-10]: package-local topic 'pkg1' also defined at test.wake:40:[14
 test.wake:40:[14-17]: package-local topic 'pkg1' also defined at test3.wake:9:[7-10]
 test.wake:11:[18-24]: (warning) unused import of 'binary +@wake'; consider removing.
 test.wake:15:[18-20]: (warning) unused import of 'map@wake'; consider removing.
+test.wake:53:[26-36]: (warning) unused import of 'topic unusedTopic@some_package'; consider removing.
 test.wake:11:[18-24]: (warning) unused import of 'unary +@wake'; consider removing.
 test.wake:51:[26-31]: (warning) unused import of 'unused@some_package'; consider removing.
 test.wake:27:[5-8]: (warning) unused top-level definition of 'bug2'; consider removing or renaming to _bug2

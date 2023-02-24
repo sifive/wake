@@ -47,8 +47,16 @@ global data Glob1 = Glob1
 #test.wake:32:[14-18]: global topic 'glob1' also defined at test2.wake:5:[14-18]
 global topic glob1: String
 
-#test.wake:50:[26-31]: (warning) unused import of 'unused@some_package'
+#test.wake:53:[26-36]: (warning) unused import of 'topic unusedTopic@some_package'; consider removing.
 from some_package import unused
+#test.wake:53:[26-36]: (warning) unused import of 'topic unusedTopic@some_package'; consider removing.
+from some_package import unusedTopic
+# No warning because its used
+from some_package import usedTopic
+
+export def usedTopicSubscribe =
+  def x = subscribe usedTopic
+  x
 
 export def test _ =
   Pass "Fail"
