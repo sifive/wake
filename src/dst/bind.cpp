@@ -1152,7 +1152,14 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
 
   for (auto &package : top->packages) {
     for (auto &file : package.second->files) {
-      std::map<std::string, std::pair<int, Location>> imports = {};
+      struct ImportedItem {
+        int uses = 0;
+        Location location;
+      };
+      std::map<std::string, ImportedItem> imports = {};
+
+      // The unqualified name map is per-package so there won't
+      // be conflicts as long as the isn't an error in the file.
       std::map<std::string, std::string> unqualified_to_qualified = {};
 
       std::string filename = "";
@@ -1232,7 +1239,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
           continue;
         }
 
-        import_it->second.first++;
+        import_it->second.uses++;
       }
 
       for (auto &topic : file.topics) {
@@ -1247,7 +1254,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
           continue;
         }
 
-        import_it->second.first++;
+        import_it->second.uses++;
       }
 
       for (const std::string &def : resolved_defs) {
@@ -1266,16 +1273,16 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
             continue;
           }
 
-          import_it->second.first++;
+          import_it->second.uses++;
         }
       }
 
       for (auto &import : imports) {
-        if (import.second.first > 0) {
+        if (import.second.uses > 0) {
           continue;
         }
 
-        WARNING(import.second.second,
+        WARNING(import.second.location,
                 "unused import of '" << import.first << "'; consider removing.");
       }
     }
