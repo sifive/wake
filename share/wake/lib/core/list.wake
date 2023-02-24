@@ -628,28 +628,23 @@ export def transpose: List (List a) => List (List a) =
             heads, outer tails
     outer
 
-# Given a less-than comparison operator, sort the list
-# Elements which compare equal retain their order in the output list.
-# The lessThanFn must provide these two properties for all x, y, z:
-# ```
-#   if lessThanFn x y then ! lessThanFn y x
-#   if lessThanFn x z then lessThanFn x y || lessThanFn y z
-# ```
+# Given a less-than comparison function, sort the list.
+# Elements which compare as EQ retain their order in the output list.
 #
 # Parameters:
-#  - `cmpFn`: The comparision operator that defines the ordering
-#  - `list`: The list of elements to sort by `lessThanFn`
+#  - `cmpFn`: The comparision function that defines the ordering
+#  - `list`: The list of elements to sort by `cmpFn`
 #
 # Guarantees:
 #  - The output is a permutation of `list`
-#  - If `0 <= x < y < len list` then `lessThanFn (at list x) (at list y)` (ignoring None)
+#  - If `0 <= x < y < len list` then `cmpFn (at list x) (at list y) | isLT` (ignoring None)
 #
 # Example:
 # ```
-#   sortBy (_<_) (6, 1, 4, 2, Nil) = 1, 2, 4, 6, Nil
-#   sortBy p Nil = Nil
-#   sortBy p (x, Nil) = (x, Nil)
-#   sortBy (\x\y if x == y then False else ! p x y) xs = reverse (sortBy p xs)
+#   sortBy (_<=>_) (6, 1, 4, 2, Nil) = 1, 2, 4, 6, Nil
+#   sortBy (_<=>_) Nil = Nil
+#   sortBy (_<=>_) (1, Nil) = (1, Nil)
+#   sortBy (\x\y icmp y x) (1, 2, 3, Nil) = reverse (sortBy icmp (1, 2, 3, Nil)) = 3, 2, 1, Nil
 # ```
 export def sortBy (cmpFn: a => a => Order): (list: List a) => List a =
     def sort =
