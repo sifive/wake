@@ -1,0 +1,6 @@
+package some_package
+
+export def unused = "hello"
+
+export topic unusedTopic: Integer
+export topic usedTopic: Integer
