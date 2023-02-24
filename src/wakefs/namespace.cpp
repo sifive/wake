@@ -191,7 +191,7 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
     return false;
   }
 
-  int err = mkdir_with_parents(mountpoint, 0777);
+  int err = mkdir_with_parents(mountpoint, 0555);
   if (0 != err) {
     std::cerr << "mkdir_with_parents ('" << mountpoint << "'):" << strerror(err) << std::endl;
     return false;
@@ -389,7 +389,7 @@ bool do_mounts(const std::vector<mount_op> &mount_ops, const std::string &fuse_m
       // The prefix will be pivoted to after the final mount op.
       mount_prefix = root_mount_prefix;
       // Re-use if it already exists.
-      if (0 != mkdir(mount_prefix.c_str(), 0777) && errno != EEXIST) {
+      if (0 != mkdir(mount_prefix.c_str(), 0555) && errno != EEXIST) {
         std::cerr << "mkdir (" << mount_prefix << "): " << strerror(errno) << std::endl;
         return false;
       }
