@@ -646,10 +646,10 @@ export def transpose: List (List a) => List (List a) =
 #
 # Example:
 # ```
-#   sortBy (_<_) (6, 1, 4, 2, Nil) = 1, 2, 4, 6, Nil
-#   sortBy p Nil = Nil
-#   sortBy p (x, Nil) = (x, Nil)
-#   sortBy (\x\y if x == y then False else ! p x y) xs = reverse (sortBy p xs)
+#   sortBy (_<=>_) (6, 1, 4, 2, Nil) = 1, 2, 4, 6, Nil
+#   sortBy (_<=>_) Nil = Nil
+#   sortBy (_<=>_) (1, Nil) = (1, Nil)
+#   sortBy (\x\y icmp y x) (1, 2, 3, Nil) = reverse (sortBy icmp (1, 2, 3, Nil)) = 3, 2, 1, Nil
 # ```
 export def sortBy (cmpFn: a => a => Order): (list: List a) => List a =
     def sort =
