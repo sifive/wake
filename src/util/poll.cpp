@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstring>
 
 #if defined(__linux__)
 #define USE_EPOLL 1
@@ -44,7 +45,7 @@ struct Poll::detail {
   int pfd;
 };
 
-Poll::Poll() : imp(new Poll::detail) {
+Poll::Poll() : imp(std::make_unique<Poll::detail>()) {
   imp->pfd = epoll_create1(EPOLL_CLOEXEC);
   if (imp->pfd == -1) {
     perror("epoll_create1");
@@ -60,6 +61,7 @@ void Poll::add(int fd) {
   ev.data.fd = fd;
 
   if (epoll_ctl(imp->pfd, EPOLL_CTL_ADD, fd, &ev) == -1) {
+    printf("%s\n", strerrorname_np(errno));
     perror("epoll_ctl(EPOLL_CTL_ADD)");
     exit(1);
   }

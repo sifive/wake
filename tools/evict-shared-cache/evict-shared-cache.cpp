@@ -32,6 +32,7 @@
 #include "eviction-policy.h"
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
+#include "util/poll.h"
 
 void print_help(const char* argv0) {
   // clang-format off
@@ -59,41 +60,47 @@ std::unique_ptr<EvictionPolicy> make_policy(const char* argv0, const char* polic
   exit(EXIT_FAILURE);
 }
 
-bool stdstreams_still_open() {
-  int status = fcntl(STDIN_FILENO, F_GETFD);
-
-  if (status == -1 && errno == EBADF) {
-    return false;
-  }
-
-  status = fcntl(STDOUT_FILENO, F_GETFD);
-
-  if (status == -1 && errno == EBADF) {
-    return false;
-  }
-
-  return true;
-}
+enum class CommandParserState { Continue, StopSuccess, StopFail };
 
 struct CommandParser {
   std::string command_buff = "";
+  Poll poll;
 
-  std::vector<std::string> read_commands() {
-    std::vector<std::string> commands = {};
-    while (stdstreams_still_open()) {
+  CommandParser() { poll.add(STDIN_FILENO); }
+
+  CommandParserState read_commands(std::vector<std::string>& commands) {
+    commands = {};
+
+    sigset_t saved;
+    struct timespec timeout;
+    timeout.tv_sec = 1;
+
+    // Sleep until timeout or a signal arrives
+    std::vector<int> ready_fds = poll.wait(&timeout, &saved);
+
+    // Nothing is ready within timeout, yield control
+    if (ready_fds.size() == 0) {
+      return CommandParserState::Continue;
+    }
+
+    while (true) {
       uint8_t buffer[4096] = {};
 
       ssize_t count = read(STDIN_FILENO, static_cast<void*>(buffer), 4096);
 
       // Nothing new to process, yield control
       if (count == 0) {
-        return commands;
+        return CommandParserState::Continue;
       }
 
       // An error occured during read
       if (count < 0) {
+        if (errno == EBADF) {
+          return CommandParserState::StopSuccess;
+        }
+
         std::cerr << "Failed to read from stdin: " << strerror(errno) << std::endl;
-        exit(EXIT_FAILURE);
+        return CommandParserState::StopFail;
       }
 
       // do the stuff
@@ -111,16 +118,17 @@ struct CommandParser {
 
       // last read consumed the buffer, yield control
       if (count < 4096) {
-        return commands;
+        return CommandParserState::Continue;
       }
 
       // yield if 100 commands have been buffered up without yielding
       if (commands.size() > 100) {
-        return commands;
+        return CommandParserState::Continue;
       }
     }
-    // stdin or stdout were closed. Exit cleanly
-    exit(EXIT_SUCCESS);
+
+    // not actually reachable
+    return CommandParserState::Continue;
   }
 };
 
@@ -162,8 +170,11 @@ int main(int argc, char** argv) {
   policy->init();
 
   CommandParser cmd_parser;
-  while (true) {
-    const std::vector<std::string> cmds = cmd_parser.read_commands();
+  CommandParserState state;
+  do {
+    std::vector<std::string> cmds;
+    state = cmd_parser.read_commands(cmds);
+
     for (const auto& c : cmds) {
       Command cmd;
       if (!Command::parse(c, cmd)) {
@@ -182,7 +193,7 @@ int main(int argc, char** argv) {
           exit(EXIT_FAILURE);
       }
     }
-  }
+  } while (state == CommandParserState::Continue);
 
-  exit(EXIT_SUCCESS);
+  exit(state == CommandParserState::StopSuccess ? EXIT_SUCCESS : EXIT_FAILURE);
 }
