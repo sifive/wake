@@ -95,6 +95,8 @@ struct CommandParser {
 
       // An error occured during read
       if (count < 0) {
+        // EBADF means that stdin was closed. This is the signal to stop
+        // processing commands.
         if (errno == EBADF) {
           return CommandParserState::StopSuccess;
         }
@@ -103,7 +105,6 @@ struct CommandParser {
         return CommandParserState::StopFail;
       }
 
-      // do the stuff
       uint8_t* iter = buffer;
       uint8_t* buffer_end = buffer + count;
       while (iter < buffer_end) {
