@@ -49,7 +49,7 @@ struct Command {
 
     const std::string& command_str = command.value;
 
-    CommandType type = CommandType::Read;
+    CommandType type;
     if (command_str == "read") {
       type = CommandType::Read;
     } else if (command_str == "write") {
