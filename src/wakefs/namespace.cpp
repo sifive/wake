@@ -50,7 +50,7 @@ static const std::string root_mount_prefix = "/tmp/.wakebox-mount";
 // Path to place a squashfs mount before it's moved to the real mountpoint.
 // While this location will be mounted-over, it will be uncovered when we do the move.
 // Must not hide 'root_mount_prefix'.
-static const std::string squashfs_staging_location = "/mnt";
+static const std::string squashfs_staging_location = "/tmp/.wakebox-mount-squashfs";
 
 // Path within a squashfs mount containing where its temporary mount should be moved to.
 static const std::string mount_location_data = ".wakebox/mountpoint";
@@ -188,6 +188,12 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
   // The squashfuse executable doesn't give a clear error message when the file is missing.
   if (access(source.c_str(), R_OK | F_OK) != 0) {
     std::cerr << "squashfs mount ('" << source << "'): " << strerror(errno) << std::endl;
+    return false;
+  }
+
+  int err = mkdir_with_parents(mountpoint, 0777);
+  if (0 != err) {
+    std::cerr << "mkdir_with_parents ('" << mountpoint << "'):" << strerror(err) << std::endl;
     return false;
   }
 
