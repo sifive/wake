@@ -637,7 +637,7 @@ export def transpose: List (List a) => List (List a) =
 #
 # Guarantees:
 #  - The output is a permutation of `list`
-#  - If `0 <= x < y < len list` then `cmpFn (at list x) (at list y)` (ignoring None)
+#  - If `0 <= x < y < len list` then `cmpFn (at list x) (at list y) | isLT` (ignoring None)
 #
 # Example:
 # ```
