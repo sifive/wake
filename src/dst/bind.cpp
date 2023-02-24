@@ -1162,6 +1162,15 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
         const Location &location = import.second.fragment.location();
 
         filename = location.filename;
+
+        // TODO: Fix this. Its challenging to detect when a type has
+        // been used. Instead of solving that just ignore type imports for now
+        // This means some types will be imported when not used but some unused
+        // import warnings are better than none.
+        if (qualified[0] >= 'A' && qualified[0] <= 'Z') {
+          continue;
+        }
+
         imports.insert({qualified, {0, location}});
 
         std::size_t at_pos = qualified.find("@");
