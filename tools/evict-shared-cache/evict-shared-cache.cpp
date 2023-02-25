@@ -71,17 +71,9 @@ struct CommandParser {
   CommandParserState read_commands(std::vector<std::string>& commands) {
     commands = {};
 
+    // Sleep until a signal arrives
     sigset_t saved;
-    struct timespec timeout;
-    timeout.tv_sec = 1;
-
-    // Sleep until timeout or a signal arrives
-    std::vector<int> ready_fds = poll.wait(&timeout, &saved);
-
-    // Nothing is ready within timeout, yield control
-    if (ready_fds.size() == 0) {
-      return CommandParserState::Continue;
-    }
+    /* std::vector<int> ready_fds = */ poll.wait(nullptr, &saved);
 
     while (true) {
       uint8_t buffer[4096] = {};
@@ -115,16 +107,6 @@ struct CommandParser {
           command_buff = "";
         }
         iter = end + 1;
-      }
-
-      // last read consumed the buffer, yield control
-      if (count < 4096) {
-        return CommandParserState::Continue;
-      }
-
-      // yield if 100 commands have been buffered up without yielding
-      if (commands.size() > 100) {
-        return CommandParserState::Continue;
       }
     }
 
