@@ -61,7 +61,6 @@ void Poll::add(int fd) {
   ev.data.fd = fd;
 
   if (epoll_ctl(imp->pfd, EPOLL_CTL_ADD, fd, &ev) == -1) {
-    printf("%s\n", strerrorname_np(errno));
     perror("epoll_ctl(EPOLL_CTL_ADD)");
     exit(1);
   }
