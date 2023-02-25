@@ -21,6 +21,7 @@ compile_commands.json
 /bin/wake*
 /bin/preload-wake
 /bin/preload-wake.*
+/bin/evict-shared-cache.*
 /bin/wakebox
 /bin/wakebox.*
 /bin/wake-format.*

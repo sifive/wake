@@ -33,6 +33,7 @@ mkdir -p %{buildroot}/var/cache/wake
 /usr/bin/wake
 /usr/bin/wakebox
 /usr/bin/wake-format
+/usr/bin/evict-shared-cache
 /usr/lib/wake
 /usr/share/wake
 %dir /var/cache/wake
