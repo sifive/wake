@@ -2,6 +2,12 @@ wake (@VERSION@-1) unstable; urgency=medium
 
   * Auto-generated release package.
 
+ -- Jake Ehrlich <jake.ehrlich@sifive.com>  Tue, 27 Feb 2023 10:00:00 -0800
+
+wake (0.30.0-1) unstable; urgency=medium
+
+  * Auto-generated release package.
+
  -- Ashley Coleman <ashley.coleman@sifive.com>  Tue, 21 Feb 2023 10:00:00 -0800
 
 wake (0.29.2-1) unstable; urgency=medium
