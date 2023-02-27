@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <wcl/defer.h>
+#include <wcl/filepath.h>
 
 #include <algorithm>
 #include <chrono>
@@ -281,7 +282,7 @@ int main(int argc, char **argv) {
   }
 
   if (lsp) {
-    std::string lsp = make_canonical(find_execpath() + "/../lib/wake/lsp-wake");
+    std::string lsp = wcl::make_canonical(find_execpath() + "/../lib/wake/lsp-wake");
     execl(lsp.c_str(), "lsp-wake", nullptr);
     std::cerr << "exec(" << lsp << "): " << strerror(errno) << std::endl;
     return 1;
@@ -571,13 +572,13 @@ int main(int argc, char **argv) {
 
   if (input) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1), policy);
+      describe(db.explain(wcl::make_canonical(wake_cwd + argv[i]), 1), policy);
     }
   }
 
   if (output) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2), policy);
+      describe(db.explain(wcl::make_canonical(wake_cwd + argv[i]), 2), policy);
     }
   }
 
@@ -608,7 +609,7 @@ int main(int argc, char **argv) {
   }
 
   bool enumok = true;
-  std::string libdir = make_canonical(find_execpath() + "/../share/wake/lib");
+  std::string libdir = wcl::make_canonical(find_execpath() + "/../share/wake/lib");
   auto wakefilenames = find_all_wakefiles(enumok, workspace, verbose, libdir, ".", user_warn);
   if (!enumok) {
     if (verbose) std::cerr << "Workspace wake file enumeration failed" << std::endl;
@@ -790,7 +791,7 @@ int main(int argc, char **argv) {
 
   /* Primitives */
   JobTable jobtable(&db, memory_budget, cpu_budget, debug, verbose, quiet, check, !tty);
-  StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(wake_cwd), cmdline);
+  StringInfo info(verbose, debug, quiet, VERSION_STR, wcl::make_canonical(wake_cwd), cmdline);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 
   bool isTreeBuilt = true;

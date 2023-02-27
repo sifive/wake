@@ -15,6 +15,7 @@ PASSED:
   doc_large
   doc_undo
   doc_unicode
+  filepath_make_canonical
   filepath_range_basic
   filepath_range_empty_node
   filepath_range_fuzz_garbage

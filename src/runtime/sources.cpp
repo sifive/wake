@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <wcl/filepath.h>
 
 #include <algorithm>
 #include <cstring>
@@ -411,7 +412,7 @@ static PRIMFN(prim_sources) {
   Promise *low = runtime.sources->at(0);
   Promise *high = low + runtime.sources->size();
 
-  std::string root = make_canonical(arg0->as_str());
+  std::string root = wcl::make_canonical(arg0->as_str());
   if (root != ".") {
     auto prefixL = root + "/";
     auto prefixH = root + "0";  // '/' + 1 = '0'
@@ -436,7 +437,7 @@ static PRIMFN(prim_files) {
   STRING(arg0, 0);
   REGEXP(arg1, 1);
 
-  std::string root = make_canonical(arg0->as_str());
+  std::string root = wcl::make_canonical(arg0->as_str());
   size_t skip = (root == ".") ? 0 : (root.size() + 1);
 
   std::vector<std::string> match;
@@ -522,7 +523,7 @@ static PRIMFN(prim_simplify) {
   EXPECT(1);
   STRING(arg0, 0);
 
-  RETURN(String::alloc(runtime.heap, make_canonical(arg0->as_str())));
+  RETURN(String::alloc(runtime.heap, wcl::make_canonical(arg0->as_str())));
 }
 
 static PRIMTYPE(type_relative) {
@@ -535,8 +536,8 @@ static PRIMFN(prim_relative) {
   STRING(dir, 0);
   STRING(path, 1);
 
-  RETURN(String::alloc(
-      runtime.heap, make_relative(make_canonical(dir->as_str()), make_canonical(path->as_str()))));
+  RETURN(String::alloc(runtime.heap, make_relative(wcl::make_canonical(dir->as_str()),
+                                                   wcl::make_canonical(path->as_str()))));
 }
 
 static PRIMTYPE(type_execpath) { return args.size() == 0 && out->unify(Data::typeString); }

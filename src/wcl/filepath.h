@@ -17,7 +17,9 @@
 
 #pragma once
 
+#include <sstream>
 #include <string>
+#include <vector>
 
 namespace wcl {
 
@@ -132,6 +134,61 @@ inline std::string join_paths(std::string a, const std::string& b, const std::st
 inline std::string join_paths(std::string a, const std::string& b, const std::string& c,
                               const std::string& d, const std::string& e) {
   return join_paths(join_paths(join_paths(join_paths(a, b), c), d), e);
+}
+
+// Returns the canonicalized version of string x.
+//
+// Ex:
+//   . => .
+//   hax/ => hax
+//   foo/.././bar.z => bar.z
+//   foo/../../bar.z => ../bar.z
+inline std::string make_canonical(const std::string& x) {
+  bool abs = x[0] == '/';
+
+  std::stringstream str;
+  if (abs) str << "/";
+
+  std::vector<std::string> tokens;
+
+  size_t tok = 0;
+  size_t scan = 0;
+  bool repeat;
+  bool pop = false;
+  do {
+    scan = x.find_first_of('/', tok);
+    repeat = scan != std::string::npos;
+    std::string token(x, tok, repeat ? (scan - tok) : scan);
+    tok = scan + 1;
+    if (token == "..") {
+      if (!tokens.empty()) {
+        tokens.pop_back();
+      } else if (!abs) {
+        str << "../";
+        pop = true;
+      }
+    } else if (!token.empty() && token != ".") {
+      tokens.emplace_back(std::move(token));
+    }
+  } while (repeat);
+
+  if (tokens.empty()) {
+    if (abs) {
+      return "/";
+    } else {
+      if (pop) {
+        std::string out = str.str();
+        out.resize(out.size() - 1);
+        return out;
+      } else {
+        return ".";
+      }
+    }
+  } else {
+    str << tokens.front();
+    for (auto i = tokens.begin() + 1; i != tokens.end(); ++i) str << "/" << *i;
+    return str.str();
+  }
 }
 
 }  // namespace wcl

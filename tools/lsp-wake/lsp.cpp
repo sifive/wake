@@ -23,6 +23,7 @@
 #include <poll.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <wcl/filepath.h>
 
 #include <algorithm>
 #include <fstream>
@@ -631,7 +632,7 @@ int main(int argc, const char **argv) {
   if (argc >= 2) {
     instantiateServer(argv[1]);
   } else {
-    instantiateServer(make_canonical(find_execpath() + "/../../share/wake/lib"));
+    instantiateServer(wcl::make_canonical(find_execpath() + "/../../share/wake/lib"));
   }
   // Process requests until something goes wrong
   lspServer->processRequests();

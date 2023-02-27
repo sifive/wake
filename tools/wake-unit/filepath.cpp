@@ -229,3 +229,10 @@ TEST(filepath_range_fuzz_garbage) {
     EXPECT_TRUE(total_size <= path.size());
   }
 }
+
+TEST(filepath_make_canonical) {
+  EXPECT_EQUAL(wcl::make_canonical("."), ".");
+  EXPECT_EQUAL(wcl::make_canonical("hax/"), "hax");
+  EXPECT_EQUAL(wcl::make_canonical("foo/.././bar.z"), "bar.z");
+  EXPECT_EQUAL(wcl::make_canonical("foo/../../bar.z"), "../bar.z");
+}

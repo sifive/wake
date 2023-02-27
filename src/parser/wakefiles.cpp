@@ -291,59 +291,6 @@ bool push_files(std::vector<std::string> &out, const std::string &path, const RE
 }
 #endif
 
-// . => ., hax/ => hax, foo/.././bar.z => bar.z, foo/../../bar.z => ../bar.z
-std::string make_canonical(const std::string &x) {
-  bool abs = x[0] == '/';
-
-  std::stringstream str;
-  if (abs) str << "/";
-
-  std::vector<std::string> tokens;
-
-  size_t tok = 0;
-  size_t scan = 0;
-  bool repeat;
-  bool pop = false;
-  do {
-    if (is_windows()) {
-      scan = x.find_first_of("\\/", tok);
-    } else {
-      scan = x.find_first_of('/', tok);
-    }
-    repeat = scan != std::string::npos;
-    std::string token(x, tok, repeat ? (scan - tok) : scan);
-    tok = scan + 1;
-    if (token == "..") {
-      if (!tokens.empty()) {
-        tokens.pop_back();
-      } else if (!abs) {
-        str << "../";
-        pop = true;
-      }
-    } else if (!token.empty() && token != ".") {
-      tokens.emplace_back(std::move(token));
-    }
-  } while (repeat);
-
-  if (tokens.empty()) {
-    if (abs) {
-      return "/";
-    } else {
-      if (pop) {
-        std::string out = str.str();
-        out.resize(out.size() - 1);
-        return out;
-      } else {
-        return ".";
-      }
-    }
-  } else {
-    str << tokens.front();
-    for (auto i = tokens.begin() + 1; i != tokens.end(); ++i) str << "/" << *i;
-    return str.str();
-  }
-}
-
 struct WakeFilter {
   size_t prefix;
   bool allow;
