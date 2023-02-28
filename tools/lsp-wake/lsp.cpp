@@ -23,6 +23,7 @@
 #include <poll.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <wcl/filepath.h>
 
 #include <algorithm>
 #include <fstream>
@@ -579,7 +580,7 @@ extern "C" {
 void instantiateServer() {
   // This path doesn't matter in web since we don't check the validity of this stdlib there.
   // (We don't check it since we can't send an 'accessFile' request to the client at this stage)
-  auto stdlib = make_canonical(find_execpath() + "/../../share/wake/lib");
+  auto stdlib = wcl::make_canonical(find_execpath() + "/../../share/wake/lib");
   instantiateServerInternal(stdlib);
 }
 
@@ -590,7 +591,7 @@ void instantiateServerCustomStdLib(const char *stdLib) {
   });
   // clang-format on
   if (isNode) {
-    instantiateServerInternal(make_canonical(stdLib));
+    instantiateServerInternal(wcl::make_canonical(stdLib));
   } else {
     instantiateServerInternal(stdLib);  // We want to preserve the uri scheme of stdlib in web
   }
@@ -631,7 +632,7 @@ int main(int argc, const char **argv) {
   if (argc >= 2) {
     instantiateServer(argv[1]);
   } else {
-    instantiateServer(make_canonical(find_execpath() + "/../../share/wake/lib"));
+    instantiateServer(wcl::make_canonical(find_execpath() + "/../../share/wake/lib"));
   }
   // Process requests until something goes wrong
   lspServer->processRequests();
