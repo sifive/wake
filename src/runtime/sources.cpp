@@ -201,7 +201,7 @@ std::string check_version(bool workspace, const char *wake_version) {
   int wake_major, wake_minor, wake_patch;
   int repo_major, repo_minor, repo_patch;
   auto repo = parse_numbers(repo_version.c_str(), repo_major, repo_minor, repo_patch);
-  auto wake = parse_numbers(wake_version + 1, wake_major, wake_minor, wake_patch);
+  auto wake = parse_numbers(wake_version, wake_major, wake_minor, wake_patch);
 
   if (!repo.empty()) return repo + " (" + repo_version + ")";
   if (!wake.empty()) return wake + " (" + wake_version + ")";
