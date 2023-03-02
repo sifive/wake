@@ -1145,7 +1145,9 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
       mkdir_all(pair.second.begin(), pair.second.end());
 
       // Lastly make the symlink
-      symlink(pair.first.c_str(), output_symlink.value.c_str());
+      if (symlink(pair.first.c_str(), output_symlink.value.c_str()) == -1) {
+        std::cerr << "[WARN] failed to create symlink" << std::endl;
+      }
     }
   }
 
