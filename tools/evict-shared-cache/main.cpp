@@ -28,11 +28,10 @@
 #include <memory>
 #include <vector>
 
-#include "command.h"
 #include "eviction_policy.h"
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
-#include "util/poll.h"
+#include "job-cache/eviction_command.h"
 
 void print_help(const char* argv0) {
   // clang-format off
@@ -64,35 +63,24 @@ enum class CommandParserState { Continue, StopSuccess, StopFail };
 
 struct CommandParser {
   std::string command_buff = "";
-  Poll poll;
 
-  CommandParser() { poll.add(STDIN_FILENO); }
+  CommandParser() {}
 
   CommandParserState read_commands(std::vector<std::string>& commands) {
     commands = {};
-
-    // Sleep until a signal arrives
-    sigset_t saved;
-    /* std::vector<int> ready_fds = */ poll.wait(nullptr, &saved);
 
     while (true) {
       uint8_t buffer[4096] = {};
 
       ssize_t count = read(STDIN_FILENO, static_cast<void*>(buffer), 4096);
 
-      // Nothing new to process, yield control
+      // Pipe has been closed. Stop processing
       if (count == 0) {
-        return CommandParserState::Continue;
+        return CommandParserState::StopSuccess;
       }
 
       // An error occured during read
       if (count < 0) {
-        // EBADF means that stdin was closed. This is the signal to stop
-        // processing commands.
-        if (errno == EBADF) {
-          return CommandParserState::StopSuccess;
-        }
-
         std::cerr << "Failed to read from stdin: " << strerror(errno) << std::endl;
         return CommandParserState::StopFail;
       }
@@ -107,6 +95,10 @@ struct CommandParser {
           command_buff = "";
         }
         iter = end + 1;
+      }
+
+      if (count < 4096) {
+        return CommandParserState::Continue;
       }
     }
 
@@ -159,16 +151,16 @@ int main(int argc, char** argv) {
     state = cmd_parser.read_commands(cmds);
 
     for (const auto& c : cmds) {
-      Command cmd;
-      if (!Command::parse(c, cmd)) {
+      EvictionCommand cmd;
+      if (!EvictionCommand::parse(c, cmd)) {
         exit(EXIT_FAILURE);
       }
 
       switch (cmd.type) {
-        case CommandType::Read:
+        case EvictionCommandType::Read:
           policy->read(cmd.job_id);
           break;
-        case CommandType::Write:
+        case EvictionCommandType::Write:
           policy->write(cmd.job_id);
           break;
         default:

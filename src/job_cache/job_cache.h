@@ -159,6 +159,12 @@ class Cache {
   std::string dir;
   wcl::xoshiro_256 rng;
   std::unique_ptr<CacheDbImpl> impl;  // pimpl
+  int evict_stdin;
+  int evict_stdout;
+  int evict_pid;
+
+  void launch_evict_tool();
+  void reap_evict_tool();
 
  public:
   ~Cache();

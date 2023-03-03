@@ -17,4 +17,4 @@ package build_wake
 from wake import _
 
 target buildEvictSharedCache variant =
-    tool here Nil variant "bin/evict-shared-cache" (gopt, json, util,) Nil Nil
+    tool here Nil variant "bin/evict-shared-cache" (gopt, jobCacheLib, json, util, wcl,) Nil Nil

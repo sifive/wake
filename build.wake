@@ -36,9 +36,41 @@ export def install: List String => Result String Error = match _
     dest, Nil = doInstall (in cwd dest) "default" | rmap (\_ "INSTALL")
     _ = Fail "no directory specified (try: install /opt/local)".makeError
 
+def bootstrapTarget targetFn variant =
+    require Pass paths = targetFn variant
+
+    require Some _ =
+        getenv "BOOTSTRAP_WAKE"
+    else
+        Pass paths
+
+    def cppSuffixRegex =
+        (".", variant.getPairFirst,) | cat | quote
+
+    def cSuffixRegex =
+        (".", variant.getPairSecond,) | cat | quote
+
+    def getInstallName path =
+        path.getPathName | replace cppSuffixRegex "" | replace cSuffixRegex ""
+
+    def doInstall path =
+        def location = getInstallName path
+
+        def installed =
+            makeExecPlan ("cp", path.getPathName, location, Nil) (path,)
+            | setPlanLabel "Bootstrap {location}"
+            | runJob
+            | getJobOutputs
+
+        match installed
+            Pass (first, Nil) = Pass first
+            _ = Fail "Unexpected arity in  bootstrap install".makeError
+
+    paths | map doInstall | findFail
+
 # Build all wake targets
 def targets =
-    buildWake, buildWakeBox, buildFuseDaemon, buildShim, buildBSP, buildLSP, buildWakeFormat, buildEvictSharedCache, Nil
+    buildWake, buildWakeBox, buildFuseDaemon, buildShim, buildBSP, (bootstrapTarget buildLSP), buildWakeFormat, (bootstrapTarget buildEvictSharedCache), Nil
 
 def all variant =
     require Pass x =
