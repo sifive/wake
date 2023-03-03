@@ -27,6 +27,6 @@ target buildLSP variant: Result (List Path) Error = match variant
             "-s", 'ENVIRONMENT="web"',
             "--post-js", postJS.getPathName,
             "--pre-js", preJS.getPathName,
-        tool here Nil variant "lib/wake/lsp-wake" (dst,) (postJS, preJS,) extraLFlags
+        tool here Nil variant "lib/wake/lsp-wake" (dst, util,) (postJS, preJS,) extraLFlags
     _ =
-        tool here Nil variant "lib/wake/lsp-wake" (dst,) Nil Nil
+        tool here Nil variant "lib/wake/lsp-wake" (dst, util,) Nil Nil
