@@ -39,7 +39,7 @@
 #include "dst/todst.h"
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
-#include "job-cache/job-cache.h"
+#include "job_cache/job_cache.h"
 #include "markup.h"
 #include "optimizer/ssa.h"
 #include "parser/cst.h"

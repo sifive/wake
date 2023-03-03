@@ -19,7 +19,7 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "job-cache.h"
+#include "job_cache.h"
 
 #include <errno.h>
 #include <fcntl.h>
