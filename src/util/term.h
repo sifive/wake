@@ -15,8 +15,7 @@
  * limitations under the License.
  */
 
-#ifndef TERM_H
-#define TERM_H
+#pragma once
 
 #include <streambuf>
 #include <vector>
@@ -120,5 +119,3 @@ const char *term_cuu1();
 const char *term_cr();
 const char *term_ed();
 bool term_tty();
-
-#endif

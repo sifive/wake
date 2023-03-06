@@ -64,9 +64,6 @@ static const char *ServerNotInitialized = "-32002";
 
 DiagnosticReporter *reporter;
 
-const char *term_colour(int _) { return ""; }
-const char *term_normal() { return ""; }
-
 class LSPServer {
  public:
   LSPServer() : astree() {}
