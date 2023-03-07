@@ -27,7 +27,7 @@ export def staticLFlags  = ("-lpthread", "-flto", "-static", "-s", Nil)
 
 target pwd _ =
     makeExecPlan ("pwd",) Nil
-    | setPlanLabel "pwd: Get pwd"
+    | setPlanLabel "pwd: Get workspace directory"
     | setPlanLocalOnly True
     | runJob
     | getJobStdout
