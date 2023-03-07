@@ -70,6 +70,7 @@ export def vscode _: Result Path Error =
 
     require Pass nodeModules =
         makeExecPlan (npm, "ci", Nil) (packageJSON, packageLockJSON, Nil)
+        | setPlanLabel "Install npm dependencies (npm ci)"
         | editPlanEnvironment (addEnvironmentPath emsdkBinDir)
         | setPlanDirectory @here
         | runJob
@@ -115,6 +116,7 @@ export def vscode _: Result Path Error =
 
     require Pass outputs =
         makeExecPlan (npx, "@vscode/vsce@2.15.0", "package", Nil) vsceFiles
+        | setPlanLabel "Package vsix (vsce package)"
         | editPlanEnvironment (addEnvironmentPath emsdkBinDir)
         | setPlanDirectory here
         | setPlanStdin (relative @here vsceStdin.getPathName)

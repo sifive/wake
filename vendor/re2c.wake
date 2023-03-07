@@ -23,6 +23,7 @@ def re2cOk Unit: Result String Error =
 
     require Some x, Some y, _ =
         makeExecPlan (re2c, "--version", Nil) Nil
+        | setPlanLabel "re2c --version"
         | setPlanStdout logNever
         | setPlanStderr logNever
         | runJob

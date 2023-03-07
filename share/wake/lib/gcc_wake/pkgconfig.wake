@@ -33,16 +33,17 @@ export def flattenSysLibs (packages: List SysLib): SysLib =
     def lflags  = mapFlat getSysLibLFlags  packages
     SysLib "" headers objects cflags lflags
 
-target pkgConfigImp args =
+target pkgConfigImp flags pkgs =
     require Some pkgConfig = whichInEnvPath "pkg-config" 
     else None
 
-    def cmdline = pkgConfig, args
+    def cmdline = pkgConfig, flags ++ pkgs
     def addenv list = match (getenv "PKG_CONFIG_PATH")
         Some p = "PKG_CONFIG_PATH={p}", list
         None   = list
     def result =
         makeExecPlan cmdline Nil
+        | setPlanLabel "pkg-config: {pkgs | catWith " "}"
         | setPlanLocalOnly True
         | setPlanStdout logNever
         | setPlanStderr logDebug
@@ -64,11 +65,11 @@ target pkgConfigImp args =
 export def pkgConfig (pkg: String): Option SysLib =
     def pkgs = tokenize ` ` pkg
     require Some (version, _) =
-        pkgConfigImp ("--short-errors", "--modversion", pkgs)
+        pkgConfigImp ("--short-errors", "--modversion",) pkgs
     else
         None
-    def cflags = pkgConfigImp ("--silence-errors", "--cflags", pkgs)
-    def lflags = pkgConfigImp ("--silence-errors", "--libs",   pkgs)
+    def cflags = pkgConfigImp ("--silence-errors", "--cflags",) pkgs
+    def lflags = pkgConfigImp ("--silence-errors", "--libs",)   pkgs
     require Some cflags = cflags
     require Some lflags = lflags
     Some (SysLib version Nil Nil cflags lflags)

@@ -27,6 +27,7 @@ export def staticLFlags  = ("-lpthread", "-flto", "-static", "-s", Nil)
 
 target pwd _ =
     makeExecPlan ("pwd",) Nil
+    | setPlanLabel "pwd"
     | setPlanLocalOnly True
     | runJob
     | getJobStdout

@@ -41,6 +41,7 @@ def raw_source file =
         failWithError "{file}: source does not exist. Did you delete it or move it without telling git?"
     else
         makeExecPlan ("<source>", str time, file, Nil) Nil
+        | setPlanLabel "<source> {file}"
         | setPlanShare       False
         | setPlanEcho        logDebug
         | setPlanEnvironment Nil
@@ -90,6 +91,7 @@ export def claim (file: String): Result Path Error =
             # Its important that the command here is distinct from what `source` would use
             # so that claim and source do not overlap.
             makeExecPlan ("<claim>", str time, file, Nil) Nil
+            | setPlanLabel "<claim> {file}"
             | setPlanShare       False
             | setPlanEcho        logDebug
             | setPlanEnvironment Nil
@@ -152,6 +154,7 @@ export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (des
         def visible = outputDirectory, Nil
         def cmdline = which "cp", existingFile, desiredWorkspacePath, Nil
         makeExecPlan cmdline visible
+        | setPlanLabel "claimFileAsPathIn: cp {existingFile} {desiredWorkspacePath}"
         | setPlanLocalOnly   True
         | setPlanPersistence Once
         | setPlanFnOutputs   (\_ desiredWorkspacePath, Nil)
