@@ -5,7 +5,7 @@ export def goodLink Unit =
     require Pass dat =
         datFile Unit
     makeExecPlan ("ln", "-s", "datFile", "goodLink", Nil) (dat, Nil)
-    | setPlanLabel "goodLink"
+    | setPlanLabel "test (symlinks): goodLink"
     | runJob
     | getJobOutput
 
