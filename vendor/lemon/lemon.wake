@@ -63,7 +63,7 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
 
     require Pass result =
         makeExecPlan cmdline (file, template, lemon)
-        | setPlanLabel "lemon {file.getPathName}"
+        | setPlanLabel "lemon: {file.getPathName}"
         | runJob
         | getJobOutputs
 

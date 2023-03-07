@@ -116,7 +116,7 @@ export def vscode _: Result Path Error =
 
     require Pass outputs =
         makeExecPlan (npx, "@vscode/vsce@2.15.0", "package", Nil) vsceFiles
-        | setPlanLabel "Package vsix (vsce package)"
+        | setPlanLabel "vsce: Package vsix extension"
         | editPlanEnvironment (addEnvironmentPath emsdkBinDir)
         | setPlanDirectory here
         | setPlanStdin (relative @here vsceStdin.getPathName)

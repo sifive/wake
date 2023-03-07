@@ -27,7 +27,7 @@ export def staticLFlags  = ("-lpthread", "-flto", "-static", "-s", Nil)
 
 target pwd _ =
     makeExecPlan ("pwd",) Nil
-    | setPlanLabel "pwd"
+    | setPlanLabel "pwd: Get pwd"
     | setPlanLocalOnly True
     | runJob
     | getJobStdout
@@ -46,7 +46,7 @@ def doCompileC variant gcc flags headers cfile =
 
     def out =
       makeExecPlan cmdline (cfile, headers)
-      | setPlanLabel "compile {replace `^.*/` '' gcc} {obj}"
+      | setPlanLabel "compile: {replace `^.*/` '' gcc} {obj}"
       | setPlanIsAtty True
       | runJob
       | getJobOutputs
@@ -79,7 +79,7 @@ def doLinkO variant linker flags objects targ extraFiles =
         simplify "{targ}/.."
         | mkdir
     makeExecPlan cmdline (destDir, objects ++ extraFiles)
-    | setPlanLabel "link {replace `^.*/` '' linker} {targ}"
+    | setPlanLabel "link: {replace `^.*/` '' linker} {targ}"
     | setPlanIsAtty True
     | runJob
     | getJobOutputs

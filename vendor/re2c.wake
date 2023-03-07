@@ -49,7 +49,7 @@ def re2cReal re2c file =
 
     require Pass result =
         makeExecPlan cmdline (file, Nil)
-        | setPlanLabel "re2c {cpp}"
+        | setPlanLabel "re2c: {cpp}"
         | runJob
         | getJobOutput
 

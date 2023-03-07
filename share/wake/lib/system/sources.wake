@@ -41,7 +41,7 @@ def raw_source file =
         failWithError "{file}: source does not exist. Did you delete it or move it without telling git?"
     else
         makeExecPlan ("<source>", str time, file, Nil) Nil
-        | setPlanLabel "<source> {file}"
+        | setPlanLabel "source: {file}"
         | setPlanShare       False
         | setPlanEcho        logDebug
         | setPlanEnvironment Nil
