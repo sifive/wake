@@ -34,6 +34,7 @@ def m4 (file: Path): Result Path Error =
 
     def run =
         makeExecPlan (which "m4", file.getPathName, Nil) (file, Nil)
+        | setPlanLabel "lemon: m4 {file.getPathName}"
         | setPlanStdout logNever
         | runJob
 
@@ -62,7 +63,7 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
 
     require Pass result =
         makeExecPlan cmdline (file, template, lemon)
-        | setPlanLabel "lemon {file.getPathName}"
+        | setPlanLabel "lemon: {file.getPathName}"
         | runJob
         | getJobOutputs
 

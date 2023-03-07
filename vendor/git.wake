@@ -24,6 +24,7 @@ def buildAs Unit = match (subscribe releaseAs)
 
         require Pass stdout =
             makeExecPlan cmdline Nil
+            | setPlanLabel "buildAs: git describe"
             | setPlanKeep False
             | setPlanLocalOnly True
             | setPlanStdout logNever
@@ -47,6 +48,7 @@ def buildOn Unit = match (subscribe releaseOn)
         def cmdline = which "git", "show", "-s", "--format=%ci", "HEAD", Nil
         require Pass stdout =
             makeExecPlan cmdline Nil
+            | setPlanLabel "buildOn: git show"
             | setPlanKeep False
             | setPlanLocalOnly True
             | setPlanStdout logNever

@@ -36,6 +36,7 @@ target writeImp inputs mode path content =
                     Pass path = Pass (editRunnerOutputOutputs (path, _) output)
         makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
     makeExecPlan ("<write>", str mode, path, Nil) inputs
+    | setPlanLabel "write: {path} {str mode}"
     | setPlanOnce        False
     | setPlanEnvironment Nil
     | runJobWith writeRunner
@@ -115,6 +116,7 @@ def mkdirRunner: Runner =
 
 def mkdirImp inputs mode path =
     makeExecPlan ("<mkdir>", "-m", "0{strOctal mode}", path, Nil) inputs
+    | setPlanLabel "mkdir: {path} 0{strOctal mode}"
     | setPlanKeep        False
     | setPlanEnvironment Nil
     | runJobWith mkdirRunner
