@@ -60,6 +60,12 @@ void print_help() {
       "                             Use 'eval $WAKEBOX_CMD' to run the command from params file. \n"
       "    -i --allow-interactive   Use default stdin, ignoring the params json file's stdin     \n"
       "                             value.                                                       \n"
+#ifdef __linux__
+      "    -b --bind DIR1:DIR2      Place the directory (or file) at DIR1 within the command's   \n"
+      "                             view of the filesystem at location DIR2.                     \n"
+      "                             May be specified multiple times.                             \n"
+      "                             These are applied after the params file mount ops.           \n"
+#endif
       "    -I --isolate-retcode     Don't allow COMMAND's return code to impact wakebox's return \n"
       "                             code.                                                        \n"
       "                                                                                          \n"
@@ -141,7 +147,7 @@ int run_interactive(const std::string &rootfs, const std::vector<std::string> &t
 }
 
 int run_batch(const char *params_path, bool has_output, bool use_stdin_file, bool use_shell,
-              bool isolate_retcode, const char *result_path) {
+              bool isolate_retcode, const char *result_path, const std::vector<mount_op> &binds) {
   // Read the params file
   std::ifstream ifs(params_path);
   const std::string json((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
@@ -159,6 +165,9 @@ int run_batch(const char *params_path, bool has_output, bool use_stdin_file, boo
     std::cerr << "No command was provided." << std::endl;
     return 1;
   }
+
+  // Append CLI-specified binds after params file binds.
+  args.mount_ops.insert(args.mount_ops.end(), binds.begin(), binds.end());
 
   if (use_shell) {
     std::stringstream ss;
@@ -245,6 +254,20 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  std::vector<mount_op> bind_ops;
+#ifdef __linux__
+  for (unsigned int i = 0; i < arg(options, "bind")->count; i++) {
+    const std::string s = binds[i];
+    std::string source = s.substr(0, s.find(":"));
+    std::string destination = s.substr(s.find(":") + 1);
+    if (source.empty() || destination.empty() || s.find(":") == std::string::npos) {
+      std::cerr << "Invalid bind: " << s << std::endl;
+      return 1;
+    }
+    bind_ops.push_back({"bind", source, destination});
+  }
+#endif
+
   if (has_positional_cmd) {
     std::string rootfs;
     if (arg(options, "rootfs")->count > 0) rootfs = arg(options, "rootfs")->argument;
@@ -252,18 +275,6 @@ int main(int argc, char *argv[]) {
     std::vector<std::string> toolchains;
     for (unsigned int i = 0; i < arg(options, "toolchain")->count; i++)
       toolchains.push_back(tools[i]);
-
-    std::vector<mount_op> bind_ops;
-    for (unsigned int i = 0; i < arg(options, "bind")->count; i++) {
-      const std::string s = binds[i];
-      std::string source = s.substr(0, s.find(":"));
-      std::string destination = s.substr(s.find(":") + 1);
-      if (source.empty() || destination.empty() || s.find(":") == std::string::npos) {
-        std::cerr << "Invalid bind: " << s << std::endl;
-        return 1;
-      }
-      bind_ops.push_back({"bind", source, destination});
-    }
     if (arg(options, "bind-cwd")->count > 0) {
       std::string cwd = get_cwd();
       bind_ops.push_back({"create-dir", "", cwd});
@@ -284,7 +295,8 @@ int main(int argc, char *argv[]) {
     bool use_stdin_file = arg(options, "interactive")->count == 0;
     bool use_shell = arg(options, "force-shell")->count > 0;
     const char *result_path = arg(options, "output-stats")->argument;
-    return run_batch(params, has_output, use_stdin_file, use_shell, isolate_retcode, result_path);
+    return run_batch(params, has_output, use_stdin_file, use_shell, isolate_retcode, result_path,
+                     bind_ops);
   }
   print_help();
   return 1;
