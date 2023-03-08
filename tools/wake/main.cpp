@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <map>
 #include <random>
 #include <set>
 #include <sstream>
@@ -571,39 +572,95 @@ int main(int argc, char **argv) {
     policy = DescribePolicy::verbose();
   }
 
+  std::unordered_map<long, JobReflection> captured_jobs = {};
+  std::map<long, int> captured_count = {};
+
   if (job) {
-    auto hits = db.explain(std::atol(job));
-    describe(hits, policy);
+    std::vector<JobReflection> hits = db.explain(std::atol(job));
     if (hits.empty())
       std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
+    for (JobReflection &j : hits) {
+      captured_jobs[j.job] = std::move(j);
+      captured_count[j.job]++;
+    }
   }
 
-  for (unsigned int i = 0; i < input; ++i) {
-    describe(db.explain(wcl::make_canonical(wake_cwd + input_files[i]), 1), policy);
+  {
+    std::vector<JobReflection> hits = {};
+    for (unsigned int i = 0; i < input; ++i) {
+      auto current = db.explain(wcl::make_canonical(wake_cwd + input_files[i]), 1);
+      std::move(current.begin(), current.end(), std::back_inserter(hits));
+    }
+    for (JobReflection &j : hits) {
+      captured_jobs[j.job] = std::move(j);
+      captured_count[j.job]++;
+    }
   }
 
-  for (unsigned int i = 0; i < output; ++i) {
-    describe(db.explain(wcl::make_canonical(wake_cwd + output_files[i]), 2), policy);
+  {
+    std::vector<JobReflection> hits = {};
+    for (unsigned int i = 0; i < output; ++i) {
+      auto current = db.explain(wcl::make_canonical(wake_cwd + output_files[i]), 2);
+      std::move(current.begin(), current.end(), std::back_inserter(hits));
+    }
+    for (JobReflection &j : hits) {
+      captured_jobs[j.job] = std::move(j);
+      captured_count[j.job]++;
+    }
   }
 
   if (label) {
     std::string glob = std::string(label);
     std::replace(glob.begin(), glob.end(), '*', '%');
     std::replace(glob.begin(), glob.end(), '?', '_');
-    describe(db.labels_matching(glob), policy);
+    std::vector<JobReflection> hits = db.labels_matching(glob);
+    for (JobReflection &j : hits) {
+      captured_jobs[j.job] = std::move(j);
+      captured_count[j.job]++;
+    }
   }
 
   if (last_use) {
-    describe(db.last_use(), policy);
+    std::vector<JobReflection> hits = db.last_use();
+    for (JobReflection &j : hits) {
+      captured_jobs[j.job] = std::move(j);
+      captured_count[j.job]++;
+    }
   }
 
   if (last_exe) {
-    describe(db.last_exe(), policy);
+    std::vector<JobReflection> hits = db.last_exe();
+    for (JobReflection &j : hits) {
+      captured_jobs[j.job] = std::move(j);
+      captured_count[j.job]++;
+    }
   }
 
   if (failed) {
-    describe(db.failed(), policy);
+    std::vector<JobReflection> hits = db.failed();
+    for (JobReflection &j : hits) {
+      captured_jobs[j.job] = std::move(j);
+      captured_count[j.job]++;
+    }
   }
+
+  int max_count = 0;
+  for (const auto &pair : captured_count) {
+    if (pair.second > max_count) {
+      max_count = pair.second;
+    }
+  }
+
+  std::vector<JobReflection> captures = {};
+  for (const auto &pair : captured_count) {
+    if (pair.second == max_count) {
+      auto it = captured_jobs.find(pair.first);
+      assert(it != captured_jobs.end());
+      captures.push_back(std::move(it->second));
+    }
+  }
+
+  describe(captures, policy);
 
   if (tagdag) {
     JAST json = create_tagdag(db, tagdag);
