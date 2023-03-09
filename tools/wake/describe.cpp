@@ -252,7 +252,7 @@ void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy) {
       break;
     }
     case DescribePolicy::DEBUG: {
-      describe_metadata(jobs, true, false);
+      describe_metadata(jobs, true, true);
       break;
     }
     case DescribePolicy::VERBOSE: {
