@@ -183,6 +183,9 @@ def id x = x
 export def makeExecPlan (cmd: List String) (visible: List Path): Plan =
   Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share False Nil (\_ True) defaultUsage id id False
 
+export def makeNoEnvironmentExecPlan (cmd: List String) (visible: List Path): Plan =
+  Plan "" cmd visible Nil "." "" logInfo logWarning logEcho Share False Nil (\_ True) defaultUsage id id False
+
 export def makeShellPlan (script: String) (visible: List Path): Plan =
   makeExecPlan (which "dash", "-c", script, Nil) visible
 
