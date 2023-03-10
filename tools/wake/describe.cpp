@@ -26,6 +26,7 @@
 
 #include <deque>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 
@@ -53,7 +54,7 @@ static std::string describe_hash(const std::string &hash, bool verbose, bool sta
 }
 
 static void describe_metadata(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
-  TermInfoBuf tbuf(std::cout.rdbuf(), true);
+  TermInfoBuf tbuf(std::cout.rdbuf());
   std::ostream out(&tbuf);
 
   for (auto &job : jobs) {
@@ -90,30 +91,28 @@ static void describe_metadata(const std::vector<JobReflection> &jobs, bool debug
       indent(out, "  ", job.stack);
     }
 
-    std::vector<std::string> stdout_writes;
-    std::vector<std::string> stderr_writes;
+    std::stringstream stdout_writes;
+    std::stringstream stderr_writes;
     for (auto &write : job.std_writes) {
       if (write.second == 1) {
-        stdout_writes.push_back(write.first);
+        stdout_writes << write.first;
       }
       if (write.second == 2) {
-        stderr_writes.push_back(write.first);
+        stderr_writes << write.first;
       }
     }
 
     if (verbose) {
-      if (!stdout_writes.empty()) {
+      std::string stdout_str = stdout_writes.str();
+      if (!stdout_str.empty()) {
         out << "Stdout:";
-        for (std::string write : stdout_writes) {
-          indent(out, "  ", write);
-        }
+        indent(out, "  ", stdout_str);
       }
 
-      if (!stderr_writes.empty()) {
+      std::string stderr_str = stderr_writes.str();
+      if (!stderr_str.empty()) {
         out << "Stderr:";
-        for (std::string write : stderr_writes) {
-          indent(out, "  ", write);
-        }
+        indent(out, "  ", stderr_str);
       }
     }
 
@@ -175,29 +174,27 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
       indent(out, "#   ", job.stack);
     }
 
-    std::vector<std::string> stdout_writes;
-    std::vector<std::string> stderr_writes;
+    std::stringstream stdout_writes;
+    std::stringstream stderr_writes;
     for (auto &write : job.std_writes) {
       if (write.second == 1) {
-        stdout_writes.push_back(write.first);
+        stdout_writes << write.first;
       }
       if (write.second == 2) {
-        stderr_writes.push_back(write.first);
+        stderr_writes << write.first;
       }
     }
 
-    if (!stdout_writes.empty()) {
+    std::string stdout_str = stdout_writes.str();
+    if (!stdout_str.empty()) {
       out << "# Stdout:";
-      for (std::string write : stdout_writes) {
-        indent(out, "#   ", write);
-      }
+      indent(out, "#   ", stdout_str);
     }
 
-    if (!stderr_writes.empty()) {
+    std::string stderr_str = stderr_writes.str();
+    if (!stderr_str.empty()) {
       out << "# Stderr:";
-      for (std::string write : stderr_writes) {
-        indent(out, "#   ", write);
-      }
+      indent(out, "#   ", stderr_str);
     }
 
     if (!job.tags.empty()) {
