@@ -128,50 +128,51 @@ static void describe_metadata(const std::vector<JobReflection> &jobs, bool debug
 }
 
 static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
-  std::cout << "#! /bin/sh -ex" << std::endl;
+  TermInfoBuf tbuf(std::cout.rdbuf(), true);
+  std::ostream out(&tbuf);
+
+  out << "#! /bin/sh -ex" << std::endl;
 
   for (auto &job : jobs) {
-    std::cout << std::endl << "# Wake job " << job.job;
-    if (!job.label.empty()) std::cout << " (" << job.label << ")";
-    std::cout << ":" << std::endl;
-    std::cout << "cd " << shell_escape(get_cwd()) << std::endl;
+    out << std::endl << "# Wake job " << job.job;
+    if (!job.label.empty()) out << " (" << job.label << ")";
+    out << ":" << std::endl;
+    out << "cd " << shell_escape(get_cwd()) << std::endl;
     if (job.directory != ".") {
-      std::cout << "cd " << shell_escape(job.directory) << std::endl;
+      out << "cd " << shell_escape(job.directory) << std::endl;
     }
-    std::cout << "env -i \\" << std::endl;
+    out << "env -i \\" << std::endl;
     for (auto &env : job.environment) {
-      std::cout << "\t" << shell_escape(env) << " \\" << std::endl;
+      out << "\t" << shell_escape(env) << " \\" << std::endl;
     }
     for (auto &arg : job.commandline) {
-      std::cout << shell_escape(arg) << " \\" << std::endl << '\t';
+      out << shell_escape(arg) << " \\" << std::endl << '\t';
     }
-    std::cout << "< " << shell_escape(job.stdin_file) << std::endl << std::endl;
-    std::cout << "# When wake ran this command:" << std::endl
-              << "#   Built:     " << job.endtime.as_string() << std::endl
-              << "#   Runtime:   " << job.usage.runtime << std::endl
-              << "#   CPUtime:   " << job.usage.cputime << std::endl
-              << "#   Mem bytes: " << job.usage.membytes << std::endl
-              << "#   In  bytes: " << job.usage.ibytes << std::endl
-              << "#   Out bytes: " << job.usage.obytes << std::endl
-              << "#   Status:    " << job.usage.status << std::endl;
+    out << "< " << shell_escape(job.stdin_file) << std::endl << std::endl;
+    out << "# When wake ran this command:" << std::endl
+        << "#   Built:     " << job.endtime.as_string() << std::endl
+        << "#   Runtime:   " << job.usage.runtime << std::endl
+        << "#   CPUtime:   " << job.usage.cputime << std::endl
+        << "#   Mem bytes: " << job.usage.membytes << std::endl
+        << "#   In  bytes: " << job.usage.ibytes << std::endl
+        << "#   Out bytes: " << job.usage.obytes << std::endl
+        << "#   Status:    " << job.usage.status << std::endl;
     if (verbose) {
-      std::cout << "#  Wake run:  " << job.wake_start.as_string() << " (" << job.wake_cmdline << ")"
-                << std::endl;
-      std::cout << "# Visible:" << std::endl;
+      out << "#  Wake run:  " << job.wake_start.as_string() << " (" << job.wake_cmdline << ")"
+          << std::endl;
+      out << "# Visible:" << std::endl;
       for (auto &in : job.visible)
-        std::cout << "#  " << describe_hash(in.hash, verbose, job.stale) << " " << in.path
-                  << std::endl;
+        out << "#  " << describe_hash(in.hash, verbose, job.stale) << " " << in.path << std::endl;
     }
-    std::cout << "# Inputs:" << std::endl;
+    out << "# Inputs:" << std::endl;
     for (auto &in : job.inputs)
-      std::cout << "#  " << describe_hash(in.hash, verbose, job.stale) << " " << in.path
-                << std::endl;
-    std::cout << "# Outputs:" << std::endl;
-    for (auto &out : job.outputs)
-      std::cout << "#  " << describe_hash(out.hash, verbose, false) << " " << out.path << std::endl;
+      out << "#  " << describe_hash(in.hash, verbose, job.stale) << " " << in.path << std::endl;
+    out << "# Outputs:" << std::endl;
+    for (auto &output : job.outputs)
+      out << "#  " << describe_hash(output.hash, verbose, false) << " " << output.path << std::endl;
     if (debug) {
-      std::cout << "# Stack:";
-      indent(std::cout, "#   ", job.stack);
+      out << "# Stack:";
+      indent(out, "#   ", job.stack);
     }
 
     std::vector<std::string> stdout_writes;
@@ -186,24 +187,24 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
     }
 
     if (!stdout_writes.empty()) {
-      std::cout << "# Stdout:";
+      out << "# Stdout:";
       for (std::string write : stdout_writes) {
-        indent(std::cout, "#   ", write);
+        indent(out, "#   ", write);
       }
     }
 
     if (!stderr_writes.empty()) {
-      std::cout << "# Stderr:";
+      out << "# Stderr:";
       for (std::string write : stderr_writes) {
-        indent(std::cout, "#   ", write);
+        indent(out, "#   ", write);
       }
     }
 
     if (!job.tags.empty()) {
-      std::cout << "# Tags:" << std::endl;
+      out << "# Tags:" << std::endl;
       for (auto &x : job.tags) {
-        std::cout << "   " << x.uri << ": ";
-        indent(std::cout, "#     ", x.content);
+        out << "   " << x.uri << ": ";
+        indent(out, "#     ", x.content);
       }
     }
   }
