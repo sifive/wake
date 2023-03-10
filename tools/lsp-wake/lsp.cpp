@@ -26,6 +26,7 @@
 #include <wcl/filepath.h>
 
 #include <algorithm>
+#include <cassert>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -35,6 +36,7 @@
 
 #include "astree.h"
 #include "compat/readable.h"
+#include "json.h"
 #include "json/json5.h"
 #include "json_converter.h"
 #include "parser/parser.h"
@@ -86,32 +88,27 @@ class LSPServer {
   };
 
   MethodResult processRequest(const std::string &requestString) {
-    // Parse that requestString as JSON
-    JAST request;
-    std::stringstream parseErrors;
-    if (!JAST::parse(requestString, parseErrors, request)) {
-      JAST errorMessage = JSONConverter::createErrorMessage(ParseError, parseErrors.str());
-      return MethodResult(errorMessage);
+    LSPRequestMessage msg;
+    assert(LSPRequestMessage::parse(requestString, msg));
+
+    if (!isInitialized && (msg.method != LSPMessageMethod::Initialize)) {
+      auto res = msg.createErrorResponse(ServerNotInitialized, "Must request initialize first");
+      return {};
+
+      // TODO: LSPResponseMsg -> MethodResult
+      // return MethodResult(errorMessage);
     }
 
-    const std::string &method = request.get("method").value;
-    if (!isInitialized && (method != "initialize")) {
-      JAST errorMessage = JSONConverter::createErrorMessage(request, ServerNotInitialized,
-                                                            "Must request initialize first");
-      return MethodResult(errorMessage);
+    if (isShutDown && (msg.method != LSPMessageMethod::Exit)) {
+      auto res = msg.createErrorResponse(
+          InvalidRequest, "Received a request other than 'exit' after a shutdown request.");
+      return {};
+
+      // TODO: LSPResponseMsg -> MethodResult
+      // return MethodResult(errorMessage);
     }
 
-    if (isShutDown && (method != "exit")) {
-      JAST errorMessage = JSONConverter::createErrorMessage(
-          request, InvalidRequest,
-          "Received a request other than 'exit' after a shutdown request.");
-      return MethodResult(errorMessage);
-    }
-
-    if (!method.empty()) {
-      return callMethod(method, request);
-    }
-    return {};  // empty result
+    return callMethod(msg);
   }
 
   void processRequests() {
@@ -155,7 +152,7 @@ class LSPServer {
   }
 
  private:
-  typedef MethodResult (LSPServer::*LspMethod)(const JAST &);
+  typedef MethodResult (LSPServer::*LspMethod)(const LSPRequestMessage &);
 
   bool isSTDLibValid = false;
   bool isInitialized = false;
@@ -163,24 +160,24 @@ class LSPServer {
   int ignoredCount = 0;
   bool isShutDown = false;
   ASTree astree;
-  std::map<std::string, LspMethod> essentialMethods = {
-      {"initialize", &LSPServer::initialize},
-      {"initialized", &LSPServer::initialized},
-      {"textDocument/didOpen", &LSPServer::didOpen},
-      {"textDocument/didChange", &LSPServer::didChange},
-      {"textDocument/didSave", &LSPServer::didSave},
-      {"textDocument/didClose", &LSPServer::didClose},
-      {"workspace/didChangeWatchedFiles", &LSPServer::didChangeWatchedFiles},
-      {"shutdown", &LSPServer::shutdown},
-      {"exit", &LSPServer::serverExit}};
-  std::map<std::string, LspMethod> additionalMethods = {
-      {"textDocument/definition", &LSPServer::goToDefinition},
-      {"textDocument/references", &LSPServer::findReportReferences},
-      {"textDocument/documentHighlight", &LSPServer::highlightOccurrences},
-      {"textDocument/hover", &LSPServer::hover},
-      {"textDocument/documentSymbol", &LSPServer::documentSymbol},
-      {"workspace/symbol", &LSPServer::workspaceSymbol},
-      {"textDocument/rename", &LSPServer::rename}};
+  std::map<LSPMessageMethod, LspMethod> essentialMethods = {
+      {LSPMessageMethod::Initialize, &LSPServer::initialize},
+      {LSPMessageMethod::Initialized, &LSPServer::initialized},
+      {LSPMessageMethod::TextDocument_DidOpen, &LSPServer::didOpen},
+      {LSPMessageMethod::TextDocument_DidChange, &LSPServer::didChange},
+      {LSPMessageMethod::TextDocument_DidSave, &LSPServer::didSave},
+      {LSPMessageMethod::TextDocument_DidClose, &LSPServer::didClose},
+      {LSPMessageMethod::Workspace_DidChangeWatchedFiles, &LSPServer::didChangeWatchedFiles},
+      {LSPMessageMethod::Shutdown, &LSPServer::shutdown},
+      {LSPMessageMethod::Exit, &LSPServer::serverExit}};
+  std::map<LSPMessageMethod, LspMethod> additionalMethods = {
+      {LSPMessageMethod::TextDocument_Definition, &LSPServer::goToDefinition},
+      {LSPMessageMethod::TextDocument_References, &LSPServer::findReportReferences},
+      {LSPMessageMethod::TextDocument_DocumentHighlight, &LSPServer::highlightOccurrences},
+      {LSPMessageMethod::TextDocument_Hover, &LSPServer::hover},
+      {LSPMessageMethod::TextDocument_DocumentSymbol, &LSPServer::documentSymbol},
+      {LSPMessageMethod::Workspace_Symbol, &LSPServer::workspaceSymbol},
+      {LSPMessageMethod::TextDocument_Rename, &LSPServer::rename}};
 
   void notifyAboutInvalidSTDLib(MethodResult &methodResult) const {
     JAST message = JSONConverter::createMessage();
@@ -280,8 +277,21 @@ class LSPServer {
     refresh("timeout", methodResult);
   }
 
-  MethodResult callMethod(const std::string &method, const JAST &request) {
-    auto functionPointer = essentialMethods.find(method);
+  MethodResult callMethod(const LSPRequestMessage &msg) {
+    if (msg.method == LSPMessageMethod::None) {
+      return {};
+    }
+
+    if (msg.method == LSPMessageMethod::Unsupported) {
+      auto res = msg.createErrorResponse(
+          MethodNotFound, "Method '" + std::string("--todo--") + "' is not implemented.");
+      return {};
+
+      // TODO: LSPResponseMethod -> MethodResult
+      // return MethodResult(errorMessage);
+    }
+
+    auto functionPointer = essentialMethods.find(msg.method);
     if (functionPointer != essentialMethods.end()) {
       return (this->*(functionPointer->second))(request);
     }
@@ -291,9 +301,12 @@ class LSPServer {
       return (this->*(functionPointer->second))(request);
     }
 
-    JAST errorMessage = JSONConverter::createErrorMessage(
-        request, MethodNotFound, "Method '" + method + "' is not implemented.");
-    return MethodResult(errorMessage);
+    // Should be unreachable
+    auto res = msg.createErrorResponse(
+        MethodNotFound, "Method '" + std::string("--todo--") + "' is not implemented.");
+    return {};
+    // TODO: LSPResponseMethod -> MethodResult
+    // return MethodResult(errorMessage);
   }
 
   static void sendMessage(const JAST &message) {
@@ -313,7 +326,7 @@ class LSPServer {
     std::cout << msg << "\r\n" << std::flush;
   }
 
-  MethodResult initialize(const JAST &receivedMessage) {
+  MethodResult initialize(const LSPRequestMessage &receivedMessage) {
     MethodResult methodResult;
     if (!isSTDLibValid) {
       notifyAboutInvalidSTDLib(methodResult);  // set notification
