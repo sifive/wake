@@ -289,7 +289,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
         break;
       } else {
         close_db(imp.get());
-        return "produced by an incompatible verison of wake; remove it.";
+        return "produced by an incompatible version of wake; remove it.";
       }
     }
 
