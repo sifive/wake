@@ -604,6 +604,7 @@ int main(int argc, char **argv) {
   if (label) {
     std::string glob = argv[1];
     std::replace(glob.begin(), glob.end(), '*', '%');
+    std::replace(glob.begin(), glob.end(), '?', '_');
     describe(db.labels_matching(glob), policy);
   }
 
