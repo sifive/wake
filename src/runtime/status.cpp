@@ -36,6 +36,7 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <iomanip>
 #include <limits>
 #include <sstream>
@@ -43,7 +44,9 @@
 
 #include "compat/sigwinch.h"
 #include "job.h"
+#include "util/config.h"
 #include "util/term.h"
+#include "wcl/defer.h"
 
 // How often is the status updated (should be a multiple of 2 for budget=0)
 #define REFRESH_HZ 6
@@ -80,6 +83,163 @@ static void status_clear() {
     std::string s = os.str();
     write_all(2, s.data(), s.size());
   }
+}
+
+// This function takes in a string with variables of the form
+// $var in them and splits the string into the printed part,
+// and the variables parts. The resulting vector alternates
+// between strings and vars. It will always begin with a string
+// and end with a string. Since '$' is treated specially, it can
+// be escaped with a second '$' as in "That will be $$5.00" would
+// render to "That will be $5.00".
+static std::vector<std::string> split_by_var(std::string fmt) {
+  std::vector<std::string> out;
+  auto front = fmt.begin();
+  std::string cur;
+
+  // While looping we maintain the invariant that either
+  // the `out` vector is empty, or the last item was a variable.
+  while (front < fmt.end()) {
+    // find the next possible split point.
+    auto iter = std::find(front, fmt.end(), '$');
+
+    // First we might be at the end, so go ahead and append that last
+    // string.
+    if (iter == fmt.end()) {
+      // We just append to the current string and let
+      // the loop invariant be maintained.
+      cur.append(front, iter);
+      break;
+    }
+
+    // Next we might want to escape a dollar
+    if (iter + 1 < fmt.end() && *(iter + 1) == '$') {
+      front += 2;
+      cur += '$';
+      continue;
+    }
+
+    // Lastly this might be a variable
+    // By first pushing back a string and then the variable,
+    // we ensure that the loop invariant is maintained.
+    cur.append(front, iter);
+    out.emplace_back(std::move(cur));
+
+    // Move past the '$'
+    ++iter;
+    front = iter;
+
+    // Now find the full variable name
+    while (iter < fmt.end() && isalpha(*iter)) ++iter;
+
+    // And lastly maintain the loop invariant by pushing back the variable
+    out.emplace_back(front, iter);
+
+    // move past the variable
+    front = iter;
+  }
+
+  // This ensures that the last item is always a string. Note that
+  // if the last thing was a variable, this might be the empty string
+  // and that's ok.
+  out.emplace_back(std::move(cur));
+  return out;
+}
+
+void StatusBuf::emit_header() {
+  auto fmt_vec = split_by_var(WakeConfig::get()->log_header);
+
+  // Push the current state so that we can overwrite
+  // but restore it later
+  buf.push_state();
+
+  // Now start writing things out
+  std::ostream out(&buf);
+
+  // Set color
+  out << term_normal();
+  int colour = color % 8;
+  int intensity = color / 16;
+  if (colour != TERM_DEFAULT) {
+    out << term_colour(colour);
+  }
+  if (intensity != TERM_DEFAULT) {
+    out << term_intensity(intensity);
+  }
+
+  // Now output the format the user requested.
+  out << fmt_vec[0];
+  const size_t extra_width = WakeConfig::get()->log_header_extra_width;
+  for (size_t i = 1; i < fmt_vec.size(); i += 2) {
+    const std::string &var = fmt_vec[i];
+
+    // A var is always followed by a string, so defer that
+    // until the end, that way we can break after each var
+    // check
+    auto write_string = wcl::make_defer([i, &out, &fmt_vec]() {
+      out << std::setw(0);
+      out << fmt_vec[i + 1];
+    });
+
+    if (var == "time") {
+      // Get the current time
+      time_t t = time(NULL);
+      struct tm tm = *localtime(&t);
+      out << std::setw(0);
+      out << std::put_time(&tm, "%FT%T%z");
+      continue;
+    }
+
+    if (var == "stream") {
+      // TODO: Make this configurable
+      constexpr size_t stream_width = 7;
+      out << std::setw(stream_width);
+      out << name;
+      continue;
+    }
+
+    if (var == "extra") {
+      // TODO: Make this configurable
+      std::string tmp_extra;
+      if (extra) {
+        if (extra->size() <= extra_width) {
+          tmp_extra = *extra;
+        } else if (extra_width >= 3) {
+          tmp_extra.append(extra->begin(), extra->begin() + (extra_width - 3));
+          tmp_extra += "...";
+        } else {
+          tmp_extra.append(extra->begin(), extra->begin() + extra_width);
+        }
+      }
+      out << std::setw(extra_width);
+      out << tmp_extra;
+      continue;
+    }
+  }
+
+  buf.pop_state();
+}
+
+int StatusBuf::overflow(int c) {
+  line_buf += c;
+  if (c == '\n') {
+    status_clear();
+    emit_header();
+    buf.sputn(line_buf.data(), line_buf.size());
+    line_buf = "";
+  }
+
+  return 0;
+}
+
+StatusBuf::~StatusBuf() {
+  if (line_buf.size()) {
+    status_clear();
+    line_buf += '\n';
+    emit_header();
+    buf.sputn(line_buf.data(), line_buf.size());
+  }
+  sync();
 }
 
 static int ilog10(int x) {
@@ -275,16 +435,75 @@ struct StreamSettings {
   int fd;
   bool istty;
   int colour;
+  std::unique_ptr<std::streambuf> fd_buf;
+  std::unique_ptr<TermInfoBuf> term_buf;
+  std::unique_ptr<StatusBuf> log_buf;
+  std::unique_ptr<std::ostream> generic_stream;
   StreamSettings() : fd(-1), istty(false), colour(TERM_DEFAULT) {}
 };
 
 static std::unordered_map<std::string, StreamSettings> settings;
 
-void status_set_colour(const char *name, int colour) { settings[name].colour = colour; }
+int status_get_colour(const char *name) {
+  if (settings.count(name)) return settings[name].colour;
+  return 0;
+}
+
+int status_get_fd(const char *name) {
+  if (settings.count(name)) return settings[name].fd;
+  return -1;
+}
+
+static int stream_color(std::string name) {
+  if (name == "error") {
+    return 1;
+  }
+  if (name == "warning") {
+    return 3;
+  }
+  if (name == "echo") {
+    return 0;
+  }
+  if (name == "info") {
+    return 16;
+  }
+  if (name == "debug") {
+    return 4;
+  }
+  if (name == "null") {
+    return 0;
+  }
+
+  return 0;
+}
+
+std::ostream &status_get_generic_stream(const char *name) {
+  if (settings.count(name)) {
+    return *settings[name].generic_stream;
+  }
+  auto &stream = settings[name];
+  stream.fd = -1;
+  stream.istty = false;
+  stream.colour = stream_color(name);
+  stream.fd_buf = std::make_unique<NullBuf>();
+  stream.generic_stream = std::make_unique<std::ostream>(stream.fd_buf.get());
+
+  return *stream.generic_stream;
+}
 
 void status_set_fd(const char *name, int fd) {
-  settings[name].fd = fd;
-  settings[name].istty = isatty(fd) == 1;
+  if (settings.count(name)) {
+    return;
+  }
+  auto &stream = settings[name];
+  stream.fd = fd;
+  stream.istty = isatty(fd) == 1;
+  stream.colour = stream_color(name);
+  stream.fd_buf = std::make_unique<FdBuf>(fd);
+  stream.term_buf = std::make_unique<TermInfoBuf>(stream.fd_buf.get());
+  stream.log_buf = std::make_unique<StatusBuf>(name, wcl::optional<std::string>{}, stream.colour,
+                                               *stream.term_buf.get());
+  stream.generic_stream = std::make_unique<std::ostream>(stream.log_buf.get());
 }
 
 void status_set_bulk_fd(int fd, const char *streams) {
@@ -297,32 +516,6 @@ void status_set_bulk_fd(int fd, const char *streams) {
     }
     status_set_fd(std::string(start, end - start).c_str(), fd);
     start = *end ? (end + 1) : end;
-  }
-}
-
-void status_write(const char *name, const char *data, int len) {
-  StreamSettings s = settings[name];
-  FdBuf buf(s.fd);
-  TermInfoBuf tbuf(&buf, true);
-  std::ostream raw(&buf);
-  std::ostream term(&tbuf);
-  if (s.fd != -1) {
-    status_clear();
-    if (s.istty && s.colour != TERM_DEFAULT) {
-      int colour = s.colour % 8;
-      int intensity = s.colour / 16;
-      if (colour != TERM_DEFAULT) {
-        raw << term_colour(colour);
-      }
-      if (intensity != TERM_DEFAULT) {
-        raw << term_intensity(intensity);
-      }
-    }
-    term.write(data, len);
-    if (s.istty && s.colour != TERM_DEFAULT) {
-      raw << term_normal();
-    }
-    refresh_needed = true;
   }
 }
 
@@ -349,6 +542,7 @@ StatusState status_state;
 
 void status_init() {}
 
+// TODO: I need to make a stream buf specifically for emscripten
 void status_write(const char *name, const char *data, int len) {
   // clang-format off
   EM_ASM_INT({

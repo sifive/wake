@@ -19,7 +19,10 @@
 #define STATUS_H
 
 #include <sys/time.h>
+#include <util/term.h>
+#include <wcl/optional.h>
 
+#include <iostream>
 #include <list>
 #include <string>
 
@@ -47,6 +50,31 @@ struct StatusState {
   StatusState() : jobs(), remain(0), total(0), current(0) {}
 };
 
+class StatusBuf : public std::streambuf {
+ private:
+  std::string name;
+  wcl::optional<std::string> extra;
+  int color;
+  TermInfoBuf &buf;
+  std::string line_buf;
+
+  StatusBuf() = delete;
+  StatusBuf(const StatusBuf &) = delete;
+  StatusBuf(StatusBuf &&) = delete;
+
+  void emit_header();
+
+ public:
+  explicit StatusBuf(std::string name, wcl::optional<std::string> extra, int color,
+                     TermInfoBuf &buf)
+      : name(name), extra(extra), color(color), buf(buf) {}
+
+  virtual ~StatusBuf() override;
+
+  virtual int sync() override { return buf.pubsync(); }
+  virtual int overflow(int c) override;
+};
+
 extern StatusState status_state;
 
 #define STREAM_LOG "debug"
@@ -57,15 +85,14 @@ extern StatusState status_state;
 #define STREAM_ERROR "error"
 
 void status_init();
-void status_write(const char *name, const char *data, int len);
-inline void status_write(const char *name, const std::string &str) {
-  status_write(name, str.data(), str.size());
-}
 void status_refresh(bool idle);
 void status_finish();
 
-void status_set_colour(const char *name, int colour);
-void status_set_fd(const char *name, int fd);
+void status_set_stream(const char *name, int fd);
 void status_set_bulk_fd(int fd, const char *streams);
+
+std::ostream &status_get_generic_stream(const char *name);
+int status_get_colour(const char *name);
+int status_get_fd(const char *name);
 
 #endif

@@ -1,3 +1,5 @@
 Wake config:
-  version = '' (Default)
-  user_config = '' (WakeRoot)
+  version = ''
+  user config = ''
+  log_header = ''
+  log_header_extra_width = 0

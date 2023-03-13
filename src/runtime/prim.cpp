@@ -40,7 +40,7 @@ void require_fail(const char *message, unsigned size, Runtime &runtime, const Sc
   std::stringstream ss;
   ss.write(message, size - 1);
   for (auto &x : scope->stack_trace()) ss << "  from " << x << std::endl;
-  status_write(STREAM_ERROR, ss.str());
+  status_get_generic_stream(STREAM_ERROR) << ss.str() << std::endl;
   runtime.abort = true;
 }
 

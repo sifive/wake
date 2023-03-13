@@ -94,7 +94,7 @@ class directory_range {
     }
   }
   directory_range(const directory_range&) = delete;
-  directory_range(directory_range&& dir) : dir(dir.dir), dir_path(std::move(dir_path)) {
+  directory_range(directory_range&& dir) : dir(dir.dir), dir_path(std::move(dir.dir_path)) {
     dir.dir = nullptr;
   }
 

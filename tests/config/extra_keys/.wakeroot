@@ -1,4 +1,6 @@
 {
   "user_config": "./wake_user.json",
-  "not-a-root-key": 1234
+  "not-a-root-key": 1234,
+  "log_header":"",
+  "log_header_extra_width":0
 }

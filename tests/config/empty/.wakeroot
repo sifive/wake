@@ -1,3 +1,5 @@
 {
-  "user_config": ""
+  "user_config": "",
+  "log_header":"",
+  "log_header_extra_width":0
 }

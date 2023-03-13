@@ -38,75 +38,35 @@ from wake export type LogLevel
 export def getLogLevelName (LogLevel name): String =
     name
 
-# These colours are available for use with LogLevels
-export data Colour =
-    Black
-    Red
-    Green
-    Yellow
-    Blue
-    Magenta
-    Cyan
-    White
-
-export data Intensity =
-    Dim
-    Bright
-
-# makeLogLevel: define a new log level
-export def makeLogLevel (name: String) (colour: Option Colour): LogLevel =
-    makeLogLevel2 name colour None
-
-export def makeLogLevel2 (name: String) (colour: Option Colour) (intensity: Option Intensity): LogLevel =
-    def set name code = prim "colour"
-    def colourCode = match colour
-        None   = 0
-        Some c = match c
-            Black   = 8
-            Red     = 9
-            Green   = 10
-            Yellow  = 11
-            Blue    = 12
-            Magenta = 13
-            Cyan    = 14
-            White   = 15
-    def intensityCode = match intensity
-        None   = 0
-        Some i = match i
-            Dim    = 16
-            Bright = 32
-    def _ = set name (colourCode+intensityCode)
-    LogLevel name
-
 # The standard logging levels used in wake
 
 # logError: logged to stdout and stderr by default (Red)
 export def logError: LogLevel =
-    makeLogLevel "error" (Some Red)
+    LogLevel "error" # (Some Red)
 
 # logWarning: logged to stdout unless run with -q (Yellow)
 export def logWarning: LogLevel =
-    makeLogLevel "warning" (Some Yellow)
+    LogLevel "warning" # (Some Yellow)
 
 # logReport: logged to stdout unless run with -q (Magenta)
 export def logReport: LogLevel =
-    makeLogLevel "report" (Some Magenta)
+    LogLevel "report" # (Some Magenta)
 
 # logEcho: logged to stdout when run with -v (default console color)
 export def logEcho: LogLevel =
-    makeLogLevel "echo" None
+    LogLevel "echo" # None
 
 # logInfo: logged to stdout when run with -v (Dim version of default console color)
 export def logInfo: LogLevel =
-    makeLogLevel2 "info" None (Some Dim)
+    LogLevel "info" # None (Some Dim)
 
 # logDebug: logged to stdout when run with -d (Blue)
 export def logDebug: LogLevel =
-    makeLogLevel "debug" (Some Blue)
+    LogLevel "debug" # (Some Blue)
 
 # logNever: not logged to any stream
 export def logNever: LogLevel =
-    makeLogLevel "null" None
+    LogLevel "null" # None
 
 # tap: inject a diagnostic into a pipeline
 # Oftern used in conjunction with println and/or format.
@@ -124,9 +84,9 @@ export def tap (consumerFn: a => b) (value: a): a =
 #
 #   # Produce a yellow hello on stdout unless run with -q
 #   def Unit = printlnLevel logWarning "hello"
-export def printlnLevel (LogLevel name): String => Unit =
+export def printlnLevel (LogLevel name) (message: String): Unit =
     def p stream outputStr = prim "print"
-    (\outputStr p name "{outputStr}\n")
+    p name "{message}\n"
 
 # println: print a colourless String with a newline, visible when run with -v.
 #

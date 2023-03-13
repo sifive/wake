@@ -386,20 +386,6 @@ static PRIMFN(prim_format) {
                  CFormat::claim(runtime.heap, args[0], scope->claim_fulfiller(runtime, output))));
 }
 
-static PRIMTYPE(type_colour) {
-  return args.size() == 2 && args[0]->unify(Data::typeString) &&
-         args[1]->unify(Data::typeInteger) && out->unify(Data::typeUnit);
-}
-
-static PRIMFN(prim_colour) {
-  EXPECT(2);
-  STRING(stream, 0);
-  INTEGER_MPZ(code, 1);
-  runtime.heap.reserve(reserve_unit());
-  status_set_colour(stream->c_str(), mpz_get_si(code));
-  RETURN(claim_unit(runtime.heap));
-}
-
 static PRIMTYPE(type_print) {
   return args.size() == 2 && args[0]->unify(Data::typeString) && args[1]->unify(Data::typeString) &&
          out->unify(Data::typeUnit);
@@ -410,7 +396,8 @@ static PRIMFN(prim_print) {
   STRING(stream, 0);
   STRING(message, 1);
   runtime.heap.reserve(reserve_unit());
-  status_write(stream->c_str(), message->c_str(), message->size());
+  // prim "print" is now assured to receive a newline
+  status_get_generic_stream(stream->c_str()) << message->as_str();
   RETURN(claim_unit(runtime.heap));
 }
 
@@ -681,7 +668,6 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "filter_term_codes", prim_filter_term_codes, type_filter_term_codes,
                 PRIM_PURE);
   prim_register(pmap, "hash_str", prim_hash_str, type_hash_str, PRIM_PURE);
-  prim_register(pmap, "colour", prim_colour, type_colour, PRIM_IMPURE);
   prim_register(pmap, "print", prim_print, type_print, PRIM_IMPURE);
   prim_register(pmap, "mkdir", prim_mkdir, type_mkdir, PRIM_IMPURE);
   prim_register(pmap, "unlink", prim_unlink, type_unlink, PRIM_IMPURE);

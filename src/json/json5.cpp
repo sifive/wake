@@ -60,6 +60,22 @@ JAST &JAST::add(std::string key, SymbolJSON kind, std::string &&value) {
   return children.back().second;
 }
 
+wcl::optional<std::string> JAST::expect_string(std::string key) {
+  const JAST &entry = get(key);
+  if (entry.kind != JSON_STR) {
+    return {};
+  }
+  return {wcl::in_place_t{}, entry.value};
+}
+
+wcl::optional<int64_t> JAST::expect_integer(std::string key) {
+  const JAST &entry = get(key);
+  if (entry.kind != JSON_INTEGER) {
+    return {};
+  }
+  return {wcl::in_place_t{}, std::stol(entry.value)};
+}
+
 static char hex(unsigned char x) {
   if (x < 10) return '0' + x;
   return 'a' + x - 10;

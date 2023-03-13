@@ -58,6 +58,7 @@
 #include "timeline.h"
 #include "types/data.h"
 #include "types/sums.h"
+#include "util/config.h"
 #include "util/diagnostic.h"
 #include "util/execpath.h"
 #include "util/file.h"
@@ -310,9 +311,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // Currently there are no overrides
-  WakeConfigOverrides overrides;
-  if (!WakeConfig::init(".wakeroot", overrides)) {
+  if (!WakeConfig::init(".wakeroot")) {
     return 1;
   }
 

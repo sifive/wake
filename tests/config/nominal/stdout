@@ -1,3 +1,10 @@
 Wake config:
+<<<<<<< HEAD
   version = '' (Default)
   user_config = './wake_user.json' (WakeRoot)
+=======
+  version = ''
+  user config = './wake_user.json'
+  log_header = ''
+  log_header_extra_width = 0
+>>>>>>> 68e5c92d (Major changes to how logging works.)
