@@ -107,6 +107,7 @@ void print_help(const char *argv0) {
     << "    --clean          Delete all job outputs"                                     << std::endl
     << "    --input  -i FILE Capture jobs which read FILES"                              << std::endl
     << "    --output -o FILE Capture jobs which wrote FILES"                             << std::endl
+    << "    --label     GLOB Capture jobs where label matches GLOB"                      << std::endl
     << "    --job       JOB  Captre the job with the specified job id"                   << std::endl
     << "    --last     -l    See --last-used"                                            << std::endl
     << "    --last-used      Capture all jobs used by last build. Regardless of cache"   << std::endl
@@ -179,6 +180,7 @@ int main(int argc, char **argv) {
     {0, "job", GOPT_ARGUMENT_REQUIRED},
     {'i', "input", GOPT_ARGUMENT_FORBIDDEN},
     {'o', "output", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "label", GOPT_ARGUMENT_FORBIDDEN},
     {'l', "last", GOPT_ARGUMENT_FORBIDDEN},
     {0, "last-used", GOPT_ARGUMENT_FORBIDDEN},
     {0, "last-executed", GOPT_ARGUMENT_FORBIDDEN},
@@ -230,6 +232,7 @@ int main(int argc, char **argv) {
   int profileh = arg(options, "profile-heap")->count;
   bool input = arg(options, "input")->count;
   bool output = arg(options, "output")->count;
+  bool label = arg(options, "label")->count;
   bool last = arg(options, "last")->count;
   bool last_use = last || arg(options, "last-used")->count;
   bool last_exe = arg(options, "last-executed")->count;
@@ -306,6 +309,21 @@ int main(int argc, char **argv) {
   if (shebang && argc < 2) {
     std::cerr << "Shebang invocation requires a script name as the first non-option argument"
               << std::endl;
+    return 1;
+  }
+
+  if (input && argc < 2) {
+    std::cerr << "--input requires at least one FILE" << std::endl;
+    return 1;
+  }
+
+  if (output && argc < 2) {
+    std::cerr << "--ouput requires at least one FILE" << std::endl;
+    return 1;
+  }
+
+  if (label && argc < 2) {
+    std::cerr << "--label requires a GLOB to filter with" << std::endl;
     return 1;
   }
 
@@ -403,7 +421,8 @@ int main(int argc, char **argv) {
   bool targets = argc == 1 && !noargs;
 
   bool nodb = init;
-  bool noparse = nodb || job || output || input || last_use || last_exe || failed || tagdag;
+  bool noparse =
+      nodb || job || output || input || label || last_use || last_exe || failed || tagdag;
   bool notype = noparse || parse;
   bool noexecute = notype || html || tcheck || dumpssa || global || exports || api || targets;
 
@@ -580,6 +599,13 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; ++i) {
       describe(db.explain(wcl::make_canonical(wake_cwd + argv[i]), 2), policy);
     }
+  }
+
+  if (label) {
+    std::string glob = argv[1];
+    std::replace(glob.begin(), glob.end(), '*', '%');
+    std::replace(glob.begin(), glob.end(), '?', '_');
+    describe(db.labels_matching(glob), policy);
   }
 
   if (last_use) {

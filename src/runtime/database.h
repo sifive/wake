@@ -156,6 +156,7 @@ struct Database {
   std::vector<JobReflection> explain(const std::string &file, int use);
 
   std::vector<JobReflection> failed();
+  std::vector<JobReflection> labels_matching(const std::string glob);
 
   std::vector<JobReflection> last_exe();
   std::vector<JobReflection> last_use();

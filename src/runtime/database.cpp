@@ -74,6 +74,7 @@ struct Database::detail {
   sqlite3_stmt *find_last_exe;
   sqlite3_stmt *find_last_use;
   sqlite3_stmt *find_failed;
+  sqlite3_stmt *find_label;
   sqlite3_stmt *fetch_hash;
   sqlite3_stmt *delete_jobs;
   sqlite3_stmt *delete_dups;
@@ -125,6 +126,7 @@ struct Database::detail {
         find_last_exe(0),
         find_last_use(0),
         find_failed(0),
+        find_label(0),
         fetch_hash(0),
         delete_jobs(0),
         delete_dups(0),
@@ -413,6 +415,12 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "s.membytes, s.ibytes, s.obytes"
       " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
       " where s.status<>0 order by j.job_id";
+  const char *sql_find_label =
+      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
+      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
+      "s.membytes, s.ibytes, s.obytes"
+      " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
+      " where j.label like ? order by j.job_id";
   const char *sql_fetch_hash = "select hash from files where path=? and modified=?";
   const char *sql_delete_jobs =
       "delete from jobs where job_id in"
@@ -519,6 +527,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_find_last_exe, find_last_exe);
   PREPARE(sql_find_last_use, find_last_use);
   PREPARE(sql_find_failed, find_failed);
+  PREPARE(sql_find_label, find_label);
   PREPARE(sql_fetch_hash, fetch_hash);
   PREPARE(sql_delete_jobs, delete_jobs);
   PREPARE(sql_delete_dups, delete_dups);
@@ -583,6 +592,7 @@ void Database::close() {
   FINALIZE(find_last_exe);
   FINALIZE(find_last_use);
   FINALIZE(find_failed);
+  FINALIZE(find_label);
   FINALIZE(fetch_hash);
   FINALIZE(delete_jobs);
   FINALIZE(delete_dups);
@@ -1279,6 +1289,12 @@ std::vector<JobReflection> Database::failed() { return find_all(this, imp->find_
 std::vector<JobReflection> Database::last_exe() { return find_all(this, imp->find_last_exe); }
 
 std::vector<JobReflection> Database::last_use() { return find_all(this, imp->find_last_use); }
+
+std::vector<JobReflection> Database::labels_matching(const std::string glob) {
+  const char *why = "Could not bind args";
+  bind_string(why, imp->find_label, 1, glob);
+  return find_all(this, imp->find_label);
+}
 
 std::vector<JobReflection> Database::explain(long job) {
   const char *why = "Could not bind args";
