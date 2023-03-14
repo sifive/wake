@@ -1,0 +1,3 @@
+Content-Length: 63
+
+{"method":"$/cancelRequest","jsonrpc":"2.0","params":{"id":1}}

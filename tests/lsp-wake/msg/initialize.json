@@ -1,0 +1,284 @@
+Content-Length: 6537
+
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "initialize",
+  "params": {
+    "initializationOptions": {},
+    "capabilities": {
+      "textDocument": {
+        "codeAction": {
+          "codeActionLiteralSupport": {
+            "codeActionKind": {
+              "valueSet": [
+                "",
+                "Empty",
+                "QuickFix",
+                "Refactor",
+                "RefactorExtract",
+                "RefactorInline",
+                "RefactorRewrite",
+                "Source",
+                "SourceOrganizeImports",
+                "quickfix",
+                "refactor",
+                "refactor.extract",
+                "refactor.inline",
+                "refactor.rewrite",
+                "source",
+                "source.organizeImports"
+              ]
+            }
+          },
+          "isPreferredSupport": true,
+          "dynamicRegistration": false,
+          "dataSupport": true,
+          "resolveSupport": {
+            "properties": [
+              "edit"
+            ]
+          }
+        },
+        "typeDefinition": {
+          "linkSupport": true
+        },
+        "signatureHelp": {
+          "signatureInformation": {
+            "documentationFormat": [
+              "markdown",
+              "plaintext"
+            ],
+            "activeParameterSupport": true,
+            "parameterInformation": {
+              "labelOffsetSupport": true
+            }
+          },
+          "dynamicRegistration": false
+        },
+        "completion": {
+          "contextSupport": true,
+          "completionItem": {
+            "tagSupport": {
+              "valueSet": [
+                1
+              ]
+            },
+            "resolveSupport": {
+              "properties": [
+                "documentation",
+                "detail",
+                "additionalTextEdits"
+              ]
+            },
+            "labelDetailsSupport": true,
+            "deprecatedSupport": true,
+            "snippetSupport": true,
+            "commitCharactersSupport": true,
+            "preselectSupport": true,
+            "insertReplaceSupport": true,
+            "documentationFormat": [
+              "markdown",
+              "plaintext"
+            ],
+            "insertTextModeSupport": {
+              "valueSet": [
+                1,
+                2
+              ]
+            }
+          },
+          "completionList": {
+            "itemDefaults": [
+              "commitCharacters",
+              "editRange",
+              "insertTextFormat",
+              "insertTextMode",
+              "data"
+            ]
+          },
+          "dynamicRegistration": false,
+          "insertTextMode": 1,
+          "completionItemKind": {
+            "valueSet": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ]
+          }
+        },
+        "references": {
+          "dynamicRegistration": false
+        },
+        "hover": {
+          "contentFormat": [
+            "markdown",
+            "plaintext"
+          ],
+          "dynamicRegistration": false
+        },
+        "definition": {
+          "linkSupport": true
+        },
+        "documentHighlight": {
+          "dynamicRegistration": false
+        },
+        "documentSymbol": {
+          "hierarchicalDocumentSymbolSupport": true,
+          "dynamicRegistration": false,
+          "symbolKind": {
+            "valueSet": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26
+            ]
+          }
+        },
+        "rename": {
+          "prepareSupport": true,
+          "dynamicRegistration": false
+        },
+        "synchronization": {
+          "didSave": true,
+          "dynamicRegistration": false,
+          "willSave": false,
+          "willSaveWaitUntil": false
+        },
+        "declaration": {
+          "linkSupport": true
+        },
+        "publishDiagnostics": {
+          "tagSupport": {
+            "valueSet": [
+              1,
+              2
+            ]
+          },
+          "relatedInformation": true
+        },
+        "implementation": {
+          "linkSupport": true
+        }
+      },
+      "workspace": {
+        "configuration": true,
+        "applyEdit": true,
+        "workspaceEdit": {
+          "resourceOperations": [
+            "rename",
+            "create",
+            "delete"
+          ]
+        },
+        "workspaceFolders": true,
+        "symbol": {
+          "dynamicRegistration": false,
+          "hierarchicalWorkspaceSymbolSupport": true,
+          "symbolKind": {
+            "valueSet": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26
+            ]
+          }
+        }
+      },
+      "callHierarchy": {
+        "dynamicRegistration": false
+      },
+      "window": {
+        "showMessage": {
+          "messageActionItem": {
+            "additionalPropertiesSupport": false
+          }
+        },
+        "showDocument": {
+          "support": false
+        },
+        "workDoneProgress": true
+      }
+    },
+    "processId": 8821,
+    "clientInfo": {
+      "name": "Neovim",
+      "version": "0.8.0"
+    },
+    "trace": "off",
+    "workspaceFolders": [
+      {
+        "uri": "file:\\/\\/\\/home\\/ashley\\/git\\/work\\/wake",
+        "name": "\\/home\\/ashley\\/git\\/work\\/wake"
+      }
+    ],
+    "rootUri": "file:\\/\\/\\/home\\/ashley\\/git\\/work\\/wake",
+    "rootPath": "\\/home\\/ashley\\/git\\/work\\/wake"
+  }
+}

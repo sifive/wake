@@ -1,0 +1,84 @@
+Content-Length: 283
+
+{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"definitionProvider":1,"referencesProvider":1,"documentHighlightProvider":1,"hoverProvider":1,"documentSymbolProvider":1,"workspaceSymbolProvider":1,"renameProvider":1},"serverInfo":{"name":"lsp wake server"}}}
+Content-Length: 165
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/boolean.wake","diagnostics":[]}}
+Content-Length: 164
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/double.wake","diagnostics":[]}}
+Content-Length: 165
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/integer.wake","diagnostics":[]}}
+Content-Length: 162
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/json.wake","diagnostics":[]}}
+Content-Length: 162
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/list.wake","diagnostics":[]}}
+Content-Length: 161
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/map.wake","diagnostics":[]}}
+Content-Length: 164
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/option.wake","diagnostics":[]}}
+Content-Length: 163
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/order.wake","diagnostics":[]}}
+Content-Length: 163
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/print.wake","diagnostics":[]}}
+Content-Length: 164
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/regexp.wake","diagnostics":[]}}
+Content-Length: 164
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/result.wake","diagnostics":[]}}
+Content-Length: 164
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/string.wake","diagnostics":[]}}
+Content-Length: 164
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/syntax.wake","diagnostics":[]}}
+Content-Length: 162
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/tree.wake","diagnostics":[]}}
+Content-Length: 163
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/tuple.wake","diagnostics":[]}}
+Content-Length: 163
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/types.wake","diagnostics":[]}}
+Content-Length: 164
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/core/vector.wake","diagnostics":[]}}
+Content-Length: 165
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/gcc_wake/gcc.wake","diagnostics":[]}}
+Content-Length: 171
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/gcc_wake/pkgconfig.wake","diagnostics":[]}}
+Content-Length: 168
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/nothing/nothing.wake","diagnostics":[]}}
+Content-Length: 171
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/system/environment.wake","diagnostics":[]}}
+Content-Length: 171
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/system/incremental.wake","diagnostics":[]}}
+Content-Length: 162
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/system/io.wake","diagnostics":[]}}
+Content-Length: 163
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/system/job.wake","diagnostics":[]}}
+Content-Length: 164
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/system/path.wake","diagnostics":[]}}
+Content-Length: 167
+
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///home/ashley/git/work/wake/share/wake/lib/system/sources.wake","diagnostics":[]}}
+Content-Length: 43
+
+{"jsonrpc":"2.0","id":null,"result":null}
