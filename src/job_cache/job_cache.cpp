@@ -1145,10 +1145,11 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
       mkdir_all(pair.second.begin(), pair.second.end());
 
       // Lastly make the symlink
-      if (symlink(pair.first.c_str(), output_symlink.value.c_str()) == -1) {
-        log_fatal("symlink(%s, %s): %s", pair.first.c_str(), output_symlink.value.c_str(),
-                  strerror(errno));
+      std::string tmp_link = rng.unique_name();
+      if (symlink(pair.first.c_str(), tmp_link.c_str()) == -1) {
+        log_fatal("symlink(%s, %s): %s", pair.first.c_str(), tmp_link.c_str(), strerror(errno));
       }
+      rename_no_fail(tmp_link.c_str(), output_symlink.value.c_str());
     }
   }
 
