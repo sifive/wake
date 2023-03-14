@@ -64,6 +64,11 @@ static const char *ServerNotInitialized = "-32002";
 
 DiagnosticReporter *reporter;
 
+static inline bool message_is_notification(JAST request) {
+  const JAST &entry = request.get("id");
+  return entry.kind == JSON_NULLVAL;
+}
+
 class LSPServer {
  public:
   LSPServer() : astree() {}
@@ -289,6 +294,12 @@ class LSPServer {
     functionPointer = additionalMethods.find(method);
     if (functionPointer != additionalMethods.end()) {
       return (this->*(functionPointer->second))(request);
+    }
+
+    // If a server or client receives notifications starting with ‘$/’
+    // it is free to ignore the notification.
+    if (message_is_notification(request) && method[0] == '$' && method[1] == '/') {
+      return {};
     }
 
     JAST errorMessage = JSONConverter::createErrorMessage(
