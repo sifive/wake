@@ -1207,7 +1207,9 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
   std::string msg = cmd.serialize();
   msg += '\0';
 
-  write(evict_stdin, msg.data(), msg.size());
+  if (write(evict_stdin, msg.data(), msg.size()) == -1) {
+    std::cerr << "Failed to send eviction update" << std::endl;
+  }
 
   // TODO: We should really return a different thing here
   //       that mentions the *output* locations but for
@@ -1290,7 +1292,9 @@ void Cache::add(const AddJobRequest &add_request) {
   std::string msg = cmd.serialize();
   msg += '\0';
 
-  write(evict_stdin, msg.data(), msg.size());
+  if (write(evict_stdin, msg.data(), msg.size()) == -1) {
+    std::cerr << "Failed to send eviction update" << std::endl;
+  }
 }
 
 void Cache::launch_evict_tool() {
