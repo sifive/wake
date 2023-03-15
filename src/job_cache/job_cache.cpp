@@ -69,10 +69,9 @@ static void mkdir_no_fail(const char *dir) {
   }
 }
 
-// Ensures the given file has been linked
-static void link_no_fail(const char *from, const char *to) {
-  if (link(from, to) < 0 && errno != ENOENT) {
-    log_fatal("link(%s, %s): %s", from, to, strerror(errno));
+static void symlink_no_fail(const char *target, const char *symlink_path) {
+  if (symlink(target, symlink_path) == -1) {
+    log_fatal("symlink(%s, %s): %s", target, symlink_path, strerror(errno));
   }
 }
 
@@ -1152,12 +1151,9 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
       mkdir_all(pair.second.begin(), pair.second.end());
 
       // Lastly make the symlink
-      std::string tmp_link = output_symlink.value + "." + rng.unique_name();
-      if (symlink(pair.first.c_str(), tmp_link.c_str()) == -1) {
-        log_fatal("symlink(%s, %s): %s", pair.first.c_str(), tmp_link.c_str(), strerror(errno));
-      }
-      link_no_fail(tmp_link.c_str(), output_symlink.value.c_str());
-      unlink_no_fail(output_symlink.value.c_str());
+      std::string tmp_link = pair.first + "." + rng.unique_name();
+      symlink_no_fail(output_symlink.value.c_str(), tmp_link.c_str());
+      rename_no_fail(tmp_link.c_str(), pair.first.c_str());
     }
   }
 
