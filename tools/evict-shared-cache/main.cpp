@@ -31,7 +31,7 @@
 #include "eviction_policy.h"
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
-#include "job-cache/eviction_command.h"
+#include "job_cache/eviction_command.h"
 
 void print_help(const char* argv0) {
   // clang-format off
