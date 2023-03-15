@@ -29,7 +29,7 @@
 #include <vector>
 
 #include "command.h"
-#include "eviction-policy.h"
+#include "eviction_policy.h"
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
 #include "util/poll.h"

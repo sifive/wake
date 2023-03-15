@@ -19,7 +19,7 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "job-cache.h"
+#include "job_cache.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -66,6 +66,12 @@ static void rename_no_fail(const char *old_path, const char *new_path) {
 static void mkdir_no_fail(const char *dir) {
   if (mkdir(dir, 0777) < 0 && errno != EEXIST) {
     log_fatal("mkdir(%s): %s", dir, strerror(errno));
+  }
+}
+
+static void symlink_no_fail(const char *target, const char *symlink_path) {
+  if (symlink(target, symlink_path) == -1) {
+    log_fatal("symlink(%s, %s): %s", target, symlink_path, strerror(errno));
   }
 }
 
@@ -1145,7 +1151,9 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
       mkdir_all(pair.second.begin(), pair.second.end());
 
       // Lastly make the symlink
-      symlink(pair.first.c_str(), output_symlink.value.c_str());
+      std::string tmp_link = pair.first + "." + rng.unique_name();
+      symlink_no_fail(output_symlink.value.c_str(), tmp_link.c_str());
+      rename_no_fail(tmp_link.c_str(), pair.first.c_str());
     }
   }
 

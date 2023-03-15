@@ -21,7 +21,7 @@
 #include <memory>
 #include <string>
 
-#include "job-cache/job-cache.h"
+#include "job_cache/job_cache.h"
 
 struct Database;
 struct Runtime;

@@ -28,7 +28,7 @@ COMMON_CPP  := $(foreach dir,$(COMMON_DIRS),$(wildcard $(dir)/*.cpp))
 COMMON_OBJS := src/json/jlexer.o \
                $(patsubst %.cpp,%.o,$(COMMON_CPP)) $(patsubst %.c,%.o,$(COMMON_C))
 
-WAKE_DIRS := $(COMMON_DIRS) src/dst src/optimizer src/parser src/runtime src/types src/job-cache src/wcl tools/wake
+WAKE_DIRS := $(COMMON_DIRS) src/dst src/optimizer src/parser src/runtime src/types src/job_cache src/wcl tools/wake
 WAKE_C    := $(foreach dir,$(WAKE_DIRS),$(wildcard $(dir)/*.c)) \
              vendor/blake2/blake2b-ref.c vendor/utf8proc/utf8proc.c \
              vendor/siphash/siphash.c vendor/whereami/whereami.c \
@@ -88,13 +88,13 @@ static:	wake.db
 bin/wake:	$(WAKE_OBJS)
 	$(CXX) $(CFLAGS) $(CXX_VERSION) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
-bin/wakebox:		tools/wakebox/wakebox.cpp src/wakefs/*.cpp vendor/gopt/*.c $(COMMON_OBJS)
+bin/wakebox:		tools/wakebox/main.cpp src/wakefs/*.cpp vendor/gopt/*.c $(COMMON_OBJS)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(CXX_VERSION) $^ -o $@ $(LDFLAGS) $(CORE_LDFLAGS)
 
-lib/wake/fuse-waked:	tools/fuse-waked/fuse-waked.cpp $(COMMON_OBJS)
+lib/wake/fuse-waked:	tools/fuse-waked/main.cpp $(COMMON_OBJS)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(FUSE_CFLAGS) $(CXX_VERSION) $^ -o $@ $(LDFLAGS)  $(CORE_LDFLAGS) $(FUSE_LDFLAGS)
 
-lib/wake/shim-wake:	tools/shim-wake/shim.o vendor/blake2/blake2b-ref.o
+lib/wake/shim-wake:	tools/shim-wake/main.o vendor/blake2/blake2b-ref.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
 %.o:	%.cpp	$(filter-out src/parser/parser.h,$(wildcard */*/*.h)) | src/parser/parser.h
