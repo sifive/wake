@@ -676,8 +676,8 @@ int main(int argc, char **argv) {
     auto now = std::chrono::steady_clock::now();
     if (!quiet && is_stdout_tty &&
         std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
-      std::cout << "Scanning " << i + 1 << "/" << wakefilenames.size()
-                << " wake files. Kernel file cache may be cold.\r" << std::flush;
+      std::cout << "Scanning " << i + 1 << "/" << wakefilenames.size() << " wake files.\r"
+                << std::flush;
       start = now;
       alerted_slow_cache = true;
     }
@@ -713,7 +713,7 @@ int main(int argc, char **argv) {
 
   if (!quiet && alerted_slow_cache && is_stdout_tty) {
     std::cout << "Scanning " << wakefilenames.size() << "/" << wakefilenames.size()
-              << " wake files. Kernel file cache may be cold." << std::endl;
+              << " wake files.\r" << std::endl;
   }
 
   if (in) {
