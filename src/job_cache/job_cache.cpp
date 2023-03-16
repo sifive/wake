@@ -31,6 +31,7 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <util/execpath.h>
 #include <util/mkdir_parents.h>
@@ -48,6 +49,7 @@
 #include <thread>
 #include <unordered_map>
 
+#include "eviction_command.h"
 #include "logging.h"
 #include "unique_fd.h"
 
@@ -1048,6 +1050,7 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
 Cache::Cache(std::string _dir) : dir(std::move(_dir)), rng(wcl::xoshiro_256::get_rng_seed()) {
   mkdir_no_fail(dir.c_str());
   impl = std::make_unique<CacheDbImpl>(dir);
+  launch_evict_tool();
 }
 
 wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
@@ -1199,6 +1202,15 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
     redirect_path(input_dir);
   }
 
+  EvictionCommand cmd(EvictionCommandType::Read, result->job_id);
+
+  std::string msg = cmd.serialize();
+  msg += '\0';
+
+  if (write(evict_stdin, msg.data(), msg.size()) == -1) {
+    std::cerr << "Failed to send eviction update" << std::endl;
+  }
+
   // TODO: We should really return a different thing here
   //       that mentions the *output* locations but for
   //       now this is good enough and we can assume
@@ -1274,10 +1286,84 @@ void Cache::add(const AddJobRequest &add_request) {
   mkdir_no_fail(job_group_dir.c_str());
   std::string job_dir = wcl::join_paths(job_group_dir, std::to_string(job_id));
   rename_no_fail(tmp_job_dir.c_str(), job_dir.c_str());
+
+  EvictionCommand cmd(EvictionCommandType::Write, job_id);
+
+  std::string msg = cmd.serialize();
+  msg += '\0';
+
+  if (write(evict_stdin, msg.data(), msg.size()) == -1) {
+    std::cerr << "Failed to send eviction update" << std::endl;
+  }
+}
+
+void Cache::launch_evict_tool() {
+  const size_t read_side = 0;
+  const size_t write_side = 1;
+
+  int stdinPipe[2];
+  int stdoutPipe[2];
+
+  if (pipe(stdinPipe) < 0) {
+    perror("Failed to allocate eviction pipe");
+    exit(EXIT_FAILURE);
+  }
+
+  if (pipe(stdoutPipe) < 0) {
+    perror("Failed to allocate eviction pipe");
+    exit(EXIT_FAILURE);
+  }
+
+  int pid = fork();
+
+  // error forking
+  if (pid < 0) {
+    perror("Failed to fork eviction process");
+    exit(EXIT_FAILURE);
+  }
+
+  // child
+  if (pid == 0) {
+    if (dup2(stdinPipe[read_side], STDIN_FILENO) == -1) {
+      perror("Failed to dup2 stdin pipe for eviction process");
+      exit(EXIT_FAILURE);
+    }
+
+    if (dup2(stdoutPipe[write_side], STDOUT_FILENO) == -1) {
+      perror("Failed to dup2 stdout pipe for eviction process");
+      exit(EXIT_FAILURE);
+    }
+
+    close(stdinPipe[read_side]);
+    close(stdinPipe[write_side]);
+    close(stdoutPipe[read_side]);
+    close(stdoutPipe[write_side]);
+
+    std::string evict = wcl::make_canonical(find_execpath() + "/evict-shared-cache");
+    execl(evict.c_str(), "evict-shared-cache", "--cache", "not-a-dir", "--policy", "nil", nullptr);
+    std::cerr << "exec(" << evict << "): " << strerror(errno) << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // parent
+  if (pid > 0) {
+    close(stdinPipe[read_side]);
+    close(stdoutPipe[write_side]);
+
+    evict_pid = pid;
+    evict_stdin = stdinPipe[write_side];
+    evict_stdout = stdoutPipe[read_side];
+  }
+}
+
+void Cache::reap_evict_tool() {
+  close(evict_stdin);
+  close(evict_stdout);
+  waitpid(evict_pid, nullptr, 0);
 }
 
 // This has to be here because the destructor code for std::unique_ptr<CacheDbImpl>
 // requires that the CacheDbImpl be complete.
-Cache::~Cache() {}
+Cache::~Cache() { reap_evict_tool(); }
 
 }  // namespace job_cache

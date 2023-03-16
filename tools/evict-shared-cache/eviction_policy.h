@@ -28,6 +28,7 @@ struct EvictionPolicy {
   virtual void init() = 0;
   virtual void read(int id) = 0;
   virtual void write(int id) = 0;
+  virtual ~EvictionPolicy() {}
 };
 
 struct NilEvictionPolicy : EvictionPolicy {

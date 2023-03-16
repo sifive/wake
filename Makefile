@@ -40,7 +40,7 @@ WAKE_OBJS := src/parser/lexer.o src/parser/parser.o src/json/jlexer.o \
 WAKE_ENV := WAKE_PATH=$(shell dirname $(shell which $(firstword $(CC))))
 
 all:		wake.db
-	$(WAKE_ENV) ./bin/wake build default
+	$(WAKE_ENV) BOOTSTRAP_WAKE=true ./bin/wake build default
 
 clean:
 	rm -f bin/* lib/wake/* */*.o */*/*.o src/json/jlexer.cpp src/parser/lexer.cpp src/parser/parser.cpp src/parser/parser.h src/version.h wake.db

@@ -27,13 +27,16 @@
 
 #include "json/json5.h"
 
-enum class CommandType { Read, Write };
+enum class EvictionCommandType { Read, Write };
 
-struct Command {
-  CommandType type;
+struct EvictionCommand {
+  EvictionCommandType type;
   int job_id;
 
-  static bool parse(const std::string& str, Command& out) {
+  EvictionCommand() {}
+  EvictionCommand(EvictionCommandType type, int job_id) : type(type), job_id(job_id) {}
+
+  static bool parse(const std::string& str, EvictionCommand& out) {
     JAST json;
     std::stringstream parse_errors;
     if (!JAST::parse(str, parse_errors, json)) {
@@ -49,11 +52,11 @@ struct Command {
 
     const std::string& command_str = command.value;
 
-    CommandType type;
+    EvictionCommandType type;
     if (command_str == "read") {
-      type = CommandType::Read;
+      type = EvictionCommandType::Read;
     } else if (command_str == "write") {
-      type = CommandType::Write;
+      type = EvictionCommandType::Write;
     } else {
       std::cerr << "Invalid value for 'command' key. Expected: 'read' | 'write', saw "
                 << command_str << std::endl;
@@ -69,5 +72,29 @@ struct Command {
     out = {type, std::stoi(job_id.value)};
 
     return true;
+  }
+
+  std::string serialize() {
+    JAST json(JSON_OBJECT);
+
+    std::string command;
+    switch (type) {
+      case EvictionCommandType::Read:
+        command = "read";
+        break;
+      case EvictionCommandType::Write:
+        command = "write";
+        break;
+      default:
+        std::cerr << "Unhandled type in EvictionCommand::serialize()" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    json.add("command", command);
+    json.add("job_id", job_id);
+
+    std::stringstream s;
+    s << json;
+    return s.str();
   }
 };
