@@ -406,7 +406,7 @@ int main(int argc, char **argv) {
 
   // Arguments are forbidden with these options
   bool noargs = init || job || last_use || last_exe || failed || tagdag || html || global ||
-                exports || api || exec;
+                exports || api || exec || label || input || output;
   bool targets = argc == 1 && !noargs;
 
   bool nodb = init;
