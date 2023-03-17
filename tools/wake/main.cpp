@@ -105,8 +105,8 @@ void print_help(const char *argv0) {
     << "    --timeline       Print the timeline of wake jobs as HTML"                    << std::endl
     << "    --list-outputs   List all job outputs"                                       << std::endl
     << "    --clean          Delete all job outputs"                                     << std::endl
-    << "    --input  -i FILE Capture jobs which read FILES"                              << std::endl
-    << "    --output -o FILE Capture jobs which wrote FILES"                             << std::endl
+    << "    --input  -i FILE Capture jobs which read FILE. (repeat for multiple files)"  << std::endl
+    << "    --output -o FILE Capture jobs which wrote FILE. (repeat for multiple files)" << std::endl
     << "    --label     GLOB Capture jobs where label matches GLOB"                      << std::endl
     << "    --job       JOB  Captre the job with the specified job id"                   << std::endl
     << "    --last     -l    See --last-used"                                            << std::endl
@@ -158,6 +158,10 @@ int main(int argc, char **argv) {
   TerminalReporter terminalReporter;
   reporter = &terminalReporter;
 
+  unsigned int max_pairs = argc / 2;
+  std::vector<char *> input_files(max_pairs, nullptr);
+  std::vector<char *> output_files(max_pairs, nullptr);
+
   // clang-format off
   struct option options[] {
     {'p', "percent", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
@@ -178,9 +182,9 @@ int main(int argc, char **argv) {
     {0, "in", GOPT_ARGUMENT_REQUIRED},
     {'x', "exec", GOPT_ARGUMENT_REQUIRED},
     {0, "job", GOPT_ARGUMENT_REQUIRED},
-    {'i', "input", GOPT_ARGUMENT_FORBIDDEN},
-    {'o', "output", GOPT_ARGUMENT_FORBIDDEN},
-    {0, "label", GOPT_ARGUMENT_FORBIDDEN},
+    {'i', "input", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, input_files.data(), max_pairs},
+    {'o', "output", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, output_files.data(), max_pairs},
+    {0, "label", GOPT_ARGUMENT_REQUIRED},
     {'l', "last", GOPT_ARGUMENT_FORBIDDEN},
     {0, "last-used", GOPT_ARGUMENT_FORBIDDEN},
     {0, "last-executed", GOPT_ARGUMENT_FORBIDDEN},
@@ -230,9 +234,8 @@ int main(int argc, char **argv) {
   bool tty = !arg(options, "no-tty")->count;
   bool fwarning = arg(options, "fatal-warnings")->count;
   int profileh = arg(options, "profile-heap")->count;
-  bool input = arg(options, "input")->count;
-  bool output = arg(options, "output")->count;
-  bool label = arg(options, "label")->count;
+  unsigned int input = arg(options, "input")->count;
+  unsigned int output = arg(options, "output")->count;
   bool last = arg(options, "last")->count;
   bool last_use = last || arg(options, "last-used")->count;
   bool last_exe = arg(options, "last-executed")->count;
@@ -264,6 +267,7 @@ int main(int argc, char **argv) {
   const char *in = arg(options, "in")->argument;
   const char *exec = arg(options, "exec")->argument;
   const char *job = arg(options, "job")->argument;
+  const char *label = arg(options, "label")->argument;
   char *shebang = arg(options, "shebang")->argument;
   const char *tagdag = arg(options, "tag-dag")->argument;
   const char *tag = arg(options, "tag")->argument;
@@ -309,21 +313,6 @@ int main(int argc, char **argv) {
   if (shebang && argc < 2) {
     std::cerr << "Shebang invocation requires a script name as the first non-option argument"
               << std::endl;
-    return 1;
-  }
-
-  if (input && argc < 2) {
-    std::cerr << "--input requires at least one FILE" << std::endl;
-    return 1;
-  }
-
-  if (output && argc < 2) {
-    std::cerr << "--ouput requires at least one FILE" << std::endl;
-    return 1;
-  }
-
-  if (label && argc < 2) {
-    std::cerr << "--label requires a GLOB to filter with" << std::endl;
     return 1;
   }
 
@@ -417,7 +406,7 @@ int main(int argc, char **argv) {
 
   // Arguments are forbidden with these options
   bool noargs = init || job || last_use || last_exe || failed || tagdag || html || global ||
-                exports || api || exec;
+                exports || api || exec || label || input || output;
   bool targets = argc == 1 && !noargs;
 
   bool nodb = init;
@@ -589,20 +578,16 @@ int main(int argc, char **argv) {
       std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
   }
 
-  if (input) {
-    for (int i = 1; i < argc; ++i) {
-      describe(db.explain(wcl::make_canonical(wake_cwd + argv[i]), 1), policy);
-    }
+  for (unsigned int i = 0; i < input; ++i) {
+    describe(db.explain(wcl::make_canonical(wake_cwd + input_files[i]), 1), policy);
   }
 
-  if (output) {
-    for (int i = 1; i < argc; ++i) {
-      describe(db.explain(wcl::make_canonical(wake_cwd + argv[i]), 2), policy);
-    }
+  for (unsigned int i = 0; i < output; ++i) {
+    describe(db.explain(wcl::make_canonical(wake_cwd + output_files[i]), 2), policy);
   }
 
   if (label) {
-    std::string glob = argv[1];
+    std::string glob = std::string(label);
     std::replace(glob.begin(), glob.end(), '*', '%');
     std::replace(glob.begin(), glob.end(), '?', '_');
     describe(db.labels_matching(glob), policy);
