@@ -73,6 +73,40 @@
 
 static CPPFile cppFile(__FILE__);
 
+namespace {
+
+template <class T>
+using Set = std::function<bool(const T &)>;
+
+template <class T>
+Set<T> from_finite(std::set<T> set) {
+  return [s = std::move(set)](const T &member) -> bool { return s.count(member); };
+}
+
+template <class T>
+Set<T> sintersect(Set<T> a, Set<T> b) {
+  return [a = std::move(a), b = std::move(b)](const T &member) -> bool {
+    return a(member) && b(member);
+  };
+}
+
+template <class T>
+Set<T> suniversal() {
+  return [](const T &member) -> bool { return true; };
+}
+
+Set<long> upkeep_intersects(std::unordered_map<long, JobReflection> &captured_jobs,
+                            Set<long> current, std::vector<JobReflection> jobs) {
+  std::set<long> ids = {};
+  for (JobReflection &job : jobs) {
+    ids.insert(job.job);
+    captured_jobs[job.job] = std::move(job);
+  }
+  return sintersect(std::move(current), from_finite(std::move(ids)));
+}
+
+}  // namespace
+
 void print_help(const char *argv0) {
   // clang-format off
   std::cout << std::endl
@@ -410,8 +444,8 @@ int main(int argc, char **argv) {
   bool targets = argc == 1 && !noargs;
 
   bool nodb = init;
-  bool noparse =
-      nodb || job || output || input || label || last_use || last_exe || failed || tagdag;
+  bool job_capture = job || output || input || label || last_use || last_exe || failed;
+  bool noparse = nodb || tagdag || job_capture;
   bool notype = noparse || parse;
   bool noexecute = notype || html || tcheck || dumpssa || global || exports || api || targets;
 
@@ -571,39 +605,73 @@ int main(int argc, char **argv) {
     policy = DescribePolicy::verbose();
   }
 
+  std::unordered_map<long, JobReflection> captured_jobs = {};
+  Set<long> intersected_job_ids = suniversal<long>();
+
   if (job) {
     auto hits = db.explain(std::atol(job));
-    describe(hits, policy);
     if (hits.empty())
       std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
   }
 
-  for (unsigned int i = 0; i < input; ++i) {
-    describe(db.explain(wcl::make_canonical(wake_cwd + input_files[i]), 1), policy);
+  if (input) {
+    std::vector<JobReflection> hits = {};
+    for (unsigned int i = 0; i < input; ++i) {
+      auto current = db.explain(wcl::make_canonical(wake_cwd + input_files[i]), 1);
+      std::move(current.begin(), current.end(), std::back_inserter(hits));
+    }
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
   }
 
-  for (unsigned int i = 0; i < output; ++i) {
-    describe(db.explain(wcl::make_canonical(wake_cwd + output_files[i]), 2), policy);
+  if (output) {
+    std::vector<JobReflection> hits = {};
+    for (unsigned int i = 0; i < output; ++i) {
+      auto current = db.explain(wcl::make_canonical(wake_cwd + output_files[i]), 2);
+      std::move(current.begin(), current.end(), std::back_inserter(hits));
+    }
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
   }
 
   if (label) {
     std::string glob = std::string(label);
     std::replace(glob.begin(), glob.end(), '*', '%');
     std::replace(glob.begin(), glob.end(), '?', '_');
-    describe(db.labels_matching(glob), policy);
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.labels_matching(glob));
   }
 
   if (last_use) {
-    describe(db.last_use(), policy);
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.last_use());
   }
 
   if (last_exe) {
-    describe(db.last_exe(), policy);
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.last_exe());
   }
 
   if (failed) {
-    describe(db.failed(), policy);
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.failed());
   }
+
+  std::vector<JobReflection> intersected_jobs = {};
+  for (auto &it : captured_jobs) {
+    if (intersected_job_ids(it.first)) {
+      intersected_jobs.push_back(std::move(it.second));
+    }
+  }
+
+  if (job_capture && intersected_jobs.empty()) {
+    std::cerr << "No jobs matched query" << std::endl;
+    return 1;
+  }
+
+  describe(intersected_jobs, policy);
 
   if (tagdag) {
     JAST json = create_tagdag(db, tagdag);
