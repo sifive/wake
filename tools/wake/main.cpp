@@ -95,8 +95,8 @@ Set<T> suniversal() {
   return [](const T &member) -> bool { return true; };
 }
 
-Set<long> upkeep_jobs(std::unordered_map<long, JobReflection> &captured_jobs, Set<long> current,
-                      std::vector<JobReflection> jobs) {
+Set<long> upkeep_intersects(std::unordered_map<long, JobReflection> &captured_jobs,
+                            Set<long> current, std::vector<JobReflection> jobs) {
   std::set<long> ids = {};
   for (JobReflection &job : jobs) {
     ids.insert(job.job);
@@ -613,7 +613,7 @@ int main(int argc, char **argv) {
     if (hits.empty())
       std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
     intersected_job_ids =
-        upkeep_jobs(captured_jobs, std::move(intersected_job_ids), std::move(hits));
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
   }
 
   if (input) {
@@ -623,7 +623,7 @@ int main(int argc, char **argv) {
       std::move(current.begin(), current.end(), std::back_inserter(hits));
     }
     intersected_job_ids =
-        upkeep_jobs(captured_jobs, std::move(intersected_job_ids), std::move(hits));
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
   }
 
   if (output) {
@@ -633,7 +633,7 @@ int main(int argc, char **argv) {
       std::move(current.begin(), current.end(), std::back_inserter(hits));
     }
     intersected_job_ids =
-        upkeep_jobs(captured_jobs, std::move(intersected_job_ids), std::move(hits));
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
   }
 
   if (label) {
@@ -641,19 +641,22 @@ int main(int argc, char **argv) {
     std::replace(glob.begin(), glob.end(), '*', '%');
     std::replace(glob.begin(), glob.end(), '?', '_');
     intersected_job_ids =
-        upkeep_jobs(captured_jobs, std::move(intersected_job_ids), db.labels_matching(glob));
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.labels_matching(glob));
   }
 
   if (last_use) {
-    intersected_job_ids = upkeep_jobs(captured_jobs, std::move(intersected_job_ids), db.last_use());
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.last_use());
   }
 
   if (last_exe) {
-    intersected_job_ids = upkeep_jobs(captured_jobs, std::move(intersected_job_ids), db.last_exe());
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.last_exe());
   }
 
   if (failed) {
-    intersected_job_ids = upkeep_jobs(captured_jobs, std::move(intersected_job_ids), db.failed());
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.failed());
   }
 
   std::vector<JobReflection> intersected_jobs = {};
