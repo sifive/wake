@@ -28,7 +28,7 @@
 
 namespace wcl {
 
-enum class file_type { block, character, directory, fifo, symlink, regular, socket };
+enum class file_type { block, character, directory, fifo, symlink, regular, socket, unknown };
 
 struct directory_entry {
   std::string entry_name;
@@ -51,7 +51,11 @@ class directory_iterator {
 
  public:
   ~directory_iterator() {}
-  directory_iterator() : dir_path(), dir(nullptr), value() {}
+  directory_iterator() : dir_path(), dir(nullptr), value() {
+    // The default constructor should behave like something
+    // going past the end of a directory when using readdir
+    value = some(make_error<directory_entry, posix_error_t>(EBADF));
+  }
   directory_iterator(const directory_iterator&) = delete;
   directory_iterator(directory_iterator&& other) : dir(other.dir), value(std::move(other.value)) {
     other.dir = nullptr;
@@ -63,13 +67,13 @@ class directory_iterator {
       step();
     }
 
-    // If we go past the end of the directory we'll have an issue
-    // but that's to be expected with iterators.
-    assert(static_cast<bool>(value));
     return *value;
   }
 
-  directory_iterator& operator++() { step(); }
+  directory_iterator& operator++() {
+    step();
+    return *this;
+  }
 
   bool operator!=(const directory_iterator& other) { return dir == other.dir; }
 };

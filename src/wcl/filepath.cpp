@@ -41,6 +41,7 @@ static file_type dir_type_conv(unsigned char type) {
     case DT_SOCK:
       return file_type::socket;
   }
+  return file_type::unknown;
 }
 
 static file_type stat_type_conv(mode_t mode) {
@@ -60,6 +61,7 @@ static file_type stat_type_conv(mode_t mode) {
     case S_IFSOCK:
       return file_type::socket;
   }
+  return file_type::unknown;
 }
 
 void directory_iterator::step() {
@@ -75,10 +77,12 @@ void directory_iterator::step() {
   // we've hit the end and want to turn outselves into
   // the end pointer
   if (entry == nullptr) {
-    closedir(dir);
     dir = nullptr;
     dir_path = "";
-    value = optional<result<directory_entry, posix_error_t>>{};
+    // We set value not just to empty but to an error for EBADF.
+    // This mimics what would happen if you called readdir again
+    // after passing the end of the DIR
+    value = some(make_error<directory_entry, posix_error_t>(EBADF));
   }
 
   // Now that we have a good entry we need to construct

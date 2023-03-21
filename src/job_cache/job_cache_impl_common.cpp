@@ -234,13 +234,14 @@ void remove_backing_files(std::string dir, const std::vector<int64_t> &job_ids,
   auto iter = job_ids.begin();
   auto end = job_ids.end();
   while (iter < end) {
-    auto task_end = iter + min_removals_per_thread;
+    auto task_end = iter + actual_removals_per_thread;
     tasks.emplace_back(std::async(std::launch::async, [&dir, iter, task_end, end]() {
       auto i = iter;
       for (; i < task_end && i < end; ++i) {
         remove_backing_files(dir, *i);
       }
     }));
+    iter = task_end;
   }
 
   // Now join the tasks

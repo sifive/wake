@@ -26,14 +26,17 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <future>
 #include <iostream>
 #include <memory>
+#include <thread>
 #include <vector>
 
 #include "db_helpers.h"
 #include "eviction_command.h"
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
+#include "job_cache_impl_common.h"
 #include "wcl/defer.h"
 
 enum class CommandParserState { Continue, StopSuccess, StopFail };
@@ -85,6 +88,7 @@ struct CommandParser {
 };
 
 struct LRUEvictionPolicyImpl {
+  std::string cache_dir;
   PreparedStatement update_size;
   PreparedStatement update_last_use;
   PreparedStatement find_least_recently_used;
@@ -103,7 +107,7 @@ struct LRUEvictionPolicyImpl {
   // Takes two arguments, first is the latest time as an integer.
   // second is the job_id to update.
   static constexpr const char* update_last_use_query =
-      "update lru_stats set last_use = ? where job_id = ?";
+      "insert into lru_stats (job_id, last_use) values (?, ?) on duplicate key update last_use=?2";
 
   // This is meant to be used as part of a transaction with remove_least_recently_used.
   // It simply returns the job_ids in last use order.
@@ -117,8 +121,9 @@ struct LRUEvictionPolicyImpl {
   static constexpr const char* remove_least_recently_used_query =
       "delete from jobs where job_id in (select job_id from lru_stats where last_use <= ?)";
 
-  LRUEvictionPolicyImpl(std::shared_ptr<Database> db)
-      : update_size(db, update_size_query),
+  LRUEvictionPolicyImpl(std::string dir, std::shared_ptr<Database> db)
+      : cache_dir(dir),
+        update_size(db, update_size_query),
         update_last_use(db, update_last_use_query),
         find_least_recently_used(db, find_least_recently_used_query),
         remove_least_recently_used(db, remove_least_recently_used_query),
@@ -129,7 +134,7 @@ struct LRUEvictionPolicyImpl {
     remove_least_recently_used.set_why("Could not remove least recently used");
   }
 
-  uint64_t update_size(uint64_t job_id) {
+  uint64_t add_job_size(uint64_t job_id) {
     update_size.bind_integer(1, job_id);
     update_size.step();
     uint64_t out = update_size.read_integer(0);
@@ -137,11 +142,11 @@ struct LRUEvictionPolicyImpl {
     return out;
   }
 
-  void update_last_use(uint64_t job_id) {
+  void mark_new_use(uint64_t job_id) {
     timespec tp;
     clock_gettime(CLOCK_MONOTONIC, &tp);
-    update_last_use.bind_integer(1, tp.tv_nsec);
-    update_last_use.bind_integer(2, job_id);
+    update_last_use.bind_integer(1, job_id);
+    update_last_use.bind_integer(2, tp.tv_nsec);
     update_last_use.step();
     update_last_use.reset();
   }
@@ -152,27 +157,29 @@ struct LRUEvictionPolicyImpl {
       uint64_t last_use;
       uint64_t to_remove = bytes_to_remove;
 
-      auto reset = wcl::make_defer([this]() { find_least_recently_used.reset(); });
+      {
+        auto reset1 = wcl::make_defer([this]() { find_least_recently_used.reset(); });
 
-      // First find the use time that we want to remove from
-      while (true) {
-        find_least_recently_used.step();
+        // First find the use time that we want to remove from
+        while (true) {
+          find_least_recently_used.step();
 
-        // Since we entered this loop we know we need to remove at least
-        // the next job so mark its last_use, and mark its job ids
-        // for file removal later.
-        last_use = find_least_recently_used.read_integer(0);
-        uint64_t obytes = find_least_recently_used.read_integer(1);
-        jobs_to_remove.push_back(find_least_recently_used.read_integer(2));
+          // Since we entered this loop we know we need to remove at least
+          // the next job so mark its last_use, and mark its job ids
+          // for file removal later.
+          last_use = find_least_recently_used.read_integer(0);
+          uint64_t obytes = find_least_recently_used.read_integer(1);
+          jobs_to_remove.push_back(find_least_recently_used.read_integer(2));
 
-        // If obytes is more than to_remove then we can break because
-        // this will put us over our bytes_to_remove.
-        if (obytes < to_remove) {
-          break;
+          // If obytes is more than to_remove then we can break because
+          // this will put us over our bytes_to_remove.
+          if (obytes < to_remove) {
+            break;
+          }
+
+          // Otherwise mark these bytes and keep working.
+          to_remove -= obytes;
         }
-
-        // Otherwise mark these bytes and keep working.
-        to_remove -= obytes;
       }
 
       // Next actully remove those jobs from the database
@@ -184,18 +191,44 @@ struct LRUEvictionPolicyImpl {
       // the backing files to occur *after* this transaction completes.
       // Still, doing things in this order reduces the chance of a
       // failed read occuring.
-      auto reset = wcl::make_defer([this]() { remove_least_recently_used.reset(); });
+      auto reset2 = wcl::make_defer([this]() { remove_least_recently_used.reset(); });
       remove_least_recently_used.bind_integer(1, last_use);
       remove_least_recently_used.step();
+    });
+
+    // Now we remove the threads in the background.
+    // TODO: Figure out how many cores we actully have and use a multiple of that
+    // NOTE: We don't wait for this to finish
+    std::async(std::launch::async, [dir = cache_dir, jobs_to_remove = std::move(jobs_to_remove)]() {
+      remove_backing_files(dir, jobs_to_remove, 8, 128);
     });
   }
 };
 
-void LRUEvictionPolicy::init(const std::string& cache_dir) {}
+void LRUEvictionPolicy::init(const std::string& cache_dir) {
+  impl = std::make_unique<LRUEvictionPolicyImpl>(cache_dir, std::make_unique<Database>(cache_dir));
+}
 
-void LRUEvictionPolicy::read(int id) {}
+void LRUEvictionPolicy::read(int job_id) { impl->mark_new_use(job_id); }
 
-void LRUEvictionPolicy::write(int id) {}
+// TODO: Make this configurable...right now its just set at 16GB...because
+//       that seems vaugely sensible.
+constexpr uint64_t max_db_size = 1ULL << 34ULL;
+
+// TODO: Same. I'm just sort of guessing that deleting a GB at
+//       at a time is sensible. No real clue.
+constexpr uint64_t low_water_mark = max_db_size - (1ULL << 30);
+
+void LRUEvictionPolicy::write(int job_id) {
+  impl->mark_new_use(job_id);
+  uint64_t size = impl->add_job_size(job_id);
+  if (size > max_db_size) {
+    impl->cleanup(max_db_size - low_water_mark);
+  }
+}
+
+LRUEvictionPolicy::LRUEvictionPolicy() {}
+LRUEvictionPolicy::~LRUEvictionPolicy() {}
 
 int eviction_loop(std::string cache_dir, std::unique_ptr<EvictionPolicy> policy) {
   policy->init(cache_dir);

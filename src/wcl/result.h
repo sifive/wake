@@ -41,14 +41,14 @@ class alignas(max(alignof(T), alignof(E))) result_base<T, E, true> {
  protected:
   union {
     T value;
-    E error;
+    E error_;
   };
   bool is_error = true;
 
  public:
   ~result_base() {
     if (is_error) {
-      error.~E();
+      error_.~E();
     } else {
       value.~T();
     }
@@ -56,8 +56,8 @@ class alignas(max(alignof(T), alignof(E))) result_base<T, E, true> {
   result_base() = delete;
   result_base(const result_base& other) {
     is_error = other.is_error;
-    if (error) {
-      new (&error) E(other.error);
+    if (is_error) {
+      new (&error_) E(other.error_);
     } else {
       new (&value) T(other.value);
     }
@@ -69,7 +69,7 @@ class alignas(max(alignof(T), alignof(E))) result_base<T, E, true> {
     // so if you move a result, it will keeps its errorness
     // but the underlying value may be changed.
     if (is_error) {
-      new (&error) E(std::move(other.error));
+      new (&error_) E(std::move(other.error_));
     } else {
       new (&value) T(std::move(other.value));
     }
@@ -77,14 +77,14 @@ class alignas(max(alignof(T), alignof(E))) result_base<T, E, true> {
 
   result_base& operator=(const result_base& other) {
     if (is_error) {
-      error.~E();
+      error_.~E();
     } else {
       value.~T();
     }
 
     is_error = other.is_error;
     if (other.is_error) {
-      new (&error) E(other.error);
+      new (&error_) E(other.error_);
     } else {
       new (&value) T(other.value);
     }
@@ -92,14 +92,14 @@ class alignas(max(alignof(T), alignof(E))) result_base<T, E, true> {
 
   result_base& operator=(result_base&& other) {
     if (is_error) {
-      error.~E();
+      error_.~E();
     } else {
       value.~T();
     }
 
     is_error = other.is_error;
     if (other.is_error) {
-      new (&error) E(std::move(other.error));
+      new (&error_) E(std::move(other.error_));
     } else {
       new (&value) T(std::move(other.value));
     }
@@ -110,7 +110,7 @@ class alignas(max(alignof(T), alignof(E))) result_base<T, E, true> {
 
   template <class... Args>
   result_base(in_place_error_t, Args&&... args)
-      : error(std::forward<Args>(args)...), is_error(true) {}
+      : error_(std::forward<Args>(args)...), is_error(true) {}
 };
 
 // result demands that the error be copyable
@@ -121,14 +121,14 @@ class alignas(max(alignof(T), alignof(E))) result_base<T, E, false> {
  protected:
   union {
     T value;
-    E error;
+    E error_;
   };
   bool is_error = true;
 
  public:
   ~result_base() {
     if (is_error) {
-      error.~E();
+      error_.~E();
     } else {
       value.~T();
     }
@@ -142,7 +142,7 @@ class alignas(max(alignof(T), alignof(E))) result_base<T, E, false> {
     // so if you move a result, it will keeps its errorness
     // but the underlying value may be changed.
     if (is_error) {
-      new (&error) E(std::move(other.error));
+      new (&error_) E(std::move(other.error_));
     } else {
       new (&value) T(std::move(other.value));
     }
@@ -152,14 +152,14 @@ class alignas(max(alignof(T), alignof(E))) result_base<T, E, false> {
 
   result_base& operator=(result_base&& other) {
     if (is_error) {
-      error.~E();
+      error_.~E();
     } else {
       value.~T();
     }
 
     is_error = other.is_error;
     if (other.is_error) {
-      new (&error) E(std::move(other.error));
+      new (&error_) E(std::move(other.error_));
     } else {
       new (&value) T(std::move(other.value));
     }
@@ -170,7 +170,7 @@ class alignas(max(alignof(T), alignof(E))) result_base<T, E, false> {
 
   template <class... Args>
   result_base(in_place_error_t, Args&&... args)
-      : error(std::forward<Args>(args)...), is_error(true) {}
+      : error_(std::forward<Args>(args)...), is_error(true) {}
 };
 
 template <class T, class E>
@@ -194,7 +194,7 @@ class result : public result_base_t<T, E> {
   result& operator=(const result&) = default;
   result& operator=(result&&) = default;
 
-  explicit operator bool() const { return !this->error; }
+  explicit operator bool() const { return !this->is_error; }
 
   T& operator*() { return this->value; }
 
@@ -204,24 +204,24 @@ class result : public result_base_t<T, E> {
 
   const T* operator->() const { return &this->value; }
 
-  E& error() { return this->error; }
+  E& error() { return this->error_; }
 
-  const E& error() const { return this->error; }
+  const E& error() const { return this->error_; }
 };
 
 template <class T, class E, class... Args>
 result<T, E> make_result(Args&&... args) {
-  return result<T, E> { in_place_t{}, std::forward<Args>(args)... }
+  return result<T, E>{in_place_t{}, std::forward<Args>(args)...};
 }
 
 template <class T, class E, class... Args>
 result<T, E> make_error(Args&&... args) {
-  return result<T, E> { in_place_error_t{}, std::forward<Args>(args)... }
+  return result<T, E>{in_place_error_t{}, std::forward<Args>(args)...};
 }
 
 template <class T>
 result<T, posix_error_t> make_errno() {
-  return result<T, posix_error_t> { in_place_error_t{}, errno }
+  return result<T, posix_error_t>{in_place_error_t{}, errno};
 }
 
 }  // namespace wcl

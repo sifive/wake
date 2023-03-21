@@ -34,6 +34,8 @@ struct EvictionPolicy {
 };
 
 struct NilEvictionPolicy : public EvictionPolicy {
+  virtual ~NilEvictionPolicy() {}
+
   virtual void init(const std::string& cache_dir) override {
     std::cerr << "NilEvictionPolicy::init()" << std::endl;
   }
@@ -54,6 +56,11 @@ class LRUEvictionPolicy : public EvictionPolicy {
   std::unique_ptr<LRUEvictionPolicyImpl> impl;
 
  public:
+  LRUEvictionPolicy();
+  LRUEvictionPolicy(const LRUEvictionPolicy&) = delete;
+  LRUEvictionPolicy(LRUEvictionPolicy&&) = delete;
+  virtual ~LRUEvictionPolicy();
+
   virtual void init(const std::string& cache_dir) override;
 
   virtual void read(int id) override;

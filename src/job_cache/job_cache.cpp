@@ -39,6 +39,7 @@
 #include <wcl/defer.h>
 #include <wcl/filepath.h>
 #include <wcl/trie.h>
+#include <wcl/unique_fd.h>
 #include <wcl/xoshiro_256.h>
 
 #include <algorithm>
@@ -55,7 +56,6 @@
 #include "filesystem_helpers.h"
 #include "job_cache_impl_common.h"
 #include "logging.h"
-#include "unique_fd.h"
 
 namespace {
 
@@ -586,8 +586,11 @@ AddJobRequest::AddJobRequest(const JAST &job_result_json) {
     OutputFile output;
     output.source = output_file.second.get("src").value;
     output.path = output_file.second.get("path").value;
-    auto fd = UniqueFd::open(output.source.c_str(), O_RDONLY);
-    output.hash = do_hash_file(output.source.c_str(), fd.get());
+    auto fd = wcl::unique_fd::open(output.source.c_str(), O_RDONLY);
+    if (!fd) {
+      log_fatal("open(%s): %s", output.source.c_str(), strerror(fd.error()));
+    }
+    output.hash = do_hash_file(output.source.c_str(), fd->get());
     output.mode = buf.st_mode;
     outputs.emplace_back(std::move(output));
   }
