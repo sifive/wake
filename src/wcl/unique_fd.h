@@ -31,30 +31,33 @@
 #include <cstring>
 #include <ctime>
 
-#include "logging.h"
+#include "result.h"
 
-class UniqueFd {
+namespace wcl {
+
+class unique_fd {
  private:
   int fd = -1;
 
-  explicit UniqueFd(int fd) : fd(fd) {}
+  explicit unique_fd(int fd) : fd(fd) {}
 
  public:
-  UniqueFd() = default;
-  UniqueFd(const UniqueFd&) = delete;
+  unique_fd() = default;
+  unique_fd(const unique_fd&) = delete;
 
-  UniqueFd& operator=(UniqueFd&& f) {
+  unique_fd& operator=(unique_fd&& f) {
     fd = f.fd;
     f.fd = -1;
     return *this;
   }
-  UniqueFd(UniqueFd&& f) : fd(f.fd) { f.fd = -1; }
+  unique_fd(unique_fd&& f) : fd(f.fd) { f.fd = -1; }
 
-  ~UniqueFd() {
+  ~unique_fd() {
     if (fd > 0) {
-      if (close(fd) == -1) {
-        log_fatal("close: %s", strerror(errno));
-      }
+      // We can't actully handle the error here because
+      // destructors and constructors assume exceptions
+      // will be used :(
+      close(fd);
     }
   }
 
@@ -65,21 +68,23 @@ class UniqueFd {
     return fd;
   }
 
-  static UniqueFd open(const char* str, int flags) {
+  static result<unique_fd, posix_error_t> open(const char* str, int flags) {
     int fd = ::open(str, flags);
     if (fd == -1) {
-      log_fatal("open(%s): %s", str, strerror(errno));
+      return make_errno<unique_fd>();
     }
-    return UniqueFd(fd);
+    return make_result<unique_fd, posix_error_t>(unique_fd(fd));
   }
 
   // Helper that only returns successful file opens and exits
   // otherwise.
-  static UniqueFd open(const char* str, int flags, mode_t mode) {
+  static result<unique_fd, posix_error_t> open(const char* str, int flags, mode_t mode) {
     int fd = ::open(str, flags, mode);
     if (fd == -1) {
-      log_fatal("open(%s): %s", str, strerror(errno));
+      return make_errno<unique_fd>();
     }
-    return UniqueFd(fd);
+    return make_result<unique_fd, posix_error_t>(unique_fd(fd));
   }
 };
+
+}  // namespace wcl

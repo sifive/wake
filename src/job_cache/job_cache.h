@@ -163,8 +163,8 @@ class Cache {
   int evict_stdout;
   int evict_pid;
 
-  void launch_evict_tool();
-  void reap_evict_tool();
+  void launch_evict_loop();
+  void reap_evict_loop();
 
  public:
   ~Cache();

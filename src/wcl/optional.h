@@ -197,4 +197,14 @@ class optional : public optional_base_t<T> {
   const T* operator->() const { return &this->value; }
 };
 
+template <class T>
+inline optional<T> some(T&& x) {
+  optional<T> { in_place_t{}, std::forward<T>(x) }
+}
+
+template <class T, class... Args>
+inline optional<T> make_some(Args&&... args) {
+  optional<T> { in_place_t{}, std::forward<Args>(args)... }
+}
+
 }  // namespace wcl

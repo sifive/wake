@@ -24,6 +24,24 @@ def toVariant = match _
     "wasm"    = Pass (Pair "wasm-cpp14-release"   "wasm-c11-release")
     s = Fail "Unknown build target ({s})".makeError
 
+export def mapMaxParallel (maxParallel: Integer) (f: a => Result b e) (l: List a): Result (List b) e =
+    def splitLength = len l / maxParallel
+    def splits = match _
+        Nil = Nil
+        lst =
+            def Pair split rest = splitAt splitLength lst
+            def otherSplits = splits rest
+            split, otherSplits
+    # Now we kick off at most maxParallel jobs. Each job
+    # serially handles up to splitLength jobs.
+    def partitionedWork = splits l
+    def partialResults = map (findFailFn f) partitionedWork
+
+    # Now we just need to join the work of these tasks togethor
+    def concat = foldr (_++_) Nil
+    require Pass listOfLists = findFail partialResults
+    Pass (concat listOfLists)
+
 export def build: List String => Result String Error = match _
     "tarball", Nil = tarball Unit | rmap (\_ "TARBALL")
     kind, Nil =
@@ -70,7 +88,7 @@ def bootstrapTarget targetFn variant =
 
 # Build all wake targets
 def targets =
-    buildWake, buildWakeBox, buildFuseDaemon, buildShim, buildBSP, (bootstrapTarget buildLSP), buildWakeFormat, (bootstrapTarget buildEvictSharedCache), Nil
+    buildWake, buildWakeBox, buildFuseDaemon, buildShim, buildBSP, (bootstrapTarget buildLSP), buildWakeFormat, Nil
 
 def all variant =
     require Pass x =

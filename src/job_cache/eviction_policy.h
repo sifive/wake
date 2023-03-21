@@ -24,15 +24,19 @@
 #include <iostream>
 #include <string>
 
+#include "job_cache.h"
+
 struct EvictionPolicy {
-  virtual void init() = 0;
+  virtual void init(const std::string& cache_dir) = 0;
   virtual void read(int id) = 0;
   virtual void write(int id) = 0;
   virtual ~EvictionPolicy() {}
 };
 
-struct NilEvictionPolicy : EvictionPolicy {
-  virtual void init() override { std::cerr << "NilEvictionPolicy::init()" << std::endl; }
+struct NilEvictionPolicy : public EvictionPolicy {
+  virtual void init(const std::string& cache_dir) override {
+    std::cerr << "NilEvictionPolicy::init()" << std::endl;
+  }
 
   virtual void read(int id) override {
     std::cerr << "NilEvictionPolicy::read(" << id << ")" << std::endl;
@@ -42,3 +46,19 @@ struct NilEvictionPolicy : EvictionPolicy {
     std::cerr << "NilEvictionPolicy::write(" << id << ")" << std::endl;
   }
 };
+
+struct LRUEvictionPolicyImpl;
+
+class LRUEvictionPolicy : public EvictionPolicy {
+  // We need to touch the database so we use pimpl to hide the implementation
+  std::unique_ptr<LRUEvictionPolicyImpl> impl;
+
+ public:
+  virtual void init(const std::string& cache_dir) override;
+
+  virtual void read(int id) override;
+
+  virtual void write(int id) override;
+};
+
+int eviction_loop(std::string cache_dir, std::unique_ptr<EvictionPolicy> policy);
