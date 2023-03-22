@@ -443,9 +443,8 @@ int main(int argc, char **argv) {
                 exports || api || exec || label || input || output;
   bool targets = argc == 1 && !noargs;
 
-  bool nodb = init;
   bool job_capture = job || output || input || label || last_use || last_exe || failed;
-  bool noparse = nodb || tagdag || job_capture;
+  bool noparse = init || tagdag || job_capture;
   bool notype = noparse || parse;
   bool noexecute = notype || html || tcheck || dumpssa || global || exports || api || targets;
 
@@ -463,12 +462,13 @@ int main(int argc, char **argv) {
       std::cerr << "Unable to initialize a workspace in " << init << std::endl;
       return 1;
     }
-  } else if (workspace && !chdir_workspace(chdir, wake_cwd, src_dir)) {
+    return 0;
+  }
+
+  if (workspace && !chdir_workspace(chdir, wake_cwd, src_dir)) {
     std::cerr << "Unable to locate wake.db in any parent directory." << std::endl;
     return 1;
   }
-
-  if (nodb) return 0;
 
   // check that the .wakeroot is compatible with the wake version
   std::string version_check = check_version(workspace, VERSION_STR);
