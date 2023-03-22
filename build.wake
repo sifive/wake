@@ -106,7 +106,10 @@ def setVersion release file =
         sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
         mv "%{file}.tmp" "%{file}"
         %"
-    shellJob script (in, Nil) | getJobOutput
+    makeShellPlan script (in, Nil)
+    | setPlanLabel "release: replace placeholder with version number"
+    | runJob
+    | getJobOutput
 
 # Create a release tarball
 def tarball Unit =
@@ -170,7 +173,11 @@ def tarball Unit =
             tar, "--mtime={time}", "--transform=s@^@wake-{release}/@",
             "--owner=0", "--group=0", "--numeric-owner", "-cJf",
             "wake_{release}.tar.xz", files
-        job cmd (manifest, testManifest, spec, srcs)
+        makeExecPlan cmd (manifest, testManifest, spec, srcs)
+        | setPlanLabel "release: package wake source tarball"
+        # Since this includes the current time, it's not going to benefit from caching.
+        | setPlanKeep False
+        | runJob
         | getJobOutput
     Pass (tarball, changelog, Nil)
 
@@ -185,7 +192,11 @@ export def static _: Result Path Error =
         which "tar", "--mtime={time}", "--transform=s@^tmp/@wake-{release}/@",
         "--owner=0", "--group=0", "--numeric-owner", "-cJf",
         "wake-static_{release}.tar.xz", map getPathName files | sortBy scmp
-    job cmd files
+    makeExecPlan cmd files
+    | setPlanLabel "release: package wake-static tarball"
+    # Since this includes the current time, it's not going to benefit from caching.
+    | setPlanKeep False
+    | runJob
     | getJobOutput
 
 from test_wake import topic wakeTestBinary

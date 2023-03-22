@@ -89,7 +89,9 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
         which "gzip", "-nk9", cppfile.getPathName, hfile.getPathName, Nil
 
     def zip =
-        job compress (cppfile, result)
+        makeExecPlan compress (cppfile, result)
+        | setPlanLabel "lemon: compress generated files"
+        | runJob
 
     match zip.getJobStatus
         Exited 0 = Pass (Pair cppfile hfile)
