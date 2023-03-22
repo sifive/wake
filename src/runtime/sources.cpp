@@ -188,22 +188,15 @@ static std::string parse_numbers(const char *s, int &major, int &minor, int &pat
   return "excess text after the patch version number";
 }
 
-std::string check_version(bool workspace, const char *wake_version) {
+std::string check_version(bool workspace, const char *config_version, const char *wake_version) {
   if (!workspace) return "";
-
-  std::ifstream ifs(".wakeroot");
-  if (!ifs) return "";
-
-  std::string repo_version;
-  std::getline(ifs, repo_version);
-  if (repo_version.empty()) return "";
 
   int wake_major, wake_minor, wake_patch;
   int repo_major, repo_minor, repo_patch;
-  auto repo = parse_numbers(repo_version.c_str(), repo_major, repo_minor, repo_patch);
+  auto repo = parse_numbers(config_version, repo_major, repo_minor, repo_patch);
   auto wake = parse_numbers(wake_version, wake_major, wake_minor, wake_patch);
 
-  if (!repo.empty()) return repo + " (" + repo_version + ")";
+  if (!repo.empty()) return repo + " (" + config_version + ")";
   if (!wake.empty()) return wake + " (" + wake_version + ")";
 
   if (repo_major != wake_major)

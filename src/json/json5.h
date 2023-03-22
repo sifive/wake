@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "util/location.h"
+#include "wcl/optional.h"
 
 enum SymbolJSON {
   // appear in JAST and JSymbol
@@ -107,6 +108,8 @@ struct JAST {
   }
   JAST &add(SymbolJSON kind) { return add(std::string(), kind, std::string()); }
   JAST &add(std::string value) { return add(std::string(), JSON_STR, std::move(value)); }
+
+  wcl::optional<std::string> expect_string(std::string key);
 };
 
 std::ostream &operator<<(std::ostream &os, const JAST &jast);

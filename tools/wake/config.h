@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 SiFive, Inc.
+ * Copyright 2022 SiFive, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,18 +15,30 @@
  * limitations under the License.
  */
 
-#ifndef SOURCES_H
-#define SOURCES_H
+#pragma once
 
 #include <string>
-#include <vector>
 
-struct Runtime;
+namespace config {
 
-bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &src_dir);
-bool make_workspace(const std::string &dir);
+struct WakeConfig {
+  const std::string version = "";
+  const std::string user_config = "";
 
-std::string check_version(bool workspace, const char *config_version, const char *wake_version);
-bool find_all_sources(Runtime &runtime, bool workspace);
+  WakeConfig() = delete;
+  WakeConfig(const WakeConfig&) = delete;
+  WakeConfig(const WakeConfig&&) = delete;
 
-#endif
+ private:
+  WakeConfig(std::string version, std::string user_config)
+      : version(version), user_config(user_config) {}
+
+  friend bool init(const std::string& wakeroot);
+};
+
+std::ostream& operator<<(std::ostream& os, const WakeConfig& config);
+
+bool init(const std::string& wakeroot);
+const WakeConfig* const get();
+
+}  // namespace config
