@@ -139,6 +139,7 @@ export def runUnitTests _: Result Unit Error =
         | setPlanLabel "testing: {testName}"
         | setPlanStdout logNever
         | setPlanStderr logNever
+        | setPlanOnce False
         | runJob
 
     def removeCarriageReturns = replace `\r` ""
@@ -220,6 +221,7 @@ def runTest (testScript: Path): Result Unit Error =
         | setPlanLocalOnly True # On OS/X you cannot mount fuse within fuse
         | setPlanStdout logNever
         | setPlanStderr logNever
+        | setPlanOnce False
         | runJob
 
     require Pass jobStdout =

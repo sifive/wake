@@ -45,7 +45,8 @@ def buildSqlite3WASM _ =
     """
     | makePlan "compiling sqlite3" (buildDir, Nil)
     | editPlanEnvironment (addEnvironmentPath emsdk)
-    | setPlanDirectory here
+    | setPlanDirectory @here
+    | setPlanShare False
     | runJob
 
   require Pass outputs = job.getJobOutputs

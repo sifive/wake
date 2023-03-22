@@ -73,6 +73,8 @@ export def vscode _: Result Path Error =
         | setPlanLabel "npm ci: Install npm dependencies"
         | editPlanEnvironment (addEnvironmentPath emsdkBinDir)
         | setPlanDirectory @here
+        # NPM installs its dependencies from the web, and so can't be fully sandboxed.
+        | setPlanShare False
         | runJob
         | getJobOutputs
 
