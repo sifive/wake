@@ -71,10 +71,18 @@ export def makeRunner name score pre post (Runner _ _ run) =
   Runner name score doit
 
 export data Persistence =
-  ReRun	# Job should be re-executed on every runJob call
-  Once	# Job should only be run once in a given wake execution
-  Keep	# Job should output be reusable between wake invocations
-  Share	# Job should output be shared between workspaces
+  # Job should be re-executed on every runJob call.
+  #
+  # In this case, no job deduplication is performed and so it must
+  # *not* write any files (stdout/stderr are fine) or be guaranteed to only be
+  # encountered once in any wake execution anyway.
+  ReRun
+  # Job should only be run once in a given wake execution.
+  Once
+  # Job should output be reusable between wake invocations.
+  Keep
+  # Job should output be shared between workspaces.
+  Share
 
 # A Plan describes a not-yet-executed Job
 tuple Plan =
@@ -112,6 +120,9 @@ export def getPlanOnce  p = isOnce  (getPlanPersistence p)
 export def getPlanKeep  p = isKeep  (getPlanPersistence p)
 export def getPlanShare p = isShare (getPlanPersistence p)
 
+# If `Once` is set to `False`, no job deduplication is performed and so it must
+# *not* write any files (stdout/stderr are fine) or be guaranteed to only be
+# encountered once in any wake execution anyway.
 export def setPlanOnce  v p = editPlanOnce  (\_ v) p
 export def setPlanKeep  v p = editPlanKeep  (\_ v) p
 export def setPlanShare v p = editPlanShare (\_ v) p
@@ -125,6 +136,10 @@ export def setPlanEnvVar (name: String) (value: String) (plan: Plan): Plan =
   editPlanEnvironment ("{name}={value}", _) plan
 
 # Helper methods that maintain the invariant that: Share => Keep => Once
+
+# If `Once` is set to `False`, no job deduplication is performed and so it must
+# *not* write any files (stdout/stderr are fine) or be guaranteed to only be
+# encountered once in any wake execution anyway.
 export def editPlanOnce (f: Boolean => Boolean): Plan => Plan =
   def helper = match _
     ReRun if   f False = Once
