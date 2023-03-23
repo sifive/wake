@@ -6,14 +6,14 @@ export def goodLink Unit =
         datFile Unit
     makeExecPlan ("ln", "-s", "datFile", "goodLink", Nil) (dat, Nil)
     | setPlanLabel "test (symlinks): goodLink"
-    | setPlanKeep False
+    | setPlanShare False
     | runJob
     | getJobOutput
 
 export def badLink Unit =
     makeExecPlan ("ln", "-s", "badFile", "badLink", Nil) Nil
     | setPlanLabel "test (symlinks): badLink"
-    | setPlanKeep False
+    | setPlanShare False
     | runJob
     | getJobOutput
 
@@ -25,7 +25,7 @@ export def shouldWork Unit =
     makeExecPlan ("cat", "goodLink", Nil) (link, dat, Nil)
     | setPlanLabel "test (symlinks): cat goodLink"
     | editPlanEnvironment (setEnvironment "TEST" "1")
-    | setPlanKeep False
+    | setPlanShare False
     | runJob
     | getJobInputs
 
@@ -35,7 +35,7 @@ export def shouldFail1 Unit =
     makeExecPlan ("cat", "goodLink", Nil) (link, Nil)
     | setPlanLabel "test (symlinks): cat goodLink shouldFail"
     | editPlanEnvironment (setEnvironment "TEST" "2")
-    | setPlanKeep False
+    | setPlanShare False
     | runJob
     | getJobInputs
 
