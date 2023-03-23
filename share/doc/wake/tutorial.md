@@ -608,6 +608,11 @@ containing any following command-line arguments.  In this case, it was `Nil`
 since nothing followed the `wake infoH`, but if we had written
 `wake infoH example` then `_args` would have been `"example", Nil`.
 
+As a side effect of this feature, any command-line arguments you want to pass to
+`wake` itself -- rather than to the function invoked -- must be given *before*
+the function name: `wake -v infoH` will increase the verbosity as expected,
+while `wake infoH -v` will not.
+
 Each executed job -- in other words, when wake calls out to an external program
 -- is recorded, and we can retrieve all the information about them as desired.
 
