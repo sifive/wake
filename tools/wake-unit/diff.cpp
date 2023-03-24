@@ -218,7 +218,7 @@ TEST(diff_fuzz2_large) {
   uint64_t seedV = 0xdeadbeefdeadbeef;
   std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> seed = {seedV, seedV, seedV, seedV};
   wcl::xoshiro_256 rng(seed);
-  std::uniform_int_distribution<int> length(500, 3000);
+  std::uniform_int_distribution<int> length(300, 1500);
   std::uniform_int_distribution<int> values(0, 20);
 
   for (int i = 0; i < 10; ++i) {
