@@ -63,7 +63,6 @@ TEST(result_copy) {
   EXPECT_EQUAL(10, *value2);
 }
 
-
 TEST(result_move) {
   wcl::result<int, int> err1 = wcl::result_error<int>(10);
   wcl::result<int, int> err2(std::move(err1));
@@ -79,35 +78,36 @@ TEST(result_move) {
 
   // We want to make sure we can make result move only things.
   {
-  wcl::result<std::unique_ptr<int>, int> move_only1(wcl::in_place_t{}, std::make_unique<int>(10));
-  wcl::result<std::unique_ptr<int>, int> move_only2(std::move(move_only1));
-  EXPECT_TRUE((bool)move_only1);
-  ASSERT_TRUE((bool)move_only2);
-  EXPECT_EQUAL(10, *move_only2->get());
-  EXPECT_FALSE(move_only2->get() == nullptr);
-  EXPECT_FALSE((*move_only2).get() == nullptr);
-  EXPECT_EQUAL(nullptr, move_only1->get());
-  EXPECT_EQUAL(nullptr, (*move_only1).get());
-  const auto& ref = move_only2;
-  EXPECT_FALSE(ref->get() == nullptr);
-  EXPECT_FALSE((*ref).get() == nullptr);
-  const auto& ref2 = move_only1;
-  EXPECT_TRUE(ref2->get() == nullptr);
-  EXPECT_TRUE((*ref2).get() == nullptr);
+    wcl::result<std::unique_ptr<int>, int> move_only1(wcl::in_place_t{}, std::make_unique<int>(10));
+    wcl::result<std::unique_ptr<int>, int> move_only2(std::move(move_only1));
+    EXPECT_TRUE((bool)move_only1);
+    ASSERT_TRUE((bool)move_only2);
+    EXPECT_EQUAL(10, *move_only2->get());
+    EXPECT_FALSE(move_only2->get() == nullptr);
+    EXPECT_FALSE((*move_only2).get() == nullptr);
+    EXPECT_EQUAL(nullptr, move_only1->get());
+    EXPECT_EQUAL(nullptr, (*move_only1).get());
+    const auto& ref = move_only2;
+    EXPECT_FALSE(ref->get() == nullptr);
+    EXPECT_FALSE((*ref).get() == nullptr);
+    const auto& ref2 = move_only1;
+    EXPECT_TRUE(ref2->get() == nullptr);
+    EXPECT_TRUE((*ref2).get() == nullptr);
   }
 
   // We also want to know the same for errors
   {
-  wcl::result<int, std::unique_ptr<int>> move_only1(wcl::in_place_error_t{}, std::make_unique<int>(10));
-  wcl::result<int, std::unique_ptr<int>> move_only2(std::move(move_only1));
-  EXPECT_FALSE((bool)move_only1);
-  EXPECT_FALSE((bool)move_only2);
-  EXPECT_EQUAL(10, *move_only2.error().get());
-  EXPECT_FALSE(move_only2.error().get() == nullptr);
-  EXPECT_TRUE(move_only1.error().get() == nullptr);
-  const auto& ref = move_only2;
-  EXPECT_FALSE(ref.error().get() == nullptr);
-  EXPECT_FALSE(ref.error().get() == nullptr);
+    wcl::result<int, std::unique_ptr<int>> move_only1(wcl::in_place_error_t{},
+                                                      std::make_unique<int>(10));
+    wcl::result<int, std::unique_ptr<int>> move_only2(std::move(move_only1));
+    EXPECT_FALSE((bool)move_only1);
+    EXPECT_FALSE((bool)move_only2);
+    EXPECT_EQUAL(10, *move_only2.error().get());
+    EXPECT_FALSE(move_only2.error().get() == nullptr);
+    EXPECT_TRUE(move_only1.error().get() == nullptr);
+    const auto& ref = move_only2;
+    EXPECT_FALSE(ref.error().get() == nullptr);
+    EXPECT_FALSE(ref.error().get() == nullptr);
   }
 }
 

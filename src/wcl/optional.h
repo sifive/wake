@@ -213,5 +213,4 @@ inline optional<T> make_some(Args&&... args) {
   return optional<T>{in_place_t{}, std::forward<Args>(args)...};
 }
 
-
 }  // namespace wcl
