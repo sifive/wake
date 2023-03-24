@@ -34,6 +34,18 @@ PASSED:
   option_no_construct
   option_none_is_none
   option_some
+  result_assign1
+  result_assign2
+  result_copy
+  result_destructs
+  result_err_is_err
+  result_forward_error
+  result_forward_value
+  result_inplace_error
+  result_inplace_value
+  result_move
+  result_no_construct
+  result_value
   sanity_check1
   sanity_check2
   shell_escape_empty_string

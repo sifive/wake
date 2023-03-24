@@ -197,4 +197,21 @@ class optional : public optional_base_t<T> {
   const T* operator->() const { return &this->value; }
 };
 
+// `some` is used when you want to wrap a known value in an optinal
+// and don't want to mess with template arguments.
+// Example: some(10) would be of type wcl::optional<int>
+template <class T>
+inline optional<T> some(T&& x) {
+  return optional<T>{in_place_t{}, std::forward<T>(x)};
+}
+
+// `make_some` is the more general older brother of `some` which
+// demands that you tell it the output type you want to use but allows
+// you to construct the value in place using an constructor of that type.
+template <class T, class... Args>
+inline optional<T> make_some(Args&&... args) {
+  return optional<T>{in_place_t{}, std::forward<Args>(args)...};
+}
+
+
 }  // namespace wcl
