@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <set>
@@ -32,14 +33,14 @@
 #include <unordered_map>
 
 #include "json/json5.h"
+#include "wcl/filepath.h"
 #include "wcl/optional.h"
+#include "wcl/result.h"
 
 namespace config {
 
 // TODO: remaining items for the implementation
 //   - Document (probably in main readme) the various configuration flags
-//   - Move error printing up via wcl::result
-//   - Write unit tests for the config unit
 
 static WakeConfig* _config = nullptr;
 
@@ -134,19 +135,35 @@ std::string shell_expand(const std::string& to_expand) {
 // Find the default location for the user level wake config
 std::string default_user_config() {
   // If XDG_CONFIG_HOME is set use it, otherwise use home
-  std::string prefix = shell_expand("$XDG_CONFIG_HOME");
-  if (prefix == "") {
-    prefix = "~";
+  char* xdg_config_home = getenv("XDG_CONFIG_HOME");
+  // char* home_dir = getenv("HOME");
+  //
+  // if (home_dir == nullptr) {
+  //   std::cerr  << "$HOME is not set!" << std::endl;
+  //   exit(EXIT_FAILURE);
+  // }
+
+  // std::string prefix = std::string(home_dir);
+  std::string prefix = "~/";
+
+  if (xdg_config_home != nullptr) {
+    prefix = std::string(xdg_config_home);
   }
-  return prefix + "/.wake.json";
+
+  return wcl::join_paths(prefix, ".wake.json");
 }
 
-wcl::optional<JAST> read_json_file(const std::string& path) {
+enum class ReadJsonFileError {
+  BadFile,
+  InvalidJson,
+};
+
+wcl::result<JAST, std::pair<ReadJsonFileError, std::string>> read_json_file(
+    const std::string& path) {
   std::ifstream file(path);
   if (!file) {
-    // TODO: add this error message back once I have a result type
-    // std::cerr << "Failed to read '" << path << "'" << std::endl;
-    return {};
+    return wcl::make_error<JAST, std::pair<ReadJsonFileError, std::string>>(
+        ReadJsonFileError::BadFile, "Failed  to read '" + path + "'");
   }
 
   std::stringstream buff;
@@ -156,30 +173,24 @@ wcl::optional<JAST> read_json_file(const std::string& path) {
   JAST json;
   std::stringstream errors;
   if (!JAST::parse(contents, errors, json)) {
-    std::cerr << path << " must be a valid JSON object: " << errors.str() << std::endl;
-    return {};
+    return wcl::make_error<JAST, std::pair<ReadJsonFileError, std::string>>(
+        ReadJsonFileError::InvalidJson, path + " must be a valid JSON object: " + errors.str());
   }
 
-  return {wcl::in_place_t{}, std::move(json)};
+  return wcl::result_value<std::pair<ReadJsonFileError, std::string>>(std::move(json));
 }
 
-bool insert_top_level_values(std::unordered_map<std::string, std::string>& map,
-                             const std::string& path) {
-  wcl::optional<JAST> json_opt = read_json_file(path);
-  if (!json_opt) {
-    return false;
-  }
+std::vector<std::string> find_disallowed_keys(const JAST& json, const std::set<std::string>& keys) {
+  std::vector<std::string> disallowed = {};
 
-  for (const auto& it : (*json_opt).children) {
-    if (it.second.kind == JSON_ARRAY || it.second.kind == JSON_OBJECT) {
-      std::cerr << "[WARNING]: Key '" << it.first
-                << "' is a nested structure. Only flat values suppored." << std::endl;
+  for (const auto& key : keys) {
+    if (json.get(key).kind == JSON_NULLVAL) {
       continue;
     }
-    map[it.first] = it.second.value;
+    disallowed.push_back(key);
   }
 
-  return true;
+  return disallowed;
 }
 
 bool init(const std::string& wakeroot_path) {
@@ -188,54 +199,96 @@ bool init(const std::string& wakeroot_path) {
     assert(false);
   }
 
-  // These keys may only be specified in .wakeroot
-  std::set<std::string> wakeroot_only_keys = {"version", "user_config"};
+  // Keys that may not be specified in .wakeroot
+  std::set<std::string> wakeroot_disallowed_keys = {};
 
-  // Set the default values for the listed keys
-  std::unordered_map<std::string, std::string> wakeroot_config = {
-      {"version", ""},
-      {"user_config", default_user_config()},
-  };
+  // Keys that may not be specified in the user config
+  std::set<std::string> user_config_disallowed_keys = {"version", "user_config"};
 
-  // These keys may only be specified in the user config
-  std::set<std::string> user_config_only_keys = {};
+  //  Set default values
+  std::string version = "";
+  std::string user_config_path = default_user_config();
 
-  // Set the default values for the listed keys
-  std::unordered_map<std::string, std::string> user_config = {};
-
-  if (!insert_top_level_values(wakeroot_config, wakeroot_path)) {
-    std::cerr << "Failed to load .wakeroot" << std::endl;
+  // Parse .wakeroot
+  auto wakeroot_res = read_json_file(wakeroot_path);
+  if (!wakeroot_res) {
+    std::cerr << "Failed to load .wakeroot: " << wakeroot_res.error().second << std::endl;
     return false;
   }
 
-  wakeroot_config["user_config"] = shell_expand(wakeroot_config["user_config"]);
-  insert_top_level_values(user_config, wakeroot_config["user_config"]);
+  JAST wakeroot_json = std::move(*wakeroot_res);
 
-  // Verify only allowed keys are set in .wakeroot
-  for (const auto& key : user_config_only_keys) {
-    auto it = wakeroot_config.find(key);
-    if (it == wakeroot_config.end()) {
-      continue;
-    }
-    std::cerr << "[WARNING]: Key '" << key << "' may only be set in user config ("
-              << wakeroot_config["user_config"] << "). Ignoring." << std::endl;
-    wakeroot_config.erase(key);
-  }
-
-  // Verify only allowed keys are set in user config
-  // then overlay the user configs on top of the repo configs
-  for (const auto& it : user_config) {
-    if (wakeroot_only_keys.count(it.first)) {
-      std::cerr << "[WARNING]: Key '" << it.first << "' may only be set in .wakeroot. Ignoring."
+  // Check for disallowed keys
+  {
+    auto disallowed_keys = find_disallowed_keys(wakeroot_json, wakeroot_disallowed_keys);
+    for (const auto& key : disallowed_keys) {
+      std::cerr << "Key '" << key << "' may only be set in user config but is set in .wakeroot."
                 << std::endl;
-      continue;
     }
-    wakeroot_config[it.first] = it.second;
+    if (!disallowed_keys.empty()) {
+      return false;
+    }
   }
 
-  static WakeConfig wc(wakeroot_config["version"], wakeroot_config["user_config"]);
+  // Parse values from .wakeroot
+  {
+    auto json_version = wakeroot_json.expect_string("version");
+    if (json_version) {
+      version = *json_version;
+    }
+  }
+  {
+    auto json_user_config = wakeroot_json.expect_string("user_config");
+    if (json_user_config) {
+      user_config_path = *json_user_config;
+    }
+  }
+
+  user_config_path = shell_expand(user_config_path);
+
+  // Parse user config
+  auto user_config_res = read_json_file(user_config_path);
+  if (!user_config_res) {
+    // When parsing the user config, its fine if the file is missing
+    // but we should report all other errors.
+    if (user_config_res.error().first != ReadJsonFileError::BadFile) {
+      std::cerr << user_config_path << ": " << user_config_res.error().second << std::endl;
+      return false;
+    }
+
+    // since the user config was missig, ignore it and return the config thus far
+    static WakeConfig wc = {version, user_config_path};
+    _config = &wc;
+    return true;
+  }
+
+  JAST user_config_json = std::move(*user_config_res);
+
+  // Check for disallowed keys
+  {
+    auto disallowed_keys = find_disallowed_keys(user_config_json, user_config_disallowed_keys);
+    for (const auto& key : disallowed_keys) {
+      std::cerr << "Key '" << key << "' may only be set in .wakeroot but is set in user config ("
+                << user_config_path << ")." << std::endl;
+    }
+    if (!disallowed_keys.empty()) {
+      return false;
+    }
+  }
+
+  // Parse values from the user config
+  // TODO: there are currently no allowed keys in the user config.
+  // Below is left as an example  for when one is added
+  // {
+  //   auto json_version = user_config_json.expect_string("version");
+  //   if (json_version) {
+  //     version = *json_version;
+  //   }
+  // }
+
+  static WakeConfig wc = {version, user_config_path};
   _config = &wc;
-  return false;
+  return true;
 }
 
 const WakeConfig* const get() {

@@ -474,7 +474,10 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  config::init(".wakeroot");
+  if (!config::init(".wakeroot")) {
+    return 1;
+  }
+
   if (config) {
     std::cout << *config::get();
     return 0;

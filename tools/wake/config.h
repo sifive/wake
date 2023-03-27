@@ -25,13 +25,11 @@ struct WakeConfig {
   const std::string version = "";
   const std::string user_config = "";
 
-  WakeConfig() = delete;
   WakeConfig(const WakeConfig&) = delete;
   WakeConfig(const WakeConfig&&) = delete;
 
  private:
-  WakeConfig(std::string version, std::string user_config)
-      : version(version), user_config(user_config) {}
+  WakeConfig() = default;
 
   friend bool init(const std::string& wakeroot);
 };
