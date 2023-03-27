@@ -45,7 +45,7 @@ export def shouldFail2 Unit =
     makeExecPlan ("cat", "goodLink", Nil) (dat, Nil)
     | setPlanLabel "test (symlinks): cat goodLink shouldFail2"
     | editPlanEnvironment (setEnvironment "TEST" "3")
-    | setPlanKeep False
+    | setPlanShare False
     | runJob
     | getJobInputs
 
