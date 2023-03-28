@@ -147,7 +147,7 @@ static std::string default_user_config() {
     exit(EXIT_FAILURE);
   }
 
-  std::string prefix = std::string(home_dir);
+  std::string prefix = wcl::join_paths(std::string(home_dir), ".config");
 
   if (xdg_config_home != nullptr) {
     prefix = std::string(xdg_config_home);
