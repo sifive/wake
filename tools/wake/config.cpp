@@ -45,7 +45,7 @@ namespace config {
 static WakeConfig* _config = nullptr;
 
 // Expands a string as echo would.
-std::string shell_expand(const std::string& to_expand) {
+static std::string shell_expand(const std::string& to_expand) {
   constexpr size_t read_side = 0;
   constexpr size_t write_side = 1;
 
@@ -70,7 +70,7 @@ std::string shell_expand(const std::string& to_expand) {
     // would require escaping things and would change expansion. Since
     // the intended use cases will likely not have spaces in them this
     // seems like an ok trade off.
-    std::string shell_string = "echo -n " + to_expand;
+    std::string shell_string = "echo " + to_expand;
 
     // overwrite stdout with the write side of the pipe
     if (dup2(stdoutPipe[write_side], STDOUT_FILENO) == -1) {
@@ -128,12 +128,16 @@ std::string shell_expand(const std::string& to_expand) {
     exit(EXIT_FAILURE);
   }
 
+  // Remove the newline added by echo
+  // echo -n doesn't work MacOS
+  acc.pop_back();
+
   // Return the string we got back
   return acc;
 }
 
 // Find the default location for the user level wake config
-std::string default_user_config() {
+static std::string default_user_config() {
   // If XDG_CONFIG_HOME is set use it, otherwise use home
   char* xdg_config_home = getenv("XDG_CONFIG_HOME");
   // char* home_dir = getenv("HOME");
@@ -158,7 +162,7 @@ enum class ReadJsonFileError {
   InvalidJson,
 };
 
-wcl::result<JAST, std::pair<ReadJsonFileError, std::string>> read_json_file(
+static wcl::result<JAST, std::pair<ReadJsonFileError, std::string>> read_json_file(
     const std::string& path) {
   std::ifstream file(path);
   if (!file) {
@@ -180,7 +184,8 @@ wcl::result<JAST, std::pair<ReadJsonFileError, std::string>> read_json_file(
   return wcl::result_value<std::pair<ReadJsonFileError, std::string>>(std::move(json));
 }
 
-std::vector<std::string> find_disallowed_keys(const JAST& json, const std::set<std::string>& keys) {
+static std::vector<std::string> find_disallowed_keys(const JAST& json,
+                                                     const std::set<std::string>& keys) {
   std::vector<std::string> disallowed = {};
 
   for (const auto& key : keys) {
