@@ -1,4 +1,4 @@
 Wake config: 
   version = ''
-  user config  = ''
+  user config  = 'tests/config/empty/.wake.json'
 

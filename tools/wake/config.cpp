@@ -140,15 +140,14 @@ static std::string shell_expand(const std::string& to_expand) {
 static std::string default_user_config() {
   // If XDG_CONFIG_HOME is set use it, otherwise use home
   char* xdg_config_home = getenv("XDG_CONFIG_HOME");
-  // char* home_dir = getenv("HOME");
-  //
-  // if (home_dir == nullptr) {
-  //   std::cerr  << "$HOME is not set!" << std::endl;
-  //   exit(EXIT_FAILURE);
-  // }
+  char* home_dir = getenv("HOME");
 
-  // std::string prefix = std::string(home_dir);
-  std::string prefix = "~/";
+  if (home_dir == nullptr) {
+    std::cerr << "$HOME is not set!" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  std::string prefix = std::string(home_dir);
 
   if (xdg_config_home != nullptr) {
     prefix = std::string(xdg_config_home);
