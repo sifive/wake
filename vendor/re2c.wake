@@ -62,7 +62,9 @@ def re2cReal re2c file =
         which "gzip", "-nk9", result.getPathName, Nil
 
     def zip =
-        job compress (result, Nil)
+        makeExecPlan compress (result, Nil)
+        | setPlanLabel "re2c: compress generated file"
+        | runJob
 
     match zip.getJobStatus
         Exited 0 = Pass result
@@ -82,7 +84,9 @@ def gunzip zip =
         gzip -dc "%{zip.getPathName}" > "%{out}.tmp"
         mv "%{out}.tmp" "%{out}"
         %"
-    shellJob script (zip, Nil)
+    makeShellPlan script (zip, Nil)
+    | setPlanLabel "gzip: extract {zip.getPathName}"
+    | runJob
     | getJobOutput
 
 def re2c (file: Path): Result Path Error =

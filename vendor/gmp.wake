@@ -46,6 +46,7 @@ def buildGmpWASM _ =
     | makePlan "compiling gmp" (buildDir, Nil)
     | editPlanEnvironment (addEnvironmentPath emsdk)
     | setPlanDirectory here
+    | setPlanShare False
     | runJob
 
   require Pass outputs = job.getJobOutputs
