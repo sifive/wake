@@ -246,9 +246,8 @@ bool init(const std::string& wakeroot_path) {
     if (json_user_config) {
       user_config_path = *json_user_config;
     }
+    user_config_path = shell_expand(user_config_path);
   }
-
-  user_config_path = shell_expand(user_config_path);
 
   // Parse user config
   auto user_config_res = read_json_file(user_config_path);

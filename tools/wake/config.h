@@ -26,7 +26,7 @@ struct WakeConfig {
   const std::string user_config = "";
 
   WakeConfig(const WakeConfig&) = delete;
-  WakeConfig(const WakeConfig&&) = delete;
+  WakeConfig(WakeConfig&&) = delete;
 
  private:
   WakeConfig() = default;
