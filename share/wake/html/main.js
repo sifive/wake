@@ -25,10 +25,25 @@ tooltip.style.visibility = 'hidden';
 const usecss = document.createElement('div');
 usecss.appendChild(document.createElement('style'));
 
+// The following variables encompass the state for expression selection mode,
+// where pressing + or - on the keyboard while the mouse is hovering over an
+// expression will allow one to select parent or child expressions, which
+// affects the type shown in the tooltip.
+
+/** The current expression selection depth. */
 let depth = 0;
+/** The inner-most (depth 0) element in the expression tree. */
 let inner = null;
+/** The currently-selected element in the expression tree. */
 let select = null;
 
+/** Update the currently selected expression.
+ *
+ * The global variables `depth` and `inner` are essentially the arguments to the
+ * function, used to determine which expression should be selected. `inner` is
+ * the smallest expression that the mouse is hovering over. `depth` is how many
+ * parent expressions to walk up.
+ */
 function update () {
   let next = inner;
   for (let i = 0; i < depth; ++i) {
