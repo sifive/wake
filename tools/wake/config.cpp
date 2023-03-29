@@ -40,9 +40,6 @@
 
 namespace config {
 
-// TODO: remaining items for the implementation
-//   - Document (probably in main readme) the various configuration flags
-
 static WakeConfig* _config = nullptr;
 
 // Expands a string as echo would.
@@ -233,11 +230,13 @@ bool init(const std::string& wakeroot_path) {
   {
     auto disallowed_keys = find_disallowed_keys(wakeroot_json, wakeroot_allowed_keys);
     for (const auto& key : disallowed_keys) {
-      std::cerr << "Key '" << key << "' may not be set in .wakeroot";
+      std::stringstream s;
+      s << "Key '" << key << "' may not be set in .wakeroot";
       if (user_config_allowed_keys.count(key) > 0) {
-        std::cerr << " but it may be set in user config";
+        s << " but it may be set in user config";
       }
-      std::cerr << "." << std::endl;
+      s << ".";
+      reporter->reportWarning(Location(wakeroot_path.c_str()), s.str());
     }
   }
 
@@ -278,11 +277,13 @@ bool init(const std::string& wakeroot_path) {
   {
     auto disallowed_keys = find_disallowed_keys(user_config_json, user_config_allowed_keys);
     for (const auto& key : disallowed_keys) {
-      std::cerr << "Key '" << key << "' may not be set in user config (" << user_config_path << ")";
+      std::stringstream s;
+      s << "Key '" << key << "' may not be set in user config";
       if (wakeroot_allowed_keys.count(key) > 0) {
-        std::cerr << " but it may be set in .wakeroot";
+        s << " but it may be set in .wakeroot";
       }
-      std::cerr << "." << std::endl;
+      s << ".";
+      reporter->reportWarning(Location(user_config_path.c_str()), s.str());
     }
   }
 
