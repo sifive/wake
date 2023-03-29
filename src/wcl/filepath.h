@@ -17,11 +17,100 @@
 
 #pragma once
 
+#include <dirent.h>
+#include <sys/types.h>
+
 #include <sstream>
 #include <string>
 #include <vector>
 
+#include "result.h"
+
 namespace wcl {
+
+enum class file_type { block, character, directory, fifo, symlink, regular, socket, unknown };
+
+struct directory_entry {
+  std::string entry_name;
+  file_type type;
+};
+
+class directory_range;
+
+class directory_iterator {
+  friend class directory_range;
+
+ private:
+  std::string dir_path;
+  DIR* dir = nullptr;
+  optional<result<directory_entry, posix_error_t>> value;
+
+  // This steps the current entry by one
+  void step();
+  directory_iterator(std::string dir_path, DIR* dir) : dir(dir), value() {}
+
+ public:
+  ~directory_iterator() {}
+  directory_iterator() : dir_path(), dir(nullptr), value() {
+    // The default constructor should behave like something
+    // going past the end of a directory when using readdir
+    value = some(make_error<directory_entry, posix_error_t>(EBADF));
+  }
+  directory_iterator(const directory_iterator&) = delete;
+  directory_iterator(directory_iterator&& other) : dir(other.dir), value(std::move(other.value)) {
+    other.dir = nullptr;
+  }
+
+  const result<directory_entry, posix_error_t>& operator*() {
+    // on our first call we won't have a value set, so set it.
+    if (!value && dir) {
+      step();
+    }
+
+    return *value;
+  }
+
+  directory_iterator& operator++() {
+    step();
+    return *this;
+  }
+
+  bool operator!=(const directory_iterator& other) { return dir == other.dir; }
+};
+
+class directory_range {
+ private:
+  DIR* dir = nullptr;
+  std::string dir_path;
+
+  directory_range(const std::string& path) : dir(nullptr), dir_path(path) {
+    dir = opendir(path.c_str());
+  }
+
+ public:
+  ~directory_range() {
+    if (dir) {
+      closedir(dir);
+    }
+  }
+  directory_range(const directory_range&) = delete;
+  directory_range(directory_range&& dir) : dir(dir.dir), dir_path(std::move(dir_path)) {
+    dir.dir = nullptr;
+  }
+
+  static result<directory_range, posix_error_t> open(const std::string& path) {
+    directory_range out{path};
+    if (out.dir == nullptr) {
+      return make_error<directory_range, posix_error_t>(errno);
+    }
+
+    return make_result<directory_range, posix_error_t>(std::move(out));
+  }
+
+  directory_iterator begin() { return directory_iterator(dir_path, dir); }
+
+  directory_iterator end() { return directory_iterator{}; }
+};
 
 // filepath_iterator breaks up a filepath
 // into its parts. So if you're iterating over
