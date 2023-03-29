@@ -84,9 +84,9 @@ function onMouseOut(event) {
 };
 
 document.addEventListener('keypress', function(event) {
-  const char = event.which || event.keyCode;
-  if (char === 43 || char == 61) { ++depth; update(); }
-  if ((char === 45 || char == 95) && depth > 0) { --depth; update(); }
+  const char = event.key;
+  if (char === '+' || char === '=') { ++depth; update(); }
+  if ((char === '-' || char === '_') && depth > 0) { --depth; update(); }
 }, true);
 
 function smoothFromTo(fromX, fromY, destX, destY, step) {
