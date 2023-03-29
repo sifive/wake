@@ -205,7 +205,7 @@ void markup_html(const std::string &libdir, std::ostream &os, Expr *root) {
   os << "<script type=\"text/javascript\">" << std::endl;
   os << main.rdbuf();
   os << "</script>" << std::endl;
-  os << "<script type=\"wake\">";
+  os << "<script id=\"wake-data\" type=\"application/json\">";
   JSONRender(libdir, os).render(root);
   os << "</script>" << std::endl;
 }

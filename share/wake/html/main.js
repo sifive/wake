@@ -179,13 +179,9 @@ function workspace(node) {
 document.addEventListener('DOMContentLoaded', function main () {
   document.body.appendChild(usecss);
   document.body.appendChild(tooltip);
-  var points = document.querySelectorAll('*');
-  for (let point of points) {
-    if (point.type === 'wake') {
-      const node = JSON.parse(point.innerHTML);
-      document.body.appendChild(workspace(node));
-    }
-  }
+  const wakeData = document.getElementById('wake-data');
+  const node = JSON.parse(wakeData.text);
+  document.body.appendChild(workspace(node));
 });
 
 /* eslint-env browser */
