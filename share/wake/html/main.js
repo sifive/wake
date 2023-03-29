@@ -47,8 +47,8 @@ let select = null;
 function update () {
   let next = inner;
   for (let i = 0; i < depth; ++i) {
-    let parent = next.parentElement;
-    if (!parent.getAttribute('sourceType')) {
+    let parent = next?.parentElement;
+    if (!parent?.getAttribute('sourceType')) {
       depth = i;
       break;
     }
