@@ -39,8 +39,10 @@ pre {
 .Prim       { color: yellow; }
 .Literal    { color: pink; }
 
-*[sourceType]:hover { background-color: hsla(0, 100%, 100%, 0.1); }
-*[focus='true']:hover { background-color: green; }
+.sourceType:hover { background-color: hsla(0, 100%, 100%, 0.1); }
+.focus:hover { background-color: green; }
+
+.highlightUseDef { background-color: red; }
 
 .tooltip {
   display: block;
@@ -49,6 +51,9 @@ pre {
   position: absolute;
   min-width: 200px;
   background-color: #333;
+}
+.tooltip.hidden {
+  visibility: hidden;
 }
 
 a:link {

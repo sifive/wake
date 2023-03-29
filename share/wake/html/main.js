@@ -19,11 +19,7 @@
 // tooltip
 const tooltip = document.createElement('div');
 tooltip.classList.add('tooltip');
-tooltip.style.visibility = 'hidden';
-
-// css to select uses
-const usecss = document.createElement('div');
-usecss.appendChild(document.createElement('style'));
+tooltip.classList.add('hidden');
 
 // The following variables encompass the state for expression selection mode,
 // where pressing + or - on the keyboard while the mouse is hovering over an
@@ -48,7 +44,7 @@ function update () {
   let next = inner;
   for (let i = 0; i < depth; ++i) {
     let parent = next?.parentElement;
-    if (!parent?.getAttribute('sourceType')) {
+    if (!parent?.dataset?.sourceType) {
       depth = i;
       break;
     }
@@ -56,13 +52,13 @@ function update () {
   }
   if (next != select) {
     if (select) {
-      select.removeAttribute('focus');
-      tooltip.style.visibility = 'hidden';
+      select.classList.remove('focus');
+      tooltip.classList.add('hidden');
     }
     if (next) {
-      next.setAttribute('focus', 'true');
-      tooltip.style.visibility = 'visible';
-      tooltip.innerHTML = next.getAttribute('sourceType');
+      next.classList.add('focus');
+      tooltip.classList.remove('hidden');
+      tooltip.innerHTML = next.dataset.sourceType;
     }
   }
   select = next;
@@ -72,7 +68,8 @@ function onMouseOver(event) {
   inner = event.target;
   depth = 0;
   update();
-  tooltip.style.cssText = `position: absolute; top: ${event.pageY + 10}px; left: ${event.pageX}px;`;
+  tooltip.style.top = `${event.pageY + 10}px`;
+  tooltip.style.left = `${event.pageX}px`;
   event.stopPropagation();
 };
 
@@ -104,6 +101,11 @@ function smoothFromTo(fromX, fromY, destX, destY, step) {
     setTimeout(function () { smoothFromTo(fromX, fromY, destX, destY, step+1); }, stepMs);
 }
 
+function resetUseDefHighlights() {
+  document.querySelectorAll('.highlightUseDef')
+    .forEach(e => e.classList.remove('highlightUseDef'));
+}
+
 function focusOn(event) {
   const target = event.currentTarget.getAttribute('href').substring(1);
   const where = document.getElementById(target).getBoundingClientRect();
@@ -112,7 +114,8 @@ function focusOn(event) {
   const destX = (where.left + where.right  - window.innerWidth)  / 2 + fromX;
   const destY = (where.top  + where.bottom - window.innerHeight) / 2 + fromY;
 
-  usecss.firstChild.innerHTML = '*[id=\'' + target + '\'] { background-color: red; }';
+  resetUseDefHighlights();
+  document.getElementById(target).classList.add('highlightUseDef');
   window.location.hash = target;
   event.preventDefault();
 
@@ -120,7 +123,9 @@ function focusOn(event) {
 };
 
 function onMouseClick(event) {
-  usecss.firstChild.innerHTML = '*[href=\'#' + event.currentTarget.id + '\'] { background-color: red; }';
+  resetUseDefHighlights();
+  document.querySelectorAll(`*[href='#${event.currentTarget.id}']`)
+    .forEach(e => e.classList.add('highlightUseDef'));
   event.stopPropagation();
 };
 
@@ -132,21 +137,22 @@ function render(root) {
     const body = node.body;
 
     let res = document.createElement(node.target ? 'a' : 'span');
-    res.setAttribute('class', node.type);
+    res.classList.add(node.type);
 
     if (node.sourceType) {
-      res.setAttribute('sourceType', node.sourceType);
+      res.dataset.sourceType = node.sourceType;
+      res.classList.add('sourceType');
       res.addEventListener('mouseover', onMouseOver);
       res.addEventListener('mouseout', onMouseOut);
     }
 
     if (node.type === 'VarDef' || node.type === 'VarArg') {
-      res.setAttribute('id', root.filename + ':' + node.range.join(':'));
+      res.id = root.filename + ':' + node.range.join(':');
       res.addEventListener('click', onMouseClick);
     }
 
     if (node.target) {
-      res.setAttribute('href', '#' + node.target.filename + ':' + node.target.range.join(':'));
+      res.href = '#' + node.target.filename + ':' + node.target.range.join(':');
       res.addEventListener('click', focusOn);
     }
 
@@ -192,7 +198,6 @@ function workspace(node) {
 }
 
 document.addEventListener('DOMContentLoaded', function main () {
-  document.body.appendChild(usecss);
   document.body.appendChild(tooltip);
   const wakeData = document.getElementById('wake-data');
   const node = JSON.parse(wakeData.text);
