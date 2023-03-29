@@ -1,0 +1,3 @@
+Key 'not-a-root-key' may not be set in .wakeroot.
+Key 'version' may not be set in user config (./wake_user.json) but it may be set in .wakeroot.
+Key 'not-a-key' may not be set in user config (./wake_user.json).

@@ -33,6 +33,7 @@
 #include <unordered_map>
 
 #include "json/json5.h"
+#include "util/diagnostic.h"
 #include "wcl/filepath.h"
 #include "wcl/optional.h"
 #include "wcl/result.h"
@@ -183,15 +184,21 @@ static wcl::result<JAST, std::pair<ReadJsonFileError, std::string>> read_json_fi
   return wcl::result_value<std::pair<ReadJsonFileError, std::string>>(std::move(json));
 }
 
+// Returns a list of keys present in *json* that are not listed in *keys*
+// *json* must be of kind JSON_OBJECT to return any results.
 static std::vector<std::string> find_disallowed_keys(const JAST& json,
                                                      const std::set<std::string>& keys) {
   std::vector<std::string> disallowed = {};
 
-  for (const auto& key : keys) {
-    if (json.get(key).kind == JSON_NULLVAL) {
+  if (json.kind != JSON_OBJECT) {
+    return disallowed;
+  }
+
+  for (const auto& entry : json.children) {
+    if (keys.count(entry.first) > 0) {
       continue;
     }
-    disallowed.push_back(key);
+    disallowed.push_back(entry.first);
   }
 
   return disallowed;
@@ -203,11 +210,11 @@ bool init(const std::string& wakeroot_path) {
     assert(false);
   }
 
-  // Keys that may not be specified in .wakeroot
-  std::set<std::string> wakeroot_disallowed_keys = {};
+  // Only keys that may be specified in .wakeroot
+  std::set<std::string> wakeroot_allowed_keys = {"version", "user_config"};
 
-  // Keys that may not be specified in the user config
-  std::set<std::string> user_config_disallowed_keys = {"version", "user_config"};
+  // Only keys that may be specified in the user config
+  std::set<std::string> user_config_allowed_keys = {};
 
   //  Set default values
   std::string version = "";
@@ -224,13 +231,13 @@ bool init(const std::string& wakeroot_path) {
 
   // Check for disallowed keys
   {
-    auto disallowed_keys = find_disallowed_keys(wakeroot_json, wakeroot_disallowed_keys);
+    auto disallowed_keys = find_disallowed_keys(wakeroot_json, wakeroot_allowed_keys);
     for (const auto& key : disallowed_keys) {
-      std::cerr << "Key '" << key << "' may only be set in user config but is set in .wakeroot."
-                << std::endl;
-    }
-    if (!disallowed_keys.empty()) {
-      return false;
+      std::cerr << "Key '" << key << "' may not be set in .wakeroot";
+      if (user_config_allowed_keys.count(key) > 0) {
+        std::cerr << " but it may be set in user config";
+      }
+      std::cerr << "." << std::endl;
     }
   }
 
@@ -269,13 +276,13 @@ bool init(const std::string& wakeroot_path) {
 
   // Check for disallowed keys
   {
-    auto disallowed_keys = find_disallowed_keys(user_config_json, user_config_disallowed_keys);
+    auto disallowed_keys = find_disallowed_keys(user_config_json, user_config_allowed_keys);
     for (const auto& key : disallowed_keys) {
-      std::cerr << "Key '" << key << "' may only be set in .wakeroot but is set in user config ("
-                << user_config_path << ")." << std::endl;
-    }
-    if (!disallowed_keys.empty()) {
-      return false;
+      std::cerr << "Key '" << key << "' may not be set in user config (" << user_config_path << ")";
+      if (wakeroot_allowed_keys.count(key) > 0) {
+        std::cerr << " but it may be set in .wakeroot";
+      }
+      std::cerr << "." << std::endl;
     }
   }
 
