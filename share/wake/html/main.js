@@ -197,11 +197,36 @@ function workspace(node) {
   return res;
 }
 
+function createThemeToggle() {
+  const prefersDark = matchMedia('prefers-color-scheme: dark');
+  document.documentElement.className = prefersDark ? 'dark' : 'light';
+
+  const themeToggle = document.createElement('div');
+  themeToggle.innerHTML = `
+    <label>Light<input type="radio" name="style" value="light"${prefersDark ? '' : ' checked'}>
+    <label>Dark<input type="radio" name="style" value="dark"${prefersDark ? ' checked' : ''}>
+  `;
+
+  const onChange = (e) => {
+    e.preventDefault();
+    document.documentElement.className = e.target.value;
+  }
+  themeToggle.querySelectorAll('input')
+    .forEach(e => e.addEventListener('change', onChange));
+
+  themeToggle.style.position = 'fixed';
+  themeToggle.style.top = '10px';
+  themeToggle.style.right = '10px';
+
+  return themeToggle;
+}
+
 document.addEventListener('DOMContentLoaded', function main () {
   document.body.appendChild(tooltip);
   const wakeData = document.getElementById('wake-data');
   const node = JSON.parse(wakeData.text);
   document.body.appendChild(workspace(node));
+  document.body.appendChild(createThemeToggle());
 });
 
 /* eslint-env browser */
