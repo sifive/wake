@@ -147,10 +147,10 @@ two values conflict. Certain values may only be specified in a specific
 location. For example, min version may only be set in the .wakeroot. Both files
 contain JSON5 source where the root object may contain the following keys.
 
-| Key | Description | Required | Type | .wakeroot allowed | user config allowed   | Default |
-| --- | ----------- | -------- | ---- | ----------------- | --------------------- | ------- |
-| version | SemVer compatible  with the repo | N  | SemVer string | Y | N | "" |
-| user_config | Path to user config for this repo. Allows a different config for each repo. | N | shell expandable path string | Y | N | $XDG_CONFIG_HOME/.wake.json if $XDG_CONFIG_HOME set, $HOME/.config/.wake.json otherwise |
+| Key         | Description                                                                 | Required | Type                         | .wakeroot | user config | Default                                                                                     |
+| ----------- | --------------------------------------------------------------------------- | -------- | ---------------------------- | --------- | ----------- | ------------------------------------------------------------------------------------------- |
+| version     | SemVer compatible  with the repo                                            | No       | SemVer string                | Yes       | No          | ""                                                                                          |
+| user_config | Path to user config for this repo. Allows a different config for each repo. | No       | shell expandable path string | Yes       | No          | `$XDG_CONFIG_HOME/wake.json` if `$XDG_CONFIG_HOME` set, `$HOME/.config/wake.json` otherwise |
 
 Below is a full example
 
@@ -158,10 +158,10 @@ Below is a full example
 // .wakeroot
 {
   "version": "0.31.0",
-  "user_config": "~/.config/.wake.myrepo.json"
+  "user_config": "~/.config/wake.myrepo.json"
 }
 
-// ~/.config/.wake.myrepo.json
+// ~/.config/wake.myrepo.json
 {
   // Right now there are no implemented user keys so this file is always empty
   // This will be updated once log verbosity or another user key is implemented

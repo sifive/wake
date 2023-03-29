@@ -154,7 +154,7 @@ static std::string default_user_config() {
     prefix = std::string(xdg_config_home);
   }
 
-  return wcl::join_paths(prefix, ".wake.json");
+  return wcl::join_paths(prefix, "wake.json");
 }
 
 enum class ReadJsonFileError {
