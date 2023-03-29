@@ -1,0 +1,4 @@
+{
+  "user_config": "./wake_user.json",
+  "not-a-root-key": 1234
+}

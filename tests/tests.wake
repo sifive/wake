@@ -219,6 +219,7 @@ def runTest (testScript: Path): Result Unit Error =
         | setPlanDirectory testDirectory
         | setPlanLabel "testing: {testName}"
         | setPlanLocalOnly True # On OS/X you cannot mount fuse within fuse
+        | setPlanEnvironment ("HOME={testDirectory}",)
         | setPlanStdout logNever
         | setPlanStderr logNever
         | setPlanShare False

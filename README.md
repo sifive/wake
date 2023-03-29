@@ -137,6 +137,37 @@ Give FUSE permission to run as stated in the instructions and you should be good
 | [BLAKE2](https://github.com/BLAKE2/libb2)                | 2018-07 | CC0           |
 | [whereami](https://github.com/gpakosz/whereami)          | 2018-09 | WTFPLV2       |
 
+# Configuring wake
+
+Certain characteristics of wake execution can be configured for all invocations
+of the wake tool. For example, the repo may set the minimum wake version or a
+user may set the verbosity of a log message. This is achieved  via two config
+files: .wakeroot and the user config. The user config overrides .wakeroot if
+two values conflict. Certain values may only be specified in a specific
+location. For example, min version may only be set in the .wakeroot. Both files
+contain JSON5 source where the root object may contain the following keys.
+
+| Key         | Description                                                                 | Required | Type                         | .wakeroot | user config | Default                                                                                     |
+| ----------- | --------------------------------------------------------------------------- | -------- | ---------------------------- | --------- | ----------- | ------------------------------------------------------------------------------------------- |
+| version     | SemVer compatible  with the repo                                            | No       | SemVer string                | Yes       | No          | ""                                                                                          |
+| user_config | Path to user config for this repo. Allows a different config for each repo. | No       | shell expandable path string | Yes       | No          | `$XDG_CONFIG_HOME/wake.json` if `$XDG_CONFIG_HOME` set, `$HOME/.config/wake.json` otherwise |
+
+Below is a full example
+
+```json5
+// .wakeroot
+{
+  "version": "0.31.0",
+  "user_config": "~/.config/wake.myrepo.json"
+}
+
+// ~/.config/wake.myrepo.json
+{
+  // Right now there are no implemented user keys so this file is always empty
+  // This will be updated once log verbosity or another user key is implemented
+}
+```
+
 # Documentation
 
 Documentation for wake can be found in [share/doc/wake](share/doc/wake).

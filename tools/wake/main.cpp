@@ -33,6 +33,7 @@
 #include <set>
 #include <sstream>
 
+#include "config.h"
 #include "describe.h"
 #include "dst/bind.h"
 #include "dst/expr.h"
@@ -157,6 +158,7 @@ void print_help(const char *argv0) {
     << "    --html           Print all wake source files as cross-referenced HTML"       << std::endl
     << "    --globals -g     Print global symbols made available to all wake files"      << std::endl
     << "    --exports -e     Print symbols exported by the selected package (see --in)"  << std::endl
+    << "    --config         Print the configuration parsed from wakeroot and wakerc"    << std::endl
     << "    --help    -h     Print this help message and exit"                           << std::endl
     << std::endl;
     // debug-db, no-optimize, stop-after-* are secret undocumented options
@@ -233,6 +235,7 @@ int main(int argc, char **argv) {
     {0, "html", GOPT_ARGUMENT_FORBIDDEN},
     {0, "timeline", GOPT_ARGUMENT_OPTIONAL},
     {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "config", GOPT_ARGUMENT_FORBIDDEN},
     {0, "debug-db", GOPT_ARGUMENT_FORBIDDEN},
     {0, "stop-after-parse", GOPT_ARGUMENT_FORBIDDEN},
     {0, "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN},
@@ -281,6 +284,7 @@ int main(int argc, char **argv) {
   bool html = arg(options, "html")->count;
   bool global = arg(options, "globals")->count;
   bool help = arg(options, "help")->count;
+  bool config = arg(options, "config")->count;
   bool debugdb = arg(options, "debug-db")->count;
   bool parse = arg(options, "stop-after-parse")->count;
   bool tcheck = arg(options, "stop-after-type-check")->count;
@@ -470,11 +474,23 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // check that the .wakeroot is compatible with the wake version
-  std::string version_check = check_version(workspace, VERSION_STR);
-  if (!version_check.empty()) {
-    std::cerr << ".wakeroot: " << version_check << std::endl;
+  if (!config::init(".wakeroot")) {
     return 1;
+  }
+
+  if (config) {
+    std::cout << *config::get();
+    return 0;
+  }
+
+  // if specified, check that .wakeroot is compatible with the wake version
+  if (config::get()->version != "") {
+    std::string version_check =
+        check_version(workspace, config::get()->version.c_str(), VERSION_STR);
+    if (!version_check.empty()) {
+      std::cerr << ".wakeroot: " << version_check << std::endl;
+      return 1;
+    }
   }
 
   Database db(debugdb);

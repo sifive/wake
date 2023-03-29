@@ -1,0 +1,3 @@
+.wakeroot:1:1: (warning) Key 'not-a-root-key' may not be set in .wakeroot.
+./wake_user.json:1:1: (warning) Key 'version' may not be set in user config but it may be set in .wakeroot.
+./wake_user.json:1:1: (warning) Key 'not-a-key' may not be set in user config.
