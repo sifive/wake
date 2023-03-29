@@ -53,15 +53,15 @@ function update () {
   select = next;
 }
 
-document.onMouseOver = function (that, event) {
-  inner = that;
+function onMouseOver(event) {
+  inner = event.target;
   depth = 0;
   update();
   tooltip.style.cssText = `position: absolute; top: ${event.pageY + 10}px; left: ${event.pageX}px;`;
   event.stopPropagation();
 };
 
-document.onMouseOut = function (that, event) {
+function onMouseOut(event) {
   inner = null;
   depth = 0;
   update();
@@ -89,8 +89,8 @@ function smoothFromTo(fromX, fromY, destX, destY, step) {
     setTimeout(function () { smoothFromTo(fromX, fromY, destX, destY, step+1); }, stepMs);
 }
 
-document.focusOn = function (that, event) {
-  const target = that.getAttribute('href').substring(1);
+function focusOn(event) {
+  const target = event.currentTarget.getAttribute('href').substring(1);
   const where = document.getElementById(target).getBoundingClientRect();
   const fromX = window.scrollX;
   const fromY = window.scrollY;
@@ -104,8 +104,8 @@ document.focusOn = function (that, event) {
   smoothFromTo(fromX, fromY, destX, destY, 1);
 };
 
-document.onMouseClick = function (that, event) {
-  usecss.firstChild.innerHTML = '*[href=\'#' + that.id + '\'] { background-color: red; }';
+function onMouseClick(event) {
+  usecss.firstChild.innerHTML = '*[href=\'#' + event.currentTarget.id + '\'] { background-color: red; }';
   event.stopPropagation();
 };
 
@@ -121,18 +121,18 @@ function render(root) {
 
     if (node.sourceType) {
       res.setAttribute('sourceType', node.sourceType);
-      res.setAttribute('onmouseover', 'onMouseOver(this, event)');
-      res.setAttribute('onmouseout', 'onMouseOut(this, event)');
+      res.addEventListener('mouseover', onMouseOver);
+      res.addEventListener('mouseout', onMouseOut);
     }
 
     if (node.type === 'VarDef' || node.type === 'VarArg') {
       res.setAttribute('id', root.filename + ':' + node.range.join(':'));
-      res.setAttribute('onclick', 'onMouseClick(this, event)');
+      res.addEventListener('click', onMouseClick);
     }
 
     if (node.target) {
       res.setAttribute('href', '#' + node.target.filename + ':' + node.target.range.join(':'));
-      res.setAttribute('onclick', 'focusOn(this, event)');
+      res.addEventListener('click', focusOn);
     }
 
     let pointer = pRange[0];
