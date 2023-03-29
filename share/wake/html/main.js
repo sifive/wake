@@ -198,21 +198,32 @@ function workspace(node) {
 }
 
 function createThemeToggle() {
-  const prefersDark = matchMedia('prefers-color-scheme: dark');
-  document.documentElement.className = prefersDark ? 'dark' : 'light';
+  // If the user previously chose a theme, default to that theme.
+  // Otherwise, check the browser/OS preferences for dark vs. light theme.
+  let colorTheme = window.localStorage?.getItem('wakeColorTheme');
+  colorTheme ||= matchMedia('prefers-color-scheme: dark') ? 'dark' : 'light';
+
+  document.documentElement.className = colorTheme;
 
   const themeToggle = document.createElement('div');
   themeToggle.innerHTML = `
-    <label>Light<input type="radio" name="style" value="light"${prefersDark ? '' : ' checked'}>
-    <label>Dark<input type="radio" name="style" value="dark"${prefersDark ? ' checked' : ''}>
+    <label>Light<input type="radio" name="style" value="light">
+    <label>Dark<input type="radio" name="style" value="dark">
   `;
 
   const onChange = (e) => {
     e.preventDefault();
     document.documentElement.className = e.target.value;
+    window.localStorage?.setItem('wakeColorTheme', e.target.value);
   }
   themeToggle.querySelectorAll('input')
-    .forEach(e => e.addEventListener('change', onChange));
+    .forEach(elem => {
+      elem.addEventListener('change', onChange);
+
+      if (elem.value === colorTheme) {
+        elem.checked = true;
+      }
+    });
 
   themeToggle.style.position = 'fixed';
   themeToggle.style.top = '10px';
