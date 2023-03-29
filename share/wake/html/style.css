@@ -14,9 +14,27 @@
  * limitations under the License.
  */
 
+:root {
+  /* Foreground colors */
+  --color-default: white;
+  --color-program: #999;
+  --color-var-ref: white;
+  --color-var-def: #ee3;
+  --color-var-arg: #55f;
+  --color-prim: yellow;
+  --color-literal: pink;
+
+  /* Background colors */
+  --color-background: black;
+  --color-tooltip-background: #333;
+  --color-focus-background: green;
+  --color-sourcetype-background: hsla(0, 100%, 100%, 0.1);
+  --color-highlight-usedef-background: red;
+}
+
 body {
   hyphens: auto;
-  background-color: black;
+  background-color: var(--color-background);
   font-family: 'Roboto', sans-serif;
 }
 
@@ -25,22 +43,24 @@ th,td {
   border: 1px solid #000;
 }
 
-div { color: white; }
+div { color: var(--color-default); }
 
 pre {
   /* font-family: 'IBM Plex Mono', monospace; */
   font-family: 'Roboto Mono', monospace;
 }
 
-.Program    { color: #999; }
-.VarRef     { color: white; }
-.VarDef     { color: #ee3; }
-.VarArg     { color: #55f; }
-.Prim       { color: yellow; }
-.Literal    { color: pink; }
+.Program    { color: var(--color-program); }
+.VarRef     { color: var(--color-var-ref); }
+.VarDef     { color: var(--color-var-def); }
+.VarArg     { color: var(--color-var-arg); }
+.Prim       { color: var(--color-prim); }
+.Literal    { color: var(--color-literal); }
 
-*[sourceType]:hover { background-color: hsla(0, 100%, 100%, 0.1); }
-*[focus='true']:hover { background-color: green; }
+.sourceType:hover { background-color: var(--color-sourcetype-background); }
+.focus:hover { background-color: var(--color-focus-background); }
+
+.highlightUseDef { background-color: var(--color-highlight-usedef-background); }
 
 .tooltip {
   display: block;
@@ -48,7 +68,10 @@ pre {
   z-index: 5;
   position: absolute;
   min-width: 200px;
-  background-color: #333;
+  background-color: var(--color-tooltip-background);
+}
+.tooltip.hidden {
+  visibility: hidden;
 }
 
 a:link {

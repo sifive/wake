@@ -19,21 +19,32 @@
 // tooltip
 const tooltip = document.createElement('div');
 tooltip.classList.add('tooltip');
-tooltip.style.visibility = 'hidden';
+tooltip.classList.add('hidden');
 
-// css to select uses
-const usecss = document.createElement('div');
-usecss.appendChild(document.createElement('style'));
+// The following variables encompass the state for expression selection mode,
+// where pressing + or - on the keyboard while the mouse is hovering over an
+// expression will allow one to select parent or child expressions, which
+// affects the type shown in the tooltip.
 
+/** The current expression selection depth. */
 let depth = 0;
+/** The inner-most (depth 0) element in the expression tree. */
 let inner = null;
+/** The currently-selected element in the expression tree. */
 let select = null;
 
+/** Update the currently selected expression.
+ *
+ * The global variables `depth` and `inner` are essentially the arguments to the
+ * function, used to determine which expression should be selected. `inner` is
+ * the smallest expression that the mouse is hovering over. `depth` is how many
+ * parent expressions to walk up.
+ */
 function update () {
   let next = inner;
   for (let i = 0; i < depth; ++i) {
-    let parent = next.parentElement;
-    if (!parent.getAttribute('sourceType')) {
+    let parent = next?.parentElement;
+    if (!parent?.dataset?.sourceType) {
       depth = i;
       break;
     }
@@ -41,27 +52,28 @@ function update () {
   }
   if (next != select) {
     if (select) {
-      select.removeAttribute('focus');
-      tooltip.style.visibility = 'hidden';
+      select.classList.remove('focus');
+      tooltip.classList.add('hidden');
     }
     if (next) {
-      next.setAttribute('focus', 'true');
-      tooltip.style.visibility = 'visible';
-      tooltip.innerHTML = next.getAttribute('sourceType');
+      next.classList.add('focus');
+      tooltip.classList.remove('hidden');
+      tooltip.innerHTML = next.dataset.sourceType;
     }
   }
   select = next;
 }
 
-document.onMouseOver = function (that, event) {
-  inner = that;
+function onMouseOver(event) {
+  inner = event.target;
   depth = 0;
   update();
-  tooltip.style.cssText = `position: absolute; top: ${event.pageY + 10}px; left: ${event.pageX}px;`;
+  tooltip.style.top = `${event.pageY + 10}px`;
+  tooltip.style.left = `${event.pageX}px`;
   event.stopPropagation();
 };
 
-document.onMouseOut = function (that, event) {
+function onMouseOut(event) {
   inner = null;
   depth = 0;
   update();
@@ -69,9 +81,9 @@ document.onMouseOut = function (that, event) {
 };
 
 document.addEventListener('keypress', function(event) {
-  const char = event.which || event.keyCode;
-  if (char === 43 || char == 61) { ++depth; update(); }
-  if ((char === 45 || char == 95) && depth > 0) { --depth; update(); }
+  const char = event.key;
+  if (char === '+' || char === '=') { ++depth; update(); }
+  if ((char === '-' || char === '_') && depth > 0) { --depth; update(); }
 }, true);
 
 function smoothFromTo(fromX, fromY, destX, destY, step) {
@@ -89,23 +101,31 @@ function smoothFromTo(fromX, fromY, destX, destY, step) {
     setTimeout(function () { smoothFromTo(fromX, fromY, destX, destY, step+1); }, stepMs);
 }
 
-document.focusOn = function (that, event) {
-  const target = that.getAttribute('href').substring(1);
+function resetUseDefHighlights() {
+  document.querySelectorAll('.highlightUseDef')
+    .forEach(e => e.classList.remove('highlightUseDef'));
+}
+
+function focusOn(event) {
+  const target = event.currentTarget.getAttribute('href').substring(1);
   const where = document.getElementById(target).getBoundingClientRect();
   const fromX = window.scrollX;
   const fromY = window.scrollY;
   const destX = (where.left + where.right  - window.innerWidth)  / 2 + fromX;
   const destY = (where.top  + where.bottom - window.innerHeight) / 2 + fromY;
 
-  usecss.firstChild.innerHTML = '*[id=\'' + target + '\'] { background-color: red; }';
+  resetUseDefHighlights();
+  document.getElementById(target).classList.add('highlightUseDef');
   window.location.hash = target;
   event.preventDefault();
 
   smoothFromTo(fromX, fromY, destX, destY, 1);
 };
 
-document.onMouseClick = function (that, event) {
-  usecss.firstChild.innerHTML = '*[href=\'#' + that.id + '\'] { background-color: red; }';
+function onMouseClick(event) {
+  resetUseDefHighlights();
+  document.querySelectorAll(`*[href='#${event.currentTarget.id}']`)
+    .forEach(e => e.classList.add('highlightUseDef'));
   event.stopPropagation();
 };
 
@@ -117,22 +137,23 @@ function render(root) {
     const body = node.body;
 
     let res = document.createElement(node.target ? 'a' : 'span');
-    res.setAttribute('class', node.type);
+    res.classList.add(node.type);
 
     if (node.sourceType) {
-      res.setAttribute('sourceType', node.sourceType);
-      res.setAttribute('onmouseover', 'onMouseOver(this, event)');
-      res.setAttribute('onmouseout', 'onMouseOut(this, event)');
+      res.dataset.sourceType = node.sourceType;
+      res.classList.add('sourceType');
+      res.addEventListener('mouseover', onMouseOver);
+      res.addEventListener('mouseout', onMouseOut);
     }
 
     if (node.type === 'VarDef' || node.type === 'VarArg') {
-      res.setAttribute('id', root.filename + ':' + node.range.join(':'));
-      res.setAttribute('onclick', 'onMouseClick(this, event)');
+      res.id = root.filename + ':' + node.range.join(':');
+      res.addEventListener('click', onMouseClick);
     }
 
     if (node.target) {
-      res.setAttribute('href', '#' + node.target.filename + ':' + node.target.range.join(':'));
-      res.setAttribute('onclick', 'focusOn(this, event)');
+      res.href = '#' + node.target.filename + ':' + node.target.range.join(':');
+      res.addEventListener('click', focusOn);
     }
 
     let pointer = pRange[0];
@@ -177,15 +198,10 @@ function workspace(node) {
 }
 
 document.addEventListener('DOMContentLoaded', function main () {
-  document.body.appendChild(usecss);
   document.body.appendChild(tooltip);
-  var points = document.querySelectorAll('*');
-  for (let point of points) {
-    if (point.type === 'wake') {
-      const node = JSON.parse(point.innerHTML);
-      document.body.appendChild(workspace(node));
-    }
-  }
+  const wakeData = document.getElementById('wake-data');
+  const node = JSON.parse(wakeData.text);
+  document.body.appendChild(workspace(node));
 });
 
 /* eslint-env browser */

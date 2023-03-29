@@ -195,6 +195,10 @@ void markup_html(const std::string &libdir, std::ostream &os, Expr *root) {
   std::ifstream style(find_execpath() + "/../share/wake/html/style.css");
   std::ifstream utf8(find_execpath() + "/../share/wake/html/utf8.js");
   std::ifstream main(find_execpath() + "/../share/wake/html/main.js");
+  os << "<!DOCTYPE html>" << std::endl;
+  os << "<html lang=\"en\">" << std::endl;
+  os << "<head>" << std::endl;
+  os << "<title>Wake Annotated Source Code</title>" << std::endl;
   os << "<meta charset=\"UTF-8\">" << std::endl;
   os << "<style type=\"text/css\">" << std::endl;
   os << style.rdbuf();
@@ -205,9 +209,12 @@ void markup_html(const std::string &libdir, std::ostream &os, Expr *root) {
   os << "<script type=\"text/javascript\">" << std::endl;
   os << main.rdbuf();
   os << "</script>" << std::endl;
-  os << "<script type=\"wake\">";
+  os << "<script id=\"wake-data\" type=\"application/json\">";
   JSONRender(libdir, os).render(root);
   os << "</script>" << std::endl;
+  os << "</head>" << std::endl;
+  os << "<body></body>" << std::endl;
+  os << "</html>" << std::endl;
 }
 
 void format_reexports(std::ostream &os, const char *package, const char *kind,
