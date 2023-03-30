@@ -299,7 +299,7 @@ TEST(filepath_dir_range_basic) {
   size_t counter = 0;
   for (auto entry : *dir_range) {
     // First assert that the entry has no error
-    ASSERT_TRUE((bool)entry) << "entry: " << entry->name << std::endl;
+    ASSERT_TRUE((bool)entry) << "entry: " << entry->name;
 
     // Now check the type if we can
     EXPECT_TRUE((bool)expected_type.count(entry->name));
