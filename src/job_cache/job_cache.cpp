@@ -39,9 +39,8 @@
 #include <wcl/defer.h>
 #include <wcl/filepath.h>
 #include <wcl/trie.h>
-#include <wcl/xoshiro_256.h>
 #include <wcl/unique_fd.h>
-
+#include <wcl/xoshiro_256.h>
 
 #include <algorithm>
 #include <future>
