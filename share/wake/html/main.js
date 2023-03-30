@@ -197,11 +197,47 @@ function workspace(node) {
   return res;
 }
 
+function createThemeToggle() {
+  // If the user previously chose a theme, default to that theme.
+  // Otherwise, check the browser/OS preferences for dark vs. light theme.
+  let colorTheme = window.localStorage?.getItem('wakeColorTheme');
+  colorTheme ||= matchMedia('prefers-color-scheme: dark') ? 'dark' : 'light';
+
+  document.documentElement.className = colorTheme;
+
+  const themeToggle = document.createElement('div');
+  themeToggle.innerHTML = `
+    <label>Light<input type="radio" name="style" value="light" /></label>
+    <label>Dark<input type="radio" name="style" value="dark" /></label>
+  `;
+
+  const onChange = (e) => {
+    e.preventDefault();
+    document.documentElement.className = e.target.value;
+    window.localStorage?.setItem('wakeColorTheme', e.target.value);
+  }
+  themeToggle.querySelectorAll('input')
+    .forEach(elem => {
+      elem.addEventListener('change', onChange);
+
+      if (elem.value === colorTheme) {
+        elem.checked = true;
+      }
+    });
+
+  themeToggle.style.position = 'fixed';
+  themeToggle.style.top = '10px';
+  themeToggle.style.right = '10px';
+
+  return themeToggle;
+}
+
 document.addEventListener('DOMContentLoaded', function main () {
   document.body.appendChild(tooltip);
   const wakeData = document.getElementById('wake-data');
   const node = JSON.parse(wakeData.text);
   document.body.appendChild(workspace(node));
+  document.body.appendChild(createThemeToggle());
 });
 
 /* eslint-env browser */

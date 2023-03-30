@@ -16,20 +16,38 @@
 
 :root {
   /* Foreground colors */
-  --color-default: white;
-  --color-program: #999;
-  --color-var-ref: white;
-  --color-var-def: #ee3;
-  --color-var-arg: #55f;
-  --color-prim: yellow;
-  --color-literal: pink;
+  --color-default: #1c1735;
+  --color-program: #5f588a;
+  --color-var-ref: #1c1735;
+  --color-var-def: #895400;
+  --color-var-arg: #0056b5;
+  --color-prim: #5e6500;
+  --color-literal: #70007f;
 
   /* Background colors */
-  --color-background: black;
-  --color-tooltip-background: #333;
-  --color-focus-background: green;
+  --color-background: #f1f0f6;
+  --color-tooltip-background: #c6c5d2;
+  --color-focus-background: #a2d491;
+  --color-sourcetype-background: hsla(0, 100%, 0%, 0.1);
+  --color-highlight-usedef-background: #f68ba2;
+}
+
+:root.dark {
+  /* Foreground colors */
+  --color-default: #e2e0f4;
+  --color-program: #918bbc;
+  --color-var-ref: #e2e0f4;
+  --color-var-def: #f1bf51;
+  --color-var-arg: #65aeff;
+  --color-prim: #c6ce3e;
+  --color-literal: #fea7ff;
+
+  /* Background colors */
+  --color-background: #1c1a24;
+  --color-tooltip-background: #302e44;
+  --color-focus-background: #005600;
   --color-sourcetype-background: hsla(0, 100%, 100%, 0.1);
-  --color-highlight-usedef-background: red;
+  --color-highlight-usedef-background: #88193d;
 }
 
 body {
