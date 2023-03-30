@@ -1140,7 +1140,9 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
 
       // Finally copy the file (as efficently as we can) to
       // the destination.
-      copy_or_reflink(tmp_file.c_str(), pair.first.c_str(), mode);
+      std::string tmp_dst = pair.first + "." + rng.unique_name();
+      copy_or_reflink(tmp_file.c_str(), tmp_dst.c_str(), mode);
+      rename_no_fail(tmp_dst.c_str(), pair.first.c_str());
     }
 
     // Now create all the symlinks
