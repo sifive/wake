@@ -182,9 +182,10 @@ static void copy(int src_fd, int dst_fd) {
 
 #ifdef FICLONE
 
-static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644) {
+static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644,
+                            int extra_flags = 0) {
   auto src_fd = UniqueFd::open(src, O_RDONLY);
-  auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT, mode);
+  auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT | extra_flags, mode);
 
   if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
     if (errno != EINVAL && errno != EOPNOTSUPP && errno != EXDEV) {
@@ -196,9 +197,10 @@ static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644
 
 #else
 
-static mode_t copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644) {
+static mode_t copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644,
+                              int extra_flags = 0) {
   auto src_fd = UniqueFd::open(src, O_RDONLY);
-  auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT, 0644);
+  auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT | extra_flags, 0644);
 
   copy(src_fd.get(), dst_fd.get());
 
@@ -1140,7 +1142,9 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
 
       // Finally copy the file (as efficently as we can) to
       // the destination.
-      copy_or_reflink(tmp_file.c_str(), pair.first.c_str(), mode);
+      std::string tmp_dst = pair.first + "." + rng.unique_name();
+      copy_or_reflink(tmp_file.c_str(), tmp_dst.c_str(), mode, O_EXCL);
+      rename_no_fail(tmp_dst.c_str(), pair.first.c_str());
     }
 
     // Now create all the symlinks
