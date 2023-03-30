@@ -15,10 +15,16 @@
  * limitations under the License.
  */
 
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <wcl/filepath.h>
 #include <wcl/xoshiro_256.h>
 
+#include <fstream>
+#include <map>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -235,4 +241,89 @@ TEST(filepath_make_canonical) {
   EXPECT_EQUAL(wcl::make_canonical("hax/"), "hax");
   EXPECT_EQUAL(wcl::make_canonical("foo/.././bar.z"), "bar.z");
   EXPECT_EQUAL(wcl::make_canonical("foo/../../bar.z"), "../bar.z");
+}
+
+TEST(filepath_dir_range_empty) {
+  ASSERT_TRUE(mkdir("test_dir", 0777) >= 0);
+  auto dir_range = wcl::directory_range::open("test_dir");
+  ASSERT_TRUE((bool)dir_range);
+  for (auto entry : *dir_range) {
+    if (entry && entry->name == ".") continue;
+    if (entry && entry->name == "..") continue;
+    // First assert that the entry has no error
+    ASSERT_TRUE((bool)entry);
+    // Now assert that we shouldn't have found this in the first place!
+    EXPECT_TRUE(false) << " found entry '" << entry->name << "' but epected nothing";
+  }
+  ASSERT_TRUE(rmdir("test_dir") >= 0);
+}
+
+TEST(filepath_dir_range_basic) {
+  // We need a clean dir for our tests
+  ASSERT_TRUE(mkdir("test_dir", 0777) >= 0);
+
+  std::map<std::string, wcl::file_type> expected_type;
+  expected_type["."] = wcl::file_type::directory;
+  expected_type[".."] = wcl::file_type::directory;
+
+  auto touch = [&](std::string entry) {
+    std::ofstream file("test_dir/" + entry);
+    file << " ";
+    file.close();
+    expected_type[entry] = wcl::file_type::regular;
+  };
+
+  auto touch_dir = [&](std::string entry) {
+    std::string dir = "test_dir/" + entry;
+    mkdir(dir.c_str(), 0777);
+    expected_type[entry] = wcl::file_type::directory;
+  };
+
+  auto touch_sym = [&](std::string entry) {
+    std::string path = "test_dir/" + entry;
+    symlink("touch", path.c_str());
+    expected_type[entry] = wcl::file_type::symlink;
+  };
+
+  touch("test1.txt");
+  touch("test2.txt");
+  touch("test3.txt");
+  touch_dir("test1");
+  touch_dir("test2");
+  touch_dir("test3");
+  touch_sym("sym1");
+  touch_sym("sym2");
+
+  auto dir_range = wcl::directory_range::open("test_dir");
+  ASSERT_TRUE((bool)dir_range);
+  size_t counter = 0;
+  for (auto entry : *dir_range) {
+    // First assert that the entry has no error
+    ASSERT_TRUE((bool)entry) << "entry: " << entry->name;
+
+    // Now check the type if we can
+    EXPECT_TRUE((bool)expected_type.count(entry->name));
+    if (expected_type.count(entry->name)) {
+      EXPECT_EQUAL(expected_type[entry->name], entry->type) << " on entry '" << entry->name << "'";
+    }
+
+    // And record how many files we found to make sure we found
+    // everything we expected
+    counter++;
+  }
+
+  EXPECT_EQUAL(expected_type.size(), counter);
+
+  // Now clean up
+  for (auto entry : expected_type) {
+    if (entry.first == ".") continue;
+    if (entry.first == "..") continue;
+    std::string path = "test_dir/" + entry.first;
+    if (entry.second == wcl::file_type::directory) {
+      ASSERT_TRUE(rmdir(path.c_str()) >= 0) << "on entry '" << entry.first << "'";
+    } else {
+      ASSERT_TRUE(unlink(path.c_str()) >= 0) << "on entry '" << entry.first << "'";
+    }
+  }
+  rmdir("test_dir");
 }

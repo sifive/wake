@@ -188,6 +188,36 @@ struct TestLogger {
     return fail(*err, assert);
   }
 
+  TestStream expect_equal(bool assert, size_t expected, size_t actual, const char* expected_str,
+                          const char* actual_str, int line, const char* file) {
+    if (expected == actual) return TestStream(nullptr, nullptr);
+    errors.emplace_back(new ErrorMessage);
+    auto& err = errors.back();
+    err->test_name = test_name;
+    err->file = file;
+    err->line = line;
+    err->predicate_error << "Expected:\n\t" << term_colour(TERM_MAGENTA) << expected;
+    err->predicate_error << term_normal() << "\nBut got:\n\t";
+    err->predicate_error << term_colour(TERM_MAGENTA) << actual;
+    err->predicate_error << term_normal() << std::endl;
+    return fail(*err, assert);
+  }
+
+  TestStream expect_equal(bool assert, int64_t expected, int64_t actual, const char* expected_str,
+                          const char* actual_str, int line, const char* file) {
+    if (expected == actual) return TestStream(nullptr, nullptr);
+    errors.emplace_back(new ErrorMessage);
+    auto& err = errors.back();
+    err->test_name = test_name;
+    err->file = file;
+    err->line = line;
+    err->predicate_error << "Expected:\n\t" << term_colour(TERM_MAGENTA) << expected;
+    err->predicate_error << term_normal() << "\nBut got:\n\t";
+    err->predicate_error << term_colour(TERM_MAGENTA) << actual;
+    err->predicate_error << term_normal() << std::endl;
+    return fail(*err, assert);
+  }
+
   TestStream expect_equal(bool assert, std::string expected, std::string actual,
                           const char* expected_str, const char* actual_str, int line,
                           const char* file) {
