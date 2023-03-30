@@ -1,0 +1,8 @@
+export def test (_: List String): Result (List String) Error =
+    require Some payload = getenv "PAYLOAD"
+    else failWithError "$PAYLOAD was not set"
+    require Pass outputs =
+        makePlan "basic_test" Nil "echo {payload} > test.txt"
+        | runJob
+        | getJobOutputs
+    Pass (map (_.getPathName) outputs)
