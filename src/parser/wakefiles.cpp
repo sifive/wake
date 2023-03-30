@@ -245,9 +245,7 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
       profile->start = now;
       profile->alerted_user = true;
 
-      fprintf(profile->dest,
-              "Finding wake files is taking longer than expected. Kernel file cache may be cold. "
-              "(%ld explored).\r",
+      fprintf(profile->dest, "Finding wake files is taking longer than expected (%ld explored).\r",
               profile->explored);
       fflush(profile->dest);
     }
