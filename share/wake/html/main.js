@@ -207,8 +207,8 @@ function createThemeToggle() {
 
   const themeToggle = document.createElement('div');
   themeToggle.innerHTML = `
-    <label>Light<input type="radio" name="style" value="light">
-    <label>Dark<input type="radio" name="style" value="dark">
+    <label>Light<input type="radio" name="style" value="light" /></label>
+    <label>Dark<input type="radio" name="style" value="dark" /></label>
   `;
 
   const onChange = (e) => {
