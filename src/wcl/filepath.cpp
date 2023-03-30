@@ -71,6 +71,7 @@ void directory_iterator::step() {
   dirent *entry = readdir(dir);
   if (entry == nullptr && errno != 0) {
     value = some(make_errno<directory_entry>());
+    return;
   }
 
   // if errno is still zero but entry == nullptr then
@@ -83,17 +84,18 @@ void directory_iterator::step() {
     // This mimics what would happen if you called readdir again
     // after passing the end of the DIR
     value = some(make_error<directory_entry, posix_error_t>(EBADF));
+    return;
   }
 
   // Now that we have a good entry we need to construct
   // the wrapper
   directory_entry out;
-  out.entry_name = entry->d_name;
+  out.name = entry->d_name;
 
   // d_name might be missing so we stat if that
   // occurs.
   if (entry->d_type == DT_UNKNOWN) {
-    std::string path = join_paths(dir_path, out.entry_name);
+    std::string path = join_paths(dir_path, out.name);
     struct stat buf;
     stat(path.c_str(), &buf);
     out.type = stat_type_conv(buf.st_mode);
@@ -101,7 +103,6 @@ void directory_iterator::step() {
     out.type = dir_type_conv(entry->d_type);
   }
 
-  // finally if there's nothing holding us back set the value
   value = some(make_result<directory_entry, posix_error_t>(std::move(out)));
 }
 
