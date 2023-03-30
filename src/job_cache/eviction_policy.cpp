@@ -19,6 +19,8 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include "eviction_policy.h"
+
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
@@ -28,36 +30,7 @@
 #include <memory>
 #include <vector>
 
-#include "eviction_policy.h"
-#include "gopt/gopt-arg.h"
-#include "gopt/gopt.h"
-#include "job_cache/eviction_command.h"
-
-void print_help(const char* argv0) {
-  // clang-format off
-  std::cerr << std::endl
-     << "Usage: " << argv0 << " [OPTIONS]" << std::endl
-     << "  --cache  DIR     Evict from shared cache DIR"  << std::endl
-     << "  --policy POLICY  Evict using POLICY"           << std::endl
-     << "  --help   -h      Print this message and exit"  << std::endl
-     << "Commands (read from stdin):" << std::endl
-     << "  write JOB_ID     JOB_ID was written into the shared cache" << std::endl
-     << "  read JOB_ID      JOB_ID was read from the shared cache" << std::endl
-     << "Available Policies:" << std::endl
-     << "  nil              No op policy. Process commands but do nothing." << std::endl
-     << std::endl;
-  // clang-format on
-}
-
-std::unique_ptr<EvictionPolicy> make_policy(const char* argv0, const char* policy) {
-  if (strcmp(policy, "nil") == 0) {
-    return std::make_unique<NilEvictionPolicy>();
-  }
-
-  std::cerr << "Unknown policy: " << policy << std::endl;
-  print_help(argv0);
-  exit(EXIT_FAILURE);
-}
+#include "eviction_command.h"
 
 enum class CommandParserState { Continue, StopSuccess, StopFail };
 
@@ -107,41 +80,7 @@ struct CommandParser {
   }
 };
 
-int main(int argc, char** argv) {
-  // clang-format off
-  struct option options[] {
-    {0, "cache", GOPT_ARGUMENT_REQUIRED},
-    {0, "policy", GOPT_ARGUMENT_REQUIRED},
-    {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
-    {0, 0, GOPT_LAST}
-  };
-  // clang-format on
-
-  argc = gopt(argv, options);
-  gopt_errors(argv[0], options);
-
-  bool help = arg(options, "help")->count;
-  const char* cache = arg(options, "cache")->argument;
-  const char* policy_name = arg(options, "policy")->argument;
-
-  if (help) {
-    print_help(argv[0]);
-    exit(EXIT_SUCCESS);
-  }
-
-  if (!cache) {
-    std::cerr << "Cache directory not specified" << std::endl;
-    print_help(argv[0]);
-    exit(EXIT_FAILURE);
-  }
-
-  if (!policy_name) {
-    std::cerr << "Eviction policy not specified" << std::endl;
-    print_help(argv[0]);
-    exit(EXIT_FAILURE);
-  }
-
-  std::unique_ptr<EvictionPolicy> policy = make_policy(argv[0], policy_name);
+int eviction_loop(std::unique_ptr<EvictionPolicy> policy) {
   policy->init();
 
   CommandParser cmd_parser;
@@ -151,17 +90,17 @@ int main(int argc, char** argv) {
     state = cmd_parser.read_commands(cmds);
 
     for (const auto& c : cmds) {
-      EvictionCommand cmd;
-      if (!EvictionCommand::parse(c, cmd)) {
+      auto cmd = EvictionCommand::parse(c);
+      if (!cmd) {
         exit(EXIT_FAILURE);
       }
 
-      switch (cmd.type) {
+      switch (cmd->type) {
         case EvictionCommandType::Read:
-          policy->read(cmd.job_id);
+          policy->read(cmd->job_id);
           break;
         case EvictionCommandType::Write:
-          policy->write(cmd.job_id);
+          policy->write(cmd->job_id);
           break;
         default:
           std::cerr << "Unhandled command type" << std::endl;
