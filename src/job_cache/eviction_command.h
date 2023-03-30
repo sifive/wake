@@ -36,18 +36,18 @@ struct EvictionCommand {
   EvictionCommand() {}
   EvictionCommand(EvictionCommandType type, int job_id) : type(type), job_id(job_id) {}
 
-  static bool parse(const std::string& str, EvictionCommand& out) {
+  static wcl::optional<EvictionCommand> parse(const std::string& str) {
     JAST json;
     std::stringstream parse_errors;
     if (!JAST::parse(str, parse_errors, json)) {
       std::cerr << "Failed to parse json command: " << parse_errors.str() << std::endl;
-      return false;
+      return {};
     }
 
     const JAST& command = json.get("command");
     if (command.kind != JSON_STR) {
       std::cerr << "Expected string for 'command' key" << std::endl;
-      return false;
+      return {};
     }
 
     const std::string& command_str = command.value;
@@ -60,18 +60,16 @@ struct EvictionCommand {
     } else {
       std::cerr << "Invalid value for 'command' key. Expected: 'read' | 'write', saw "
                 << command_str << std::endl;
-      return false;
+      return {};
     }
 
     const JAST& job_id = json.get("job_id");
     if (job_id.kind != JSON_INTEGER) {
       std::cerr << "Expected integer for 'job_id' key" << std::endl;
-      return false;
+      return {};
     }
 
-    out = {type, std::stoi(job_id.value)};
-
-    return true;
+    return wcl::some(EvictionCommand{type, std::stoi(job_id.value)});
   }
 
   std::string serialize() {

@@ -51,6 +51,7 @@
 #include <unordered_map>
 
 #include "eviction_command.h"
+#include "eviction_policy.h"
 #include "logging.h"
 
 namespace {
@@ -1360,10 +1361,10 @@ void Cache::launch_evict_tool() {
     close(stdoutPipe[read_side]);
     close(stdoutPipe[write_side]);
 
-    std::string evict = wcl::make_canonical(find_execpath() + "/evict-shared-cache");
-    execl(evict.c_str(), "evict-shared-cache", "--cache", "not-a-dir", "--policy", "nil", nullptr);
-    std::cerr << "exec(" << evict << "): " << strerror(errno) << std::endl;
-    exit(EXIT_FAILURE);
+    // Finally enter the eviction loop, if it exits cleanly
+    // go ahead and exit with its result.
+    int result = eviction_loop(std::make_unique<NilEvictionPolicy>());
+    exit(result);
   }
 
   // parent

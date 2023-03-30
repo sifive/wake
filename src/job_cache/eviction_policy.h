@@ -22,6 +22,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <iostream>
+#include <memory>
 #include <string>
 
 struct EvictionPolicy {
@@ -42,3 +43,5 @@ struct NilEvictionPolicy : EvictionPolicy {
     std::cerr << "NilEvictionPolicy::write(" << id << ")" << std::endl;
   }
 };
+
+int eviction_loop(std::unique_ptr<EvictionPolicy> policy);
