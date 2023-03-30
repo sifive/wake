@@ -39,8 +39,6 @@
 #include "dst/bind.h"
 #include "dst/expr.h"
 #include "dst/todst.h"
-#include "gopt/gopt-arg.h"
-#include "gopt/gopt.h"
 #include "job_cache/job_cache.h"
 #include "markup.h"
 #include "optimizer/ssa.h"
@@ -189,16 +187,16 @@ class TerminalReporter : public DiagnosticReporter {
   }
 };
 
-int main(int argcTMP, char **argvTMP) {
+int main(int argc, char **argv) {
   auto start = std::chrono::steady_clock::now();
 
   TerminalReporter terminalReporter;
   reporter = &terminalReporter;
 
-  std::string original_command_line = shell_escape(argvTMP[0]);
-  for (int i = 1; i < argcTMP; ++i) original_command_line += " " + shell_escape(argvTMP[i]);
+  std::string original_command_line = shell_escape(argv[0]);
+  for (int i = 1; i < argc; ++i) original_command_line += " " + shell_escape(argv[i]);
 
-  CommandLineOptions clo(argcTMP, argvTMP);
+  CommandLineOptions clo(argc, argv);
 
   if (clo.help) {
     print_help(clo.argv[0]);
