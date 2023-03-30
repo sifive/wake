@@ -182,7 +182,8 @@ static void copy(int src_fd, int dst_fd) {
 
 #ifdef FICLONE
 
-static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644, int extra_flags = 0) {
+static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644,
+                            int extra_flags = 0) {
   auto src_fd = UniqueFd::open(src, O_RDONLY);
   auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT | extra_flags, mode);
 
@@ -196,7 +197,8 @@ static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644
 
 #else
 
-static mode_t copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644, int extra_flags = 0) {
+static mode_t copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644,
+                              int extra_flags = 0) {
   auto src_fd = UniqueFd::open(src, O_RDONLY);
   auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT | extra_flags, 0644);
 
