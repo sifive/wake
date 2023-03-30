@@ -40,6 +40,8 @@
 #include <wcl/filepath.h>
 #include <wcl/trie.h>
 #include <wcl/xoshiro_256.h>
+#include <wcl/unique_fd.h>
+
 
 #include <algorithm>
 #include <future>
@@ -51,7 +53,6 @@
 
 #include "eviction_command.h"
 #include "logging.h"
-#include "unique_fd.h"
 
 namespace {
 
@@ -184,14 +185,21 @@ static void copy(int src_fd, int dst_fd) {
 
 static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644,
                             int extra_flags = 0) {
-  auto src_fd = UniqueFd::open(src, O_RDONLY);
-  auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT | extra_flags, mode);
+  auto src_fd = wcl::unique_fd::open(src, O_RDONLY);
+  if (!src_fd) {
+    log_fatal("open(%s): %s", src, strerror(src_fd.error()));
+  }
 
-  if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
+  auto dst_fd = wcl::unique_fd::open(dst, O_WRONLY | O_CREAT | extra_flags, mode);
+  if (!dst_fd) {
+    log_fatal("open(%s): %s", dst, strerror(dst_fd.error()));
+  }
+
+  if (ioctl(dst_fd->get(), FICLONE, src_fd->get()) < 0) {
     if (errno != EINVAL && errno != EOPNOTSUPP && errno != EXDEV) {
       log_fatal("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
     }
-    copy(src_fd.get(), dst_fd.get());
+    copy(src_fd->get(), dst_fd->get());
   }
 }
 
@@ -199,10 +207,17 @@ static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644
 
 static mode_t copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644,
                               int extra_flags = 0) {
-  auto src_fd = UniqueFd::open(src, O_RDONLY);
-  auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT | extra_flags, 0644);
+  auto src_fd = wcl::unique_fd::open(src, O_RDONLY);
+  if (!src_fd) {
+    log_fatal("open(%s): %s", src, strerror(src_fd.error()));
+  }
 
-  copy(src_fd.get(), dst_fd.get());
+  auto dst_fd = wcl::unique_fd::open(dst, O_WRONLY | O_CREAT | extra_flags, mode);
+  if (!dst_fd) {
+    log_fatal("open(%s): %s", dst, strerror(dst_fd.error()));
+  }
+
+  copy(src_fd->get(), dst_fd->get());
 
   return mode;
 }
@@ -951,8 +966,11 @@ AddJobRequest::AddJobRequest(const JAST &job_result_json) {
     OutputFile output;
     output.source = output_file.second.get("src").value;
     output.path = output_file.second.get("path").value;
-    auto fd = UniqueFd::open(output.source.c_str(), O_RDONLY);
-    output.hash = do_hash_file(output.source.c_str(), fd.get());
+    auto fd = wcl::unique_fd::open(output.source.c_str(), O_RDONLY);
+    if (!fd) {
+      log_fatal("open(%s): %s", output.source.c_str(), strerror(fd.error()));
+    }
+    output.hash = do_hash_file(output.source.c_str(), fd->get());
     output.mode = buf.st_mode;
     outputs.emplace_back(std::move(output));
   }
