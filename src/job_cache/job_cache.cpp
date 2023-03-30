@@ -184,7 +184,7 @@ static void copy(int src_fd, int dst_fd) {
 
 static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644) {
   auto src_fd = UniqueFd::open(src, O_RDONLY);
-  auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT, mode);
+  auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT | O_EXCL, mode);
 
   if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
     if (errno != EINVAL && errno != EOPNOTSUPP && errno != EXDEV) {
