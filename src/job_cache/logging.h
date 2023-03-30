@@ -48,6 +48,16 @@ void log_info(Args &&...args) {
   fflush(stdout);
 }
 
+// A logging function for logging to stderr but
+// without exiting
+template <class... Args>
+void log_warning(Args &&...args) {
+  log_header(stderr);
+  fprintf(stderr, args...);
+  fprintf(stderr, "\n");
+  fflush(stderr);
+}
+
 // A logging function for logging and then exiting with
 // a failure code.
 template <class... Args>
