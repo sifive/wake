@@ -15,19 +15,18 @@
  * limitations under the License.
  */
 
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <wcl/filepath.h>
 #include <wcl/xoshiro_256.h>
 
-#include <sys/stat.h>
-#include <unistd.h>
-#include <string.h>
-
+#include <fstream>
+#include <map>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
-#include <map>
-#include <set>
-#include <fstream>
 
 #include "unit.h"
 
