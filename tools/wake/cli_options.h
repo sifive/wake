@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "gopt/gopt-arg.h"
@@ -32,8 +33,6 @@ struct CommandLineOptions {
   bool tty;
   bool fwarning;
   int profileh;
-  unsigned int input;
-  unsigned int output;
   bool last_use;
   bool last_exe;
   bool lsp;
@@ -76,16 +75,16 @@ struct CommandLineOptions {
   const char *fd4;
   const char *fd5;
 
-  std::vector<char *> input_files;
-  std::vector<char *> output_files;
+  std::vector<std::string> input_files = {};
+  std::vector<std::string> output_files = {};
 
   int argc;
   char **argv;
 
   CommandLineOptions(int argc_in, char **argv_in) {
     argv = argv_in;
-    input_files = std::vector<char *>(argc_in, nullptr);
-    output_files = std::vector<char *>(argc_in, nullptr);
+    std::vector<char *> input_files_buffer(argc_in, nullptr);
+    std::vector<char *> output_files_buffer(argc_in, nullptr);
 
     // clang-format off
     struct option options[] {
@@ -107,8 +106,8 @@ struct CommandLineOptions {
       {0, "in", GOPT_ARGUMENT_REQUIRED},
       {'x', "exec", GOPT_ARGUMENT_REQUIRED},
       {0, "job", GOPT_ARGUMENT_REQUIRED},
-      {'i', "input", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, input_files.data(), (unsigned int)argc_in},
-      {'o', "output", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, output_files.data(), (unsigned int)argc_in},
+      {'i', "input", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, input_files_buffer.data(), (unsigned int)argc_in},
+      {'o', "output", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, output_files_buffer.data(), (unsigned int)argc_in},
       {0, "label", GOPT_ARGUMENT_REQUIRED},
       {'l', "last", GOPT_ARGUMENT_FORBIDDEN},
       {0, "last-used", GOPT_ARGUMENT_FORBIDDEN},
@@ -157,10 +156,7 @@ struct CommandLineOptions {
     tty = !arg(options, "no-tty")->count;
     fwarning = arg(options, "fatal-warnings")->count;
     profileh = arg(options, "profile-heap")->count;
-    input = arg(options, "input")->count;
-    output = arg(options, "output")->count;
-    bool last = arg(options, "last")->count;
-    last_use = last || arg(options, "last-used")->count;
+    last_use = arg(options, "last")->count || arg(options, "last-used")->count;
     last_exe = arg(options, "last-executed")->count;
     lsp = arg(options, "lsp")->count;
     failed = arg(options, "failed")->count;
@@ -201,5 +197,13 @@ struct CommandLineOptions {
     fd3 = arg(options, "fd:3")->argument;
     fd4 = arg(options, "fd:4")->argument;
     fd5 = arg(options, "fd:5")->argument;
+
+    for (unsigned int i = 0; i < arg(options, "input")->count; i++) {
+      input_files.emplace_back(std::string(input_files_buffer[i]));
+    }
+
+    for (unsigned int i = 0; i < arg(options, "output")->count; i++) {
+      output_files.emplace_back(std::string(output_files_buffer[i]));
+    }
   }
 };

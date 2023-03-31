@@ -327,11 +327,11 @@ int main(int argc, char **argv) {
   // Arguments are forbidden with these options
   bool noargs = clo.init || clo.job || clo.last_use || clo.last_exe || clo.failed || clo.tagdag ||
                 clo.html || clo.global || clo.exports || clo.api || clo.exec || clo.label ||
-                clo.input || clo.output;
+                !clo.input_files.empty() || !clo.output_files.empty();
   bool targets = clo.argc == 1 && !noargs;
 
-  bool job_capture =
-      clo.job || clo.output || clo.input || clo.label || clo.last_use || clo.last_exe || clo.failed;
+  bool job_capture = clo.job || !clo.output_files.empty() || !clo.input_files.empty() ||
+                     clo.label || clo.last_use || clo.last_exe || clo.failed;
   bool noparse = clo.init || clo.tagdag || job_capture;
   bool notype = noparse || clo.parse;
   bool noexecute = notype || clo.html || clo.tcheck || clo.dumpssa || clo.global || clo.exports ||
@@ -517,20 +517,20 @@ int main(int argc, char **argv) {
         upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
   }
 
-  if (clo.input) {
+  if (!clo.input_files.empty()) {
     std::vector<JobReflection> hits = {};
-    for (unsigned int i = 0; i < clo.input; ++i) {
-      auto current = db.explain(wcl::make_canonical(wake_cwd + clo.input_files[i]), 1);
+    for (const std::string &input : clo.input_files) {
+      auto current = db.explain(wcl::make_canonical(wake_cwd + input), 1);
       std::move(current.begin(), current.end(), std::back_inserter(hits));
     }
     intersected_job_ids =
         upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
   }
 
-  if (clo.output) {
+  if (!clo.output_files.empty()) {
     std::vector<JobReflection> hits = {};
-    for (unsigned int i = 0; i < clo.output; ++i) {
-      auto current = db.explain(wcl::make_canonical(wake_cwd + clo.output_files[i]), 2);
+    for (const std::string &output : clo.output_files) {
+      auto current = db.explain(wcl::make_canonical(wake_cwd + output), 2);
       std::move(current.begin(), current.end(), std::back_inserter(hits));
     }
     intersected_job_ids =
