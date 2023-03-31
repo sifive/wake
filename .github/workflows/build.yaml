@@ -222,7 +222,7 @@ jobs:
           if: always()
           with:
             name: logs_${{ matrix.target }}
-            path: logs
+            path: logs/
 
     macos_10_15:
         name: MacOS 10.15 Build
