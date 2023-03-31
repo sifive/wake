@@ -161,7 +161,7 @@ jobs:
 
       steps:
         - name: Create target directories
-          run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && mkdir logs && chmod ugo+rwx build
+          run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && mkdir logs && chmod ugo+rwx build && chmod ugo+rwx logs
 
         - name: Download Tarball
           uses: actions/download-artifact@v3
