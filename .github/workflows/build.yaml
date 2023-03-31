@@ -161,7 +161,7 @@ jobs:
 
       steps:
         - name: Create target directories
-          run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && mkdir logs && chmod ugo+rwx build && chmod ugo+rwx logs
+          run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
 
         - name: Download Tarball
           uses: actions/download-artifact@v3
@@ -203,7 +203,7 @@ jobs:
           run: docker build -f dockerfiles/${{ matrix.dockerfile }} ${{ matrix.extra_docker_build_args }} -t wake-${{ matrix.dockerfile }} .
 
         - name: Build
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --mount type=bind,source=$PWD/logs,target=/build/.npm/_logs --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined ${{ matrix.extra_docker_run_args }} wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.build_cmd }}'
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined ${{ matrix.extra_docker_run_args }} wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.build_cmd }}'
 
         - name: Test
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.test_cmd }}'
@@ -222,7 +222,7 @@ jobs:
           if: always()
           with:
             name: logs_${{ matrix.target }}
-            path: logs/
+            path: build/.npm/_logs/
 
     macos_10_15:
         name: MacOS 10.15 Build
