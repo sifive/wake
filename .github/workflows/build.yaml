@@ -219,6 +219,7 @@ jobs:
 
         - name: Upload Logs
           uses: actions/upload-artifact@v3
+          if: always()
           with:
             name: logs_${{ matrix.target }}
             path: logs
