@@ -84,9 +84,8 @@ struct CommandLineOptions {
 
   CommandLineOptions(int argc_in, char **argv_in) {
     argv = argv_in;
-    unsigned int max_pairs = argc_in / 2;
-    input_files.reserve(max_pairs);
-    output_files.reserve(max_pairs);
+    input_files = std::vector<char *>(argc_in, nullptr);
+    output_files = std::vector<char *>(argc_in, nullptr);
 
     // clang-format off
     struct option options[] {
@@ -108,8 +107,8 @@ struct CommandLineOptions {
       {0, "in", GOPT_ARGUMENT_REQUIRED},
       {'x', "exec", GOPT_ARGUMENT_REQUIRED},
       {0, "job", GOPT_ARGUMENT_REQUIRED},
-      {'i', "input", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, input_files.data(), max_pairs},
-      {'o', "output", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, output_files.data(), max_pairs},
+      {'i', "input", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, input_files.data(), (unsigned int)argc_in},
+      {'o', "output", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, output_files.data(), (unsigned int)argc_in},
       {0, "label", GOPT_ARGUMENT_REQUIRED},
       {'l', "last", GOPT_ARGUMENT_FORBIDDEN},
       {0, "last-used", GOPT_ARGUMENT_FORBIDDEN},
