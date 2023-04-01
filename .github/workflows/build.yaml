@@ -140,13 +140,20 @@ jobs:
               test_cmd: ls # no-op
               install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
 
-            - target: vscode_latest
-              dockerfile: wasm
-              extra_docker_build_args: --build-arg EMSDK_VERSION=latest
-              extra_docker_run_args: -u build
-              build_cmd: make -C wake-* vscode
-              test_cmd: ls # no-op
-              install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
+            # Two confounding bugs are breaking the latest emsdk build. We can't really work around them
+            # so for now, disable the latest target and track them closely.
+            #
+            # Bugs:
+            #   webpack tries to resolve new URL into a module which is incorrect (https://github.com/webpack/webpack/issues/16878)
+            #   emscripten may emit ES6 style imports which makes webpack grumpy (https://github.com/emscripten-core/emscripten/issues/19066#issuecomment-1486853354)
+            #
+            # - target: vscode_latest
+            #   dockerfile: wasm
+            #   extra_docker_build_args: --build-arg EMSDK_VERSION=latest
+            #   extra_docker_run_args: -u build
+            #   build_cmd: make -C wake-* vscode
+            #   test_cmd: ls # no-op
+            #   install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
 
             - target: wasm
               dockerfile: wasm
