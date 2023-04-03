@@ -17,11 +17,14 @@
 
 #pragma once
 
+#include <sys/stat.h>
+
 #include <string>
 #include <vector>
 
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
+#include "wcl/optional.h"
 
 struct CommandLineOptions {
   bool check;
@@ -205,5 +208,65 @@ struct CommandLineOptions {
     for (unsigned int i = 0; i < arg(options, "output")->count; i++) {
       output_files.emplace_back(std::string(output_files_buffer[i]));
     }
+
+    if (!percent_str) {
+      percent_str = getenv("WAKE_PERCENT");
+    }
+
+    if (!memory_str) {
+      memory_str = getenv("WAKE_MEMORY");
+    }
+
+    if (!jobs_str) {
+      jobs_str = getenv("WAKE_JOBS");
+    }
+  }
+
+  wcl::optional<std::string> validate() {
+    if (quiet && verbose) {
+      return wcl::some<std::string>("Cannot specify both -v and -q!");
+    }
+
+    if (profile && !debug) {
+      return wcl::some<std::string>("Cannot profile without stack trace support (-d)!");
+    }
+
+    if (shebang && chdir) {
+      return wcl::some<std::string>("Cannot specify chdir and shebang simultaneously!");
+    }
+
+    if (shebang && argc < 2) {
+      return wcl::some<std::string>(
+          "Shebang invocation requires a script name as the first non-option argument");
+    }
+
+    struct stat sbuf;
+
+    if (fstat(1, &sbuf) != 0) {
+      return wcl::some<std::string>(
+          "Wake must be run with an open standard output (file descriptor 1)");
+    }
+
+    if (fstat(2, &sbuf) != 0) {
+      return wcl::some<std::string>(
+          "Wake must be run with an open standard error (file descriptor 2)");
+    }
+
+    if (fd3 && fstat(3, &sbuf) != 0) {
+      return wcl::some<std::string>(
+          "Cannot specify --fd:3 unless file descriptor 3 is already open");
+    }
+
+    if (fd4 && fstat(4, &sbuf) != 0) {
+      return wcl::some<std::string>(
+          "Cannot specify --fd:4 unless file descriptor 4 is already open");
+    }
+
+    if (fd5 && fstat(5, &sbuf) != 0) {
+      return wcl::some<std::string>(
+          "Cannot specify --fd:5 unless file descriptor 5 is already open");
+    }
+
+    return {};
   }
 };
