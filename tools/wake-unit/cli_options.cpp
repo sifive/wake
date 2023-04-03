@@ -116,9 +116,9 @@ TEST(cli_options_timline) {
 }
 
 TEST(cli_options_shebang) {
-  // This change should be a parse error but isn't
+  // This should be a cli error, but isn't
   {
-    int argc = 2;
+    int argc = 3;
     char *argv[] = {(char *)"wake", (char *)"-:", (char *)"funcName", nullptr};
 
     CommandLineOptions clo(argc, argv);
@@ -128,7 +128,7 @@ TEST(cli_options_shebang) {
   }
 
   {
-    int argc = 2;
+    int argc = 4;
     char *argv[] = {(char *)"wake", (char *)"-:", (char *)"funcName", (char *)"./in/directory",
                     nullptr};
 
