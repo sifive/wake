@@ -215,61 +215,15 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (clo.quiet && clo.verbose) {
-    std::cerr << "Cannot specify both -v and -q!" << std::endl;
-    return 1;
-  }
-
-  if (clo.profile && !clo.debug) {
-    std::cerr << "Cannot profile without stack trace support (-d)!" << std::endl;
-    return 1;
-  }
-
-  if (clo.shebang && clo.chdir) {
-    std::cerr << "Cannot specify chdir and shebang simultaneously!" << std::endl;
-    return 1;
-  }
-
-  if (clo.shebang && clo.argc < 2) {
-    std::cerr << "Shebang invocation requires a script name as the first non-option argument"
-              << std::endl;
-    return 1;
-  }
-
-  struct stat sbuf;
-
-  if (fstat(1, &sbuf) != 0) {
-    std::cerr << "Wake must be run with an open standard output (file descriptor 1)" << std::endl;
-    return 1;
-  }
-
-  if (fstat(2, &sbuf) != 0) {
-    std::cout << "Wake must be run with an open standard error (file descriptor 2)" << std::endl;
-    return 1;
-  }
-
-  if (clo.fd3 && fstat(3, &sbuf) != 0) {
-    std::cerr << "Cannot specify --fd:3 unless file descriptor 3 is already open" << std::endl;
-    return 1;
-  }
-
-  if (clo.fd4 && fstat(4, &sbuf) != 0) {
-    std::cerr << "Cannot specify --fd:4 unless file descriptor 4 is already open" << std::endl;
-    return 1;
-  }
-
-  if (clo.fd5 && fstat(5, &sbuf) != 0) {
-    std::cerr << "Cannot specify --fd:5 unless file descriptor 5 is already open" << std::endl;
+  wcl::optional<std::string> validate_msg = clo.validate();
+  if (validate_msg) {
+    std::cerr << *validate_msg << std::endl;
     return 1;
   }
 
   clo.tty = term_init(clo.tty);
 
   double percent = 0.9;
-
-  if (!clo.percent_str) {
-    clo.percent_str = getenv("WAKE_PERCENT");
-  }
 
   if (clo.percent_str) {
     char *tail;
@@ -285,19 +239,11 @@ int main(int argc, char **argv) {
   ResourceBudget memory_budget(percent);
   ResourceBudget cpu_budget(percent);
 
-  if (!clo.memory_str) {
-    clo.memory_str = getenv("WAKE_MEMORY");
-  }
-
   if (clo.memory_str) {
     if (auto error = ResourceBudget::parse(clo.memory_str, memory_budget)) {
       std::cerr << "Option '-m" << clo.memory_str << "' is illegal; " << error << std::endl;
       return 1;
     }
-  }
-
-  if (!clo.jobs_str) {
-    clo.jobs_str = getenv("WAKE_JOBS");
   }
 
   if (clo.jobs_str) {
