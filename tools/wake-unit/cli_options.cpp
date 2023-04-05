@@ -112,7 +112,6 @@ TEST(cli_options_timline) {
 }
 
 TEST(cli_options_shebang) {
-  // This should be a cli error, but isn't
   {
     char *argv[] = {(char *)"wake", (char *)"-:", (char *)"funcName", nullptr};
 
@@ -120,6 +119,8 @@ TEST(cli_options_shebang) {
 
     EXPECT_EQUAL("funcName", clo.shebang);
     EXPECT_EQUAL(1, clo.argc);
+    bool has_error = (bool)clo.validate();
+    EXPECT_TRUE(has_error);
   }
 
   {
