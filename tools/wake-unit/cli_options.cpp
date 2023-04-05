@@ -22,10 +22,9 @@
 
 TEST(cli_options_basic) {
   {
-    int argc = 2;
     char *argv[] = {(char *)"wake", (char *)"--help", nullptr};
 
-    CommandLineOptions clo(argc, argv);
+    CommandLineOptions clo(sizeof(argv) / sizeof(*argv), argv);
 
     EXPECT_TRUE(clo.help);
     EXPECT_FALSE(clo.init);
@@ -33,10 +32,9 @@ TEST(cli_options_basic) {
   }
 
   {
-    int argc = 4;
     char *argv[] = {(char *)"wake", (char *)"-v", (char *)"-x", (char *)"Unit", nullptr};
 
-    CommandLineOptions clo(argc, argv);
+    CommandLineOptions clo(sizeof(argv) / sizeof(*argv), argv);
 
     EXPECT_TRUE(clo.verbose);
     EXPECT_EQUAL("Unit", clo.exec);
@@ -44,10 +42,9 @@ TEST(cli_options_basic) {
   }
 
   {
-    int argc = 3;
     char *argv[] = {(char *)"wake", (char *)"--failed", (char *)"--script", nullptr};
 
-    CommandLineOptions clo(argc, argv);
+    CommandLineOptions clo(sizeof(argv) / sizeof(*argv), argv);
 
     EXPECT_TRUE(clo.failed);
     EXPECT_TRUE(clo.script);
@@ -56,10 +53,9 @@ TEST(cli_options_basic) {
 }
 
 TEST(cli_options_target) {
-  int argc = 4;
   char *argv[] = {(char *)"wake", (char *)"-v", (char *)"build", (char *)"default", nullptr};
 
-  CommandLineOptions clo(argc, argv);
+  CommandLineOptions clo(sizeof(argv) / sizeof(*argv), argv);
 
   EXPECT_TRUE(clo.verbose);
   EXPECT_EQUAL(3, clo.argc);
@@ -71,20 +67,18 @@ TEST(cli_options_target) {
 // has 3 possible values
 TEST(cli_options_timline) {
   {
-    int argc = 2;
     char *argv[] = {(char *)"wake", (char *)"--timeline", nullptr};
 
-    CommandLineOptions clo(argc, argv);
+    CommandLineOptions clo(sizeof(argv) / sizeof(*argv), argv);
 
     EXPECT_TRUE(clo.timeline);
     EXPECT_EQUAL(1, clo.argc);
   }
 
   {
-    int argc = 3;
     char *argv[] = {(char *)"wake", (char *)"--timeline", (char *)"file-accesses", nullptr};
 
-    CommandLineOptions clo(argc, argv);
+    CommandLineOptions clo(sizeof(argv) / sizeof(*argv), argv);
 
     EXPECT_TRUE(clo.timeline);
     EXPECT_EQUAL(2, clo.argc);
@@ -92,47 +86,47 @@ TEST(cli_options_timline) {
   }
 
   {
-    int argc = 3;
     char *argv[] = {(char *)"wake", (char *)"--timeline", (char *)"job-reflections", nullptr};
 
-    CommandLineOptions clo(argc, argv);
+    CommandLineOptions clo(sizeof(argv) / sizeof(*argv), argv);
 
     EXPECT_TRUE(clo.timeline);
     EXPECT_EQUAL(2, clo.argc);
     EXPECT_EQUAL("job-reflections", clo.argv[1]);
   }
 
-  // This should be a cli error, but isn't
+  // --timline may only have 3 different values, "", "job-reflections", or "file-accesses"
+  // "invalid-value" is none of those, and thus should result in a validation failure
+  // but it doesn't currently.
   {
-    int argc = 3;
     char *argv[] = {(char *)"wake", (char *)"--timeline", (char *)"invalid-value", nullptr};
 
-    CommandLineOptions clo(argc, argv);
+    CommandLineOptions clo(sizeof(argv) / sizeof(*argv), argv);
 
     EXPECT_TRUE(clo.timeline);
     EXPECT_EQUAL(2, clo.argc);
     EXPECT_EQUAL("invalid-value", clo.argv[1]);
+    bool has_error = (bool)clo.validate();
+    EXPECT_FALSE(has_error);
   }
 }
 
 TEST(cli_options_shebang) {
   // This should be a cli error, but isn't
   {
-    int argc = 3;
     char *argv[] = {(char *)"wake", (char *)"-:", (char *)"funcName", nullptr};
 
-    CommandLineOptions clo(argc, argv);
+    CommandLineOptions clo(sizeof(argv) / sizeof(*argv), argv);
 
     EXPECT_EQUAL("funcName", clo.shebang);
     EXPECT_EQUAL(1, clo.argc);
   }
 
   {
-    int argc = 4;
     char *argv[] = {(char *)"wake", (char *)"-:", (char *)"funcName", (char *)"./in/directory",
                     nullptr};
 
-    CommandLineOptions clo(argc, argv);
+    CommandLineOptions clo(sizeof(argv) / sizeof(*argv), argv);
 
     EXPECT_EQUAL("funcName", clo.shebang);
     EXPECT_EQUAL(2, clo.argc);
