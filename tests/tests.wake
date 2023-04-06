@@ -15,6 +15,7 @@
 
 package test_wake
 from wake import _
+from plan_scorer import runJob
 
 # The wake unit tests can be run on either the wake that invokes them or the
 # wake that was built by the rest of the build system.  This topic is used

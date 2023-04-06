@@ -14,6 +14,8 @@
 # limitations under the License.
 
 package gcc_wake
+from wake import _
+from plan_scorer import runJob
 
 export def cpp11Flags    = ("-std=c++11", Nil)
 export def cpp14Flags    = ("-std=c++14", Nil)

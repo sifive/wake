@@ -85,7 +85,7 @@ export data Persistence =
   Share
 
 # A Plan describes a not-yet-executed Job
-tuple Plan =
+export tuple Plan =
   export Label:        String       # The label used when showing the command during execution
   export Command:      List String  # The command-line arguments (the first is the command to run)
   export Visible:      List Path    # Only these files should be available to the command
@@ -431,7 +431,7 @@ target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run echo 
 export topic runner: Runner
 publish runner = localRunner, defaultRunner, Nil
 
-def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) (LogLevel stderr) isatty =
+export def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) (LogLevel stderr) isatty =
   if isOnce pers
   then runOnce   cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run echo stdout stderr label isatty
   else runAlways cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run echo stdout stderr label isatty
@@ -439,40 +439,6 @@ def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (L
 export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs isatty) =
   runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run echo stdout stderr isatty
 
-data RunnerOption =
-  Accept (score: Double) (runnerFn: Job => Result RunnerInput Error => Result RunnerOutput Error)
-  Reject (why: String)
-
-# Run the job!
-export def runJob (p: Plan): Job = match p
-  Plan label cmd vis env dir stdin stdout stderr echo pers _lo res rf usage finputs foutputs isatty =
-    # Transform the 'List Runner' into 'List RunnerOption'
-    def qualify runner = match runner
-      Runner name _ _ if ! rf runner = Reject "{name}: rejected by Plan"
-      Runner name scorefn fn = match (scorefn p)
-        Pass x if x <=. 0.0 = Reject "{name}: non-positive score"
-        Pass x = Accept x fn
-        Fail x = Reject "{name} {x}"
-    def opts = subscribe runner | map qualify
-    def best acc = match _ acc
-      (Reject _) _ = acc
-      (Accept score fn) (Pair bests _bestr) =
-        if score >. bests then Pair score (Some fn) else acc
-    match (opts | foldl best (Pair 0.0 None) | getPairSecond)
-      Some r = runJobImp label cmd env dir stdin res usage finputs foutputs vis pers r echo stdout stderr isatty
-      None =
-        def create label dir stdin env cmd signature visible keep echo stdout stderr isatty = prim "job_create"
-        def badfinish job e = prim "job_fail_finish"
-        def badlaunch job e = prim "job_fail_launch"
-        def job = create label dir stdin env.implode cmd.implode 0 "" 0 "echo" "info" "error" (if isatty then 1 else 0)
-        def error =
-          def pretty = match _
-            Accept _ _ = ""
-            Reject why = why
-          makeError "No runner for '{job.getJobDescription}' available, because: {map pretty opts | catWith ", "}"
-        # Make sure badlaunch completes before badfinish
-        def _ = wait (\_ badfinish job error) (badlaunch job error)
-        job
 
 
 # Set the value of a tag on a Job
@@ -714,19 +680,3 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
             Fail f = Fail (makeError f)
             Pass usage = Pass (RunnerOutput (getK `inputs`) (getK `outputs`) usage)
   makeRunner "json-{script}" score pre post localRunner
-
-# Whenever possible, use 'job' if:
-#   cmd can run under FUSE
-#   cmd guarantees to produce the same outputs given the same inputs
-# Examples:
-#   gcc
-# job only allows cmd access to 'visible', to prevent undeclared dependencies.
-# If you miss declared visible inputs, your build will fail so you can fix it.
-# If you declare too many visible inputs, cmd execution/replay will wait for unnecessary files.
-export def job (cmd: List String) (visible: List Path): Job =
-  makeExecPlan cmd visible
-  | runJob
-
-export def shellJob (script: String) (visible: List Path): Job =
-  makeShellPlan script visible
-  | runJob

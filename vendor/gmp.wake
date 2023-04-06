@@ -16,6 +16,7 @@
 package build_wake
 from wake import _
 from gcc_wake import _
+from plan_scorer import runJob
 
 def gmp = match _
   Pair "wasm-cpp14-release" _ = buildGmpWASM Unit

@@ -16,6 +16,7 @@
 package build_wake
 from wake import _
 from gcc_wake import _
+from plan_scorer import runJob
 
 def sqlite3 = match _
   Pair "wasm-cpp14-release" _ = buildSqlite3WASM Unit

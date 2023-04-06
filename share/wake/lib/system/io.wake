@@ -14,6 +14,7 @@
 # limitations under the License.
 
 package wake
+from plan_scorer import runJob
 
 # Read the file contents of a Path
 export def read (path: Path): Result String Error =
