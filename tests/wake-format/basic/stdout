@@ -7,7 +7,6 @@
 # comment
 def five = 5
 
-
 # ordinary comment
 
 
@@ -17,12 +16,10 @@ def name Unit =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
 
-
 def name Unit =
     def other = @here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
-
 
 def name Unit =
     def other = @here
@@ -32,14 +29,12 @@ def name Unit =
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
 
-
 def name Unit =
     def other = @here
 
     # not floating
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
-
 
 def name Unit =
     def other = @here
@@ -47,17 +42,14 @@ def name Unit =
     
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
-
 
 global export def glob1 = 34
-
 
 # ordinary comment
 def name Unit =
     def other = @here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
-
 
 # wake-format off
 def name Unit =
@@ -66,13 +58,11 @@ def name Unit =
   def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   another
 
-
 def name Unit =
     # wake-format off
     def other = here
     def other = @here
     another
-
 
 def name Unit =
     def other = @here
@@ -81,7 +71,6 @@ def name Unit =
     def other = @here
     another
 
-
 def name Unit =
     def other = @here
     # wake-format off
@@ -89,7 +78,6 @@ def name Unit =
 
     def other = @here
     another
-
 
 def name Unit =
     # ordinary comment
@@ -97,25 +85,21 @@ def name Unit =
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
 
-
 def t1 =
     match _
         0 = 0
         n = 2 + t (n - 1)
-
 
 # wake-format off
 def t1 =match _
   0=0
   n = 2+t(n-1)
 
-
 def t1 =
     match _
         # wake-format off
         0=0
         n = 2 + t (n - 1)
-
 
 def t1 =
     match _
@@ -123,14 +107,12 @@ def t1 =
         # wake-format off
         n = 2+t(n-1)
 
-
 def t1 =
     match _
         # wake-format off
         0=0
         # wake-format off
         n = 2+t(n-1)
-
 
 def t1 =
     match _
@@ -143,17 +125,14 @@ def t1 =
         # comments
         n = 2 + t (n - 1)
 
-
 def t2 =
     ((x + 7) * 3)
-
 
 def t4 =
     (
         # comment
         x + 5
     )
-
 
 def t4 =
     (
@@ -164,7 +143,6 @@ def t4 =
         )
     )
 
-
 def t5 =
     (
         # comment
@@ -173,13 +151,11 @@ def t5 =
         x + 5
     )
 
-
 def t7 =
     (
         x # comment
         + 5
     )
-
 
 def t8 =
     (
@@ -188,12 +164,10 @@ def t8 =
         5
     )
 
-
 def t9 =
     (
         x + 5 # comment
     )
-
 
 def t10 =
     (
@@ -201,18 +175,15 @@ def t10 =
         5
     )
 
-
 def name Unit = # wake-format off
     def other = here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
 
-
 def t3 =
     ( # comment
         x + 5
     )
-
 
 def t6 =
     ( # comment
@@ -220,7 +191,6 @@ def t6 =
         # comment
         x + 5
     )
-
 
 def t8 =
     (
@@ -232,18 +202,14 @@ def t8 =
         2 # comment
     )
 
-
 def t9 =
     x + 5 - 2
-
 
 def ff =
     a | b | c | d
 
-
 def ff =
     a $ b $ c $ d
-
 
 def ff =
     aaaaaaaaaaaaa
@@ -255,7 +221,6 @@ def ff =
     | ggggggggggg
     | hhhhhhhhhhh
 
-
 def ff =
     aaaaaaaaaaaaa
     $ bbbbbbbbbbbbbbbb
@@ -265,7 +230,6 @@ def ff =
     $ ffffffffff
     $ ggggggggggg
     $ hhhhhhhhhhh
-
 
 def ff =
     aaaaaaaaaaaaa,
@@ -277,7 +241,6 @@ def ff =
     ggggggggggg,
     hhhhhhhhhhh
 
-
 def ff =
     aaaaaaaaaaaaa
     .bbbbbbbbbbbbbbbb
@@ -288,7 +251,6 @@ def ff =
     .ggggggggggg
     .hhhhhhhhhhh
 
-
 def wakeToTestDir Unit =
     match (subscribe wakeTestBinary)
         buildTestWake, Nil =
@@ -296,7 +258,6 @@ def wakeToTestDir Unit =
             Pass (Pair (simplify "{path}/..") visible)
         Nil = Pass (Pair "{wakePath}" Nil)
         _ = Fail (makeError "Two wake binaries declared for testing!")
-
 
 def wakeToTestDir Unit =
     match (subscribe wakeTestBinary)
@@ -309,7 +270,6 @@ def wakeToTestDir Unit =
             Pass (Pair (simplify "{path}/..") visible)
         Nil = Pass (Pair "{wakePath}" Nil)
         _ = Fail (makeError "Two wake binaries declared for testing!")
-
 
 package test_wake
 
@@ -331,17 +291,14 @@ def linkKind =
         # comment
         cppVariant
 
-
 def linkKind =
     if verrrrrrrry loooooooooooog naaaaaaaaaaaame then
         verrrrrrrrrrrrrrrrrrrrrrry
     else
         looooooooooooooooong
 
-
 def linkKind =
     if true then short else short
-
 
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
 export topic compileC: (
@@ -364,31 +321,25 @@ def app1 =
     "a"
     "b"
 
-
 def app =
     Pair "a" "b"
-
 
 # TODO: The trailing NL here causes a failure for 'fits all' which is why this is NL'd
 def app =
     Pair "a" "b" # comment
 
-
 def app =
     Pair "a" "b" # comment
-
 
 def app =
     Pair
     "a" # comment
     "b"
 
-
 def app =
     Pair # comment
     "a" # comment
     "b" # comment
-
 
 def app =
     aaaaaaaaaa
@@ -400,27 +351,23 @@ def app =
     gggggggggggggggggggg
     hhhhhhhhhhhhhh
 
-
 def t1 =
     match _
         0 = 0
         n # comment
         = 2 + t (n - 1)
 
-
 def t1 =
     match _
         # comment
         0 = 0
         n = 2 + t (n - 1)
 
-
 def t1 =
     match _
         0 = 0
         # comment
         n = 2 + t (n - 1)
-
 
 publish wakeTestBinary = defaultWake, Nil
 publish animal = "Cat", Nil
@@ -456,7 +403,6 @@ publish compileC =
 
 def hello = # comment
     emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
-
 
 target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run echo stdout stderr label =
     runAlways cmd env dir stdin res usage finputs foutputs vis keep run echo stdout stderr label
@@ -506,10 +452,8 @@ def buildRE2WASM Unit =
 
     Pass (SysLib "1.0" headers objects cflags lflags)
 
-
 def t5 =
     a.b.c
-
 
 def toVariant =
     match _
@@ -519,7 +463,6 @@ def toVariant =
         "wasm" = Pass (Pair "wasm-cpp14-release" "wasm-c11-release")
         s = Fail "Unknown build target ({s})".makeError
 
-
 export def build: List String => Result String Error =
     match _
         "tarball", Nil = tarball Unit | rmap (\_ "TARBALL")
@@ -528,13 +471,11 @@ export def build: List String => Result String Error =
             all variant | rmap (\_ "BUILD")
         _ = Fail "no target specified (try: build default/debug/tarball)".makeError
 
-
 export def install: List String => Result String Error =
     match _
         dest, kind, Nil = doInstall (in cwd dest) kind | rmap (\_ "INSTALL")
         dest, Nil = doInstall (in cwd dest) "default" | rmap (\_ "INSTALL")
         _ = Fail "no directory specified (try: install /opt/local)".makeError
-
 
 # Build all wake targets
 def targets =
@@ -548,11 +489,9 @@ def targets =
     buildWakeFormat,
     Nil
 
-
 def all variant =
     require Pass x = map (_ variant) targets | findFail
     Pass (flatten x)
-
 
 # Install wake into a target location
 def doInstall dest kind =
@@ -568,7 +507,6 @@ def doInstall dest kind =
     def outputs = readme, bininstall ++ datinstall
     Pass outputs
 
-
 # Replace @VERSION@ with 'release'
 def setVersion release file =
     require Pass in = source "{file}.in"
@@ -579,7 +517,6 @@ def setVersion release file =
         mv "%{file}.tmp" "%{file}"
         %"
     shellJob script (in, Nil) | getJobOutput
-
 
 # Create a release tarball
 def tarball Unit =
@@ -649,7 +586,6 @@ def tarball Unit =
         job cmd (manifest, testManifest, spec, srcs) | getJobOutput
     Pass (tarball, changelog, Nil)
 
-
 export def static _: Result Path Error =
     def filesResult = doInstall "tmp" "static"
     def releaseResult = buildAs Unit
@@ -669,7 +605,6 @@ export def static _: Result Path Error =
         map getPathName files | sortBy (_ <* _)
     job cmd files | getJobOutput
 
-
 from test_wake import topic wakeTestBinary
 from test_wake import topic wakeUnitTestBinary
 publish wakeTestBinary = defaultWake, Nil
@@ -679,7 +614,6 @@ def defaultWake Unit =
     require Pass wakeVisible = doInstall "tmp" "default"
 
     Pass (Pair "tmp/bin/wake" wakeVisible)
-
 
 export data JValue =
     JString String
@@ -715,15 +649,12 @@ global export data Let =
 def x + y =
     add x y
 
-
 def tool (dir: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) = ""
-
 
 def f0 =
     match _ _
         (x: Integer) (True: Boolean) = x + 1
         (x: Integer) (False: Boolean) = x + 0
-
 
 def f0 =
     match (
@@ -737,7 +668,6 @@ def f0 =
         = x + 1
         x b = x + 0
 
-
 export def vfoldl (combiningFn: accum => element => accum): accum => Vector element => accum =
     def loop accumulator v s e =
         if s == e then
@@ -748,7 +678,6 @@ export def vfoldl (combiningFn: accum => element => accum): accum => Vector elem
     def top a (Vector v s e) = loop a v s e
     top
 
-
 def loop a s e =
     if s == e then
         e
@@ -756,7 +685,6 @@ def loop a s e =
         s
     else
         loop a (s + 1) e
-
 
 def loop a s e =
     if s == e then
@@ -766,7 +694,6 @@ def loop a s e =
     else
         t
 
-
 def loop aaaaa sssss eeeee =
     if sssss == eeeee then
         eeeee
@@ -774,7 +701,6 @@ def loop aaaaa sssss eeeee =
         sssss
     else
         loop aaaaa (sssss + 1) eeeee
-
 
 # A dictionary associating a key-value pair, providing fast lookup by key.
 # This is internally implemented by a balanced tree, so some total ordering must
@@ -828,24 +754,20 @@ def buildRE2WASM Unit =
 
     Pass (SysLib "1.0" headers objects cflags lflags)
 
-
 def buildRE2WASM Unit =
     require Pass outputs = job.getJobOutputs
     else blah
 
     Pass (SysLib "1.0" headers objects cflags lflags)
 
-
 def buildRE2WASM Unit =
     require Pass outputs = job.getJobOutputs
     else blah
 
     Pass (SysLib "1.0" headers objects cflags lflags)
-
 
 def x =
     (x,) ++ xs
-
 
 def a =
     # comment
@@ -859,7 +781,6 @@ def a =
     # comment
     
     result
-
 
 # floating 1
 
@@ -875,7 +796,6 @@ def name Unit =
     def other =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another # comment
-
 
 # floating 3a
 # floating 3b
@@ -894,14 +814,12 @@ def name Unit =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another # comment
 
-
 # comment 3
 def name Unit =
     def other = @here
     def other =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another # comment
-
 
 # floating 6
 
@@ -911,14 +829,12 @@ def name Unit =
 
 def a b c = 5
 
-
 def a =
     if false then
         5
     else
         require Pass a = b
         a
-
 
 tuple A B =
     c
@@ -935,34 +851,25 @@ def a name =
         x, _ = x, Nil
         Nil = Nil
 
-
 def x =
     map (\(Pair a b) c a b)
-
 
 def x =
     (\_ \_ prim "p") x y
 
-
 def x =
     (\a \b \x prim "p") x y
 
-
 def x =
     (\a \b \x prim "p") x y
-
 
 def a = 5
 
-
 def b = 6
-
 
 def c = "asdf"
 
-
 def d = identifier
-
 
 def longFunc param: Result (List Path) Error =
     match _
@@ -976,10 +883,8 @@ def longFunc param: Result (List Path) Error =
             Some x = x
             None = x
 
-
 export def !(x: Boolean): Boolean =
     if x then False else True
-
 
 export def mapPartial (f: a => Option b): (list: List a) => List b =
     def loop = match _
@@ -991,7 +896,6 @@ export def mapPartial (f: a => Option b): (list: List a) => List b =
                 Some x = x, sub
                 None = sub
     loop
-
 
 target writeImp inputs mode path content =
     def writeRunner =
@@ -1037,5 +941,4 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
         )
 
     json
-
 

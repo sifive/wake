@@ -7,14 +7,12 @@ def t10 =
     # comment
     )
 
-
 def t11 =
     (
         x + 5 # comment
     # comment
     # comment
     )
-
 
 def t12 =
     (
@@ -23,7 +21,6 @@ def t12 =
     # comment
     # comment
     )
-
 
 # trailing comment
 

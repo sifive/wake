@@ -381,7 +381,7 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
     pred(TOKEN_WS, fmt().next())
    .pred(TOKEN_COMMENT, floating_comment_fmt)
    .pred(TOKEN_NL, fmt().next().newline())
-   .pred(CST_DEF, node_fmt.join(fmt().newline().newline()).join(consume_wsnl))
+   .pred(CST_DEF, node_fmt.join(fmt().newline()).join(consume_wsnl))
    .otherwise(node_fmt));
   // clang-format on
 
