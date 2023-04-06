@@ -139,6 +139,8 @@ class Emitter {
   // Functions to combine apply using various 'full choice' options
   //
   wcl::optional<wcl::doc> combine_apply_flat(ctx_t ctx, const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_apply_constructor(ctx_t ctx,
+                                                    const std::vector<CSTElement>& parts);
   wcl::optional<wcl::doc> combine_apply_explode_all(ctx_t ctx,
                                                     const std::vector<CSTElement>& parts);
 
