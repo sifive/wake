@@ -16,6 +16,7 @@
 package build_wake
 from wake import _
 from gcc_wake import _
+from plan_scorer import runJob
 
 def buildLemon variant: Result (List Path) Error =
     def Pair _ cVariant =

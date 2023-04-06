@@ -15,6 +15,7 @@
 
 package build_wake
 from wake import _
+from plan_scorer import runJob
 
 # Useful build variants (arguments to all)
 def toVariant = match _

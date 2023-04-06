@@ -15,6 +15,7 @@
 
 package build_wake
 from wake import _
+from plan_scorer import runJob
 
 topic releaseAs: String
 def buildAs Unit = match (subscribe releaseAs)
