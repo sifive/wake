@@ -1136,9 +1136,8 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
     parts = collect_right_binary(op_token, node);
   }
 
-  if (!ctx.nested_binop &&
-      (is_binop_matching_str(op_token, TOKEN_OP_DOLLAR, "$") ||
-       is_binop_matching_str(op_token, TOKEN_OP_OR, "|"))) {
+  if (!ctx.nested_binop && (is_binop_matching_str(op_token, TOKEN_OP_DOLLAR, "$") ||
+                            is_binop_matching_str(op_token, TOKEN_OP_OR, "|"))) {
     MEMO_RET(select_best_choice({
         combine_explode_first(op_token, ctx.binop(), parts),
         combine_explode_last(op_token, ctx.binop(), parts),
