@@ -168,6 +168,11 @@ static bool is_op_suffix(const CSTElement& op) {
   }
 }
 
+// determines if a given binop matches a given type and string literal
+static inline bool is_binop_matching_str(const CSTElement& op, cst_id_t type, std::string lit) {
+  return op.id() == type && op.fragment().segment().str() == lit;
+}
+
 static size_t count_leading_newlines(const token_traits_map_t& traits, const CSTElement& node) {
   CSTElement token = node;
   while (token.isNode()) {
@@ -1132,8 +1137,8 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   }
 
   if (!ctx.nested_binop &&
-      (op_token.id() == TOKEN_OP_DOLLAR ||
-       (op_token.id() == TOKEN_OP_OR && op_token.fragment().segment().str() == "|"))) {
+      (is_binop_matching_str(op_token, TOKEN_OP_DOLLAR, "$") ||
+       is_binop_matching_str(op_token, TOKEN_OP_OR, "|"))) {
     MEMO_RET(select_best_choice({
         combine_explode_first(op_token, ctx.binop(), parts),
         combine_explode_last(op_token, ctx.binop(), parts),
