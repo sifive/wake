@@ -53,6 +53,16 @@ class IsWSNLCPredicate {
   }
 };
 
+class IsNodeEmptyPredicate {
+ public:
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                  const token_traits_map_t& traits) const {
+    return operator()(node);
+  }
+
+  bool operator()(const CSTElement& node) const { return node.empty(); }
+};
+
 class ConstPredicate {
  private:
   bool result;

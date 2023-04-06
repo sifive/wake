@@ -228,6 +228,10 @@ from wake import def unary + -
 from wake import type Pair Result
 from wake import source,Nil
 
+from recipes export cake
+from recipes export pizza
+from recipes export soup
+
 # comment
 def linkKind =
     # comment

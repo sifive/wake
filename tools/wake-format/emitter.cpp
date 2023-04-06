@@ -372,20 +372,30 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
                      fmt().token(TOKEN_COMMENT).freshline().fmt_if(TOKEN_NL, fmt().next()))
           .freshline()
           .newline()
-          .newline()
           .join(consume_wsnl),
       fmt().consume_wsnlc());
 
   // clang-format off
-  auto body_fmt = fmt().match(
-    pred(TOKEN_WS, fmt().next())
-   .pred(TOKEN_COMMENT, floating_comment_fmt)
-   .pred(TOKEN_NL, fmt().next().newline())
-   .pred(CST_DEF, node_fmt.join(fmt().newline()).join(consume_wsnl))
-   .otherwise(node_fmt));
+  auto body_fmt = fmt()
+    .fmt_while(
+      {TOKEN_WS, TOKEN_NL, TOKEN_COMMENT},
+      fmt().match(
+        pred(TOKEN_COMMENT, floating_comment_fmt)
+        .pred({TOKEN_WS, TOKEN_NL}, fmt().next())
+      )
+    ).match(
+       pred(IsNodeEmptyPredicate(), fmt())
+      // Nodes that should group together instead of being newlined
+      .pred(CST_IMPORT, fmt().fmt_while(CST_IMPORT, node_fmt))
+      .pred(CST_EXPORT, fmt().fmt_while(CST_EXPORT, node_fmt))
+      .otherwise(node_fmt)
+    );
   // clang-format on
 
-  MEMO_RET(fmt().walk_all(body_fmt).format(ctx, node.firstChildElement(), token_traits));
+  MEMO_RET(fmt()
+               .join(body_fmt)
+               .walk_all(fmt().newline().join(body_fmt))
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {

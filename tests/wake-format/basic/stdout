@@ -3,12 +3,10 @@
 # header
 # -------------
 
-
 # comment
 def five = 5
 
 # ordinary comment
-
 
 def name Unit =
     def other = @here
@@ -282,6 +280,10 @@ from wake import def unary + -
 from wake import type Pair Result
 from wake import source,Nil
 
+from recipes export cake
+from recipes export pizza
+from recipes export soup
+
 # comment
 def linkKind =
     # comment
@@ -301,19 +303,25 @@ def linkKind =
     if true then short else short
 
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
+
 export topic compileC: (
     Pair
     String
     ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error)
 )
+
 topic linkO: (
     Pair
     String
     ((extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error)
 )
+
 export topic path: String
+
 export topic wakeUnitTestBinary: (variant: Pair String String) => Result (List Path) Error
+
 global export topic glob1: String
+
 global topic glob1: String
 
 def app1 =
@@ -370,22 +378,31 @@ def t1 =
         n = 2 + t (n - 1)
 
 publish wakeTestBinary = defaultWake, Nil
+
 publish animal = "Cat", Nil
+
 publish animal = replace `u` "o" "Mouse", Nil
+
 publish compileC = makeCompileC "native-c11-debug" (which "cc") (c11Flags ++ debugCFlags)
+
 publish path = match (getenv "WAKE_PATH")
     Some x = tokenize `:` x
     None = Nil
+
 publish path = match sysname
     "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
     "FreeBSD" = "/usr/local/bin", Nil
     _ = Nil
+
 publish compileC = emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
+
 publish compileC =
     emccFn
     (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags) (another) ("thing" "here"))
+
 publish compileC = # comment
     emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
+
 publish compileC =
     # comment
     emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
@@ -607,7 +624,9 @@ export def static _: Result Path Error =
 
 from test_wake import topic wakeTestBinary
 from test_wake import topic wakeUnitTestBinary
+
 publish wakeTestBinary = defaultWake, Nil
+
 publish wakeUnitTestBinary = buildWakeUnit, Nil
 
 def defaultWake Unit =
@@ -706,7 +725,6 @@ def loop aaaaa sssss eeeee =
 # This is internally implemented by a balanced tree, so some total ordering must
 # be able to be produced for the key type.
 
-
 global export tuple Map k v =
     # The ordering function in use, over the key type only.  The `Tree` also
     
@@ -784,11 +802,9 @@ def a =
 
 # floating 1
 
-
 # floating 2a
 # floating 2b
 # floating 2c
-
 
 # comment 3
 def name Unit =
@@ -800,12 +816,9 @@ def name Unit =
 # floating 3a
 # floating 3b
 
-
 # floating 4
 
-
 # floating 5
-
 
 # comment 3
 def name Unit =
@@ -823,9 +836,7 @@ def name Unit =
 
 # floating 6
 
-
 # floating 7
-
 
 def a b c = 5
 
@@ -840,8 +851,11 @@ tuple A B =
     c
 
 global topic a: b
+
 global topic a: b
+
 global topic a: b
+
 global topic a: b
 
 def a name =
@@ -941,4 +955,3 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
         )
 
     json
-
