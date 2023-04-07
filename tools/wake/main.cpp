@@ -285,6 +285,11 @@ int main(int argc, char **argv) {
 
   if (noargs && clo.argc > 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
+    std::cerr << "\t'" << clo.argv[1] << "'";
+    for (int i = 2; i < clo.argc; i++) {
+      std::cerr << " '" << clo.argv[i] << "'";
+    }
+    std::cerr << std::endl;
     return 1;
   }
 
