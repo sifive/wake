@@ -1,4 +1,8 @@
 PASSED:
+  cli_options_basic
+  cli_options_shebang
+  cli_options_target
+  cli_options_timline
   diff_add
   diff_empty
   diff_fuzz1
