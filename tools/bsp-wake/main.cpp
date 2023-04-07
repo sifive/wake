@@ -414,10 +414,11 @@ ExtractBSPDocument::ExtractBSPDocument(const std::string &method, const JAST &pa
     : items(result.add("items", JSON_ARRAY)) {
   cmdline.push_back("--tag");
   cmdline.push_back("bsp." + method);
-  cmdline.push_back("-o");
   for (auto &x : params.get("targets").children) {
     const std::string &uri = x.second.get("uri").value;
     if (uri.compare(0, sizeof(bsp) - 1, &bsp[0]) != 0) continue;
+
+    cmdline.push_back("-o");
     cmdline.emplace_back(uri.substr(sizeof(bsp) - 1));
   }
 }
