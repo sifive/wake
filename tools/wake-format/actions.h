@@ -87,7 +87,29 @@ struct TokenAction {
     auto it = traits.find(node);
     if (it != traits.end()) {
       for (auto n : it->second.before_bound) {
-        builder.append(n.fragment().segment().str());
+        if (n.id() == TOKEN_COMMENT) {
+          // Realign indent before writing the comment
+          freshline(builder, ctx);
+          builder.append(n.fragment().segment().str());
+          builder.append(wcl::doc::lit("\n"));
+          continue;
+        }
+
+        if (n.id() == TOKEN_NL) {
+          // Emit newlines without alignment. If this is a standalone newline
+          // then we shouldn't emit any trailing whitespace.
+          builder.append(wcl::doc::lit("\n"));
+          continue;
+        }
+
+        FMT_ASSERT(false, n,
+                   "Token mismatch! Expected <" + std::string(symbolName(TOKEN_COMMENT)) + "|" +
+                       std::string(symbolName(TOKEN_NL)) + ">, Saw <" +
+                       std::string(symbolName(n.id())) + ">");
+      }
+
+      // Realign indent in case we lost alighnment.
+      if (it->second.before_bound.size() > 0) {
         freshline(builder, ctx);
       }
     }
@@ -121,7 +143,29 @@ struct TokenReplaceAction {
     auto it = traits.find(node);
     if (it != traits.end()) {
       for (auto n : it->second.before_bound) {
-        builder.append(n.fragment().segment().str());
+        if (n.id() == TOKEN_COMMENT) {
+          // Realign indent before writing the comment
+          freshline(builder, ctx);
+          builder.append(n.fragment().segment().str());
+          builder.append(wcl::doc::lit("\n"));
+          continue;
+        }
+
+        if (n.id() == TOKEN_NL) {
+          // Emit newlines without alignment. If this is a standalone newline
+          // then we shouldn't emit any trailing whitespace.
+          builder.append(wcl::doc::lit("\n"));
+          continue;
+        }
+
+        FMT_ASSERT(false, n,
+                   "Token mismatch! Expected <" + std::string(symbolName(TOKEN_COMMENT)) + "|" +
+                       std::string(symbolName(TOKEN_NL)) + ">, Saw <" +
+                       std::string(symbolName(n.id())) + ">");
+      }
+
+      // Realign indent in case we lost alighnment.
+      if (it->second.before_bound.size() > 0) {
         freshline(builder, ctx);
       }
     }
