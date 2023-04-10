@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <set>
 #include <sstream>
+#include <iostream>
 
 #include "expr.h"
 #include "parser/cst.h"
@@ -1151,11 +1152,14 @@ static Expr *dst_interpolate(CSTElement intp) {
   std::string total;
 
   MultiLineStringIndentationFSM fsm;
-  for (CSTElement i = intp.firstChildNode(); !i.empty(); i.nextSiblingNode()) {
-    if (args.size() % 2 == 0) fsm.accept(i);
+  CSTElement i = intp.firstChildNode();
+  while(!i.empty()) {
+    fsm.accept(i);
+    i.nextSiblingNode();
+    i.nextSiblingNode();
   }
 
-  for (CSTElement i = intp.firstChildNode(); !i.empty(); i.nextSiblingNode()) {
+  for (i = intp.firstChildNode(); !i.empty(); i.nextSiblingNode()) {
     if (args.size() % 2 == 0) {
       Literal *lit = dst_literal(i, fsm.prefix.size());
       if (regexp) total.append(lit->value);
