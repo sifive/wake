@@ -1514,17 +1514,18 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
      .pred(TOKEN_LSTR_RESUME, fmt().token(TOKEN_LSTR_RESUME))
      // No otherwise, this should fail if neither are true
     )
-    .fmt_while(
-      {TOKEN_NL, TOKEN_WS, TOKEN_LSTR_CONTINUE, TOKEN_LSTR_MID},
-      fmt().match(
-        pred(TOKEN_WS, fmt().token(TOKEN_WS))
-       .pred(TOKEN_NL, fmt().token(TOKEN_NL))
-       .pred(TOKEN_LSTR_CONTINUE, fmt().token(TOKEN_LSTR_CONTINUE))
-       .pred(TOKEN_LSTR_MID, fmt().token(TOKEN_LSTR_MID))
-      ))
+    .nest(
+      fmt().fmt_while(
+        {TOKEN_NL, TOKEN_WS, TOKEN_LSTR_CONTINUE, TOKEN_LSTR_MID},
+        fmt().match(
+          pred(TOKEN_LSTR_CONTINUE, fmt().freshline().token(TOKEN_LSTR_CONTINUE))
+         .pred(TOKEN_LSTR_MID, fmt().token(TOKEN_LSTR_MID))
+         .pred({TOKEN_WS, TOKEN_NL}, fmt().next())
+        )))
     .match(
-      pred(TOKEN_LSTR_PAUSE, fmt().token(TOKEN_LSTR_PAUSE))
-     .pred(TOKEN_LSTR_END, fmt().token(TOKEN_LSTR_END))
+      pred(TOKEN_LSTR_PAUSE, fmt().nest(fmt().freshline().token(TOKEN_LSTR_PAUSE)))
+     //  fmt().token(TOKEN_LSTR_END)) is not used below becase TOKEN_LSTR_END captures its leading spaces
+     .pred(TOKEN_LSTR_END, fmt().next().freshline().lit(wcl::doc::lit("%\"")))
      // No otherwise, this should fail if neither are true
     );
   // clang-format on
