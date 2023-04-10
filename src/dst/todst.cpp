@@ -27,7 +27,6 @@
 #include <algorithm>
 #include <set>
 #include <sstream>
-#include <iostream>
 
 #include "expr.h"
 #include "parser/cst.h"
@@ -1153,7 +1152,7 @@ static Expr *dst_interpolate(CSTElement intp) {
 
   MultiLineStringIndentationFSM fsm;
   CSTElement i = intp.firstChildNode();
-  while(!i.empty()) {
+  while (!i.empty()) {
     fsm.accept(i);
     i.nextSiblingNode();
     i.nextSiblingNode();
