@@ -499,7 +499,7 @@ export def dropUntil (f: a => Boolean): List a => List a =
 # Examples:
 # ```
 #   def l = (85, 4, 10, 3, Nil)
-#   find (_==10) l = Some (Pair 10 3)
+#   find (_==10) l = Some (Pair 10 2)
 #   find (_>9) l = Some (Pair 85 0)
 #   find (_<3) l = None
 # ```
