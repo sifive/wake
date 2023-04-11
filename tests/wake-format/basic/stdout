@@ -622,7 +622,7 @@ def tarball Unit =
             publish releaseAs = '%{release}', Nil
             publish releaseOn = '%{time}', Nil
             publish source =
-            ..%{wakeSourcesString}Nil
+              %{wakeSourcesString}Nil
         %"
     def testsManifestStr =
         "%
@@ -631,7 +631,7 @@ def tarball Unit =
             from wake import source , Nil
 
             publish source =
-            ..%{testSourcesString}Nil
+              %{testSourcesString}Nil
         %"
     # Create a manifest which describes the release and source files
     require Pass manifest = write "manifest.wake" manifestStr
