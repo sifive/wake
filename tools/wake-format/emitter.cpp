@@ -1484,52 +1484,139 @@ wcl::doc Emitter::walk_lambda(ctx_t ctx, CSTElement node) {
                .format(ctx, node.firstChildElement(), token_traits));
 }
 
+// TODO: extract and depend on this correctly
+struct MultiLineStringIndentationFSM {
+  std::string prefix;
+  bool priorWS;
+  bool noPrefix;
+
+  MultiLineStringIndentationFSM() : priorWS(false), noPrefix(true) {}
+  void accept(CSTElement lit);
+
+  static std::string::size_type analyze(CSTElement lit);
+};
+
+std::string::size_type MultiLineStringIndentationFSM::analyze(CSTElement lit) {
+  MultiLineStringIndentationFSM fsm;
+  fsm.accept(lit);
+  return fsm.prefix.size();
+}
+
+void MultiLineStringIndentationFSM::accept(CSTElement lit) {
+  for (CSTElement child = lit.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    switch (child.id()) {
+      case TOKEN_WS: {
+        std::string ws = child.segment().str();
+        if (noPrefix) {
+          prefix = std::move(ws);
+        } else {
+          // Find the longest common prefix
+          size_t e = std::min(ws.size(), prefix.size());
+          size_t i;
+          for (i = 0; i < e; ++i)
+            if (ws[i] != prefix[i]) break;
+          prefix.resize(i);
+        }
+        priorWS = true;
+        noPrefix = false;
+        break;
+      }
+
+      case TOKEN_LSTR_CONTINUE:
+      case TOKEN_MSTR_CONTINUE:
+      case TOKEN_LSTR_PAUSE:
+      case TOKEN_MSTR_PAUSE:
+        if (!priorWS) prefix.clear();
+        noPrefix = false;
+        break;
+
+      case TOKEN_NL:
+        priorWS = false;
+        break;
+
+      case TOKEN_LSTR_BEGIN:
+      case TOKEN_MSTR_BEGIN:
+      case TOKEN_LSTR_MID:
+      case TOKEN_MSTR_MID:
+      case TOKEN_LSTR_END:
+      case TOKEN_MSTR_END:
+      case TOKEN_LSTR_RESUME:
+      case TOKEN_MSTR_RESUME:
+      default:
+        break;
+    }
+  }
+}
+
 wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_LITERAL, node, "Expected CST_LITERAL");
 
-  // clang-format off
-  auto mstr_fmt = fmt()
-    .match(
-      pred(TOKEN_MSTR_BEGIN, fmt().token(TOKEN_MSTR_BEGIN))
-     .pred(TOKEN_MSTR_RESUME, fmt().token(TOKEN_MSTR_RESUME))
-     // No otherwise, this should fail if neither are true
-    )
-    .nest(
-    fmt().fmt_while(
-      {TOKEN_NL, TOKEN_WS, TOKEN_MSTR_CONTINUE, TOKEN_MSTR_MID},
-      fmt().match(
-        pred(TOKEN_MSTR_CONTINUE, fmt().freshline().token(TOKEN_MSTR_CONTINUE))
-       .pred(TOKEN_MSTR_MID, fmt().token(TOKEN_MSTR_MID))
-       .pred({TOKEN_WS, TOKEN_NL}, fmt().next())
-      )))
-    .match(
-      pred(TOKEN_MSTR_PAUSE, fmt().nest(fmt().freshline().token(TOKEN_MSTR_PAUSE)))
-     //  fmt().token(TOKEN_MSTR_END)) is not used below becase TOKEN_MSTR_END captures its leading spaces
-     .pred(TOKEN_MSTR_END, fmt().next().freshline().lit(wcl::doc::lit("\"\"\"")))
-     // No otherwise, this should fail if neither are true
-    );
+  std::string::size_type prefix_size = 0;
 
-  auto lstr_fmt = fmt()
+  if (node.firstChildElement().id() == TOKEN_MSTR_BEGIN ||
+      node.firstChildElement().id() == TOKEN_MSTR_RESUME ||
+      node.firstChildElement().id() == TOKEN_LSTR_BEGIN ||
+      node.firstChildElement().id() == TOKEN_LSTR_RESUME) {
+    prefix_size = MultiLineStringIndentationFSM::analyze(node);
+  }
+
+  // clang-format off
+
+  // Insert the proper amount of spaces to correctly indent the line relative to base identation
+  auto inset_line = fmt().escape([prefix_size](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node){
+           FMT_ASSERT(node.id() == TOKEN_WS, node, "Expected <TOKEN_WS>, Saw <" + std::string(symbolName(node.id())) + ">");
+           for (size_t i = prefix_size; i < node.fragment().segment().size(); i++) {
+             builder.append(".");
+           }
+           node.nextSiblingElement();
+  });
+
+  // This loop steps through the repeating part of a multiline string
+  // starting at the TOKEN_WS. Each iteration of the loop consumes everything
+  // expected by that chunk through to the start of the next loop.
+  //
+  // Ex:
+  //   TOKEN_WS <- loop 1
+  //   TOKEN_LSTR_CONTINUE
+  //   TOKEN_NL
+  //   TOKEN_WS <- loop 2
+  //   TOKEN_LSTR_CONTINUE
+  //   TOKEN_NL
+  //   TOKEN_WS <- loop 3
+  //   TOKEN_LSTR_CONTINUE
+  //   TOKEN_NL
+  //   TOKEN_NL <- loop 4
+  //   TOKEN_WS <- loop 5
+  //   TOKEN_LSTR_PAUSE
+  auto multiline_string_loop = fmt().fmt_while(
+    {TOKEN_NL, TOKEN_WS},
+    fmt().match(
+      pred(TOKEN_WS, fmt().freshline().join(inset_line)
+           .match(
+             pred(TOKEN_LSTR_CONTINUE, fmt().token(TOKEN_LSTR_CONTINUE).token(TOKEN_NL))
+            .pred(TOKEN_MSTR_CONTINUE, fmt().token(TOKEN_MSTR_CONTINUE).token(TOKEN_NL))
+            .pred(TOKEN_LSTR_PAUSE, fmt().token(TOKEN_LSTR_PAUSE))
+            .pred(TOKEN_MSTR_PAUSE, fmt().token(TOKEN_MSTR_PAUSE))
+            // otherwise: fail
+           ))
+
+      // The manditory newline is handle by the TOKEN_WS case, any other
+      // newlines are explicitly added by the user and must be maintained.
+      .pred(TOKEN_NL, fmt().token(TOKEN_NL))
+    ));
+
+  auto multiline_str_fmt = fmt()
     .match(
-      pred(TOKEN_LSTR_BEGIN, fmt().token(TOKEN_LSTR_BEGIN))
-     .pred(TOKEN_LSTR_RESUME, fmt().token(TOKEN_LSTR_RESUME))
-     // No otherwise, this should fail if neither are true
+      pred(TOKEN_LSTR_BEGIN, fmt().token(TOKEN_LSTR_BEGIN).token(TOKEN_NL))
+     .pred(TOKEN_MSTR_BEGIN, fmt().token(TOKEN_MSTR_BEGIN).token(TOKEN_NL))
+     .pred(TOKEN_LSTR_RESUME, fmt().token(TOKEN_LSTR_RESUME).token(TOKEN_NL))
+     .pred(TOKEN_MSTR_RESUME, fmt().token(TOKEN_MSTR_RESUME).token(TOKEN_NL))
+     // otherwise: fail
     )
-    .nest(
-      fmt().fmt_while(
-        {TOKEN_NL, TOKEN_WS, TOKEN_LSTR_CONTINUE, TOKEN_LSTR_MID},
-        fmt().match(
-          pred(TOKEN_LSTR_CONTINUE, fmt().freshline().token(TOKEN_LSTR_CONTINUE))
-         .pred(TOKEN_LSTR_MID, fmt().token(TOKEN_LSTR_MID))
-         .pred({TOKEN_WS, TOKEN_NL}, fmt().next())
-        )))
-    .match(
-      pred(TOKEN_LSTR_PAUSE, fmt().nest(fmt().freshline().token(TOKEN_LSTR_PAUSE)))
-     //  fmt().token(TOKEN_LSTR_END)) is not used below becase TOKEN_LSTR_END captures its leading spaces
-     .pred(TOKEN_LSTR_END, fmt().next().freshline().lit(wcl::doc::lit("%\"")))
-     // No otherwise, this should fail if neither are true
-    );
+    .nest(multiline_string_loop)
+    .fmt_if(TOKEN_LSTR_END, fmt().next().freshline().lit(wcl::doc::lit("%\"")))
+    .fmt_if(TOKEN_MSTR_END, fmt().next().freshline().lit(wcl::doc::lit("\"\"\"")));
   // clang-format on
 
   auto node_fmt = fmt().walk(DISPATCH(walk_placeholder));
@@ -1537,13 +1624,12 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
 
   // clang-format off
   MEMO_RET(fmt().match(
-    // TODO: starting 'pred()' function doesn't allow init lists
-    pred(ConstPredicate(false), fmt())
-   .pred({TOKEN_MSTR_BEGIN, TOKEN_MSTR_RESUME}, mstr_fmt)
-   .pred({TOKEN_LSTR_BEGIN, TOKEN_LSTR_RESUME}, lstr_fmt)
-   .pred([](wcl::doc_builder&, ctx_t, CSTElement& node,
-                  const token_traits_map_t&){ return node.isNode(); }, node_fmt)
-   .otherwise(token_fmt))
+      // TODO: starting 'pred()' function doesn't allow init lists
+      pred([](wcl::doc_builder&, ctx_t, CSTElement& node,
+              const token_traits_map_t&){ return node.isNode(); }, node_fmt)
+     .pred({TOKEN_LSTR_BEGIN, TOKEN_LSTR_RESUME, TOKEN_MSTR_BEGIN, TOKEN_MSTR_RESUME}, multiline_str_fmt)
+     .pred({TOKEN_LSTR_MID, TOKEN_MSTR_MID}, token_fmt)
+     .otherwise(token_fmt))
    .format(ctx, node.firstChildElement(), token_traits));
   // clang-format on
 }
