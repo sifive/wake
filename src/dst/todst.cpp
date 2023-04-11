@@ -1154,6 +1154,9 @@ static Expr *dst_interpolate(CSTElement intp) {
   CSTElement i = intp.firstChildNode();
   while (!i.empty()) {
     fsm.accept(i);
+
+    // INTERPOLATE = LITERAL (EXPR LITERAL)*
+    // Process the LITERAL and skip the EXPR
     i.nextSiblingNode();
     i.nextSiblingNode();
   }
