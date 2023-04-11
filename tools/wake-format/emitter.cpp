@@ -1092,6 +1092,72 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
                .format(ctx, node.firstChildElement(), token_traits));
 }
 
+static std::vector<CSTElement> collect_block_parts(CSTElement node) {
+  if (node.id() != CST_BLOCK) {
+    return {};
+  }
+
+  std::vector<CSTElement> parts = {};
+  for (CSTElement i = node.firstChildNode(); !i.empty(); i.nextSiblingNode()) {
+    parts.push_back(i);
+  }
+
+  return parts;
+}
+
+static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement node) {
+  if (node.id() != CST_BINARY) {
+    return {node};
+  }
+
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
+  CSTElement left = node.firstChildNode();
+  CSTElement op = left;
+  op.nextSiblingNode();
+  CSTElement right = op;
+  right.nextSiblingNode();
+
+  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
+        op.firstChildElement().fragment().segment().str() ==
+            collect_over.fragment().segment().str())) {
+    return {node};
+  }
+
+  auto collect = collect_left_binary(collect_over, left);
+  collect.push_back(right);
+
+  return collect;
+}
+
+static std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CSTElement node) {
+  if (node.id() != CST_BINARY) {
+    return {node};
+  }
+
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
+  CSTElement left = node.firstChildNode();
+  CSTElement op = left;
+  op.nextSiblingNode();
+  CSTElement right = op;
+  right.nextSiblingNode();
+
+  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
+        op.firstChildElement().fragment().segment().str() ==
+            collect_over.fragment().segment().str())) {
+    return {node};
+  }
+
+  std::vector<CSTElement> collect = {left};
+  auto right_collect = collect_right_binary(collect_over, right);
+
+  collect.insert(collect.end(), right_collect.begin(), right_collect.end());
+
+  return collect;
+>>>>>>> eb7171e0 (save work)
+}
+
 wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
                                               const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
@@ -1248,19 +1314,41 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_BLOCK, node, "Expected CST_BLOCK");
 
-  // clang-format off
-  auto body_fmt = fmt().match(
-    // Block level newlines should be re-emitted as these are the
-    // user creating 'pseudo-blocks'
-    pred(TOKEN_NL, fmt().newline().newline().next())
-   .pred(TOKEN_WS, fmt().next())
-   // Comments are followed by ws/nl/c that have already been tagged and will be
-   // handled later. Skip them for now.
-   .pred(TOKEN_COMMENT, fmt().consume_wsnlc())
-   .otherwise(fmt().freshline().walk(WALK_NODE)));
-  // clang-format on
+  auto parts = collect_block_parts(node);
 
-  MEMO_RET(fmt().walk_all(body_fmt).format(ctx, node.firstChildElement(), token_traits));
+  wcl::doc_builder builder;
+
+  for (size_t i = 0; i < parts.size() - 1; i++) {
+    CSTElement part = parts[i];
+    wcl::doc part_fmted = fmt().freshline().walk(WALK_NODE).compose(ctx.sub(builder), part, token_traits);
+
+    // The part had multiple lines, thus may not be directly next to another block
+    // if (part_fmted->newline_count() > 1) {
+    //     part = parts[i];
+    //     part_fmted = fmt().newline().newline().freshline().walk(WALK_NODE).compose(ctx.sub(builder), part, token_traits);
+    // }
+
+    builder.append(part_fmted);
+  }
+
+  CSTElement part = parts.back();
+  builder.append(fmt().newline().newline().freshline().walk(WALK_NODE).compose(ctx.sub(builder), part, token_traits));
+
+  MEMO_RET(std::move(builder).build());
+
+  // // clang-format off
+  // auto body_fmt = fmt().match(
+  //   // Block level newlines should be re-emitted as these are the
+  //   // user creating 'pseudo-blocks'
+  //   pred(TOKEN_NL, fmt().newline().newline().next())
+  //  .pred(TOKEN_WS, fmt().next())
+  //  // Comments are followed by ws/nl/c that have already been tagged and will be
+  //  // handled later. Skip them for now.
+  //  .pred(TOKEN_COMMENT, fmt().consume_wsnlc())
+  //  .otherwise(fmt().freshline().walk(WALK_NODE)));
+  // // clang-format on
+  //
+  // MEMO_RET(fmt().walk_all(body_fmt).format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
