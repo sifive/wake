@@ -1495,16 +1495,18 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
      .pred(TOKEN_MSTR_RESUME, fmt().token(TOKEN_MSTR_RESUME))
      // No otherwise, this should fail if neither are true
     )
-    .fmt_while(
-      {TOKEN_NL, TOKEN_WS, TOKEN_MSTR_CONTINUE},
+    .nest(
+    fmt().fmt_while(
+      {TOKEN_NL, TOKEN_WS, TOKEN_MSTR_CONTINUE, TOKEN_MSTR_MID},
       fmt().match(
-        pred(TOKEN_WS, fmt().token(TOKEN_WS))
-       .pred(TOKEN_NL, fmt().token(TOKEN_NL))
-       .pred(TOKEN_MSTR_CONTINUE, fmt().token(TOKEN_MSTR_CONTINUE))
-      ))
+        pred(TOKEN_MSTR_CONTINUE, fmt().freshline().token(TOKEN_MSTR_CONTINUE))
+       .pred(TOKEN_MSTR_MID, fmt().token(TOKEN_MSTR_MID))
+       .pred({TOKEN_WS, TOKEN_NL}, fmt().next())
+      )))
     .match(
-      pred(TOKEN_MSTR_PAUSE, fmt().token(TOKEN_MSTR_PAUSE))
-     .pred(TOKEN_MSTR_END, fmt().token(TOKEN_MSTR_END))
+      pred(TOKEN_MSTR_PAUSE, fmt().nest(fmt().freshline().token(TOKEN_MSTR_PAUSE)))
+     //  fmt().token(TOKEN_MSTR_END)) is not used below becase TOKEN_MSTR_END captures its leading spaces
+     .pred(TOKEN_MSTR_END, fmt().next().freshline().lit(wcl::doc::lit("\"\"\"")))
      // No otherwise, this should fail if neither are true
     );
 

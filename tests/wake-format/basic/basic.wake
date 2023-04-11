@@ -991,3 +991,62 @@ def someFunc a b =
         mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         %"
     s
+
+def hax1 = """
+  fun day.
+  happy day.
+"""
+
+def hax2 =
+  """
+  fun day.
+  happy day.
+  """
+
+def hax2 =
+  """
+    fun day.
+    happy day.
+  """
+
+def someFunc a b =
+    def s = """
+        set -e
+        sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+        mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+        """
+    s
+
+def someFunc a b =
+    def s = """
+        set -e
+        sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+        mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+    """
+    s
+
+def someFunc a b =
+    def s = """
+    set -e
+    sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+    mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+    """
+    s
+
+def someFunc a b =
+    def s =
+        """
+            set -e
+            sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+            mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+        """
+    s
+
+def someFunc a b =
+    def s =
+        """
+        set -e
+        sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+        mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+        """
+    s
