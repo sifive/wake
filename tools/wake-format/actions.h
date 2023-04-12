@@ -75,42 +75,12 @@ struct LiteralAction {
   }
 };
 
-struct TokenAction {
-  cst_id_t token_id;
-  TokenAction(cst_id_t token_id) : token_id(token_id) {}
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
-                         const token_traits_map_t& traits) {
-    FMT_ASSERT(node.id() == token_id, node,
-               "Token mismatch! Expected <" + std::string(symbolName(token_id)) + ">, Saw <" +
-                   std::string(symbolName(node.id())) + ">");
-
-    auto it = traits.find(node);
-    if (it != traits.end()) {
-      for (auto n : it->second.before_bound) {
-        builder.append(n.fragment().segment().str());
-        freshline(builder, ctx);
-      }
-    }
-
-    builder.append(node.fragment().segment().str());
-
-    if (it != traits.end()) {
-      for (auto n : it->second.after_bound) {
-        space(builder, 1);
-        builder.append(n.fragment().segment().str());
-        newline(builder, 0);
-      }
-    }
-
-    node.nextSiblingElement();
-  }
-};
-
 struct TokenReplaceAction {
   cst_id_t token_id;
-  const char* str;
+  const char* str = nullptr;
 
   TokenReplaceAction(cst_id_t token_id, const char* str) : token_id(token_id), str(str) {}
+  TokenReplaceAction(cst_id_t token_id) : token_id(token_id) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
@@ -121,12 +91,38 @@ struct TokenReplaceAction {
     auto it = traits.find(node);
     if (it != traits.end()) {
       for (auto n : it->second.before_bound) {
-        builder.append(n.fragment().segment().str());
+        if (n.id() == TOKEN_COMMENT) {
+          // Realign indent before writing the comment
+          freshline(builder, ctx);
+          builder.append(n.fragment().segment().str());
+          builder.append(wcl::doc::lit("\n"));
+          continue;
+        }
+
+        if (n.id() == TOKEN_NL) {
+          // Emit newlines without alignment. If this is a standalone newline
+          // then we shouldn't emit any trailing whitespace.
+          builder.append(wcl::doc::lit("\n"));
+          continue;
+        }
+
+        FMT_ASSERT(false, n,
+                   "Token mismatch! Expected <" + std::string(symbolName(TOKEN_COMMENT)) + "|" +
+                       std::string(symbolName(TOKEN_NL)) + ">, Saw <" +
+                       std::string(symbolName(n.id())) + ">");
+      }
+
+      // Realign indent in case we lost alighnment.
+      if (it->second.before_bound.size() > 0) {
         freshline(builder, ctx);
       }
     }
 
-    builder.append(str);
+    if (str == nullptr) {
+      builder.append(node.fragment().segment().str());
+    } else {
+      builder.append(str);
+    }
 
     if (it != traits.end()) {
       for (auto n : it->second.after_bound) {

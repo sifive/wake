@@ -23,7 +23,42 @@ def name Unit =
     def other = @here
 
     # not floating
-    
+
+    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    another
+
+def name Unit =
+    def other = @here
+
+    # not floating
+    # not floating
+    # not floating
+
+    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    another
+
+def name Unit =
+    def other = @here
+
+    # not floating
+    # not floating
+    # not floating
+
+    # not floating
+    # not floating
+
+    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    another
+
+def name Unit =
+    def other = @here
+
+    # not floating
+    # not floating
+    # not floating
+
+    # not floating
+    # not floating
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
 
@@ -37,7 +72,7 @@ def name Unit =
 def name Unit =
     def other = @here
     # not floating
-    
+
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
 
@@ -751,10 +786,10 @@ def loop aaaaa sssss eeeee =
 
 global export tuple Map k v =
     # The ordering function in use, over the key type only.  The `Tree` also
-    
-    
+
+
     # stores a version of this over the full `Pair` type, but some of the data
-    
+
     # manipulations require access to this minimal signature.
     Comparison: k => k => Order
     # The existing `Tree` type provides the storage and most of the manipulation
@@ -816,12 +851,12 @@ def a =
     def b = 5
 
     # comment
-    
+
     def c = 5
 
     def d = 5
     # comment
-    
+
     result
 
 # floating 1
