@@ -271,6 +271,8 @@ const char *symbolExample(int symbol) {
       return "binary";
     case TOKEN_P_EQUALS:
       return "=";
+    case TOKEN_P_ARROW:
+      return "->";
     case TOKEN_OP_DOT:
       return ".";
     case TOKEN_OP_QUANT:
@@ -506,6 +508,8 @@ const char *symbolName(int symbol) {
       return "TOKEN_KW_BINARY";
     case TOKEN_P_EQUALS:
       return "TOKEN_P_EQUALS";
+    case TOKEN_P_ARROW:
+      return "TOKEN_P_ARROW";
     case TOKEN_OP_DOT:
       return "TOKEN_OP_DOT";
     case TOKEN_OP_QUANT:

@@ -120,6 +120,7 @@ LexerOutput lex_wake(const uint8_t *s, const uint8_t *e) {
 
         // All special punctuation
         "\\" { return LexerOutput(TOKEN_P_BSLASH, s); }
+	"->" { return LexerOutput(TOKEN_P_ARROW,  s); }
         "="  { return LexerOutput(TOKEN_P_EQUALS, s); }
         ":"  { return LexerOutput(TOKEN_P_ASCRIBE,s); }
         "("  { return LexerOutput(TOKEN_P_POPEN,  s); }

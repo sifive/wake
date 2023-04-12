@@ -323,6 +323,8 @@ pattern_terms(R) ::= pattern_term(B).                  { R = B; }
 
 guard(R) ::=                        P_EQUALS(e). { R = 1; add(CST_GUARD, e); }
 guard(R) ::= KW_IF(b) expression(E) P_EQUALS(e). { R = 1; add(CST_GUARD, b, E, e); }
+guard(R) ::=                        P_ARROW(e). { R = 1; add(CST_GUARD, e); }
+guard(R) ::= KW_IF(b) expression(E) P_ARROW(e). { R = 1; add(CST_GUARD, b, E, e); }
 
 expression(R) ::= expression_binary_comma(B). { R = B; }
 
