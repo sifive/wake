@@ -121,7 +121,7 @@ tuple Plan =
   export FnInputs:     (List String => List String)
   # Modify the Runner's reported outputs (files created)
   export FnOutputs:    (List String => List String)
-  # Should job run in psuedoterminal
+  # Determines if job should run in psuedoterminal
   export IsAtty:       Boolean
 
 def isOnce: Persistence => Boolean = match _
