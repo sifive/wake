@@ -93,7 +93,7 @@ struct Formatter {
 
   Formatter<SeqAction<Action, LiteralAction>> lit(wcl::doc lit) { return {{action, {lit}}}; }
 
-  Formatter<SeqAction<Action, TokenAction>> token(cst_id_t id) { return {{action, {id}}}; }
+  Formatter<SeqAction<Action, TokenReplaceAction>> token(cst_id_t id) { return {{action, {id}}}; }
 
   Formatter<SeqAction<Action, TokenReplaceAction>> token(cst_id_t id, const char* str) {
     return {{action, {id, str}}};
