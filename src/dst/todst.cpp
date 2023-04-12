@@ -987,17 +987,6 @@ static void mstr_add(std::ostream &os, CSTElement token, std::string::size_type 
   }
 }
 
-struct MultiLineStringIndentationFSM {
-  std::string prefix;
-  bool priorWS;
-  bool noPrefix;
-
-  MultiLineStringIndentationFSM() : priorWS(false), noPrefix(true) {}
-  void accept(CSTElement lit);
-
-  static std::string::size_type analyze(CSTElement lit);
-};
-
 std::string::size_type MultiLineStringIndentationFSM::analyze(CSTElement lit) {
   MultiLineStringIndentationFSM fsm;
   fsm.accept(lit);

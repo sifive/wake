@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <cassert>
 
+#include "dst/todst.h"
 #include "parser/parser.h"
 
 #define FORMAT_OFF_COMMENT "# wake-format off"
@@ -1482,70 +1483,6 @@ wcl::doc Emitter::walk_lambda(ctx_t ctx, CSTElement node) {
                .space()
                .walk(is_expression, WALK_NODE)
                .format(ctx, node.firstChildElement(), token_traits));
-}
-
-// TODO: extract and depend on this correctly
-struct MultiLineStringIndentationFSM {
-  std::string prefix;
-  bool priorWS;
-  bool noPrefix;
-
-  MultiLineStringIndentationFSM() : priorWS(false), noPrefix(true) {}
-  void accept(CSTElement lit);
-
-  static std::string::size_type analyze(CSTElement lit);
-};
-
-std::string::size_type MultiLineStringIndentationFSM::analyze(CSTElement lit) {
-  MultiLineStringIndentationFSM fsm;
-  fsm.accept(lit);
-  return fsm.prefix.size();
-}
-
-void MultiLineStringIndentationFSM::accept(CSTElement lit) {
-  for (CSTElement child = lit.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
-    switch (child.id()) {
-      case TOKEN_WS: {
-        std::string ws = child.segment().str();
-        if (noPrefix) {
-          prefix = std::move(ws);
-        } else {
-          // Find the longest common prefix
-          size_t e = std::min(ws.size(), prefix.size());
-          size_t i;
-          for (i = 0; i < e; ++i)
-            if (ws[i] != prefix[i]) break;
-          prefix.resize(i);
-        }
-        priorWS = true;
-        noPrefix = false;
-        break;
-      }
-
-      case TOKEN_LSTR_CONTINUE:
-      case TOKEN_MSTR_CONTINUE:
-      case TOKEN_LSTR_PAUSE:
-      case TOKEN_MSTR_PAUSE:
-        if (!priorWS) prefix.clear();
-        noPrefix = false;
-        break;
-
-      case TOKEN_NL:
-        priorWS = false;
-        break;
-
-      case TOKEN_LSTR_BEGIN:
-      case TOKEN_MSTR_BEGIN:
-      case TOKEN_LSTR_MID:
-      case TOKEN_MSTR_MID:
-      case TOKEN_LSTR_END:
-      case TOKEN_MSTR_END:
-      case TOKEN_LSTR_RESUME:
-      case TOKEN_MSTR_RESUME:
-      default:
-        break;
-    }
-  }
 }
 
 wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
