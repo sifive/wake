@@ -787,6 +787,7 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
     case TOKEN_P_BCLOSE:
     case TOKEN_P_SOPEN:
     case TOKEN_P_SCLOSE:
+    case TOKEN_P_ARROW:
     case TOKEN_ID:
     case TOKEN_INDENT:
     case TOKEN_DEDENT:
