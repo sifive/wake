@@ -995,6 +995,7 @@ def someFunc a b =
 def x = "%
   this is the lowest / prefixed with <space><space>
   	This line is prefixed with <space><space><tab>
+	  This line is prefixed with <tab><space><space>
 	This line is prefixed with <tab>
     this line is prefixed with <space><space><space><space>
 %"
