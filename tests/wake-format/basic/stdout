@@ -1213,3 +1213,60 @@ def someFunc a b =
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         """
     s
+# Install wake into a target location
+def doInstall dest kind =
+    require Pass variant = toVariant kind
+    require Pass datfiles = sources "{@here}/share" `.*`
+
+    def binfilesResult = all variant
+    def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
+
+    # a comment
+    def a b = c
+
+    def a b =
+        def c = d
+
+        d
+
+    def a b =
+        def c = d
+
+        d
+
+    def a b =
+        def c = d
+
+        d
+
+    require Pass datinstall = findFailFn (installIn dest ".") datfiles
+
+    # comment
+    require Pass readmeSource = source "README.md"
+    require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
+    require Pass binfiles = binfilesResult
+
+    require Pass binfiles2 = binfilesResult2
+    else blah
+
+    require Pass bininstall = findFailFn releaseBin binfiles
+
+    require Pass binfiles2 =
+        def a = b
+
+        a
+
+    require Pass binfiles2 = binfilesResult2
+    require Pass binfiles2 = binfilesResult2
+
+    def outputs = readme, bininstall ++ datinstall
+
+    Pass outputs
+
+def doInstall dest kind =
+    def binfilesResult = all variant
+    def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
+
+    require Pass bin = val
+
+    Pass outputs
