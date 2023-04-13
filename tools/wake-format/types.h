@@ -36,14 +36,20 @@
 #define SPACE_PER_INDENT 4
 #define MAX_COLUMN_WIDTH 100
 
+enum class ExplodeOption {
+  // Explode must not be done
+  Prevent,
+  // Explode is allowed, but should be avoided
+  Allow,
+  // Explode must be done if possible
+  Prefer
+};
+
 struct ctx_t {
   size_t nest_level = 0;
   wcl::doc_state state = wcl::doc_state::identity();
 
-  // Expectation from a subtree
-  // 1: By default, don't explode unless you have to
-  // 2: if prefer_explode, explode if you can
-  bool prefer_explode = false;
+  ExplodeOption explode_option = ExplodeOption::Allow;
   bool nested_binop = false;
 
   ctx_t nest() const {
@@ -52,9 +58,21 @@ struct ctx_t {
     return copy;
   }
 
-  ctx_t explode() {
+  ctx_t prevent_explode() {
     ctx_t copy = *this;
-    copy.prefer_explode = true;
+    copy.explode_option = ExplodeOption::Prevent;
+    return copy;
+  }
+
+  ctx_t allow_explode() {
+    ctx_t copy = *this;
+    copy.explode_option = ExplodeOption::Allow;
+    return copy;
+  }
+
+  ctx_t prefer_explode() {
+    ctx_t copy = *this;
+    copy.explode_option = ExplodeOption::Prefer;
     return copy;
   }
 
@@ -75,7 +93,7 @@ struct ctx_t {
 
   bool operator==(const ctx_t& other) const {
     return state == other.state && nest_level == other.nest_level &&
-           prefer_explode == other.prefer_explode && nested_binop == other.nested_binop;
+           explode_option == other.explode_option && nested_binop == other.nested_binop;
   }
 };
 
@@ -151,6 +169,6 @@ struct std::hash<ctx_t> {
   size_t operator()(ctx_t const& ctx) const noexcept {
     auto hash = wcl::hash_combine(std::hash<wcl::doc_state>{}(ctx.state),
                                   std::hash<size_t>{}(ctx.nest_level));
-    return wcl::hash_combine(hash, std::hash<bool>{}(ctx.prefer_explode));
+    return wcl::hash_combine(hash, std::hash<ExplodeOption>{}(ctx.explode_option));
   }
 };

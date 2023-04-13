@@ -50,7 +50,17 @@ struct ConcatFormatter {
   }
 
   template <class CTR>
-  ConcatFormatter<SeqCatter<Catter, ExplodeCatter<CTR>>> explode(CTR ctr) {
+  ConcatFormatter<SeqCatter<Catter, PreferExplodeCatter<CTR>>> prefer_explode(CTR ctr) {
+    return {{catter, {ctr}}};
+  }
+
+  template <class CTR>
+  ConcatFormatter<SeqCatter<Catter, PreventExplodeCatter<CTR>>> prevent_explode(CTR ctr) {
+    return {{catter, {ctr}}};
+  }
+
+  template <class CTR>
+  ConcatFormatter<SeqCatter<Catter, AllowExplodeCatter<CTR>>> allow_explode(CTR ctr) {
     return {{catter, {ctr}}};
   }
 
@@ -105,7 +115,17 @@ struct Formatter {
   }
 
   template <class FMT>
-  Formatter<SeqAction<Action, ExplodeAction<FMT>>> explode(FMT formatter) {
+  Formatter<SeqAction<Action, PreferExplodeAction<FMT>>> prefer_explode(FMT formatter) {
+    return {{action, {formatter}}};
+  }
+
+  template <class FMT>
+  Formatter<SeqAction<Action, PreventExplodeAction<FMT>>> prevent_explode(FMT formatter) {
+    return {{action, {formatter}}};
+  }
+
+  template <class FMT>
+  Formatter<SeqAction<Action, AllowExplodeAction<FMT>>> allow_explode(FMT formatter) {
     return {{action, {formatter}}};
   }
 

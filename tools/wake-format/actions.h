@@ -185,14 +185,37 @@ struct NestAction {
 };
 
 template <class FMT>
-struct ExplodeAction {
+struct PreferExplodeAction {
   FMT formatter;
 
-  ExplodeAction(FMT formatter) : formatter(formatter) {}
+  PreferExplodeAction(FMT formatter) : formatter(formatter) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
-    builder.append(formatter.compose(ctx.explode().sub(builder), node, traits));
+    builder.append(formatter.compose(ctx.prefer_explode().sub(builder), node, traits));
+  }
+};
+
+template <class FMT>
+struct PreventExplodeAction {
+  FMT formatter;
+
+  PreventExplodeAction(FMT formatter) : formatter(formatter) {}
+
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    builder.append(formatter.compose(ctx.prevent_explode().sub(builder), node, traits));
+  }
+};
+template <class FMT>
+struct AllowExplodeAction {
+  FMT formatter;
+
+  AllowExplodeAction(FMT formatter) : formatter(formatter) {}
+
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    builder.append(formatter.compose(ctx.allow_explode().sub(builder), node, traits));
   }
 };
 
