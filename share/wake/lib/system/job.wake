@@ -214,8 +214,8 @@ export def makePlan (label: String) (visible: List Path) (command: String): Plan
   | setPlanLabel label
 
 # Set reasonable defaults for all Plan arguments
-def id x = x
 export def makeExecPlan (cmd: List String) (visible: List Path): Plan =
+  def id x = x
   Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share False Nil (\_ True) defaultUsage id id False
 
 export def makeShellPlan (script: String) (visible: List Path): Plan =
