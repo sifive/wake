@@ -1503,9 +1503,7 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   // Insert the proper amount of spaces to correctly indent the line relative to base identation
   auto inset_line = fmt().escape([prefix_size](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node){
            FMT_ASSERT(node.id() == TOKEN_WS, node, "Expected <TOKEN_WS>, Saw <" + std::string(symbolName(node.id())) + ">");
-           for (size_t i = prefix_size; i < node.fragment().segment().size(); i++) {
-             builder.append(" ");
-           }
+           builder.append(node.fragment().segment().str().substr(prefix_size));
            node.nextSiblingElement();
   });
 

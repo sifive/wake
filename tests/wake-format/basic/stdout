@@ -1024,17 +1024,17 @@ def a =
     require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
     x
 
-def hax1 = "%
+def x = "%
     fun day.
     happy day.
 %"
 
-def hax2 = "%
+def x = "%
     fun day.
     happy day.
 %"
 
-def hax2 = "%
+def x = "%
     fun day.
     happy day.
 %"
@@ -1084,17 +1084,24 @@ def someFunc a b =
         %"
     s
 
-def hax1 = """
+def x = "%
+      this is the lowest / prefixed with <space><space>
+      	This line is prefixed with <space><space><tab>
+    	This line is prefixed with <tab>
+        this line is prefixed with <space><space><space><space>
+%"
+
+def x = """
     fun day.
     happy day.
 """
 
-def hax2 = """
+def x = """
     fun day.
     happy day.
 """
 
-def hax2 = """
+def x = """
     fun day.
     happy day.
 """
