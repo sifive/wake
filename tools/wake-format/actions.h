@@ -207,6 +207,7 @@ struct PreventExplodeAction {
     builder.append(formatter.compose(ctx.prevent_explode().sub(builder), node, traits));
   }
 };
+
 template <class FMT>
 struct AllowExplodeAction {
   FMT formatter;
