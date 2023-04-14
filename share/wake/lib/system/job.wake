@@ -93,13 +93,14 @@ tuple Plan =
   export Label:        String
   # The command-line arguments (the first is the command to run)
   export Command:      List String
-  # Only these files should be available to the command
+  # Only these files and directories should be available to the command
   export Visible:      List Path
   # KEY=VALUE environment variables fed to the command
   export Environment:  List String
-  # The directory in which the command should be run
+  # The working directory in which the command should be run
   export Directory:    String
-  # The file to which standard input should be connected
+  # The file to which standard input should be connected.
+  # An empty string `""` is interpreted as there being no `stdin` file.
   export Stdin:        String
   # How should standard output be displayed during a build
   export Stdout:       LogLevel
@@ -109,9 +110,10 @@ tuple Plan =
   export Echo:         LogLevel
   # See Persistence table above
   export Persistence:  Persistence
-  # Must run directly in the local workspace; no output detection performed
+  # <Deprecated>
   export LocalOnly:    Boolean
-  # The resources a runner must provide to the job (licenses/etc)
+  # The resources a runner must provide to the job (licenses/etc).
+  # These strings are uninterpreted and are only meaningful to the right runners.
   export Resources:    List String
   # Reject from consideration Runners which the Plan deems inappropriate
   export RunnerFilter: Runner => Boolean
