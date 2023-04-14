@@ -725,6 +725,8 @@ def x + y =
 
 def tool (dir: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) = ""
 
+def tool (dir: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) = ""
+
 def Pair _ _: Pair Integer String =
     Pair 44 "as"
 
