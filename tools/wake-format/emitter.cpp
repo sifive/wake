@@ -200,6 +200,11 @@ static size_t count_trailing_newlines(const token_traits_map_t& traits, const CS
     token = curr_rhs;
   }
 
+  // We only bind to tokens not nodes, so we need to push in further
+  if (token.isNode()) {
+    return count_trailing_newlines(traits, token);
+  }
+
   auto it = traits.find(token);
   if (it == traits.end()) {
     return 0;
@@ -212,6 +217,32 @@ static size_t count_allowed_newlines(const token_traits_map_t& traits, const CST
   FMT_ASSERT(node.isNode(), node,
              "Expected node, Saw <" + std::string(symbolName(node.id())) + ">");
   return count_leading_newlines(traits, node) + count_trailing_newlines(traits, node);
+}
+
+// Counts all newlines allowd before and after a require header. Ignores the require body
+// - require a = b # comment -> 1
+// - require a = b
+//   else c # comment -> 1
+// - # comment
+//   require a = b # comment -> 2
+// - require a = b -> 0
+// - require a = b
+//   else c -> 0
+static size_t count_allowed_require_header_newlines(const token_traits_map_t& traits,
+                                                    const CSTElement& node) {
+  FMT_ASSERT(node.id() == CST_REQUIRE, node,
+             "Expected <CST_REQUIRE>, Saw <" + std::string(symbolName(node.id())) + ">");
+
+  CSTElement header_end = node.firstChildNode();  // lhs
+  header_end.nextSiblingNode();                   // rhs
+
+  CSTElement maybe_req_else = header_end;
+  maybe_req_else.nextSiblingNode();
+  if (!maybe_req_else.empty() && maybe_req_else.id() == CST_REQ_ELSE) {
+    header_end = maybe_req_else;
+  }
+
+  return count_leading_newlines(traits, node) + count_trailing_newlines(traits, header_end);
 }
 
 static size_t count_allowed_newlines(const token_traits_map_t& traits,
@@ -1828,7 +1859,8 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
 
                      // if the header of the this require is multiline
                      // force a split.
-                     if (builder->newline_count() > count_allowed_newlines(traits, node)) {
+                     if (builder->newline_count() >
+                         count_allowed_require_header_newlines(traits, node)) {
                        return true;
                      }
 
@@ -1840,7 +1872,8 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                      CSTElement copy = inner.firstChildElement();
                      wcl::doc fmted =
                          fmt().join(pre_body_fmt).compose(ctx.sub(builder), copy, token_traits);
-                     if (fmted->newline_count() > count_allowed_newlines(traits, inner) + 1) {
+                     if (fmted->newline_count() >
+                         count_allowed_require_header_newlines(traits, inner) + 1) {
                        return true;
                      }
 

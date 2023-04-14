@@ -1275,6 +1275,10 @@ def tarball Unit =
         | s # a comment
 
     def x = y
+    def srcs = allSources # a comment
+    def x = y
+    def srcs = allSources # a comment
+    def x = y
 
     x
 
@@ -1284,5 +1288,28 @@ def tarball Unit =
         | s # a comment
 
     require x = y
+    require srcs = allSources # a comment
+    require x = y
+    require srcs = allSources # a comment
+    require x = y
+
+    require Pass binfiles2 = binfilesResult2
+    else
+        blah # a comment
+
+    require x = y
+
+    require Pass binfiles2 = binfilesResult2 # a comment
+    else
+        blah # a comment
+
+    require x = y
+
+    require Pass binfiles2 = binfilesResult2 # a comment
+    else blah
+
+    require srcs = allSources # a comment
+    require x = y
+    require srcs = allSources # a comment
 
     x
