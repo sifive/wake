@@ -932,3 +932,129 @@ def a =
       !b
   require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
   x
+
+def x = "%
+  fun day.
+  happy day.
+%"
+
+def x =
+  "%
+  fun day.
+  happy day.
+  %"
+
+def x =
+  "%
+    fun day.
+    happy day.
+  %"
+
+def someFunc a b =
+    def s = "%
+        set -e
+        sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+        mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+        %"
+    s
+
+def someFunc a b =
+    def s = "%
+        set -e
+        sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+        mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+    %"
+    s
+
+def someFunc a b =
+    def s = "%
+    set -e
+    sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+    mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+    %"
+    s
+
+def someFunc a b =
+    def s =
+        "%
+            set -e
+            sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+            mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+        %"
+    s
+
+def someFunc a b =
+    def s =
+        "%
+        set -e
+        sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+        mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+        %"
+    s
+
+def x = "%
+  this is the lowest / prefixed with <space><space>
+  	This line is prefixed with <space><space><tab>
+	  This line is prefixed with <tab><space><space>
+	This line is prefixed with <tab>
+    this line is prefixed with <space><space><space><space>
+%"
+
+def x = """
+  fun day.
+  happy day.
+"""
+
+def x =
+  """
+  fun day.
+  happy day.
+  """
+
+def x =
+  """
+    fun day.
+    happy day.
+  """
+
+def someFunc a b =
+    def s = """
+        set -e
+        sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+        mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+        """
+    s
+
+def someFunc a b =
+    def s = """
+        set -e
+        sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+        mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+    """
+    s
+
+def someFunc a b =
+    def s = """
+    set -e
+    sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+    mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+    """
+    s
+
+def someFunc a b =
+    def s =
+        """
+            set -e
+            sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+            mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+        """
+    s
+
+def someFunc a b =
+    def s =
+        """
+        set -e
+        sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+        mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+        """
+    s

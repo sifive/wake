@@ -34,4 +34,15 @@ struct ExprParser {
   std::unique_ptr<Expr> expr(DiagnosticReporter &reporter);
 };
 
+struct MultiLineStringIndentationFSM {
+  std::string prefix;
+  bool priorWS;
+  bool noPrefix;
+
+  MultiLineStringIndentationFSM() : priorWS(false), noPrefix(true) {}
+  void accept(CSTElement lit);
+
+  static std::string::size_type analyze(CSTElement lit);
+};
+
 #endif
