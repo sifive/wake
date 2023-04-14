@@ -630,7 +630,6 @@ def tarball Unit =
         | filter (!matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
         | filter (!matches `(.*/)*\.gitignore` _.getPathName) # omit git files
 
-
     def Pair testPaths wakePaths = splitBy (matches `tests/.*` _.getPathName) srcs
 
     def wakeSourcesString =
@@ -784,8 +783,7 @@ def f0 =
         (
             aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
             aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        )
-        = x + 1
+        ) = x + 1
         x b = x + 0
 
 export def vfoldl (combiningFn: accum => element => accum): accum => Vector element => accum =

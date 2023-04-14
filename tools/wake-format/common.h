@@ -68,3 +68,15 @@ inline void freshline(wcl::doc_builder& builder, ctx_t ctx) {
     assert(false);
   }
 }
+
+inline void breakline(wcl::doc_builder& builder, ctx_t ctx) {
+  auto merged = ctx.sub(builder);
+
+  // The current line has characters and thus isn't "finished"
+  // add a newline to upgrade it to a line.
+  if (merged->last_width() != 0) {
+    newline(builder, 0);
+  }
+
+  newline(builder, 0);
+}

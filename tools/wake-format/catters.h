@@ -43,6 +43,10 @@ struct FreshlineCatter {
   ALWAYS_INLINE void cat(wcl::doc_builder& builder, ctx_t ctx) { freshline(builder, ctx); }
 };
 
+struct BreaklineCatter {
+  ALWAYS_INLINE void cat(wcl::doc_builder& builder, ctx_t ctx) { breakline(builder, ctx); }
+};
+
 struct LiteralCatter {
   wcl::doc lit;
   LiteralCatter(wcl::doc lit) : lit(lit) {}

@@ -65,6 +65,13 @@ struct FreshlineAction {
   }
 };
 
+struct BreaklineAction {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    breakline(builder, ctx);
+  }
+};
+
 struct LiteralAction {
   wcl::doc lit;
   LiteralAction(wcl::doc lit) : lit(lit) {}

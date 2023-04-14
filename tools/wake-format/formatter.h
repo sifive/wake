@@ -40,7 +40,10 @@ struct ConcatFormatter {
   }
 
   ConcatFormatter<SeqCatter<Catter, NewlineCatter>> newline() { return {{catter, {}}}; }
+
   ConcatFormatter<SeqCatter<Catter, FreshlineCatter>> freshline() { return {{catter, {}}}; }
+
+  ConcatFormatter<SeqCatter<Catter, BreaklineCatter>> breakline() { return {{catter, {}}}; }
 
   ConcatFormatter<SeqCatter<Catter, LiteralCatter>> lit(wcl::doc lit) { return {{catter, {lit}}}; }
 
@@ -97,9 +100,33 @@ struct Formatter {
 
   Formatter<SeqAction<Action, SpaceAction>> space(uint8_t count = 1) { return {{action, {count}}}; }
 
+  // Unconditionally inserts a \n
   Formatter<SeqAction<Action, NewlineAction>> newline() { return {{action, {}}}; }
 
+  // Moves to the next "best" position for a "fresh line"
+  //
+  // A freshline is defined as a line with exactly nest level * space per nest whitespaces
+  // The minimal amount of emission to complete this is done.
+  //
+  // Ex: (assume nest level = 1, space = 4)
+  //
+  // line = ""  -> emits "    " so line = "    "
+  // line = "    text" -> emits "\n    " so line = "    "
+  // line = "  " -> emits "  " so line = "    "
   Formatter<SeqAction<Action, FreshlineAction>> freshline() { return {{action, {}}}; }
+
+  // Ensures a "break" between the previous emitted content and the emit pointer.
+  // The previous content does not require a newline as it is auto detected.
+  // Each call to breakline will increase the break size by one
+  //
+  // A break is defined as two lines with a \n between them (Ex: line\n\nline\n)
+  // The minimal amount of emission to complete this is done.
+  //
+  // Ex:
+  // line = "text"  -> emits "\n\n"
+  // line = "text\n"  -> emits "\n"
+  // line = "text\n\n" -> emits "\n"
+  Formatter<SeqAction<Action, BreaklineAction>> breakline() { return {{action, {}}}; }
 
   Formatter<SeqAction<Action, LiteralAction>> lit(wcl::doc lit) { return {{action, {lit}}}; }
 
