@@ -1268,3 +1268,21 @@ def doInstall dest kind =
     require Pass bin = val
 
     Pass outputs
+
+def tarball Unit =
+    def srcs =
+        allSources
+        | s # a comment
+
+    def x = y
+
+    x
+
+def tarball Unit =
+    require srcs =
+        allSources
+        | s # a comment
+
+    require x = y
+
+    x
