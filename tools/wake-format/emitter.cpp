@@ -379,7 +379,7 @@ static inline bool is_simple_apply(wcl::doc_builder& builder, ctx_t ctx, CSTElem
 
   auto parts = collect_apply_parts(node);
 
-  if (parts.size() != 2) {
+  if (parts.size() > 2) {
     return false;
   }
 
