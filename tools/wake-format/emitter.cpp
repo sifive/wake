@@ -1811,8 +1811,8 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
 
   MEMO_RET(fmt()
                .join(pre_body_fmt)
-               // Returns true if the body should be separated from the currently require
-               .fmt_if_else(
+               // Returns true if the body should be separated from the current require
+               .fmt_if(
                    [this, node, pre_body_fmt](const wcl::doc_builder& builder, ctx_t ctx,
                                               const CSTElement& inner,
                                               const token_traits_map_t& traits) {
@@ -1846,7 +1846,8 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
 
                      return false;
                    },
-                   fmt().breakline().freshline(), fmt().freshline())
+                   fmt().breakline())
+               .freshline()
                .walk(WALK_NODE)
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));
