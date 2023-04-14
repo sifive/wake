@@ -89,7 +89,10 @@ export data Persistence =
 
 # A Plan describes a not-yet-executed Job
 tuple Plan =
-  # The label used when showing the command during execution
+  # The label used when showing the command during execution. This is recommended for efficient
+  # debugging and locating job information. For example, the label will show up in the terminal during
+  # job execution, in a job's progress bar in the terminal, when running the `wake --last` command,
+  # and in the `<..>.in.json` and `<...>.out.json` files in the `.build` directory.
   export Label:        String
   # The command-line arguments (the first is the command to run)
   export Command:      List String
