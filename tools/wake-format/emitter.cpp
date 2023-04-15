@@ -302,6 +302,19 @@ static wcl::doc binop_rhs_separator(const CSTElement& op) {
   }
 }
 
+static std::vector<CSTElement> collect_block_parts(CSTElement node) {
+  if (node.id() != CST_BLOCK) {
+    return {};
+  }
+
+  std::vector<CSTElement> parts = {};
+  for (CSTElement i = node.firstChildNode(); !i.empty(); i.nextSiblingNode()) {
+    parts.push_back(i);
+  }
+
+  return parts;
+}
+
 static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement node) {
   if (node.id() != CST_BINARY) {
     return {node};
@@ -1121,72 +1134,6 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
                .ws()
                .walk(WALK_NODE)
                .format(ctx, node.firstChildElement(), token_traits));
-}
-
-static std::vector<CSTElement> collect_block_parts(CSTElement node) {
-  if (node.id() != CST_BLOCK) {
-    return {};
-  }
-
-  std::vector<CSTElement> parts = {};
-  for (CSTElement i = node.firstChildNode(); !i.empty(); i.nextSiblingNode()) {
-    parts.push_back(i);
-  }
-
-  return parts;
-}
-
-static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement node) {
-  if (node.id() != CST_BINARY) {
-    return {node};
-  }
-
-  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
-  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
-  CSTElement left = node.firstChildNode();
-  CSTElement op = left;
-  op.nextSiblingNode();
-  CSTElement right = op;
-  right.nextSiblingNode();
-
-  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
-        op.firstChildElement().fragment().segment().str() ==
-            collect_over.fragment().segment().str())) {
-    return {node};
-  }
-
-  auto collect = collect_left_binary(collect_over, left);
-  collect.push_back(right);
-
-  return collect;
-}
-
-static std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CSTElement node) {
-  if (node.id() != CST_BINARY) {
-    return {node};
-  }
-
-  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
-  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
-  CSTElement left = node.firstChildNode();
-  CSTElement op = left;
-  op.nextSiblingNode();
-  CSTElement right = op;
-  right.nextSiblingNode();
-
-  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
-        op.firstChildElement().fragment().segment().str() ==
-            collect_over.fragment().segment().str())) {
-    return {node};
-  }
-
-  std::vector<CSTElement> collect = {left};
-  auto right_collect = collect_right_binary(collect_over, right);
-
-  collect.insert(collect.end(), right_collect.begin(), right_collect.end());
-
-  return collect;
->>>>>>> eb7171e0 (save work)
 }
 
 wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,

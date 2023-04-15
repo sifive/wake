@@ -675,6 +675,7 @@ def tarball Unit =
         def cmd =
             def gnutar = which "gnutar"
             def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
+
             def files =
                 map getPathName (manifest, testManifest, spec, srcs)
                 | sortBy (_ <* _)
@@ -1081,7 +1082,9 @@ def a = Some ""
 
 def a =
     def x = if a then b, else !b
+
     require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
+
     x
 
 def x = "%
@@ -1106,6 +1109,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         %"
+
     s
 
 def someFunc a b =
@@ -1115,6 +1119,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         %"
+
     s
 
 def someFunc a b =
@@ -1124,6 +1129,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         %"
+
     s
 
 def someFunc a b =
@@ -1133,6 +1139,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         %"
+
     s
 
 def someFunc a b =
@@ -1142,6 +1149,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         %"
+
     s
 
 def x = "%
@@ -1174,6 +1182,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         """
+
     s
 
 def someFunc a b =
@@ -1183,6 +1192,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         """
+
     s
 
 def someFunc a b =
@@ -1192,6 +1202,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         """
+
     s
 
 def someFunc a b =
@@ -1201,6 +1212,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         """
+
     s
 
 def someFunc a b =
@@ -1210,7 +1222,9 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         """
+
     s
+
 # Install wake into a target location
 def doInstall dest kind =
     require Pass variant = toVariant kind
