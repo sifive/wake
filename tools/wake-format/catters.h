@@ -74,13 +74,35 @@ struct NestCatter {
 };
 
 template <class CTR>
-struct ExplodeCatter {
+struct PreferExplodeCatter {
   CTR catter;
 
-  ExplodeCatter(CTR catter) : catter(catter) {}
+  PreferExplodeCatter(CTR catter) : catter(catter) {}
 
   ALWAYS_INLINE void cat(wcl::doc_builder& builder, ctx_t ctx) {
-    builder.append(catter.concat(ctx.explode().sub(builder)));
+    builder.append(catter.concat(ctx.prefer_explode().sub(builder)));
+  }
+};
+
+template <class CTR>
+struct PreventExplodeCatter {
+  CTR catter;
+
+  PreventExplodeCatter(CTR catter) : catter(catter) {}
+
+  ALWAYS_INLINE void cat(wcl::doc_builder& builder, ctx_t ctx) {
+    builder.append(catter.concat(ctx.prevent_explode().sub(builder)));
+  }
+};
+
+template <class CTR>
+struct AllowExplodeCatter {
+  CTR catter;
+
+  AllowExplodeCatter(CTR catter) : catter(catter) {}
+
+  ALWAYS_INLINE void cat(wcl::doc_builder& builder, ctx_t ctx) {
+    builder.append(catter.concat(ctx.allow_explode().sub(builder)));
   }
 };
 

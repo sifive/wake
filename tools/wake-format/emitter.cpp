@@ -1040,7 +1040,7 @@ wcl::optional<wcl::doc> Emitter::combine_apply_constructor(ctx_t ctx,
   }
 
   builder.append(lhs_fmt);
-  builder.append(walk_node(ctx.sub(builder).explode(), rhs));
+  builder.append(walk_node(ctx.sub(builder).prefer_explode(), rhs));
 
   return {wcl::in_place_t{}, std::move(builder).build()};
 }
@@ -1050,11 +1050,11 @@ wcl::optional<wcl::doc> Emitter::combine_apply_explode_all(ctx_t ctx,
   wcl::doc_builder builder;
   for (size_t i = 0; i < parts.size() - 1; i++) {
     CSTElement part = parts[i];
-    builder.append(
-        fmt().walk(WALK_NODE).freshline().compose(ctx.sub(builder).explode(), part, token_traits));
+    builder.append(fmt().walk(WALK_NODE).freshline().compose(ctx.sub(builder).prefer_explode(),
+                                                             part, token_traits));
   }
 
-  builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
+  builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts.back()));
 
   return {wcl::in_place_t{}, std::move(builder).build()};
 }
@@ -1068,8 +1068,11 @@ wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   std::vector<wcl::optional<wcl::doc>> choices = {
       combine_apply_flat(ctx, parts),
       combine_apply_constructor(ctx, parts),
-      combine_apply_explode_all(ctx, parts),
   };
+
+  if (ctx.explode_option != ExplodeOption::Prevent) {
+    choices.push_back(combine_apply_explode_all(ctx, parts));
+  }
 
   MEMO_RET(select_best_choice(choices));
 }
@@ -1081,7 +1084,12 @@ wcl::doc Emitter::walk_arity(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(walk_placeholder(ctx, node));
+  MEMO_RET(fmt()
+               .walk(WALK_NODE)
+               .token(TOKEN_P_ASCRIBE)
+               .ws()
+               .walk(WALK_NODE)
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
@@ -1107,7 +1115,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_first(CSTElement over, ctx_t ct
   wcl::doc_builder builder;
 
   CSTElement part = parts[0];
-  builder.append(walk_node(ctx.explode(), part));
+  builder.append(walk_node(ctx.prefer_explode(), part));
   builder.append(place_binop(over, false, ctx.sub(builder)));
 
   for (size_t i = 1; i < parts.size() - 1; i++) {
@@ -1130,7 +1138,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_last(CSTElement over, ctx_t ctx
     builder.append(place_binop(over, false, ctx.sub(builder)));
   }
 
-  builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
+  builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts.back()));
   return {wcl::in_place_t{}, std::move(builder).build()};
 }
 
@@ -1140,11 +1148,11 @@ wcl::optional<wcl::doc> Emitter::combine_explode_all(CSTElement over, ctx_t ctx,
 
   for (size_t i = 0; i < parts.size() - 1; i++) {
     CSTElement part = parts[i];
-    builder.append(walk_node(ctx.sub(builder).explode(), part));
+    builder.append(walk_node(ctx.sub(builder).prefer_explode(), part));
     builder.append(place_binop(over, false, ctx.sub(builder)));
   }
 
-  builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
+  builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts.back()));
   return {wcl::in_place_t{}, std::move(builder).build()};
 }
 
@@ -1152,7 +1160,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_first_compress(
     CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
-  builder.append(walk_node(ctx.sub(builder).explode(), parts[0]));
+  builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts[0]));
   builder.append(place_binop(over, true, ctx.sub(builder)));
 
   for (size_t i = 1; i < parts.size() - 1; i++) {
@@ -1180,7 +1188,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_last_compress(
     builder.append(place_binop(over, true, ctx.sub(builder)));
   }
 
-  builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
+  builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts.back()));
 
   wcl::doc doc = std::move(builder).build();
   if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
@@ -1325,7 +1333,7 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_DEF)
                .ws()
-               .walk(is_expression, DISPATCH(walk_no_edit))
+               .prevent_explode(fmt().walk(is_expression, WALK_NODE))
                .consume_wsnlc()
                .space()
                .token(TOKEN_P_EQUALS)
@@ -1402,35 +1410,36 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
               fmt().walk_all(fmt().next()).newline())    // garbage format to fail NL check
           .format(ctx, node.firstChildElement(), token_traits);
 
-  if (!fits_no_nl->has_newline() && !ctx.prefer_explode) {
+  if (!fits_no_nl->has_newline() && ctx.explode_option != ExplodeOption::Prefer) {
     MEMO_RET(fits_no_nl);
   }
 
-  MEMO_RET(fmt()
-               .token(TOKEN_KW_IF)
-               .consume_wsnlc()
-               .space()
-               .walk(is_expression, WALK_NODE)  // if cond
-               .consume_wsnlc()
-               .space()
-               .token(TOKEN_KW_THEN)
-               .consume_wsnlc()
-               .nest(fmt().freshline().walk(is_expression, WALK_NODE))  // true body
-               .consume_wsnlc()
-               .freshline()
-               .token(TOKEN_KW_ELSE)
-               .consume_wsnlc()
-               // clang-format off
-               // False body
-               .match(
-                 pred(ConstPredicate(false), fmt())
-                 // For an 'else if' block, we explode in the explode case to prevent partial flat emission
-                .pred({CST_IF, CST_MATCH}, fmt().space().explode(fmt().walk(WALK_NODE)))
-                .pred(is_expression, fmt().nest(fmt().freshline().walk(WALK_NODE)))
-                // fallthrough is fail
-               )
-               // clang-format on
-               .format(ctx, node.firstChildElement(), token_traits));
+  MEMO_RET(
+      fmt()
+          .token(TOKEN_KW_IF)
+          .consume_wsnlc()
+          .space()
+          .walk(is_expression, WALK_NODE)  // if cond
+          .consume_wsnlc()
+          .space()
+          .token(TOKEN_KW_THEN)
+          .consume_wsnlc()
+          .nest(fmt().freshline().walk(is_expression, WALK_NODE))  // true body
+          .consume_wsnlc()
+          .freshline()
+          .token(TOKEN_KW_ELSE)
+          .consume_wsnlc()
+          // clang-format off
+          // False body
+          .match(
+            pred(ConstPredicate(false), fmt())
+            // For an 'else if' block, we explode in the explode case to prevent partial flat emission
+           .pred({CST_IF, CST_MATCH}, fmt().space().prefer_explode(fmt().walk(WALK_NODE)))
+           .pred(is_expression, fmt().nest(fmt().freshline().walk(WALK_NODE)))
+           // fallthrough is fail
+          )
+          // clang-format on
+          .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
