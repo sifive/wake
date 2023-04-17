@@ -1251,9 +1251,11 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   }
 
   if (ctx.explode_option == ExplodeOption::Prevent) {
-    MEMO_RET(select_best_choice({
-        combine_flat(op_token, ctx.binop(), parts),
-    }));
+    auto doc = combine_flat(op_token, ctx.binop(), parts);
+    if (!doc) {
+      FMT_ASSERT(false, op_token, "Failed to flat format binop");
+    }
+    MEMO_RET(*doc);
   }
 
   if (!ctx.nested_binop && (is_binop_matching_str(op_token, TOKEN_OP_DOLLAR, "$") ||
