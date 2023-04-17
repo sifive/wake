@@ -764,9 +764,14 @@ global export data Let =
 def x + y =
     add x y
 
+export def (argument: a) | (pipeFn: a => b): b = pipeFn argument
+
 def tool (dir: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) = ""
 
 def tool (dir: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) = ""
+
+def Pair _ _: Pair Integer String =
+    Pair 44 "as"
 
 def Pair _ _: Pair Integer String =
     Pair 44 "as"

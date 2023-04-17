@@ -114,18 +114,6 @@ static inline bool is_simple_literal(wcl::doc_builder& builder, ctx_t ctx, CSTEl
   return part.empty();
 }
 
-static inline bool contains_req_else(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
-                                     const token_traits_map_t& traits) {
-  CSTElement copy = node;
-  while (!copy.empty()) {
-    if (copy.id() == CST_REQ_ELSE) {
-      return true;
-    }
-    copy.nextSiblingElement();
-  }
-  return false;
-}
-
 static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
   return lhs->height() < rhs->height();
 }
@@ -255,10 +243,8 @@ static size_t count_allowed_newlines(const token_traits_map_t& traits,
 static wcl::doc select_best_choice(std::vector<wcl::optional<wcl::doc>> choices) {
   std::vector<wcl::doc> lte_fmt = {};
   std::vector<wcl::doc> gt_fmt = {};
-  int i = 0;
 
   for (auto choice_opt : choices) {
-    i++;
     if (!choice_opt) {
       continue;
     }
@@ -1130,6 +1116,7 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   MEMO_RET(fmt()
                .walk(WALK_NODE)
+               .consume_wsnlc()
                .token(TOKEN_P_ASCRIBE)
                .ws()
                .walk(WALK_NODE)
@@ -1261,6 +1248,12 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
     parts = collect_left_binary(op_token, node);
   } else {
     parts = collect_right_binary(op_token, node);
+  }
+
+  if (ctx.explode_option == ExplodeOption::Prevent) {
+    MEMO_RET(select_best_choice({
+        combine_flat(op_token, ctx.binop(), parts),
+    }));
   }
 
   if (!ctx.nested_binop && (is_binop_matching_str(op_token, TOKEN_OP_DOLLAR, "$") ||
