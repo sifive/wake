@@ -200,6 +200,11 @@ static size_t count_trailing_newlines(const token_traits_map_t& traits, const CS
     token = curr_rhs;
   }
 
+  // We only bind to tokens not nodes, so we need to push in further
+  if (token.isNode()) {
+    return count_trailing_newlines(traits, token);
+  }
+
   auto it = traits.find(token);
   if (it == traits.end()) {
     return 0;
@@ -212,6 +217,32 @@ static size_t count_allowed_newlines(const token_traits_map_t& traits, const CST
   FMT_ASSERT(node.isNode(), node,
              "Expected node, Saw <" + std::string(symbolName(node.id())) + ">");
   return count_leading_newlines(traits, node) + count_trailing_newlines(traits, node);
+}
+
+// Counts all newlines allowd before and after a require header. Ignores the require body
+// - require a = b # comment -> 1
+// - require a = b
+//   else c # comment -> 1
+// - # comment
+//   require a = b # comment -> 2
+// - require a = b -> 0
+// - require a = b
+//   else c -> 0
+static size_t count_allowed_require_header_newlines(const token_traits_map_t& traits,
+                                                    const CSTElement& node) {
+  FMT_ASSERT(node.id() == CST_REQUIRE, node,
+             "Expected <CST_REQUIRE>, Saw <" + std::string(symbolName(node.id())) + ">");
+
+  CSTElement header_end = node.firstChildNode();  // lhs
+  header_end.nextSiblingNode();                   // rhs
+
+  CSTElement maybe_req_else = header_end;
+  maybe_req_else.nextSiblingNode();
+  if (!maybe_req_else.empty() && maybe_req_else.id() == CST_REQ_ELSE) {
+    header_end = maybe_req_else;
+  }
+
+  return count_leading_newlines(traits, node) + count_trailing_newlines(traits, header_end);
 }
 
 static size_t count_allowed_newlines(const token_traits_map_t& traits,
@@ -269,6 +300,19 @@ static wcl::doc binop_rhs_separator(const CSTElement& op) {
     default:
       return wcl::doc::lit(" ");
   }
+}
+
+static std::vector<CSTElement> collect_block_parts(CSTElement node) {
+  if (node.id() != CST_BLOCK) {
+    return {};
+  }
+
+  std::vector<CSTElement> parts = {};
+  for (CSTElement i = node.firstChildNode(); !i.empty(); i.nextSiblingNode()) {
+    parts.push_back(i);
+  }
+
+  return parts;
 }
 
 static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement node) {
@@ -1248,35 +1292,101 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_BLOCK, node, "Expected CST_BLOCK");
 
-  // clang-format off
-  auto body_fmt = fmt().match(
-    // Block level newlines should be re-emitted as these are the
-    // user creating 'pseudo-blocks'
-    pred(TOKEN_NL, fmt().newline().newline().next())
-   .pred(TOKEN_WS, fmt().next())
-   // Comments are followed by ws/nl/c that have already been tagged and will be
-   // handled later. Skip them for now.
-   .pred(TOKEN_COMMENT, fmt().consume_wsnlc())
-   .otherwise(fmt().freshline().walk(WALK_NODE)));
-  // clang-format on
+  // collect all children nodes into a list
+  // track each node with a yes/no needs preceding newline flag
+  // mark first node as not needing a preceding newline
+  // mark last node as needing a preceding newline
+  // loop over the second node to the second to last node
+  //   newline if the current node is non-human flat
+  //   else newline if previous node is non-human flat
+  //   else don't newline
+  // loop over all nodes
+  //   newlining when flag set
+  //   emitting the node
 
-  MEMO_RET(fmt().walk_all(body_fmt).format(ctx, node.firstChildElement(), token_traits));
+  auto parts = collect_block_parts(node);
+
+  std::unordered_map<CSTElement, bool> requires_preceding_nl = {};
+
+  // First part never has a newline and last part always has a newline
+  requires_preceding_nl[parts[0]] = false;
+  requires_preceding_nl[parts.back()] = true;
+
+  for (size_t i = 1; i < parts.size() - 1; i++) {
+    CSTElement prev = parts[i - 1];
+    CSTElement part = parts[i];
+
+    if (count_leading_newlines(token_traits, part) > 0) {
+      requires_preceding_nl[part] = true;
+      continue;
+    }
+
+    // This should never be possible since the only time a node changes away
+    // from CST_DEF is the return (last) item which this loop skips. CST_REQUIRE
+    // appears to break this rule but actually doesn't as a CST_REQUIRE slurps
+    // up the rest of the current block (so the only change is still the last)
+    // Assert here in case that somehow changes
+    FMT_ASSERT(prev.id() == part.id(), part, "Interal items in CST_BLOCK should all be CST_DEF");
+    // If it does change, the code should be
+    // if (prev.id() != part.id()) {
+    //   requires_preceding_nl[part] = true;
+    //   continue;
+    // }
+
+    // If we are multiline separate the previous line from us
+    CSTElement copy = part;
+    wcl::doc part_fmted = fmt().walk(WALK_NODE).compose(ctx, copy, token_traits);
+    if (part_fmted->newline_count() > count_allowed_newlines(token_traits, part)) {
+      requires_preceding_nl[part] = true;
+      continue;
+    }
+
+    // If the previous line is  multiline separate us from them
+    copy = prev;
+    wcl::doc prev_fmted = fmt().walk(WALK_NODE).compose(ctx, copy, token_traits);
+    if (prev_fmted->newline_count() > count_allowed_newlines(token_traits, prev)) {
+      requires_preceding_nl[part] = true;
+      continue;
+    }
+
+    requires_preceding_nl[part] = false;
+  }
+
+  wcl::doc_builder builder;
+
+  CSTElement front = parts.front();
+  wcl::doc front_fmted = fmt().walk(WALK_NODE).compose(ctx.sub(builder), front, token_traits);
+  builder.append(front_fmted);
+
+  for (size_t i = 1; i < parts.size(); i++) {
+    CSTElement part = parts[i];
+    auto it = requires_preceding_nl.find(part);
+    FMT_ASSERT(it != requires_preceding_nl.end(), node, "Unbound value for node");
+
+    wcl::doc part_fmted = fmt()
+                              .fmt_if(ConstPredicate(it->second), fmt().breakline())
+                              .freshline()
+                              .walk(WALK_NODE)
+                              .compose(ctx.sub(builder), part, token_traits);
+
+    builder.append(part_fmted);
+  }
+
+  MEMO_RET(std::move(builder).build());
 }
 
 wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_CASE, node, "Expected CST_CASE");
 
-  size_t leading_count = count_leading_newlines(token_traits, node);
-
   MEMO_RET(fmt()
                .join(pattern_fmt(CST_GUARD))
                .consume_wsnlc()
                // emit a freshline if the previous walk emitted a NL
                .fmt_if_else(
-                   [leading_count](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
-                                   const token_traits_map_t& traits) {
-                     return builder->newline_count() > leading_count;
+                   [](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                      const token_traits_map_t& traits) {
+                     return builder->last_width() == 0 && builder->has_newline();
                    },
                    fmt().freshline(), fmt().space())
                .walk(CST_GUARD, WALK_NODE)
@@ -1670,33 +1780,75 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
 
   auto else_fmt =
       fmt()
+          .freshline()
           .token(TOKEN_KW_ELSE)
           .fmt_if_fits_all(fmt().space().consume_wsnlc().walk(WALK_NODE),
                            fmt().nest(fmt().freshline().consume_wsnlc().walk(WALK_NODE)))
-          // if the author added extra newlines, re-emit them
-          .fmt_if(TOKEN_NL, fmt().next().fmt_while(TOKEN_NL, fmt().next().newline()))
-          .consume_wsnlc()
-          .newline()
-          .freshline();
+          .consume_wsnlc();
+
+  auto pre_body_fmt = fmt()
+                          .freshline()
+                          .token(TOKEN_KW_REQUIRE)
+                          .ws()
+                          .walk(WALK_NODE)
+                          .consume_wsnlc()
+                          .space()
+                          .token(TOKEN_P_EQUALS)
+                          .consume_wsnlc()
+                          .join(rhs_fmt())
+                          .consume_wsnlc()
+                          .fmt_if(TOKEN_KW_ELSE, else_fmt);
 
   MEMO_RET(fmt()
+               .join(pre_body_fmt)
+               // Returns true if the body should be separated from the current
+               // require based on the following rules.
+               //
+               // 1 emit the current node
+               // 2 breakine() if the next node isn't a require
+               // 3 else breakline() if the next node starts with a comment
+               // 4 else breakline() if the current node is non-human flat
+               // 5 else breakline() if the next node is non-human flat
+               // 6 else don't breakline()
+               // 7 emit the next node
+               .fmt_if(
+                   [this, node, pre_body_fmt](const wcl::doc_builder& builder, ctx_t ctx,
+                                              const CSTElement& inner,
+                                              const token_traits_map_t& traits) {
+                     // only other requires may be next to us
+                     if (inner.id() != CST_REQUIRE) {
+                       return true;
+                     }
+
+                     // header comment forces split
+                     if (count_leading_newlines(traits, inner) > 0) {
+                       return true;
+                     }
+
+                     // if the header of the this require is multiline
+                     // force a split.
+                     if (builder->newline_count() >
+                         count_allowed_require_header_newlines(traits, node)) {
+                       return true;
+                     }
+
+                     // if the header of the next require is multiline
+                     // force a split. We only check the header because
+                     // the body slurps up everything remaining in scope
+                     // thus is always many lines long. + 1 because we
+                     // start the header with a freshline.
+                     CSTElement copy = inner.firstChildElement();
+                     wcl::doc fmted =
+                         fmt().join(pre_body_fmt).compose(ctx.sub(builder), copy, token_traits);
+                     if (fmted->newline_count() >
+                         count_allowed_require_header_newlines(traits, inner) + 1) {
+                       return true;
+                     }
+
+                     return false;
+                   },
+                   fmt().breakline())
                .freshline()
-               .token(TOKEN_KW_REQUIRE)
-               .ws()
-               .walk(WALK_NODE)
-               .consume_wsnlc()
-               .space()
-               .token(TOKEN_P_EQUALS)
-               .consume_wsnlc()
-               .join(rhs_fmt())
-               .fmt_if_else(
-                   contains_req_else,
-                   fmt(),  // Do nothing if true, else re-emit author added newlines
-                   fmt().fmt_if(TOKEN_NL, fmt().next().fmt_while(TOKEN_NL, fmt().next().newline())))
-               .consume_wsnlc()
-               .newline()
-               .freshline()
-               .fmt_if(TOKEN_KW_ELSE, else_fmt)
                .walk(WALK_NODE)
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));

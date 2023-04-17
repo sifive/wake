@@ -10,31 +10,25 @@ def five = 5
 
 def name Unit =
     def other = @here
+
     def other =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 def name Unit =
     def other = @here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    another
 
-def name Unit =
-    def other = @here
-
-    # not floating
-
-    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
 
 def name Unit =
     def other = @here
 
     # not floating
-    # not floating
-    # not floating
 
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 def name Unit =
@@ -44,10 +38,8 @@ def name Unit =
     # not floating
     # not floating
 
-    # not floating
-    # not floating
-
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 def name Unit =
@@ -59,7 +51,22 @@ def name Unit =
 
     # not floating
     # not floating
+
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+    another
+
+def name Unit =
+    def other = @here
+
+    # not floating
+    # not floating
+    # not floating
+
+    # not floating
+    # not floating
+    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 def name Unit =
@@ -67,13 +74,16 @@ def name Unit =
 
     # not floating
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 def name Unit =
     def other = @here
+
     # not floating
 
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 global export def glob1 = 34
@@ -82,6 +92,7 @@ global export def glob1 = 34
 def name Unit =
     def other = @here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 # wake-format off
@@ -95,27 +106,32 @@ def name Unit =
     # wake-format off
     def other = here
     def other = @here
+
     another
 
 def name Unit =
     def other = @here
+
     # wake-format off
     def other = here
     def other = @here
+
     another
 
 def name Unit =
     def other = @here
+
     # wake-format off
     def other = here
-
     def other = @here
+
     another
 
 def name Unit =
     # ordinary comment
     def other = @here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 def t1 =
@@ -211,6 +227,7 @@ def t10 =
 def name Unit = # wake-format off
     def other = here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another
 
 def t3 =
@@ -294,6 +311,7 @@ def wakeToTestDir Unit =
     match (subscribe wakeTestBinary)
         buildTestWake, Nil =
             require Pass (Pair path visible) = buildTestWake Unit
+
             Pass (Pair (simplify "{path}/..") visible)
         Nil = Pass (Pair "{wakePath}" Nil)
         _ = Fail (makeError "Two wake binaries declared for testing!")
@@ -306,6 +324,7 @@ def wakeToTestDir Unit =
                 # comment
                 (Pair path visible)
             ) = buildTestWake Unit
+
             Pass (Pair (simplify "{path}/..") visible)
         Nil = Pass (Pair "{wakePath}" Nil)
         _ = Fail (makeError "Two wake binaries declared for testing!")
@@ -481,7 +500,6 @@ def buildRE2WASM Unit =
     def emsdk = replace `/[^/]*$` "" emmake
 
     require Pass patch = source "{@here}/re2.patch"
-
     require Pass buildDir = vendorBuildDir Unit
 
     def job =
@@ -501,11 +519,8 @@ def buildRE2WASM Unit =
     require Pass outputs = job.getJobOutputs
 
     def headers = filter (matches `.*\.h` _.getPathName) outputs
-
     def objects = filter (matches `.*\.o` _.getPathName) outputs
-
     def cflags = "-I{@here}/.build/re2-{version}", Nil
-
     def lflags = Nil
 
     Pass (SysLib "1.0" headers objects cflags lflags)
@@ -528,6 +543,7 @@ export def build: List String => Result String Error =
             | rmap (\_ "TARBALL")
         kind, Nil =
             require Pass variant = toVariant kind
+
             all variant
             | rmap (\_ "BUILD")
         _ = Fail "no target specified (try: build default/debug/tarball)".makeError
@@ -558,31 +574,38 @@ def all variant =
     require Pass x =
         map (_ variant) targets
         | findFail
+
     Pass (flatten x)
 
 # Install wake into a target location
 def doInstall dest kind =
     require Pass variant = toVariant kind
     require Pass datfiles = sources "{@here}/share" `.*`
+
     def binfilesResult = all variant
     def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
+
     require Pass datinstall = findFailFn (installIn dest ".") datfiles
     require Pass readmeSource = source "README.md"
     require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
     require Pass binfiles = binfilesResult
     require Pass bininstall = findFailFn releaseBin binfiles
+
     def outputs = readme, bininstall ++ datinstall
+
     Pass outputs
 
 # Replace @VERSION@ with 'release'
 def setVersion release file =
     require Pass in = source "{file}.in"
+
     def script =
         "%
             set -e
             sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
             mv "%{file}.tmp" "%{file}"
         %"
+
     shellJob script (in, Nil)
     | getJobOutput
 
@@ -590,29 +613,37 @@ def setVersion release file =
 def tarball Unit =
     def releaseResult = buildAs Unit
     def timeResult = buildOn Unit
+
     require Pass release = releaseResult
     require Pass time = timeResult
+
     # Create debian + RedHat package files
     require Pass changelog = setVersion release "debian/changelog"
     require Pass spec = setVersion release "wake.spec"
+
     # Identify those sources files to include in the tarball
     require Pass allSources = sources "." `.*`
+
     def srcs =
         allSources
         | filter (!matches `(debian/|wake.spec).*` _.getPathName) # omit packaging files
         | filter (!matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
         | filter (!matches `(.*/)*\.gitignore` _.getPathName) # omit git files
+
     def Pair testPaths wakePaths = splitBy (matches `tests/.*` _.getPathName) srcs
+
     def wakeSourcesString =
         wakePaths
         | map (_.getPathName.format)
         | foldr (_, ",\n  ", _) Nil
         | cat
+
     def testSourcesString =
         testPaths
         | map (getPathName _ | format | replace `^"tests/` '"{here}/')
         | foldr (_, ",\n  ", _) Nil
         | cat
+
     def manifestStr =
         "%
             # Generated by 'wake tarball Unit':
@@ -624,6 +655,7 @@ def tarball Unit =
             publish source =
               %{wakeSourcesString}Nil
         %"
+
     def testsManifestStr =
         "%
             # Generated by 'wake tarball Unit':
@@ -633,17 +665,21 @@ def tarball Unit =
             publish source =
               %{testSourcesString}Nil
         %"
+
     # Create a manifest which describes the release and source files
     require Pass manifest = write "manifest.wake" manifestStr
     require Pass testManifest = write "tests/manifest.wake" testsManifestStr
+
     # Execute tar to create a tarball of manifest + sources
     require Pass tarball =
         def cmd =
             def gnutar = which "gnutar"
             def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
+
             def files =
                 map getPathName (manifest, testManifest, spec, srcs)
                 | sortBy (_ <* _)
+
             tar,
             "--mtime={time}",
             "--transform=s@^@wake-{release}/@",
@@ -653,17 +689,21 @@ def tarball Unit =
             "-cJf",
             "wake_{release}.tar.xz",
             files
+
         job cmd (manifest, testManifest, spec, srcs)
         | getJobOutput
+
     Pass (tarball, changelog, Nil)
 
 export def static _: Result Path Error =
     def filesResult = doInstall "tmp" "static"
     def releaseResult = buildAs Unit
     def timeResult = buildOn Unit
+
     require Pass release = releaseResult
     require Pass time = timeResult
     require Pass files = filesResult
+
     def cmd =
         which "tar",
         "--mtime={time}",
@@ -674,6 +714,7 @@ export def static _: Result Path Error =
         "-cJf",
         "wake-static_{release}.tar.xz",
         map getPathName files | sortBy (_ <* _)
+
     job cmd files
     | getJobOutput
 
@@ -743,8 +784,7 @@ def f0 =
         (
             aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
             aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        )
-        = x + 1
+        ) = x + 1
         x b = x + 0
 
 export def vfoldl (combiningFn: accum => element => accum): accum => Vector element => accum =
@@ -753,8 +793,11 @@ export def vfoldl (combiningFn: accum => element => accum): accum => Vector elem
             accumulator
         else
             def element = vget v s
+
             loop (combiningFn accumulator element) v (s + 1) e
+
     def top a (Vector v s e) = loop a v s e
+
     top
 
 def loop a s e =
@@ -854,8 +897,8 @@ def a =
     # comment
 
     def c = 5
-
     def d = 5
+
     # comment
 
     result
@@ -869,8 +912,10 @@ def a =
 # comment 3
 def name Unit =
     def other = @here
+
     def other =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another # comment
 
 # floating 3a
@@ -883,15 +928,19 @@ def name Unit =
 # comment 3
 def name Unit =
     def other = @here
+
     def other =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another # comment
 
 # comment 3
 def name Unit =
     def other = @here
+
     def other =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
     another # comment
 
 # floating 6
@@ -905,6 +954,7 @@ def a =
         5
     else
         require Pass a = b
+
         a
 
 tuple A B =
@@ -950,6 +1000,7 @@ def longFunc param: Result (List Path) Error =
         Nil = Nil,
         a, b =
             def f = funcB b
+
             match f
                 Some x = x
                 None = x
@@ -966,15 +1017,18 @@ export def mapPartial (f: a => Option b): (list: List a) => List b =
         h, t =
             # don't wait on f to process tail:
             def sub = loop t
+
             match (f h)
                 Some x = x, sub
                 None = sub
+
     loop
 
 target writeImp inputs mode path content =
     def writeRunner =
         def imp m p c = prim "write"
         def pre input = Pair input Unit
+
         def post = match _
             Pair (Fail f) _ = Fail f
             Pair (Pass output) Unit =
@@ -983,7 +1037,9 @@ target writeImp inputs mode path content =
                 else match (imp mode path content)
                     Fail f = Fail (makeError f)
                     Pass path = Pass (editRunnerOutputOutputs (path, _) output)
+
         makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
+
     makeExecPlan ("<write>", str mode, path, Nil) inputs
     | setPlanOnce False
     | setPlanEnvironment Nil
@@ -1026,7 +1082,9 @@ def a = Some ""
 
 def a =
     def x = if a then b, else !b
+
     require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
+
     x
 
 def x = "%
@@ -1051,6 +1109,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         %"
+
     s
 
 def someFunc a b =
@@ -1060,6 +1119,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         %"
+
     s
 
 def someFunc a b =
@@ -1069,6 +1129,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         %"
+
     s
 
 def someFunc a b =
@@ -1078,6 +1139,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         %"
+
     s
 
 def someFunc a b =
@@ -1087,6 +1149,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         %"
+
     s
 
 def x = "%
@@ -1119,6 +1182,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         """
+
     s
 
 def someFunc a b =
@@ -1128,6 +1192,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         """
+
     s
 
 def someFunc a b =
@@ -1137,6 +1202,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         """
+
     s
 
 def someFunc a b =
@@ -1146,6 +1212,7 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         """
+
     s
 
 def someFunc a b =
@@ -1155,4 +1222,108 @@ def someFunc a b =
             sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
             mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
         """
+
     s
+
+# Install wake into a target location
+def doInstall dest kind =
+    require Pass variant = toVariant kind
+    require Pass datfiles = sources "{@here}/share" `.*`
+
+    def binfilesResult = all variant
+    def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
+
+    # a comment
+    def a b = c
+
+    def a b =
+        def c = d
+
+        d
+
+    def a b =
+        def c = d
+
+        d
+
+    def a b =
+        def c = d
+
+        d
+
+    require Pass datinstall = findFailFn (installIn dest ".") datfiles
+
+    # comment
+    require Pass readmeSource = source "README.md"
+    require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
+    require Pass binfiles = binfilesResult
+
+    require Pass binfiles2 = binfilesResult2
+    else blah
+
+    require Pass bininstall = findFailFn releaseBin binfiles
+
+    require Pass binfiles2 =
+        def a = b
+
+        a
+
+    require Pass binfiles2 = binfilesResult2
+    require Pass binfiles2 = binfilesResult2
+
+    def outputs = readme, bininstall ++ datinstall
+
+    Pass outputs
+
+def doInstall dest kind =
+    def binfilesResult = all variant
+    def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
+
+    require Pass bin = val
+
+    Pass outputs
+
+def tarball Unit =
+    def srcs =
+        allSources
+        | s # a comment
+
+    def x = y
+    def srcs = allSources # a comment
+    def x = y
+    def srcs = allSources # a comment
+    def x = y
+
+    x
+
+def tarball Unit =
+    require srcs =
+        allSources
+        | s # a comment
+
+    require x = y
+    require srcs = allSources # a comment
+    require x = y
+    require srcs = allSources # a comment
+    require x = y
+
+    require Pass binfiles2 = binfilesResult2
+    else
+        blah # a comment
+
+    require x = y
+
+    require Pass binfiles2 = binfilesResult2 # a comment
+    else
+        blah # a comment
+
+    require x = y
+
+    require Pass binfiles2 = binfilesResult2 # a comment
+    else blah
+
+    require srcs = allSources # a comment
+    require x = y
+    require srcs = allSources # a comment
+
+    x
