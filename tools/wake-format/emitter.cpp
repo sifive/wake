@@ -1292,6 +1292,18 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_BLOCK, node, "Expected CST_BLOCK");
 
+  // collect all children nodes into a list
+  // track each node with a yes/no needs preceding newline flag
+  // mark first node as not needing a preceding newline
+  // mark last node as needing a preceding newline
+  // loop over the second node to the second to last node
+  //   newline if the current node is non-human flat
+  //   else newline if previous node is non-human flat
+  //   else don't newline
+  // loop over all nodes
+  //   newlining when flag set
+  //   emitting the node
+
   auto parts = collect_block_parts(node);
 
   std::unordered_map<CSTElement, bool> requires_preceding_nl = {};
@@ -1789,7 +1801,16 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
 
   MEMO_RET(fmt()
                .join(pre_body_fmt)
-               // Returns true if the body should be separated from the current require
+               // Returns true if the body should be separated from the current
+               // require based on the following rules.
+               //
+               // 1 emit the current node
+               // 2 breakine() if the next node isn't a require
+               // 3 else breakline() if the next node starts with a comment
+               // 4 else breakline() if the current node is non-human flat
+               // 5 else breakline() if the next node is non-human flat
+               // 6 else don't breakline()
+               // 7 emit the next node
                .fmt_if(
                    [this, node, pre_body_fmt](const wcl::doc_builder& builder, ctx_t ctx,
                                               const CSTElement& inner,
