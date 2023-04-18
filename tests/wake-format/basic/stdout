@@ -4,7 +4,8 @@
 # -------------
 
 # comment
-def five = 5
+def five =
+    5
 
 # ordinary comment
 
@@ -86,7 +87,8 @@ def name Unit =
 
     another
 
-global export def glob1 = 34
+global export def glob1 =
+    34
 
 # ordinary comment
 def name Unit =
@@ -764,11 +766,14 @@ global export data Let =
 def x + y =
     add x y
 
-export def (argument: a) | (pipeFn: a => b): b = pipeFn argument
+export def (argument: a) | (pipeFn: a => b): b =
+    pipeFn argument
 
-def tool (dir: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) = ""
+def tool (dir: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) =
+    ""
 
-def tool (dir: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) = ""
+def tool (dir: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) =
+    ""
 
 def Pair _ _: Pair Integer String =
     Pair 44 "as"
@@ -952,7 +957,8 @@ def name Unit =
 
 # floating 7
 
-def a b c = 5
+def a b c =
+    5
 
 def a =
     if false then
@@ -992,13 +998,17 @@ def x =
 def x =
     (\a \b \x prim "p") x y
 
-def a = 5
+def a =
+    5
 
-def b = 6
+def b =
+    6
 
-def c = "asdf"
+def c =
+    "asdf"
 
-def d = identifier
+def d =
+    identifier
 
 def longFunc param: Result (List Path) Error =
     match _
@@ -1083,7 +1093,8 @@ def anyArray =
 def a =
     rec Nil (if indent > 0 then Some "" else None) lhs
 
-def a = Some ""
+def a =
+    Some ""
 
 def a =
     def x = if a then b, else !b
@@ -1092,30 +1103,23 @@ def a =
 
     x
 
-def x = "%
-    fun day.
-    happy day.
-%"
+def x =
+    "%
+        fun day.
+        happy day.
+    %"
 
-def x = "%
-    fun day.
-    happy day.
-%"
+def x =
+    "%
+        fun day.
+        happy day.
+    %"
 
-def x = "%
-    fun day.
-    happy day.
-%"
-
-def someFunc a b =
-    def s =
-        "%
-            set -e
-            sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
-            mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
-        %"
-
-    s
+def x =
+    "%
+        fun day.
+        happy day.
+    %"
 
 def someFunc a b =
     def s =
@@ -1157,28 +1161,42 @@ def someFunc a b =
 
     s
 
-def x = "%
-      this is the lowest / prefixed with <space><space>
-      	This line is prefixed with <space><space><tab>
-    	  This line is prefixed with <tab><space><space>
-    	This line is prefixed with <tab>
-        this line is prefixed with <space><space><space><space>
-%"
+def someFunc a b =
+    def s =
+        "%
+            set -e
+            sed "s/blah/%{varName}/g" "%{varName.getVarNameX}" > "%{1 + 2 * 3}.tmp"
+            mv "%{1 + 2 * 3}.tmp" "%{1 + 2 * 3}"
+        %"
 
-def x = """
-    fun day.
-    happy day.
-"""
+    s
 
-def x = """
-    fun day.
-    happy day.
-"""
+def x =
+    "%
+          this is the lowest / prefixed with <space><space>
+          	This line is prefixed with <space><space><tab>
+        	  This line is prefixed with <tab><space><space>
+        	This line is prefixed with <tab>
+            this line is prefixed with <space><space><space><space>
+    %"
 
-def x = """
-    fun day.
-    happy day.
-"""
+def x =
+    """
+        fun day.
+        happy day.
+    """
+
+def x =
+    """
+        fun day.
+        happy day.
+    """
+
+def x =
+    """
+        fun day.
+        happy day.
+    """
 
 def someFunc a b =
     def s =
