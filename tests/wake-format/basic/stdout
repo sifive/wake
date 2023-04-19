@@ -1316,6 +1316,8 @@ def tarball Unit =
     def x = y
     def srcs = allSources # a comment
     def x = y
+    def srcs = allSources # a comment
+    def x = y
 
     x
 
