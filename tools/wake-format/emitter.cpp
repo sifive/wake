@@ -418,30 +418,6 @@ static inline bool is_simple_apply(wcl::doc_builder& builder, ctx_t ctx, CSTElem
          is_simple_literal(builder, ctx, parts[1], traits);
 }
 
-// determines if the rest of the node
-// - only has one sibling node
-// - and that node is a "simple" thing as defined by is_simple_apply
-static inline bool is_single_apply(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
-                                   const token_traits_map_t& traits) {
-  CSTElement copy = node;
-  if (!copy.isNode()) {
-    copy.nextSiblingNode();
-  }
-
-  size_t node_count = 0;
-  while (!copy.empty()) {
-    node_count++;
-
-    if (!is_simple_apply(builder, ctx, node, traits)) {
-      return false;
-    }
-
-    copy.nextSiblingNode();
-  }
-
-  return node_count == 1;
-}
-
 Emitter::~Emitter() { MEMO_RESET(); }
 
 auto Emitter::rhs_fmt(bool always_newline) {
@@ -466,9 +442,8 @@ auto Emitter::rhs_fmt(bool always_newline) {
             const token_traits_map_t& traits) {
       return count_leading_newlines(token_traits, node) > 0;
    }, full_fmt)
-    // Always newline when requested unless the thing to be formatted is a "single literal".
-    // Used for top-level defs and top-level "constant" defs
-   .pred(ConstPredicate(always_newline), fmt().fmt_if_else(is_single_apply, flat_fmt, full_fmt))
+    // Always newline when requested. Used for top-level defs.
+   .pred(ConstPredicate(always_newline), full_fmt)
 
     // if our hand hand hasn't yet been forced then decide based on how well RHS fits
    .pred(requires_fits_all, fmt().fmt_if_fits_all(flat_fmt, full_fmt))
