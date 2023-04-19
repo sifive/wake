@@ -35,9 +35,12 @@ export tuple RunnerInput =
   export Directory:   String
   export Stdin:       String
   export Resources:   List String
-  export Prefix:      String        # a unique prefix for this job
-  export Record:      Usage         # previous resource usage
-  export IsAtty:      Boolean       # should job run in psuedoterminal
+  # A unique prefix for this job
+  export Prefix:      String
+  # Previous resource usage
+  export Record:      Usage
+  # Determines if job should run in psuedoterminal
+  export IsAtty:      Boolean
 
 export tuple RunnerOutput =
   export Inputs:  List String
@@ -86,23 +89,45 @@ export data Persistence =
 
 # A Plan describes a not-yet-executed Job
 tuple Plan =
-  export Label:        String       # The label used when showing the command during execution
-  export Command:      List String  # The command-line arguments (the first is the command to run)
-  export Visible:      List Path    # Only these files should be available to the command
-  export Environment:  List String  # KEY=VALUE environment variables fed to the command
-  export Directory:    String       # The directory in which the command should be run
-  export Stdin:        String       # The file to which standard input should be connected
-  export Stdout:       LogLevel     # How should standard output be displayed during a build
-  export Stderr:       LogLevel     # How should standard error be displayed during a build
-  export Echo:         LogLevel     # Echo the command to this stream
-  export Persistence:  Persistence  # See Persistence table above
-  export LocalOnly:    Boolean      # Must run directly in the local workspace; no output detection performed
-  export Resources:    List String  # The resources a runner must provide to the job (licenses/etc)
-  export RunnerFilter: Runner => Boolean # Reject from consideration Runners which the Plan deems inappropriate
-  export Usage:        Usage        # User-supplied usage prediction; overruled by database statistics (if any)
-  export FnInputs:     (List String => List String) # Modify the Runner's reported inputs  (files read)
-  export FnOutputs:    (List String => List String) # Modify the Runner's reported outputs (files created)
-  export IsAtty:       Boolean      # Should job run in psuedoterminal
+  # The label used when showing the command during execution. This is recommended for efficient
+  # debugging and locating job information. For example, the label will show up in the terminal during
+  # job execution, in a job's progress bar in the terminal, when running the `wake --last` command,
+  # and in the `<..>.in.json` and `<...>.out.json` files in the `.build` directory.
+  export Label:        String
+  # The command-line arguments (the first is the command to run)
+  export Command:      List String
+  # Only these files and directories should be available to the command
+  export Visible:      List Path
+  # KEY=VALUE environment variables fed to the command
+  export Environment:  List String
+  # The working directory in which the command should be run
+  export Directory:    String
+  # The file to which standard input should be connected.
+  # An empty string `""` is interpreted as there being no `stdin` file.
+  export Stdin:        String
+  # How should standard output be displayed during a build
+  export Stdout:       LogLevel
+  # How should standard error be displayed during a build
+  export Stderr:       LogLevel
+  # Echo the command to this stream
+  export Echo:         LogLevel
+  # See Persistence table above
+  export Persistence:  Persistence
+  # <Deprecated>
+  export LocalOnly:    Boolean
+  # The resources a runner must provide to the job (licenses/etc).
+  # These strings are uninterpreted and are only meaningful to the right runners.
+  export Resources:    List String
+  # Reject from consideration Runners which the Plan deems inappropriate
+  export RunnerFilter: Runner => Boolean
+  # User-supplied usage prediction; overruled by database statistics (if any)
+  export Usage:        Usage
+  # Modify the Runner's reported inputs  (files read)
+  export FnInputs:     (List String => List String)
+  # Modify the Runner's reported outputs (files created)
+  export FnOutputs:    (List String => List String)
+  # Determines if job should run in psuedoterminal
+  export IsAtty:       Boolean
 
 def isOnce: Persistence => Boolean = match _
   ReRun = False
@@ -193,8 +218,10 @@ export def makePlan (label: String) (visible: List Path) (command: String): Plan
   makeShellPlan command visible
   | setPlanLabel label
 
-# Set reasonable defaults for all Plan arguments
+# Identity function
 def id x = x
+
+# Set reasonable defaults for all Plan arguments
 export def makeExecPlan (cmd: List String) (visible: List Path): Plan =
   Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share False Nil (\_ True) defaultUsage id id False
 
