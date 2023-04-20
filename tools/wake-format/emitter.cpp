@@ -219,9 +219,11 @@ static bool is_weakly_flat(const wcl::doc& doc, const CSTElement& node,
          (doc->newline_count() == 1 && count_trailing_newlines(traits, node) == 1);
 }
 
-// Determizes of a doc is "flat" as a human would judge it. Human's don't
-// consider leading/trailing comments as invalidating flatness even though they
-// require extra newlines. Thus leading/trailing newlines are allowed.
+// Determines if a doc is "vertically" flat. A vertically flat doc is "flat" if
+// the only newlines in it come from comments. This is the notion of "flat" you
+// would want to consider when arranging docs in a vertical list where only the
+// "body" of the doc (e.g. not the leading or trailing comments) needs to be
+// flat. Internal comments would however violate this property.
 static bool is_vertically_flat(const wcl::doc& doc, const CSTElement& node,
                                const token_traits_map_t& traits) {
   return doc->newline_count() ==
