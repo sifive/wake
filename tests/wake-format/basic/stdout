@@ -1013,6 +1013,15 @@ def c =
 def d =
     identifier
 
+export def defaultJSONFormat: JSONFormat =
+    def formatDouble d = match (dclass d)
+        DoubleInfinite if d <. 0e0 -> "-Infinity"
+        DoubleInfinite -> "Infinity"
+        DoubleNaN -> "NaN"
+        _ -> dstr d
+
+    JSONFormat jsonEscape str formatDouble 0
+
 def longFunc param: Result (List Path) Error =
     match _
         Nil -> Nil,
