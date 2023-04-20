@@ -2015,7 +2015,7 @@ wcl::doc Emitter::walk_tuple_elt(ctx_t ctx, CSTElement node) {
 // Disable walke_type for MVP. The implications of it needs
 // to be first explored before rollout.
 wcl::doc Emitter::walk_type(ctx_t ctx, CSTElement node) {
-  return walk_node(ctx.prevent_explode(),  node);
+  return walk_node(ctx.prevent_explode(), node);
 
   // MEMO(ctx, node);
   //
