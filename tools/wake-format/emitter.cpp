@@ -1432,6 +1432,7 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
 wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_DATA, node, "Expected CST_DATA");
+  bool is_top_level = node_traits[node].top_level;
 
   auto fmt_members = fmt().walk(WALK_NODE).consume_wsnlc().walk_all(
       fmt().freshline().walk(WALK_NODE).consume_wsnlc());
@@ -1449,7 +1450,7 @@ wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) {
                    .join(fmt_members)
                    .format(ctx, node.firstChildElement(), token_traits);
 
-  if (is_vertically_flat(no_nl, node, token_traits)) {
+  if (is_vertically_flat(no_nl, node, token_traits) && !is_top_level) {
     MEMO_RET(no_nl);
   }
 
@@ -1813,7 +1814,8 @@ class RequireElseIsWeaklyFlat {
   const token_traits_map_t& traits;
 
  public:
-  RequireElseIsWeaklyFlat(const CSTElement& require, const token_traits_map_t& traits): require(require), traits(traits) {}
+  RequireElseIsWeaklyFlat(const CSTElement& require, const token_traits_map_t& traits)
+      : require(require), traits(traits) {}
   bool operator()(const wcl::doc_builder& builder, ctx_t ctx, wcl::doc doc) {
     // Find the nested CST_REQ_ELSE to check if it is
     // weakly flat. It *should* always be there since
@@ -1821,7 +1823,7 @@ class RequireElseIsWeaklyFlat {
     // exists, but for saftey return false if it doesn't
     CSTElement inner = require.firstChildNode();
     while (inner.id() != CST_REQ_ELSE && !inner.empty()) {
-                              inner.nextSiblingNode();
+      inner.nextSiblingNode();
     }
 
     if (inner.empty()) {
@@ -1839,10 +1841,9 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
   auto else_fmt = fmt()
                       .freshline()
                       .token(TOKEN_KW_ELSE)
-                      .fmt_try_else(
-                          RequireElseIsWeaklyFlat(node, token_traits),
-                          fmt().space().consume_wsnlc().walk(WALK_NODE),
-                          fmt().nest(fmt().freshline().consume_wsnlc().walk(WALK_NODE)))
+                      .fmt_try_else(RequireElseIsWeaklyFlat(node, token_traits),
+                                    fmt().space().consume_wsnlc().walk(WALK_NODE),
+                                    fmt().nest(fmt().freshline().consume_wsnlc().walk(WALK_NODE)))
                       .consume_wsnlc();
 
   auto pre_body_fmt = fmt()
