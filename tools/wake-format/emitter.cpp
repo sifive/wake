@@ -213,17 +213,15 @@ static bool has_trailing_comment(const CSTElement& node, const token_traits_map_
 
 // Determizes of a doc is "flat" as a human would judge it. Human's don't
 // consider leading/trailing comments as invalidating flatness even though they
-// necessite extra newlines. Thus leading/trailing newlines are allowed.
-static bool is_human_flat(const wcl::doc& doc, const CSTElement& node,
-                          const token_traits_map_t& traits) {
-  // FMT_ASSERT(node.isNode(), node,
-  //            "Expected node, Saw <" + std::string(symbolName(node.id())) + ">");
+// require extra newlines. Thus leading/trailing newlines are allowed.
+static bool is_vertically_flat(const wcl::doc& doc, const CSTElement& node,
+                               const token_traits_map_t& traits) {
   return doc->newline_count() ==
          count_leading_newlines(traits, node) + count_trailing_newlines(traits, node);
 }
 
-static bool is_human_flat(const wcl::doc& doc, const std::vector<CSTElement>& parts,
-                          const token_traits_map_t& traits) {
+static bool is_vertically_flat(const wcl::doc& doc, const std::vector<CSTElement>& parts,
+                               const token_traits_map_t& traits) {
   assert(parts.size() >= 2);
 
   const CSTElement& front = parts[0];
@@ -247,8 +245,8 @@ static bool is_human_flat(const wcl::doc& doc, const std::vector<CSTElement>& pa
 // - require a = b -> true
 // - require a = b
 //   else c -> false
-static bool is_require_human_flat(size_t newline_count, const CSTElement& node,
-                                  const token_traits_map_t& traits) {
+static bool is_require_vertically_flat(size_t newline_count, const CSTElement& node,
+                                       const token_traits_map_t& traits) {
   FMT_ASSERT(node.id() == CST_REQUIRE, node,
              "Expected <CST_REQUIRE>, Saw <" + std::string(symbolName(node.id())) + ">");
 
@@ -1044,7 +1042,7 @@ wcl::optional<wcl::doc> Emitter::combine_apply_flat(ctx_t ctx,
   builder.append(walk_node(ctx.sub(builder), parts.back()));
 
   wcl::doc doc = std::move(builder).build();
-  if (!is_human_flat(doc, parts, token_traits)) {
+  if (!is_vertically_flat(doc, parts, token_traits)) {
     return {};
   }
   return {wcl::in_place_t{}, std::move(doc)};
@@ -1168,7 +1166,7 @@ wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
   builder.append(walk_node(ctx.sub(builder), parts.back()));
 
   wcl::doc doc = std::move(builder).build();
-  if (!is_human_flat(doc, parts, token_traits)) {
+  if (!is_vertically_flat(doc, parts, token_traits)) {
     return {};
   }
   return {wcl::in_place_t{}, std::move(doc)};
@@ -1236,7 +1234,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_first_compress(
   builder.append(walk_node(ctx.sub(builder), parts.back()));
 
   wcl::doc doc = std::move(builder).build();
-  if (!is_human_flat(doc, parts, token_traits)) {
+  if (!is_vertically_flat(doc, parts, token_traits)) {
     return {};
   }
   return {wcl::in_place_t{}, std::move(doc)};
@@ -1255,7 +1253,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_last_compress(
   builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts.back()));
 
   wcl::doc doc = std::move(builder).build();
-  if (!is_human_flat(doc, parts, token_traits)) {
+  if (!is_vertically_flat(doc, parts, token_traits)) {
     return {};
   }
   return {wcl::in_place_t{}, std::move(doc)};
@@ -1364,7 +1362,7 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
     // If we are multiline separate the previous line from us
     CSTElement copy = part;
     wcl::doc part_fmted = fmt().walk(WALK_NODE).compose(ctx, copy, token_traits);
-    if (!is_human_flat(part_fmted, part, token_traits)) {
+    if (!is_vertically_flat(part_fmted, part, token_traits)) {
       requires_preceding_nl[part] = true;
       continue;
     }
@@ -1372,7 +1370,7 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
     // If the previous line is  multiline separate us from them
     copy = prev;
     wcl::doc prev_fmted = fmt().walk(WALK_NODE).compose(ctx, copy, token_traits);
-    if (!is_human_flat(prev_fmted, prev, token_traits)) {
+    if (!is_vertically_flat(prev_fmted, prev, token_traits)) {
       requires_preceding_nl[part] = true;
       continue;
     }
@@ -1443,7 +1441,7 @@ wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) {
                    .join(fmt_members)
                    .format(ctx, node.firstChildElement(), token_traits);
 
-  if (is_human_flat(no_nl, node, token_traits)) {
+  if (is_vertically_flat(no_nl, node, token_traits)) {
     MEMO_RET(no_nl);
   }
 
@@ -1767,7 +1765,7 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
                    .token(TOKEN_P_PCLOSE)
                    .format(ctx, node.firstChildElement(), token_traits);
 
-  if (is_human_flat(no_nl, node, token_traits)) {
+  if (is_vertically_flat(no_nl, node, token_traits)) {
     MEMO_RET(no_nl);
   }
 
@@ -1855,7 +1853,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
 
                      // if the header of the this require is multiline
                      // force a split.
-                     if (!is_require_human_flat(builder->newline_count(), node, traits)) {
+                     if (!is_require_vertically_flat(builder->newline_count(), node, traits)) {
                        return true;
                      }
 
@@ -1869,7 +1867,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                          fmt().join(pre_body_fmt).compose(ctx.sub(builder), copy, token_traits);
                      size_t newline_count =
                          fmted->newline_count() == 0 ? 0 : fmted->newline_count() - 1;
-                     if (!is_require_human_flat(newline_count, inner, traits)) {
+                     if (!is_require_vertically_flat(newline_count, inner, traits)) {
                        return true;
                      }
 
