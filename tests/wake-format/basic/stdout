@@ -1062,12 +1062,7 @@ target writeImp inputs mode path content =
 
 export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
     def json =
-        # comment
-        (
-            JObject "label" :-> JString label,
-            "command" :-> command | map JString | JArray,
-            "environment" :-> environment | map JString | JArray
-        ) (
+        JObject (
             "label" :-> JString label,
             "command" :-> command | map JString | JArray,
             "environment" :-> environment | map JString | JArray,
@@ -1090,27 +1085,42 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
         )
 
     def json =
+        # comment
+        (
+            JObject "label" :-> JString label,
+            "command" :-> command | map JString | JArray,
+            "environment" :-> environment | map JString | JArray
+        ) ("label" :-> JString label, "command" :-> command | map JString | JArray, Nil)
+
+    def json = (
         JObject (
             "label" :-> JString label,
             "command" :-> command | map JString | JArray,
             "environment" :-> environment | map JString | JArray,
-            "visible" :-> visible | map (_.getPathName.JString) | JArray,
-            "directory" :-> JString directory,
-            "stdin" :-> JString stdin,
-            "resources" :-> res | map JString | JArray,
-            "version" :-> JString version,
-            "mount-ops" :-> JArray (JObject ("type" :-> JString "workspace", "destination" :-> JString ".", Nil), Nil),
-            "usage" :-> JObject (
-                "status" :-> JInteger status,
-                "runtime" :-> JDouble runtime,
-                "cputime" :-> JDouble cputime,
-                "membytes" :-> JInteger membytes,
-                "inbytes" :-> JInteger inbytes,
-                "outbytes" :-> JInteger outbytes,
-                Nil
-            ),
             Nil
         )
+    )
+
+    def json = (
+        JObject #comment
+        (
+            "label" :-> JString label,
+            "command" :-> command | map JString | JArray,
+            "environment" :-> environment | map JString | JArray,
+            Nil
+        )
+    )
+
+    def json = (
+        JObject
+        #comment
+        (
+            "label" :-> JString label,
+            "command" :-> command | map JString | JArray,
+            "environment" :-> environment | map JString | JArray,
+            Nil
+        )
+    )
 
     json
 
