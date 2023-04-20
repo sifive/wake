@@ -201,23 +201,62 @@ static size_t count_trailing_newlines(const token_traits_map_t& traits, const CS
   return it->second.after_bound.size();
 }
 
-static size_t count_allowed_newlines(const token_traits_map_t& traits, const CSTElement& node) {
-  FMT_ASSERT(node.isNode(), node,
-             "Expected node, Saw <" + std::string(symbolName(node.id())) + ">");
-  return count_leading_newlines(traits, node) + count_trailing_newlines(traits, node);
+// Determines if a given node would emit a leading comment if emitted.
+static bool has_leading_comment(const CSTElement& node, const token_traits_map_t& traits) {
+  return count_leading_newlines(traits, node) > 0;
 }
 
-// Counts all newlines allowd before and after a require header. Ignores the require body
-// - require a = b # comment -> 1
+// Determines if a given node would emit a trailing comment if emitted.
+static bool has_trailing_comment(const CSTElement& node, const token_traits_map_t& traits) {
+  return count_trailing_newlines(traits, node) > 0;
+}
+
+// Determines if the doc is "weakly flat". Weakly flat is a flat doc
+// with a single trailing comment allowed. No other newlines my be emitted.
+static bool is_weakly_flat(const wcl::doc& doc, const CSTElement& node,
+                           const token_traits_map_t& traits) {
+  return !doc->has_newline() ||
+         (doc->newline_count() == 1 && count_trailing_newlines(traits, node) == 1);
+}
+
+// Determines if a doc is "vertically" flat. A vertically flat doc is "flat" if
+// the only newlines in it come from comments. This is the notion of "flat" you
+// would want to consider when arranging docs in a vertical list where only the
+// "body" of the doc (e.g. not the leading or trailing comments) needs to be
+// flat. Internal comments would however violate this property.
+static bool is_vertically_flat(const wcl::doc& doc, const CSTElement& node,
+                               const token_traits_map_t& traits) {
+  return doc->newline_count() ==
+         count_leading_newlines(traits, node) + count_trailing_newlines(traits, node);
+}
+
+static bool is_vertically_flat(const wcl::doc& doc, const std::vector<CSTElement>& parts,
+                               const token_traits_map_t& traits) {
+  assert(parts.size() >= 2);
+
+  const CSTElement& front = parts[0];
+  const CSTElement& back = parts.back();
+  FMT_ASSERT(front.isNode(), front,
+             "Expected node, Saw <" + std::string(symbolName(front.id())) + ">");
+  FMT_ASSERT(back.isNode(), back,
+             "Expected node, Saw <" + std::string(symbolName(back.id())) + ">");
+
+  return doc->newline_count() ==
+         count_leading_newlines(traits, front) + count_trailing_newlines(traits, back);
+}
+
+// Determines if a require header is "flat" as a human would judge it.
+// Considers all newlines allowd before and after a require header. Ignores the require body
+// - require a = b # comment -> true
 // - require a = b
-//   else c # comment -> 1
+//   else c # comment -> false
 // - # comment
-//   require a = b # comment -> 2
-// - require a = b -> 0
+//   require a = b # comment -> true
+// - require a = b -> true
 // - require a = b
-//   else c -> 0
-static size_t count_allowed_require_header_newlines(const token_traits_map_t& traits,
-                                                    const CSTElement& node) {
+//   else c -> false
+static bool is_require_vertically_flat(size_t newline_count, const CSTElement& node,
+                                       const token_traits_map_t& traits) {
   FMT_ASSERT(node.id() == CST_REQUIRE, node,
              "Expected <CST_REQUIRE>, Saw <" + std::string(symbolName(node.id())) + ">");
 
@@ -230,13 +269,8 @@ static size_t count_allowed_require_header_newlines(const token_traits_map_t& tr
     header_end = maybe_req_else;
   }
 
-  return count_leading_newlines(traits, node) + count_trailing_newlines(traits, header_end);
-}
-
-static size_t count_allowed_newlines(const token_traits_map_t& traits,
-                                     const std::vector<CSTElement>& parts) {
-  assert(parts.size() >= 2);
-  return count_leading_newlines(traits, parts[0]) + count_trailing_newlines(traits, parts.back());
+  return newline_count ==
+         count_leading_newlines(traits, node) + count_trailing_newlines(traits, header_end);
 }
 
 // Assumes that at least one of the choices is viable. Will assert otherwise
@@ -440,7 +474,7 @@ auto Emitter::rhs_fmt(bool always_newline) {
     // If the RHS has a leading comment then we must use the full_fmt
    .pred([this](const wcl::doc_builder& builder, ctx_t ctx, const CSTElement& node,
             const token_traits_map_t& traits) {
-      return count_leading_newlines(token_traits, node) > 0;
+      return has_leading_comment(node, token_traits);
    }, full_fmt)
     // Always newline when requested. Used for top-level defs.
    .pred(ConstPredicate(always_newline), full_fmt)
@@ -1018,12 +1052,21 @@ wcl::optional<wcl::doc> Emitter::combine_apply_flat(ctx_t ctx,
   builder.append(walk_node(ctx.sub(builder), parts.back()));
 
   wcl::doc doc = std::move(builder).build();
-  if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
+  if (!is_vertically_flat(doc, parts, token_traits)) {
     return {};
   }
   return {wcl::in_place_t{}, std::move(doc)};
 }
 
+// Attempt to format the apply as if it was a constructor.
+// If multiline then the open paren stays with the constructor name.
+//
+// Ex:
+//   Json ( ...lots of stuff... )
+//   ->
+//   Json (
+//     ...lots of stuff...
+//   )
 wcl::optional<wcl::doc> Emitter::combine_apply_constructor(ctx_t ctx,
                                                            const std::vector<CSTElement>& parts) {
   if (parts.size() != 2) {
@@ -1032,19 +1075,42 @@ wcl::optional<wcl::doc> Emitter::combine_apply_constructor(ctx_t ctx,
 
   wcl::doc_builder builder;
 
+  // lhs is the left side of the apply while rhs is the right
+  // Json ("a" :-> "b")
+  // ^^^^ ^^^^^^^^^^^^^
+  // |         |
+  // -> LHS    -> RHS
   CSTElement lhs = parts[0];
   CSTElement rhs = parts[1];
 
-  if (count_leading_newlines(token_traits, rhs) != 0) {
+  // If the RHS has a leading comment then we must respect the regular format
+  // Json
+  // # comment
+  // ( ... )
+  //
+  // can't become
+  //
+  // Json # comment (
+  //   ...
+  // )
+  if (has_leading_comment(rhs, token_traits)) {
     return {};
   }
 
-  wcl::doc lhs_fmt = fmt().walk(WALK_NODE).space().compose(ctx.sub(builder), lhs, token_traits);
-  if (lhs_fmt->newline_count() != count_leading_newlines(token_traits, lhs)) {
+  // If the LHS has a trailing comment then we must respect the regualr format
+  // Json # comment
+  // ( ... )
+  //
+  // can't become
+  //
+  // Json # comment (
+  //   ...
+  // )
+  if (has_trailing_comment(lhs, token_traits)) {
     return {};
   }
 
-  builder.append(lhs_fmt);
+  builder.append(fmt().walk(WALK_NODE).space().compose(ctx.sub(builder), lhs, token_traits));
   builder.append(walk_node(ctx.sub(builder).prefer_explode(), rhs));
 
   return {wcl::in_place_t{}, std::move(builder).build()};
@@ -1110,7 +1176,7 @@ wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
   builder.append(walk_node(ctx.sub(builder), parts.back()));
 
   wcl::doc doc = std::move(builder).build();
-  if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
+  if (!is_vertically_flat(doc, parts, token_traits)) {
     return {};
   }
   return {wcl::in_place_t{}, std::move(doc)};
@@ -1178,7 +1244,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_first_compress(
   builder.append(walk_node(ctx.sub(builder), parts.back()));
 
   wcl::doc doc = std::move(builder).build();
-  if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
+  if (!is_vertically_flat(doc, parts, token_traits)) {
     return {};
   }
   return {wcl::in_place_t{}, std::move(doc)};
@@ -1197,7 +1263,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_last_compress(
   builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts.back()));
 
   wcl::doc doc = std::move(builder).build();
-  if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
+  if (!is_vertically_flat(doc, parts, token_traits)) {
     return {};
   }
   return {wcl::in_place_t{}, std::move(doc)};
@@ -1286,7 +1352,7 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
     CSTElement prev = parts[i - 1];
     CSTElement part = parts[i];
 
-    if (count_leading_newlines(token_traits, part) > 0) {
+    if (has_leading_comment(part, token_traits)) {
       requires_preceding_nl[part] = true;
       continue;
     }
@@ -1306,7 +1372,7 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
     // If we are multiline separate the previous line from us
     CSTElement copy = part;
     wcl::doc part_fmted = fmt().walk(WALK_NODE).compose(ctx, copy, token_traits);
-    if (part_fmted->newline_count() > count_allowed_newlines(token_traits, part)) {
+    if (!is_vertically_flat(part_fmted, part, token_traits)) {
       requires_preceding_nl[part] = true;
       continue;
     }
@@ -1314,7 +1380,7 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
     // If the previous line is  multiline separate us from them
     copy = prev;
     wcl::doc prev_fmted = fmt().walk(WALK_NODE).compose(ctx, copy, token_traits);
-    if (prev_fmted->newline_count() > count_allowed_newlines(token_traits, prev)) {
+    if (!is_vertically_flat(prev_fmted, prev, token_traits)) {
       requires_preceding_nl[part] = true;
       continue;
     }
@@ -1368,6 +1434,7 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
 wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_DATA, node, "Expected CST_DATA");
+  bool is_top_level = node_traits[node].top_level;
 
   auto fmt_members = fmt().walk(WALK_NODE).consume_wsnlc().walk_all(
       fmt().freshline().walk(WALK_NODE).consume_wsnlc());
@@ -1385,7 +1452,7 @@ wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) {
                    .join(fmt_members)
                    .format(ctx, node.firstChildElement(), token_traits);
 
-  if (no_nl->newline_count() == count_leading_newlines(token_traits, node)) {
+  if (is_vertically_flat(no_nl, node, token_traits) && !is_top_level) {
     MEMO_RET(no_nl);
   }
 
@@ -1709,7 +1776,7 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
                    .token(TOKEN_P_PCLOSE)
                    .format(ctx, node.firstChildElement(), token_traits);
 
-  if (no_nl->newline_count() == count_allowed_newlines(token_traits, node)) {
+  if (is_vertically_flat(no_nl, node, token_traits)) {
     MEMO_RET(no_nl);
   }
 
@@ -1744,17 +1811,42 @@ wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) {
                .format(ctx, node.firstChildElement(), token_traits));
 }
 
+class RequireElseIsWeaklyFlat {
+  const CSTElement& require;
+  const token_traits_map_t& traits;
+
+ public:
+  RequireElseIsWeaklyFlat(const CSTElement& require, const token_traits_map_t& traits)
+      : require(require), traits(traits) {}
+  bool operator()(const wcl::doc_builder& builder, ctx_t ctx, wcl::doc doc) {
+    // Find the nested CST_REQ_ELSE to check if it is
+    // weakly flat. It *should* always be there since
+    // the predicate is only called if the else node
+    // exists, but for saftey return false if it doesn't
+    CSTElement inner = require.firstChildNode();
+    while (inner.id() != CST_REQ_ELSE && !inner.empty()) {
+      inner.nextSiblingNode();
+    }
+
+    if (inner.empty()) {
+      return false;
+    }
+
+    return is_weakly_flat(doc, inner, traits);
+  }
+};
+
 wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_REQUIRE, node, "Expected CST_REQUIRE");
 
-  auto else_fmt =
-      fmt()
-          .freshline()
-          .token(TOKEN_KW_ELSE)
-          .fmt_if_fits_all(fmt().space().consume_wsnlc().walk(WALK_NODE),
-                           fmt().nest(fmt().freshline().consume_wsnlc().walk(WALK_NODE)))
-          .consume_wsnlc();
+  auto else_fmt = fmt()
+                      .freshline()
+                      .token(TOKEN_KW_ELSE)
+                      .fmt_try_else(RequireElseIsWeaklyFlat(node, token_traits),
+                                    fmt().space().consume_wsnlc().walk(WALK_NODE),
+                                    fmt().nest(fmt().freshline().consume_wsnlc().walk(WALK_NODE)))
+                      .consume_wsnlc();
 
   auto pre_body_fmt = fmt()
                           .freshline()
@@ -1791,14 +1883,13 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                      }
 
                      // header comment forces split
-                     if (count_leading_newlines(traits, inner) > 0) {
+                     if (has_leading_comment(inner, traits)) {
                        return true;
                      }
 
                      // if the header of the this require is multiline
                      // force a split.
-                     if (builder->newline_count() >
-                         count_allowed_require_header_newlines(traits, node)) {
+                     if (!is_require_vertically_flat(builder->newline_count(), node, traits)) {
                        return true;
                      }
 
@@ -1810,8 +1901,9 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                      CSTElement copy = inner.firstChildElement();
                      wcl::doc fmted =
                          fmt().join(pre_body_fmt).compose(ctx.sub(builder), copy, token_traits);
-                     if (fmted->newline_count() >
-                         count_allowed_require_header_newlines(traits, inner) + 1) {
+                     size_t newline_count =
+                         fmted->newline_count() == 0 ? 0 : fmted->newline_count() - 1;
+                     if (!is_require_vertically_flat(newline_count, inner, traits)) {
                        return true;
                      }
 

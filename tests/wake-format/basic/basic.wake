@@ -895,6 +895,7 @@ target writeImp inputs mode path content =
     | getJobOutput
 
 export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
+
   def json = JObject (
     "label"       :-> JString label,
     "command"     :-> command     | map JString | JArray,
@@ -922,6 +923,51 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
       Nil
     ),
     Nil
+  )
+
+  def json =
+    # comment
+    ( 
+      JObject 
+      "label"       :-> JString label,
+      "command"     :-> command     | map JString | JArray,
+      "environment" :-> environment | map JString | JArray
+    )
+    (
+    "label"       :-> JString label,
+    "command"     :-> command     | map JString | JArray,
+    Nil
+    )
+
+  def json = (
+    JObject
+    (
+      "label"       :-> JString label,
+      "command"     :-> command     | map JString | JArray,
+      "environment" :-> environment | map JString | JArray,
+      Nil
+    )
+  )
+
+  def json = (
+    JObject #comment
+    (
+      "label"       :-> JString label,
+      "command"     :-> command     | map JString | JArray,
+      "environment" :-> environment | map JString | JArray,
+      Nil
+    )
+  )
+
+  def json = (
+    JObject
+    #comment
+    (
+      "label"       :-> JString label,
+      "command"     :-> command     | map JString | JArray,
+      "environment" :-> environment | map JString | JArray,
+      Nil
+    )
   )
 
   json

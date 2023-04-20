@@ -749,15 +749,18 @@ export data Option a =
     Some a
     None
 
-data LogLevel = LogLevel (name: String)
+data LogLevel =
+    LogLevel (name: String)
 
 export data Result pass fail =
     Pass pass
     Fail fail
 
-export data a; b = a; b
+export data a; b =
+    a; b
 
-export data Boolean = True
+export data Boolean =
+    True
 
 global export data Let =
     A
@@ -1085,6 +1088,44 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
             Nil
         )
 
+    def json =
+        # comment
+        (
+            JObject "label" :-> JString label,
+            "command" :-> command | map JString | JArray,
+            "environment" :-> environment | map JString | JArray
+        ) ("label" :-> JString label, "command" :-> command | map JString | JArray, Nil)
+
+    def json = (
+        JObject (
+            "label" :-> JString label,
+            "command" :-> command | map JString | JArray,
+            "environment" :-> environment | map JString | JArray,
+            Nil
+        )
+    )
+
+    def json = (
+        JObject #comment
+        (
+            "label" :-> JString label,
+            "command" :-> command | map JString | JArray,
+            "environment" :-> environment | map JString | JArray,
+            Nil
+        )
+    )
+
+    def json = (
+        JObject
+        #comment
+        (
+            "label" :-> JString label,
+            "command" :-> command | map JString | JArray,
+            "environment" :-> environment | map JString | JArray,
+            Nil
+        )
+    )
+
     json
 
 def anyArray =
@@ -1333,14 +1374,12 @@ def tarball Unit =
     require x = y
 
     require Pass binfiles2 = binfilesResult2
-    else
-        blah # a comment
+    else blah # a comment
 
     require x = y
 
     require Pass binfiles2 = binfilesResult2 # a comment
-    else
-        blah # a comment
+    else blah # a comment
 
     require x = y
 
