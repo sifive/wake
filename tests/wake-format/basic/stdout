@@ -1360,14 +1360,12 @@ def tarball Unit =
     require x = y
 
     require Pass binfiles2 = binfilesResult2
-    else
-        blah # a comment
+    else blah # a comment
 
     require x = y
 
     require Pass binfiles2 = binfilesResult2 # a comment
-    else
-        blah # a comment
+    else blah # a comment
 
     require x = y
 

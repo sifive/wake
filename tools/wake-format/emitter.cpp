@@ -211,6 +211,14 @@ static bool has_trailing_comment(const CSTElement& node, const token_traits_map_
   return count_trailing_newlines(traits, node) > 0;
 }
 
+// Determines if the doc is "weakly flat". Weakly flat is a flat doc
+// with a single trailing comment allowed. No other newlines my be emitted.
+static bool is_weakly_flat(const wcl::doc& doc, const CSTElement& node,
+                           const token_traits_map_t& traits) {
+  return !doc->has_newline() ||
+         (doc->newline_count() == 1 && count_trailing_newlines(traits, node) == 1);
+}
+
 // Determizes of a doc is "flat" as a human would judge it. Human's don't
 // consider leading/trailing comments as invalidating flatness even though they
 // require extra newlines. Thus leading/trailing newlines are allowed.
@@ -1800,17 +1808,42 @@ wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) {
                .format(ctx, node.firstChildElement(), token_traits));
 }
 
+class RequireElseIsWeaklyFlat {
+  const CSTElement& require;
+  const token_traits_map_t& traits;
+
+ public:
+  RequireElseIsWeaklyFlat(const CSTElement& require, const token_traits_map_t& traits): require(require), traits(traits) {}
+  bool operator()(const wcl::doc_builder& builder, ctx_t ctx, wcl::doc doc) {
+    // Find the nested CST_REQ_ELSE to check if it is
+    // weakly flat. It *should* always be there since
+    // the predicate is only called if the else node
+    // exists, but for saftey return false if it doesn't
+    CSTElement inner = require.firstChildNode();
+    while (inner.id() != CST_REQ_ELSE && !inner.empty()) {
+                              inner.nextSiblingNode();
+    }
+
+    if (inner.empty()) {
+      return false;
+    }
+
+    return is_weakly_flat(doc, inner, traits);
+  }
+};
+
 wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_REQUIRE, node, "Expected CST_REQUIRE");
 
-  auto else_fmt =
-      fmt()
-          .freshline()
-          .token(TOKEN_KW_ELSE)
-          .fmt_if_fits_all(fmt().space().consume_wsnlc().walk(WALK_NODE),
-                           fmt().nest(fmt().freshline().consume_wsnlc().walk(WALK_NODE)))
-          .consume_wsnlc();
+  auto else_fmt = fmt()
+                      .freshline()
+                      .token(TOKEN_KW_ELSE)
+                      .fmt_try_else(
+                          RequireElseIsWeaklyFlat(node, token_traits),
+                          fmt().space().consume_wsnlc().walk(WALK_NODE),
+                          fmt().nest(fmt().freshline().consume_wsnlc().walk(WALK_NODE)))
+                      .consume_wsnlc();
 
   auto pre_body_fmt = fmt()
                           .freshline()
