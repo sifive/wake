@@ -2012,21 +2012,25 @@ wcl::doc Emitter::walk_tuple_elt(ctx_t ctx, CSTElement node) {
   MEMO_RET(walk_placeholder(ctx, node));
 }
 
+// Disable walke_type for MVP. The implications of it needs
+// to be first explored before rollout.
 wcl::doc Emitter::walk_type(ctx_t ctx, CSTElement node) {
-  MEMO(ctx, node);
+  return walk_node(ctx.prevent_explode(),  node);
 
-  auto no_nl = walk_node(ctx, node);
-
-  if (!no_nl->has_newline() || node.id() == CST_PAREN) {
-    MEMO_RET(no_nl);
-  }
-
-  MEMO_RET(cat()
-               .lit(wcl::doc::lit("("))
-               .nest(cat().fmt(node, token_traits, fmt().freshline().walk(WALK_NODE)))
-               .freshline()
-               .lit(wcl::doc::lit(")"))
-               .concat(ctx));
+  // MEMO(ctx, node);
+  //
+  // auto no_nl = walk_node(ctx, node);
+  //
+  // if (!no_nl->has_newline() || node.id() == CST_PAREN) {
+  //   MEMO_RET(no_nl);
+  // }
+  //
+  // MEMO_RET(cat()
+  //              .lit(wcl::doc::lit("("))
+  //              .nest(cat().fmt(node, token_traits, fmt().freshline().walk(WALK_NODE)))
+  //              .freshline()
+  //              .lit(wcl::doc::lit(")"))
+  //              .concat(ctx));
 }
 
 wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) {
