@@ -490,13 +490,15 @@ auto Emitter::pattern_fmt(cst_id_t stop_at) {
   auto part_fmt = fmt().walk(is_expression, WALK_NODE).consume_wsnlc();
   auto all_flat = fmt().join(part_fmt).fmt_while([stop_at](cst_id_t id) { return id != stop_at; },
                                                  fmt().space().join(part_fmt));
-  auto all_explode =
-      fmt()
-          .lit(wcl::doc::lit("("))
-          .nest(fmt().freshline().join(part_fmt).fmt_while(
-              [stop_at](cst_id_t id) { return id != stop_at; }, fmt().freshline().join(part_fmt)))
-          .freshline()
-          .lit(wcl::doc::lit(")"));
+  // TODO: disable for MVP. Needs to be explored further for correctness.
+  // auto all_explode =
+  //     fmt().prefer_explode(fmt()
+  //         .lit(wcl::doc::lit("("))
+  //         .nest(fmt().freshline().join(part_fmt).fmt_while(
+  //             [stop_at](cst_id_t id) { return id != stop_at; }, fmt().freshline().join(part_fmt)))
+  //         .freshline()
+  //         .lit(wcl::doc::lit(")")));
+
   // 4 Cases
   // 1) The "flat format" doesn't have a newline and fits()
   // 2) The "flat format" doesn't have a newline and doesn't fits()
@@ -512,7 +514,7 @@ auto Emitter::pattern_fmt(cst_id_t stop_at) {
 
   return fmt().fmt_try_else(
       [](const wcl::doc_builder& builder, ctx_t ctx, wcl::doc doc) { return doc->has_newline(); },
-      all_flat, fmt().fmt_if_fits_all(all_flat, all_explode));
+      all_flat, fmt().fmt_if_fits_all(all_flat, all_flat /*all_explode*/));
 }
 
 wcl::doc Emitter::layout(CST cst) {
