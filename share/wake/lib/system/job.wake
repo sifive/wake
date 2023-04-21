@@ -221,6 +221,9 @@ export def makePlan (label: String) (visible: List Path) (command: String): Plan
 # Identity function
 def id x = x
 
+def bToInt b =
+  if b then 1 else 0
+
 # Set reasonable defaults for all Plan arguments
 export def makeExecPlan (cmd: List String) (visible: List Path): Plan =
   Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share False Nil (\_ True) defaultUsage id id False
@@ -241,7 +244,7 @@ export def localRunner: Runner =
       Fail e
     Pass (RunnerInput _ cmd vis env dir stdin _ _ predict isatty) =
         def Usage status runtime cputime mem in out = predict
-        def _ = launch job dir stdin env.implode cmd.implode status runtime cputime mem in out (if isatty then 1 else 0)
+        def _ = launch job dir stdin env.implode cmd.implode status runtime cputime mem in out (bToInt isatty)
         match (getJobReality job)
           Pass reality = Pass (RunnerOutput (map getPathName vis) Nil reality)
           Fail f = Fail f
@@ -420,7 +423,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
   def build Unit =
     def visStrings =
       map getPathName vis
-    def job = create label dir stdin env.implode cmd.implode hash visStrings.implode (if keep then 1 else 0) echo stdout stderr (if isatty then 1 else 0)
+    def job = create label dir stdin env.implode cmd.implode hash visStrings.implode (bToInt keep) echo stdout stderr (bToInt isatty)
     def prefix = "{str pid}.{str (getJobId job)}"
     def usage = getJobRecord job | getOrElse uusage
     def output = run job (Pass (RunnerInput label cmd vis env dir stdin res prefix usage isatty))
@@ -446,7 +449,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
     job
   match keep
     False = build Unit
-    True  = match (cache dir stdin env.implode cmd.implode hash (map getPathName vis).implode (if isatty then 1 else 0))
+    True  = match (cache dir stdin env.implode cmd.implode hash (map getPathName vis).implode (bToInt isatty))
       Pair (job, _) last = confirm True  last job
       Pair Nil      last = confirm False last (build Unit)
 
@@ -491,7 +494,7 @@ export def runJob (p: Plan): Job = match p
         def create label dir stdin env cmd signature visible keep echo stdout stderr isatty = prim "job_create"
         def badfinish job e = prim "job_fail_finish"
         def badlaunch job e = prim "job_fail_launch"
-        def job = create label dir stdin env.implode cmd.implode 0 "" 0 "echo" "info" "error" (if isatty then 1 else 0)
+        def job = create label dir stdin env.implode cmd.implode 0 "" 0 "echo" "info" "error" (bToInt isatty)
         def error =
           def pretty = match _
             Accept _ _ = ""
