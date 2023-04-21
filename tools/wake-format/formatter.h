@@ -257,6 +257,11 @@ struct Formatter {
     return {{action, {f}}};
   }
 
+  template <class F, class FMT>
+  Formatter<SeqAction<Action, ChangeContextAction<F, FMT>>> ctx(F f, FMT formatter) {
+    return {{action, {f, formatter}}};
+  }
+
   wcl::doc format(ctx_t ctx, CSTElement node, const token_traits_map_t& traits) {
     wcl::doc_builder builder;
     action.run(builder, ctx, node, traits);

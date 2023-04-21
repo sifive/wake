@@ -191,6 +191,19 @@ struct NestAction {
   }
 };
 
+template <class F, class FMT>
+struct ChangeContextAction {
+  F f;  // (ctx_t) -> ctx_t
+  FMT formatter;
+
+  ChangeContextAction(F f, FMT formatter) : f(f), formatter(formatter) {}
+
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    builder.append(formatter.compose(f(ctx).sub(builder), node, traits));
+  }
+};
+
 template <class FMT>
 struct PreferExplodeAction {
   FMT formatter;

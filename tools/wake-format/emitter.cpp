@@ -1544,8 +1544,9 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
                   .token(TOKEN_KW_IF)
                   .consume_wsnlc()
                   .space()
-                  .fmt_if_else(is_simple_binop, fmt().walk(WALK_NODE),
-                               fmt().next().newline())  // if cond
+                  .ctx([](ctx_t ctx) { return ctx.binop(); },
+                       fmt().fmt_if_else(is_simple_binop, fmt().walk(WALK_NODE),
+                                         fmt().next().newline()))  // if cond
                   .consume_wsnlc()
                   .space()
                   .token(TOKEN_KW_THEN)
@@ -1572,7 +1573,8 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
           .token(TOKEN_KW_IF)
           .consume_wsnlc()
           .space()
-          .walk(is_expression, WALK_NODE)  // if cond
+          .ctx([](ctx_t ctx) { return ctx.binop(); },
+               fmt().walk(is_expression, WALK_NODE))  // if cond
           .consume_wsnlc()
           .space()
           .token(TOKEN_KW_THEN)
