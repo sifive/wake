@@ -355,6 +355,7 @@ static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTE
   }
 
   auto collect = collect_left_binary(collect_over, left);
+  collect.push_back(op);
   collect.push_back(right);
 
   return collect;
@@ -379,7 +380,7 @@ static std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CST
     return {node};
   }
 
-  std::vector<CSTElement> collect = {left};
+  std::vector<CSTElement> collect = {left, op};
   auto right_collect = collect_right_binary(collect_over, right);
 
   collect.insert(collect.end(), right_collect.begin(), right_collect.end());
@@ -428,12 +429,12 @@ static inline bool is_simple_binop(wcl::doc_builder& builder, ctx_t ctx, CSTElem
     parts = collect_right_binary(op_token, node);
   }
 
-  if (parts.size() != 2) {
+  if (parts.size() != 3) {
     return false;
   }
 
   return is_simple_literal(builder, ctx, parts[0], traits) &&
-         is_simple_literal(builder, ctx, parts[1], traits);
+         is_simple_literal(builder, ctx, parts[2], traits);
 }
 
 static inline bool is_simple_apply(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
@@ -1170,10 +1171,11 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
 wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
                                               const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
-  for (size_t i = 0; i < parts.size() - 1; i++) {
+  for (size_t i = 0; i < parts.size() - 1; i += 2) {
     CSTElement part = parts[i];
+    CSTElement op = parts[i + 1].firstChildElement();
     builder.append(walk_node(ctx, part));
-    builder.append(place_binop(over, true, ctx.sub(builder)));
+    builder.append(place_binop(op, true, ctx.sub(builder)));
   }
 
   builder.append(walk_node(ctx.sub(builder), parts.back()));
@@ -1185,46 +1187,50 @@ wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
   return {wcl::in_place_t{}, std::move(doc)};
 }
 
-wcl::optional<wcl::doc> Emitter::combine_explode_first(CSTElement over, ctx_t ctx,
+wcl::optional<wcl::doc> Emitter::combine_explode_first(CSTElement ovr, ctx_t ctx,
                                                        const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
   CSTElement part = parts[0];
+  CSTElement op = parts[1].firstChildElement();
   builder.append(walk_node(ctx.prefer_explode(), part));
-  builder.append(place_binop(over, false, ctx.sub(builder)));
+  builder.append(place_binop(op, false, ctx.sub(builder)));
 
-  for (size_t i = 1; i < parts.size() - 1; i++) {
+  for (size_t i = 2; i < parts.size() - 1; i += 2) {
     part = parts[i];
+    op = parts[i + 1].firstChildElement();
     builder.append(walk_node(ctx.sub(builder), part));
-    builder.append(place_binop(over, false, ctx.sub(builder)));
+    builder.append(place_binop(op, false, ctx.sub(builder)));
   }
 
   builder.append(walk_node(ctx.sub(builder), parts.back()));
   return {wcl::in_place_t{}, std::move(builder).build()};
 }
 
-wcl::optional<wcl::doc> Emitter::combine_explode_last(CSTElement over, ctx_t ctx,
+wcl::optional<wcl::doc> Emitter::combine_explode_last(CSTElement ovr, ctx_t ctx,
                                                       const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
-  for (size_t i = 0; i < parts.size() - 1; i++) {
+  for (size_t i = 0; i < parts.size() - 1; i += 2) {
     CSTElement part = parts[i];
+    CSTElement op = parts[i + 1].firstChildElement();
     builder.append(walk_node(ctx.sub(builder), part));
-    builder.append(place_binop(over, false, ctx.sub(builder)));
+    builder.append(place_binop(op, false, ctx.sub(builder)));
   }
 
   builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts.back()));
   return {wcl::in_place_t{}, std::move(builder).build()};
 }
 
-wcl::optional<wcl::doc> Emitter::combine_explode_all(CSTElement over, ctx_t ctx,
+wcl::optional<wcl::doc> Emitter::combine_explode_all(CSTElement ovr, ctx_t ctx,
                                                      const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
-  for (size_t i = 0; i < parts.size() - 1; i++) {
+  for (size_t i = 0; i < parts.size() - 1; i += 2) {
     CSTElement part = parts[i];
+    CSTElement op = parts[i + 1].firstChildElement();
     builder.append(walk_node(ctx.sub(builder).prefer_explode(), part));
-    builder.append(place_binop(over, false, ctx.sub(builder)));
+    builder.append(place_binop(op, false, ctx.sub(builder)));
   }
 
   builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts.back()));
@@ -1232,16 +1238,19 @@ wcl::optional<wcl::doc> Emitter::combine_explode_all(CSTElement over, ctx_t ctx,
 }
 
 wcl::optional<wcl::doc> Emitter::combine_explode_first_compress(
-    CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts) {
+    CSTElement ovr, ctx_t ctx, const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
-  builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts[0]));
-  builder.append(place_binop(over, true, ctx.sub(builder)));
+  CSTElement part = parts[0];
+  CSTElement op = parts[1].firstChildElement();
+  builder.append(walk_node(ctx.sub(builder).prefer_explode(), part));
+  builder.append(place_binop(op, true, ctx.sub(builder)));
 
-  for (size_t i = 1; i < parts.size() - 1; i++) {
-    CSTElement part = parts[i];
+  for (size_t i = 2; i < parts.size() - 1; i += 2) {
+    part = parts[i];
+    op = parts[i + 1].firstChildElement();
     builder.append(walk_node(ctx.sub(builder), part));
-    builder.append(place_binop(over, true, ctx.sub(builder)));
+    builder.append(place_binop(op, true, ctx.sub(builder)));
   }
 
   builder.append(walk_node(ctx.sub(builder), parts.back()));
@@ -1254,13 +1263,14 @@ wcl::optional<wcl::doc> Emitter::combine_explode_first_compress(
 }
 
 wcl::optional<wcl::doc> Emitter::combine_explode_last_compress(
-    CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts) {
+    CSTElement ovr, ctx_t ctx, const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
-  for (size_t i = 0; i < parts.size() - 1; i++) {
+  for (size_t i = 0; i < parts.size() - 1; i += 2) {
     CSTElement part = parts[i];
+    CSTElement op = parts[i + 1].firstChildElement();
     builder.append(walk_node(ctx.sub(builder), part));
-    builder.append(place_binop(over, true, ctx.sub(builder)));
+    builder.append(place_binop(op, true, ctx.sub(builder)));
   }
 
   builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts.back()));
