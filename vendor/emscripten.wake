@@ -30,6 +30,7 @@ def emmake = whichInEnvPath "emmake"
 def emscriptenCFlags =
     "-Wall", "-O3", Nil
 
+# wake-format off
 def emscriptenLFlags =
     "-O3",
     "-s", "ALLOW_MEMORY_GROWTH",

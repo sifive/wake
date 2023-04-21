@@ -61,20 +61,20 @@ export def makeLogLevel2 (name: String) (colour: Option Colour) (intensity: Opti
     def set name code = prim "colour"
     def colourCode = match colour
         None   = 0
-        Some c = 8 + match c
-            Black   = 0
-            Red     = 1
-            Green   = 2
-            Yellow  = 3
-            Blue    = 4
-            Magenta = 5
-            Cyan    = 6
-            White   = 7
+        Some c = match c
+            Black   = 8
+            Red     = 9
+            Green   = 10
+            Yellow  = 11
+            Blue    = 12
+            Magenta = 13
+            Cyan    = 14
+            White   = 15
     def intensityCode = match intensity
         None   = 0
-        Some i = 16 * match i
-            Dim    = 1
-            Bright = 2
+        Some i = match i
+            Dim    = 16
+            Bright = 32
     def _ = set name (colourCode+intensityCode)
     LogLevel name
 

@@ -423,6 +423,7 @@ def mergeValueList (describeCompat: Boolean) (values: List JValue): Result JValu
             if eqFn x y then
                 Pass x
             else
+                # wake-format off
                 compatibilityMessage "N" "n" "ot every type can combine multiple different values. The incompatible values are: {map wrapFn values | formatExamples}"
                 | failWithError
         match values
@@ -508,6 +509,7 @@ def mergeValueList (describeCompat: Boolean) (values: List JValue): Result JValu
             | JArray
             | Pass
         _ _ _ _ _ _ _ =
+            # wake-format off
             compatibilityMessage "V" "v" "alues of different types may not be combined. The incompatible values are: {formatExamples values}"
             | failWithError
 
