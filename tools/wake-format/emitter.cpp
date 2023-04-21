@@ -495,7 +495,8 @@ auto Emitter::pattern_fmt(cst_id_t stop_at) {
   //     fmt().prefer_explode(fmt()
   //         .lit(wcl::doc::lit("("))
   //         .nest(fmt().freshline().join(part_fmt).fmt_while(
-  //             [stop_at](cst_id_t id) { return id != stop_at; }, fmt().freshline().join(part_fmt)))
+  //             [stop_at](cst_id_t id) { return id != stop_at; },
+  //             fmt().freshline().join(part_fmt)))
   //         .freshline()
   //         .lit(wcl::doc::lit(")")));
 
