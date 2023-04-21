@@ -123,17 +123,13 @@ class Emitter {
   //     if LTE has any elements choose the element with the smallest height
   //     otherwise choose the element with the smallest width from GT
   //
-  wcl::optional<wcl::doc> combine_flat(CSTElement over, ctx_t ctx,
-                                       const std::vector<CSTElement>& parts);
-  wcl::optional<wcl::doc> combine_explode_first(CSTElement over, ctx_t ctx,
-                                                const std::vector<CSTElement>& parts);
-  wcl::optional<wcl::doc> combine_explode_last(CSTElement over, ctx_t ctx,
-                                               const std::vector<CSTElement>& parts);
-  wcl::optional<wcl::doc> combine_explode_all(CSTElement over, ctx_t ctx,
-                                              const std::vector<CSTElement>& parts);
-  wcl::optional<wcl::doc> combine_explode_first_compress(CSTElement over, ctx_t ctx,
+  wcl::optional<wcl::doc> combine_flat(ctx_t ctx, const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_first(ctx_t ctx, const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_last(ctx_t ctx, const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_all(ctx_t ctx, const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_first_compress(ctx_t ctx,
                                                          const std::vector<CSTElement>& parts);
-  wcl::optional<wcl::doc> combine_explode_last_compress(CSTElement over, ctx_t ctx,
+  wcl::optional<wcl::doc> combine_explode_last_compress(ctx_t ctx,
                                                         const std::vector<CSTElement>& parts);
 
   // Functions to combine apply using various 'full choice' options

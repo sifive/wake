@@ -1168,8 +1168,7 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
                .format(ctx, node.firstChildElement(), token_traits));
 }
 
-wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
-                                              const std::vector<CSTElement>& parts) {
+wcl::optional<wcl::doc> Emitter::combine_flat(ctx_t ctx, const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
   for (size_t i = 0; i < parts.size() - 1; i += 2) {
     CSTElement part = parts[i];
@@ -1187,7 +1186,7 @@ wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
   return {wcl::in_place_t{}, std::move(doc)};
 }
 
-wcl::optional<wcl::doc> Emitter::combine_explode_first(CSTElement ovr, ctx_t ctx,
+wcl::optional<wcl::doc> Emitter::combine_explode_first(ctx_t ctx,
                                                        const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
@@ -1207,7 +1206,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_first(CSTElement ovr, ctx_t ctx
   return {wcl::in_place_t{}, std::move(builder).build()};
 }
 
-wcl::optional<wcl::doc> Emitter::combine_explode_last(CSTElement ovr, ctx_t ctx,
+wcl::optional<wcl::doc> Emitter::combine_explode_last(ctx_t ctx,
                                                       const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
@@ -1222,7 +1221,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_last(CSTElement ovr, ctx_t ctx,
   return {wcl::in_place_t{}, std::move(builder).build()};
 }
 
-wcl::optional<wcl::doc> Emitter::combine_explode_all(CSTElement ovr, ctx_t ctx,
+wcl::optional<wcl::doc> Emitter::combine_explode_all(ctx_t ctx,
                                                      const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
@@ -1238,7 +1237,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_all(CSTElement ovr, ctx_t ctx,
 }
 
 wcl::optional<wcl::doc> Emitter::combine_explode_first_compress(
-    CSTElement ovr, ctx_t ctx, const std::vector<CSTElement>& parts) {
+    ctx_t ctx, const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
   CSTElement part = parts[0];
@@ -1263,7 +1262,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_first_compress(
 }
 
 wcl::optional<wcl::doc> Emitter::combine_explode_last_compress(
-    CSTElement ovr, ctx_t ctx, const std::vector<CSTElement>& parts) {
+    ctx_t ctx, const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
   for (size_t i = 0; i < parts.size() - 1; i += 2) {
@@ -1305,7 +1304,7 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   }
 
   if (ctx.explode_option == ExplodeOption::Prevent) {
-    auto doc = combine_flat(op_token, ctx.binop(), parts);
+    auto doc = combine_flat(ctx.binop(), parts);
     if (!doc) {
       FMT_ASSERT(false, op_token, "Failed to flat format binop");
     }
@@ -1315,25 +1314,25 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   if (!ctx.nested_binop && (is_binop_matching_str(op_token, TOKEN_OP_DOLLAR, "$") ||
                             is_binop_matching_str(op_token, TOKEN_OP_OR, "|"))) {
     MEMO_RET(select_best_choice({
-        combine_explode_first(op_token, ctx.binop(), parts),
-        combine_explode_last(op_token, ctx.binop(), parts),
-        combine_explode_all(op_token, ctx.binop(), parts),
+        combine_explode_first(ctx.binop(), parts),
+        combine_explode_last(ctx.binop(), parts),
+        combine_explode_all(ctx.binop(), parts),
     }));
   }
 
   MEMO_RET(select_best_choice({
       // 1
-      combine_flat(op_token, ctx.binop(), parts),
+      combine_flat(ctx.binop(), parts),
       // 2
-      combine_explode_first(op_token, ctx.binop(), parts),
+      combine_explode_first(ctx.binop(), parts),
       // 3
-      combine_explode_last(op_token, ctx.binop(), parts),
+      combine_explode_last(ctx.binop(), parts),
       // 4
-      combine_explode_all(op_token, ctx.binop(), parts),
+      combine_explode_all(ctx.binop(), parts),
       // 5
-      combine_explode_first_compress(op_token, ctx.binop(), parts),
+      combine_explode_first_compress(ctx.binop(), parts),
       // 6
-      combine_explode_last_compress(op_token, ctx.binop(), parts),
+      combine_explode_last_compress(ctx.binop(), parts),
   }));
 }
 
