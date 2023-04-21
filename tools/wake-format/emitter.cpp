@@ -1812,7 +1812,7 @@ wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) {
                .space()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
-               .join(rhs_fmt())
+               .join(rhs_fmt(true))
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));
 }
@@ -1954,7 +1954,7 @@ wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) {
                        fmt().token(TOKEN_P_BSLASH).ws().walk(WALK_NODE).space().consume_wsnlc())
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
-               .join(rhs_fmt())
+               .join(rhs_fmt(true))
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));
 }
