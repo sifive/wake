@@ -1197,3 +1197,19 @@ def tarball Unit =
     require x = y
     require srcs = allSources # a comment
     x
+
+def x  =
+  if cmpFn vi vi1 | isGT 
+  then 
+    def x = y
+
+    x | a | b | c | d
+  else
+    def x = y
+
+    x | a | b | c | d
+
+def x  =
+  if cmpFn | isGT
+  then 0
+  else 0
