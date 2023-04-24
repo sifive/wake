@@ -1423,3 +1423,43 @@ def x =
 
 def x =
     if cmpFn | isGT then 0 else 0
+
+def x =
+    a
+    # Comment 1
+    |
+    b
+    | c
+
+def x =
+    a
+    | b
+    # Comment 2
+    |
+    c
+
+def x =
+    a
+    # Comment 1
+    |
+    b
+    # Comment 2
+    |
+    c
+    # Comment 3
+    |
+    d
+    # Comment 4
+    |
+    e
+
+def x =
+    a,
+    # Comment 1
+    b,
+    # Comment 2
+    c,
+    # Comment 3
+    d,
+    # Comment 4
+    e,
