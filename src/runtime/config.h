@@ -74,7 +74,7 @@ static inline const char* to_string(WakeConfigProvenance p) {
     case WakeConfigProvenance::CommandLine:
       return "Commandline";
   }
-  return "Default";
+  return "Unknown (this is an error, please report this to Wake devs)";
 }
 
 template <class... Polcies>
@@ -83,7 +83,7 @@ struct WakeConfigImpl : public Polcies... {
   WakeConfigImpl(WakeConfigImpl&&) = delete;
   WakeConfigImpl() = default;
 
-  std::map<std::string, WakeConfigProvenance> provinence;
+  std::map<std::string, WakeConfigProvenance> provenance;
 
  private:
   struct void_t {};
@@ -93,9 +93,9 @@ struct WakeConfigImpl : public Polcies... {
 
   template <class P>
   void_t emit_each(std::ostream& os) const {
-    auto iter = provinence.find(P::key);
+    auto iter = provenance.find(P::key);
     auto p = WakeConfigProvenance::Default;
-    if (iter != provinence.end()) {
+    if (iter != provenance.end()) {
       p = iter->second;
     }
     os << "  " << P::key << " = '" << this->*P::value << "' (" << to_string(p) << ")" << std::endl;
@@ -120,7 +120,6 @@ struct WakeConfigImpl : public Polcies... {
 
   template <WakeConfigProvenance p, class P>
   void_t set_policy(const JAST& json) {
-    // The current semantics want us to
     if (p == WakeConfigProvenance::Wakeroot && !P::allowed_in_wakeroot) {
       return {};
     }
@@ -129,7 +128,7 @@ struct WakeConfigImpl : public Polcies... {
     }
     auto opt_value = json.get_opt(P::key);
     if (opt_value) {
-      provinence[P::key] = p;
+      provenance[P::key] = p;
       P::set(*this, **opt_value);
     }
     return {};
@@ -138,7 +137,7 @@ struct WakeConfigImpl : public Polcies... {
   template <class P>
   void_t override_policy(const WakeConfigOverrides& overrides) {
     if (P::override_value && overrides.*P::override_value) {
-      provinence[P::key] = WakeConfigProvenance::CommandLine;
+      provenance[P::key] = WakeConfigProvenance::CommandLine;
       this->*P::value = *(overrides.*P::override_value);
     }
     return {};
