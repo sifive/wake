@@ -1427,31 +1427,25 @@ def x =
 def x =
     a
     # Comment 1
-    |
-    b
+    | b
     | c
 
 def x =
     a
     | b
     # Comment 2
-    |
-    c
+    | c
 
 def x =
     a
     # Comment 1
-    |
-    b
+    | b
     # Comment 2
-    |
-    c
+    | c
     # Comment 3
-    |
-    d
+    | d
     # Comment 4
-    |
-    e
+    | e
 
 def x =
     a,

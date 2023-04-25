@@ -167,8 +167,9 @@ static size_t count_leading_newlines(const token_traits_map_t& traits, const CST
 }
 
 static size_t count_trailing_newlines(const token_traits_map_t& traits, const CSTElement& node) {
-  CSTElement token;
-  {
+  CSTElement token = node;
+
+  if (node.isNode()) {
     IsWSNLCPredicate is_wsnlc;
     CSTElement curr_rhs = node.firstChildElement();
     CSTElement next_rhs = curr_rhs;
@@ -2093,7 +2094,7 @@ wcl::doc Emitter::place_binop(CSTElement op, bool is_flat, ctx_t ctx) {
   }
 
   wcl::doc binop = walk_token(ctx, op);
-  if (binop->has_newline()) {
+  if (has_trailing_comment(op, token_traits)) {
     // OP FR
     // '''
     // , # a comment
