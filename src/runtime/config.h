@@ -120,10 +120,10 @@ struct WakeConfigImpl : public Polcies... {
 
   template <WakeConfigProvenance p, class P>
   void_t set_policy(const JAST& json) {
-    if (p == WakeConfigProvenance::Wakeroot && !P::allowed_in_wakeroot) {
+    if (p == WakeConfigProvenance::WakeRoot && !P::allowed_in_wakeroot) {
       return {};
     }
-    if (p == WakeConfigProvenance::Userconfig && !P::allowed_in_userconfig) {
+    if (p == WakeConfigProvenance::UserConfig && !P::allowed_in_userconfig) {
       return {};
     }
     auto opt_value = json.get_opt(P::key);
