@@ -1,4 +1,3 @@
-Wake config: 
-  version = ''
-  user config  = './wake_user.json'
-
+Wake config:
+  version = '' (Default)
+  user_config = './wake_user.json' (Wakeroot)
