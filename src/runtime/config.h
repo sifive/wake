@@ -61,16 +61,16 @@ struct UserConfigPolicy {
  * Generic WakeConfig implementation
  *********************************************************************/
 
-enum class WakeConfigProvenance { Default, Wakeroot, Userconfig, CommandLine };
+enum class WakeConfigProvenance { Default, WakeRoot, UserConfig, CommandLine };
 
 static inline const char* to_string(WakeConfigProvenance p) {
   switch (p) {
     case WakeConfigProvenance::Default:
       return "Default";
-    case WakeConfigProvenance::Wakeroot:
-      return "Wakeroot";
-    case WakeConfigProvenance::Userconfig:
-      return "Userconfig";
+    case WakeConfigProvenance::WakeRoot:
+      return "WakeRoot";
+    case WakeConfigProvenance::UserConfig:
+      return "UserConfig";
     case WakeConfigProvenance::CommandLine:
       return "Commandline";
   }
