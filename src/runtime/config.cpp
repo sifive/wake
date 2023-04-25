@@ -274,7 +274,7 @@ bool WakeConfig::init(const std::string& wakeroot_path, const WakeConfigOverride
   }
 
   // Parse values from .wakeroot
-  _config->set_all<WakeConfigProvinence::Wakeroot>(wakeroot_json);
+  _config->set_all<WakeConfigProvenance::Wakeroot>(wakeroot_json);
 
   // Parse user config
   auto user_config_res = read_json_file(_config->user_config);
@@ -305,7 +305,7 @@ bool WakeConfig::init(const std::string& wakeroot_path, const WakeConfigOverride
   }
 
   // Parse values from the user config
-  _config->set_all<WakeConfigProvinence::Userconfig>(user_config_json);
+  _config->set_all<WakeConfigProvenance::Userconfig>(user_config_json);
 
   // Finally apply command line overrides
   _config->override_all(overrides);

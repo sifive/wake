@@ -61,17 +61,17 @@ struct UserConfigPolicy {
  * Generic WakeConfig implementation
  *********************************************************************/
 
-enum class WakeConfigProvinence { Default, Wakeroot, Userconfig, CommandLine };
+enum class WakeConfigProvenance { Default, Wakeroot, Userconfig, CommandLine };
 
-static inline const char* to_string(WakeConfigProvinence p) {
+static inline const char* to_string(WakeConfigProvenance p) {
   switch (p) {
-    case WakeConfigProvinence::Default:
+    case WakeConfigProvenance::Default:
       return "Default";
-    case WakeConfigProvinence::Wakeroot:
+    case WakeConfigProvenance::Wakeroot:
       return "Wakeroot";
-    case WakeConfigProvinence::Userconfig:
+    case WakeConfigProvenance::Userconfig:
       return "Userconfig";
-    case WakeConfigProvinence::CommandLine:
+    case WakeConfigProvenance::CommandLine:
       return "Commandline";
   }
   return "Default";
@@ -83,7 +83,7 @@ struct WakeConfigImpl : public Polcies... {
   WakeConfigImpl(WakeConfigImpl&&) = delete;
   WakeConfigImpl() = default;
 
-  std::map<std::string, WakeConfigProvinence> provinence;
+  std::map<std::string, WakeConfigProvenance> provinence;
 
  private:
   struct void_t {};
@@ -94,7 +94,7 @@ struct WakeConfigImpl : public Polcies... {
   template <class P>
   void_t emit_each(std::ostream& os) const {
     auto iter = provinence.find(P::key);
-    WakeConfigProvinence p = WakeConfigProvinence::Default;
+    auto p = WakeConfigProvenance::Default;
     if (iter != provinence.end()) {
       p = iter->second;
     }
@@ -118,13 +118,13 @@ struct WakeConfigImpl : public Polcies... {
     return {};
   }
 
-  template <WakeConfigProvinence p, class P>
+  template <WakeConfigProvenance p, class P>
   void_t set_policy(const JAST& json) {
     // The current semantics want us to
-    if (p == WakeConfigProvinence::Wakeroot && !P::allowed_in_wakeroot) {
+    if (p == WakeConfigProvenance::Wakeroot && !P::allowed_in_wakeroot) {
       return {};
     }
-    if (p == WakeConfigProvinence::Userconfig && !P::allowed_in_userconfig) {
+    if (p == WakeConfigProvenance::Userconfig && !P::allowed_in_userconfig) {
       return {};
     }
     auto opt_value = json.get_opt(P::key);
@@ -138,18 +138,13 @@ struct WakeConfigImpl : public Polcies... {
   template <class P>
   void_t override_policy(const WakeConfigOverrides& overrides) {
     if (P::override_value && overrides.*P::override_value) {
-      provinence[P::key] = WakeConfigProvinence::CommandLine;
+      provinence[P::key] = WakeConfigProvenance::CommandLine;
       this->*P::value = *(overrides.*P::override_value);
     }
     return {};
   }
 
- public:
-  void emit(std::ostream& os) const {
-    os << "Wake config:" << std::endl;
-    call_all(emit_each<Polcies>(os)...);
-  }
-
+ protected:
   static std::set<std::string> wakeroot_allowed_keys() {
     std::set<std::string> out;
     call_all(add_wakeroot_key<Polcies>(out)...);
@@ -162,13 +157,19 @@ struct WakeConfigImpl : public Polcies... {
     return out;
   }
 
-  template <WakeConfigProvinence p>
+  template <WakeConfigProvenance p>
   void set_all(const JAST& json) {
     call_all(set_policy<p, Polcies>(json)...);
   }
 
   void override_all(const WakeConfigOverrides& overrides) {
     call_all(override_policy<Polcies>(overrides)...);
+  }
+
+ public:
+  void emit(std::ostream& os) const {
+    os << "Wake config:" << std::endl;
+    call_all(emit_each<Polcies>(os)...);
   }
 };
 
