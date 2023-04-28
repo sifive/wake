@@ -1,6 +1,7 @@
 #! /bin/sh
 
 if [ $(uname) != Linux ] ; then
+  cat stdout
   exit 0
 fi
 
