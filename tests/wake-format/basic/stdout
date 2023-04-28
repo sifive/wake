@@ -318,6 +318,26 @@ def wakeToTestDir Unit =
         Nil -> Pass (Pair "{wakePath}" Nil)
         _ -> Fail (makeError "Two wake binaries declared for testing!")
 
+def x (var: String): Value =
+    x
+
+def x =
+    """
+
+        String with
+        no indents
+        %{someVar}
+
+        and extra spacing
+    """
+
+def x =
+    require aaaaaa, bbbbb, ccccc, ddddd, eeeee, fffff, ggggg, hhhhh, iiiii, jjjjj, kkkkk, lllll, mmmmm, nnnnn, Nil =
+        args
+    else ""
+
+    ""
+
 def wakeToTestDir Unit =
     match (subscribe wakeTestBinary)
         buildTestWake, Nil ->

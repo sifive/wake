@@ -515,9 +515,10 @@ auto Emitter::pattern_fmt(cst_id_t stop_at) {
   //    isn't a good way to determine if it fits since the NL can be in many places. Instead
   //    just return flat, accepting in some very rare cases the output will exceed the max width
 
-  return fmt().fmt_try_else(
-      [](const wcl::doc_builder& builder, ctx_t ctx, wcl::doc doc) { return doc->has_newline(); },
-      all_flat, fmt().fmt_if_fits_all(all_flat, all_flat /*all_explode*/));
+  return all_flat;
+  // return fmt().fmt_try_else(
+  //     [](const wcl::doc_builder& builder, ctx_t ctx, wcl::doc doc) { return doc->has_newline();
+  //     }, all_flat, fmt().fmt_if_fits_all(all_flat, all_explode));
 }
 
 wcl::doc Emitter::layout(CST cst) {
@@ -1164,7 +1165,8 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
                .walk(WALK_NODE)
                .consume_wsnlc()
                .token(TOKEN_P_ASCRIBE)
-               .ws()
+               .consume_wsnlc()
+               .space()
                .walk(WALK_NODE)
                .format(ctx, node.firstChildElement(), token_traits));
 }
@@ -1370,17 +1372,11 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
       continue;
     }
 
-    // This should never be possible since the only time a node changes away
-    // from CST_DEF is the return (last) item which this loop skips. CST_REQUIRE
-    // appears to break this rule but actually doesn't as a CST_REQUIRE slurps
-    // up the rest of the current block (so the only change is still the last)
-    // Assert here in case that somehow changes
-    FMT_ASSERT(prev.id() == part.id(), part, "Interal items in CST_BLOCK should all be CST_DEF");
-    // If it does change, the code should be
-    // if (prev.id() != part.id()) {
-    //   requires_preceding_nl[part] = true;
-    //   continue;
-    // }
+    // If we change node types separate the previous line from us
+    if (prev.id() != part.id()) {
+      requires_preceding_nl[part] = true;
+      continue;
+    }
 
     // If we are multiline separate the previous line from us
     CSTElement copy = part;
@@ -1684,6 +1680,15 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
            node.nextSiblingElement();
   });
 
+  auto multiline_end = fmt().match(
+    pred(TOKEN_LSTR_CONTINUE, fmt().token(TOKEN_LSTR_CONTINUE).token(TOKEN_NL))
+   .pred(TOKEN_MSTR_CONTINUE, fmt().token(TOKEN_MSTR_CONTINUE).token(TOKEN_NL))
+   .pred(TOKEN_LSTR_PAUSE, fmt().token(TOKEN_LSTR_PAUSE))
+   .pred(TOKEN_MSTR_PAUSE, fmt().token(TOKEN_MSTR_PAUSE))
+   // otherwise: fail
+  );
+
+
   // This loop steps through the repeating part of a multiline string
   // starting at the TOKEN_WS. Each iteration of the loop consumes everything
   // expected by that chunk through to the start of the next loop.
@@ -1702,16 +1707,12 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   //   TOKEN_WS <- loop 5
   //   TOKEN_LSTR_PAUSE
   auto multiline_string_loop = fmt().fmt_while(
-    {TOKEN_NL, TOKEN_WS},
+    {TOKEN_NL, TOKEN_WS, TOKEN_LSTR_CONTINUE, TOKEN_MSTR_CONTINUE, TOKEN_LSTR_PAUSE, TOKEN_MSTR_PAUSE},
     fmt().match(
-      pred(TOKEN_WS, fmt().freshline().join(inset_line)
-           .match(
-             pred(TOKEN_LSTR_CONTINUE, fmt().token(TOKEN_LSTR_CONTINUE).token(TOKEN_NL))
-            .pred(TOKEN_MSTR_CONTINUE, fmt().token(TOKEN_MSTR_CONTINUE).token(TOKEN_NL))
-            .pred(TOKEN_LSTR_PAUSE, fmt().token(TOKEN_LSTR_PAUSE))
-            .pred(TOKEN_MSTR_PAUSE, fmt().token(TOKEN_MSTR_PAUSE))
-            // otherwise: fail
-           ))
+      pred(TOKEN_WS, fmt().freshline().join(inset_line).join(multiline_end))
+
+      // If they multiline string isn't indented then the end may be at the "top level"
+      .pred({TOKEN_LSTR_CONTINUE, TOKEN_MSTR_CONTINUE, TOKEN_LSTR_PAUSE, TOKEN_MSTR_PAUSE}, fmt().freshline().join(multiline_end))
 
       // The manditory newline is handle by the TOKEN_WS case, any other
       // newlines are explicitly added by the user and must be maintained.
@@ -1869,18 +1870,23 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                                     fmt().nest(fmt().freshline().consume_wsnlc().walk(WALK_NODE)))
                       .consume_wsnlc();
 
-  auto pre_body_fmt = fmt()
-                          .freshline()
-                          .token(TOKEN_KW_REQUIRE)
-                          .ws()
-                          .walk(WALK_NODE)
-                          .consume_wsnlc()
-                          .space()
-                          .token(TOKEN_P_EQUALS)
-                          .consume_wsnlc()
-                          .join(rhs_fmt())
-                          .consume_wsnlc()
-                          .fmt_if(TOKEN_KW_ELSE, else_fmt);
+  auto pre_body_fmt =
+      fmt()
+          .freshline()
+          .token(TOKEN_KW_REQUIRE)
+          .ws()
+          .fmt_if_else(CST_BINARY,
+                       // Binops must not explode inside of a require unwrap.
+                       fmt().ctx([](ctx_t x) { return x.binop(); },
+                                 fmt().prevent_explode(fmt().walk(is_expression, WALK_NODE))),
+                       fmt().walk(WALK_NODE))
+          .consume_wsnlc()
+          .space()
+          .token(TOKEN_P_EQUALS)
+          .consume_wsnlc()
+          .join(rhs_fmt())
+          .consume_wsnlc()
+          .fmt_if(TOKEN_KW_ELSE, else_fmt);
 
   MEMO_RET(fmt()
                .join(pre_body_fmt)
@@ -1962,7 +1968,7 @@ wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) {
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_TARGET)
                .ws()
-               .walk(is_expression, WALK_NODE)
+               .prevent_explode(fmt().walk(is_expression, WALK_NODE))
                .consume_wsnlc()
                .space()
                .fmt_if(TOKEN_P_BSLASH,

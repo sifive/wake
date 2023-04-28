@@ -409,6 +409,7 @@ struct MatchAction {
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
-    assert(c.run(builder, ctx, node, traits));
+    FMT_ASSERT(c.run(builder, ctx, node, traits), node,
+               "Match failed! See <" + std::string(symbolName(node.id())) + ">");
   }
 };
