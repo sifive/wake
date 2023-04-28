@@ -38,10 +38,6 @@
 #include "wcl/optional.h"
 #include "wcl/result.h"
 
-namespace config {
-
-static WakeConfig* _config = nullptr;
-
 // Expands a string as echo would.
 static std::string shell_expand(const std::string& to_expand) {
   constexpr size_t read_side = 0;
@@ -201,21 +197,60 @@ static std::vector<std::string> find_disallowed_keys(const JAST& json,
   return disallowed;
 }
 
-bool init(const std::string& wakeroot_path) {
+#define POLCIY_STATIC_DEFINES(Policy)           \
+  constexpr const char* Policy::key;            \
+  constexpr bool Policy::allowed_in_wakeroot;   \
+  constexpr bool Policy::allowed_in_userconfig; \
+  constexpr std::string Policy::*Policy::value;
+
+/********************************************************************
+ * Definition boilerplate
+ *********************************************************************/
+
+POLCIY_STATIC_DEFINES(UserConfigPolicy)
+POLCIY_STATIC_DEFINES(VersionPolicy)
+
+/********************************************************************
+ * Non-Trivial Defaults
+ *********************************************************************/
+
+UserConfigPolicy::UserConfigPolicy() { user_config = shell_expand(default_user_config()); }
+
+/********************************************************************
+ * Setter implementations
+ *********************************************************************/
+
+void VersionPolicy::set(VersionPolicy& p, const JAST& json) {
+  auto json_version = json.expect_string();
+  if (json_version) {
+    p.version = *json_version;
+  }
+}
+
+void UserConfigPolicy::set(UserConfigPolicy& p, const JAST& json) {
+  auto json_user_config = json.expect_string();
+  if (json_user_config) {
+    p.user_config = shell_expand(*json_user_config);
+  }
+}
+
+static std::unique_ptr<WakeConfig> _config;
+
+bool WakeConfig::init(const std::string& wakeroot_path, const WakeConfigOverrides& overrides) {
   if (_config != nullptr) {
     std::cerr << "Cannot initialize config twice" << std::endl;
-    assert(false);
+    exit(1);
   }
 
   // Only keys that may be specified in .wakeroot
-  std::set<std::string> wakeroot_allowed_keys = {"version", "user_config"};
+  std::set<std::string> wakeroot_allowed_keys = WakeConfigImplFull::wakeroot_allowed_keys();
 
   // Only keys that may be specified in the user config
-  std::set<std::string> user_config_allowed_keys = {};
+  std::set<std::string> user_config_allowed_keys = WakeConfigImplFull::userconfig_allowed_keys();
 
-  //  Set default values
-  std::string version = "";
-  std::string user_config_path = default_user_config();
+  // Get a default WakeConfig, we can't use std::make_unique because it doesn't have access
+  // to our default constructor. Thus we are forced to use `new`
+  _config = std::unique_ptr<WakeConfig>(new WakeConfig());
 
   // Parse .wakeroot
   auto wakeroot_res = read_json_file(wakeroot_path);
@@ -230,44 +265,28 @@ bool init(const std::string& wakeroot_path) {
   {
     auto disallowed_keys = find_disallowed_keys(wakeroot_json, wakeroot_allowed_keys);
     for (const auto& key : disallowed_keys) {
-      std::stringstream s;
-      s << "Key '" << key << "' may not be set in .wakeroot";
+      std::cerr << wakeroot_path << ": Key '" << key << "' may not be set in .wakeroot";
       if (user_config_allowed_keys.count(key) > 0) {
-        s << " but it may be set in user config";
+        std::cerr << " but it may be set in user config";
       }
-      s << ".";
-      reporter->reportWarning(Location(wakeroot_path.c_str()), s.str());
+      std::cerr << "." << std::endl;
     }
   }
 
   // Parse values from .wakeroot
-  {
-    auto json_version = wakeroot_json.expect_string("version");
-    if (json_version) {
-      version = *json_version;
-    }
-  }
-  {
-    auto json_user_config = wakeroot_json.expect_string("user_config");
-    if (json_user_config) {
-      user_config_path = *json_user_config;
-    }
-    user_config_path = shell_expand(user_config_path);
-  }
+  _config->set_all<WakeConfigProvenance::WakeRoot>(wakeroot_json);
 
   // Parse user config
-  auto user_config_res = read_json_file(user_config_path);
+  auto user_config_res = read_json_file(_config->user_config);
   if (!user_config_res) {
     // When parsing the user config, its fine if the file is missing
     // but we should report all other errors.
     if (user_config_res.error().first != ReadJsonFileError::BadFile) {
-      std::cerr << user_config_path << ": " << user_config_res.error().second << std::endl;
+      std::cerr << _config->user_config << ": " << user_config_res.error().second << std::endl;
       return false;
     }
 
     // since the user config was missig, ignore it and return the config thus far
-    static WakeConfig wc = {version, user_config_path};
-    _config = &wc;
     return true;
   }
 
@@ -277,44 +296,32 @@ bool init(const std::string& wakeroot_path) {
   {
     auto disallowed_keys = find_disallowed_keys(user_config_json, user_config_allowed_keys);
     for (const auto& key : disallowed_keys) {
-      std::stringstream s;
-      s << "Key '" << key << "' may not be set in user config";
+      std::cerr << _config->user_config << ": Key '" << key << "' may not be set in user config";
       if (wakeroot_allowed_keys.count(key) > 0) {
-        s << " but it may be set in .wakeroot";
+        std::cerr << " but it may be set in .wakeroot";
       }
-      s << ".";
-      reporter->reportWarning(Location(user_config_path.c_str()), s.str());
+      std::cerr << "." << std::endl;
     }
   }
 
   // Parse values from the user config
-  // TODO: there are currently no allowed keys in the user config.
-  // Below is left as an example  for when one is added
-  // {
-  //   auto json_version = user_config_json.expect_string("version");
-  //   if (json_version) {
-  //     version = *json_version;
-  //   }
-  // }
+  _config->set_all<WakeConfigProvenance::UserConfig>(user_config_json);
 
-  static WakeConfig wc = {version, user_config_path};
-  _config = &wc;
+  // Finally apply command line overrides
+  _config->override_all(overrides);
+
   return true;
 }
 
-const WakeConfig* const get() {
+const WakeConfig* const WakeConfig::get() {
   if (_config == nullptr) {
     std::cerr << "Cannot retrieve config before initialization" << std::endl;
     assert(false);
   }
-  return _config;
+  return _config.get();
 }
 
 std::ostream& operator<<(std::ostream& os, const WakeConfig& config) {
-  os << "Wake config: " << std::endl;
-  os << "  version = '" << config.version << "'" << std::endl;
-  os << "  user config  = '" << config.user_config << "'" << std::endl;
-  return os << std::endl;
+  config.emit(os);
+  return os;
 }
-
-}  // namespace config

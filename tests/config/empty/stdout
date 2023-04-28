@@ -1,4 +1,3 @@
-Wake config: 
-  version = ''
-  user config  = ''
-
+Wake config:
+  version = '' (Default)
+  user_config = '' (WakeRoot)

@@ -34,7 +34,6 @@
 #include <sstream>
 
 #include "cli_options.h"
-#include "config.h"
 #include "describe.h"
 #include "dst/bind.h"
 #include "dst/expr.h"
@@ -46,6 +45,7 @@
 #include "parser/parser.h"
 #include "parser/syntax.h"
 #include "parser/wakefiles.h"
+#include "runtime/config.h"
 #include "runtime/database.h"
 #include "runtime/job.h"
 #include "runtime/prim.h"
@@ -310,19 +310,21 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (!config::init(".wakeroot")) {
+  // Currently there are no overrides
+  WakeConfigOverrides overrides;
+  if (!WakeConfig::init(".wakeroot", overrides)) {
     return 1;
   }
 
   if (clo.config) {
-    std::cout << *config::get();
+    std::cout << *WakeConfig::get();
     return 0;
   }
 
   // if specified, check that .wakeroot is compatible with the wake version
-  if (config::get()->version != "") {
+  if (WakeConfig::get()->version != "") {
     std::string version_check =
-        check_version(clo.workspace, config::get()->version.c_str(), VERSION_STR);
+        check_version(clo.workspace, WakeConfig::get()->version.c_str(), VERSION_STR);
     if (!version_check.empty()) {
       std::cerr << ".wakeroot: " << version_check << std::endl;
       return 1;

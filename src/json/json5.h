@@ -73,6 +73,7 @@ struct JAST {
 
   const JAST &get(const std::string &key) const;
   JAST &get(const std::string &key);
+  wcl::optional<const JAST *> get_opt(const std::string &key) const;
 
   // Add a child to a JObject
   JAST &add(std::string key, SymbolJSON kind, std::string &&value);
@@ -109,7 +110,12 @@ struct JAST {
   JAST &add(SymbolJSON kind) { return add(std::string(), kind, std::string()); }
   JAST &add(std::string value) { return add(std::string(), JSON_STR, std::move(value)); }
 
-  wcl::optional<std::string> expect_string(std::string key);
+  wcl::optional<std::string> expect_string() const {
+    if (kind == JSON_STR) {
+      return wcl::make_some<std::string>(value);
+    }
+    return {};
+  }
 };
 
 std::ostream &operator<<(std::ostream &os, const JAST &jast);

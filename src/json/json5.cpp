@@ -47,17 +47,17 @@ JAST &JAST::get(const std::string &key) {
   return null;
 }
 
+wcl::optional<const JAST *> JAST::get_opt(const std::string &key) const {
+  const JAST &item = get(key);
+  if (&item == &null) {
+    return {};
+  }
+  return wcl::some(&item);
+}
+
 JAST &JAST::add(std::string key, SymbolJSON kind, std::string &&value) {
   children.emplace_back(std::move(key), JAST(kind, std::move(value)));
   return children.back().second;
-}
-
-wcl::optional<std::string> JAST::expect_string(std::string key) {
-  const JAST &entry = get(key);
-  if (entry.kind != JSON_STR) {
-    return {};
-  }
-  return {wcl::in_place_t{}, entry.value};
 }
 
 static char hex(unsigned char x) {
