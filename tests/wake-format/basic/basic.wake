@@ -241,6 +241,26 @@ def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     Nil = Pass (Pair "{wakePath}" Nil)
     _ = Fail (makeError "Two wake binaries declared for testing!")
 
+def x (var:String):Value =
+    x
+
+def x = """
+
+String with
+no indents
+%{someVar}
+
+and extra spacing
+"""
+
+def x = 
+    require aaaaaa, bbbbb, ccccc, ddddd, eeeee, fffff, ggggg, hhhhh, iiiii, jjjjj, kkkkk, lllll, mmmmm, nnnnn, Nil = args
+    else
+        ""
+    ""
+target someLongTargetName (variable1: Pair (Option String) Path) (variable2: String) (variable3: String) (variable4: String): Result (List Path) Error =
+    Pass Nil
+
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     buildTestWake, Nil =
         require (
@@ -1200,6 +1220,12 @@ def tarball Unit =
     require x = y
     require srcs = allSources # a comment
     x
+
+def x =
+ def y = 0
+ from a import b
+ def z = 0
+ 1
 
 def x  =
   if cmpFn vi vi1 | isGT 
