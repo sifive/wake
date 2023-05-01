@@ -1876,7 +1876,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
           .token(TOKEN_KW_REQUIRE)
           .ws()
           .fmt_if_else(CST_BINARY,
-                       // Binops must not explode inside of a require unwrap.
+                       // Binops must not explode inside of a require pattern.
                        fmt().ctx([](ctx_t x) { return x.binop(); },
                                  fmt().prevent_explode(fmt().walk(is_expression, WALK_NODE))),
                        fmt().walk(WALK_NODE))
