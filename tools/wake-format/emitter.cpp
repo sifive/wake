@@ -1494,7 +1494,7 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
                .space()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
-               .join(rhs_fmt(is_top_level))
+               .fmt_if_else(CST_MATCH, rhs_fmt(false), rhs_fmt(is_top_level))
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));
 }
@@ -1828,7 +1828,7 @@ wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) {
                .space()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
-               .join(rhs_fmt(true))
+               .fmt_if_else(CST_MATCH, rhs_fmt(false), rhs_fmt(true))
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));
 }
@@ -1975,7 +1975,7 @@ wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) {
                        fmt().token(TOKEN_P_BSLASH).ws().walk(WALK_NODE).space().consume_wsnlc())
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
-               .join(rhs_fmt(true))
+               .fmt_if_else(CST_MATCH, rhs_fmt(false), rhs_fmt(true))
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));
 }
