@@ -2060,13 +2060,25 @@ wcl::doc Emitter::walk_type(ctx_t ctx, CSTElement node) {
   //              .concat(ctx));
 }
 
+wcl::doc Emitter::walk_unary_op(ctx_t ctx, CSTElement node) {
+  MEMO(ctx, node);
+  FMT_ASSERT(node.id() == CST_OP, node, "Expected CST_OP");
+
+  MEMO_RET(
+      fmt()
+          .fmt_if_else(TOKEN_OP_INEQUAL, fmt().walk(WALK_TOKEN).space(), fmt().walk(WALK_TOKEN))
+          .format(ctx, node.firstChildElement(), token_traits));
+}
+
 wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_UNARY, node, "Expected CST_UNARY");
 
   // clang-format off
   MEMO_RET(fmt()
-               .walk(WALK_NODE)
+               // Unary op can be leading or trailing,
+               // add a space only before a leading binop
+               .fmt_if_else(CST_OP, fmt().walk(DISPATCH(walk_unary_op)), fmt().walk(WALK_NODE))
                .consume_wsnlc()
                .walk(WALK_NODE)
                .consume_wsnlc()

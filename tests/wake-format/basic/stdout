@@ -635,9 +635,9 @@ def tarball Unit =
 
     def srcs =
         allSources
-        | filter (!matches `(debian/|wake.spec).*` _.getPathName) # omit packaging files
-        | filter (!matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
-        | filter (!matches `(.*/)*\.gitignore` _.getPathName) # omit git files
+        | filter (! matches `(debian/|wake.spec).*` _.getPathName) # omit packaging files
+        | filter (! matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
+        | filter (! matches `(.*/)*\.gitignore` _.getPathName) # omit git files
 
     def Pair testPaths wakePaths = splitBy (matches `tests/.*` _.getPathName) srcs
 
@@ -1041,7 +1041,7 @@ def longFunc param: Result (List Path) Error = match _
         Some x -> x
         None -> x
 
-export def !(x: Boolean): Boolean =
+export def ! (x: Boolean): Boolean =
     if x then False else True
 
 export def mapPartial (f: a => Option b): (list: List a) => List b =
@@ -1153,7 +1153,7 @@ def a =
     Some ""
 
 def a =
-    def x = if a then b, else !b
+    def x = if a then b, else ! b
 
     require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
 
