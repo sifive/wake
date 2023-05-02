@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstdint>
+#include <iostream>
 #include <utility>
 
 namespace wcl {
@@ -211,6 +212,16 @@ inline optional<T> some(T&& x) {
 template <class T, class... Args>
 inline optional<T> make_some(Args&&... args) {
   return optional<T>{in_place_t{}, std::forward<Args>(args)...};
+}
+
+template <class T>
+std::ostream& operator<<(std::ostream& os, const optional<T>& value) {
+  if (value) {
+    os << "{" << *value << "}";
+  } else {
+    os << "{}";
+  }
+  return os;
 }
 
 }  // namespace wcl

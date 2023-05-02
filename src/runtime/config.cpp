@@ -201,7 +201,7 @@ static std::vector<std::string> find_disallowed_keys(const JAST& json,
   constexpr const char* Policy::key;            \
   constexpr bool Policy::allowed_in_wakeroot;   \
   constexpr bool Policy::allowed_in_userconfig; \
-  constexpr std::string Policy::*Policy::value;
+  constexpr typename Policy::type Policy::*Policy::value;
 
 /********************************************************************
  * Definition boilerplate
@@ -209,6 +209,9 @@ static std::vector<std::string> find_disallowed_keys(const JAST& json,
 
 POLCIY_STATIC_DEFINES(UserConfigPolicy)
 POLCIY_STATIC_DEFINES(VersionPolicy)
+POLCIY_STATIC_DEFINES(LogHeaderPolicy)
+POLCIY_STATIC_DEFINES(LogHeaderSourceWidthPolicy)
+POLCIY_STATIC_DEFINES(LabelFilterPolicy)
 
 /********************************************************************
  * Non-Trivial Defaults
@@ -218,7 +221,7 @@ UserConfigPolicy::UserConfigPolicy() { user_config = shell_expand(default_user_c
 
 /********************************************************************
  * Setter implementations
- *********************************************************************/
+ ********************************************************************/
 
 void VersionPolicy::set(VersionPolicy& p, const JAST& json) {
   auto json_version = json.expect_string();
@@ -233,6 +236,24 @@ void UserConfigPolicy::set(UserConfigPolicy& p, const JAST& json) {
     p.user_config = shell_expand(*json_user_config);
   }
 }
+
+void LogHeaderPolicy::set(LogHeaderPolicy& p, const JAST& json) {
+  auto json_log_header = json.expect_string();
+  if (json_log_header) {
+    p.log_header = *json_log_header;
+  }
+}
+
+void LogHeaderSourceWidthPolicy::set(LogHeaderSourceWidthPolicy& p, const JAST& json) {
+  auto json_log_header_soruce_width = json.expect_integer();
+  if (json_log_header_soruce_width) {
+    p.log_header_source_width = *json_log_header_soruce_width;
+  }
+}
+
+/********************************************************************
+ * Core Implementation
+ ********************************************************************/
 
 static std::unique_ptr<WakeConfig> _config;
 
@@ -287,6 +308,8 @@ bool WakeConfig::init(const std::string& wakeroot_path, const WakeConfigOverride
     }
 
     // since the user config was missig, ignore it and return the config thus far
+    // before we do we need tohandle overrides
+    _config->override_all(overrides);
     return true;
   }
 

@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <math.h>
+#include <re2/re2.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <sys/mman.h>
@@ -51,6 +52,7 @@
 #include "compat/rusage.h"
 #include "compat/sigwinch.h"
 #include "compat/spawn.h"
+#include "config.h"
 #include "database.h"
 #include "prim.h"
 #include "status.h"
@@ -791,13 +793,14 @@ static void launch(JobTable *jobtable) {
     // or if we're going to output to a nicely rendered StatusBuf.
     auto job_label_str = wcl::some(task.job->label->as_str());
     std::unique_ptr<std::streambuf> out, err;
-    if (fd_out != -1) {
+    // TODO: Add a glob check here when picking the buffer
+    if (fd_out != -1 && RE2::FullMatch(*job_label_str, *WakeConfig::get()->label_filter)) {
       out = std::make_unique<StatusBuf>(task.job->stream_out, job_label_str, color_out,
                                         *jobtable->imp->term_bufs[fd_out].get());
     } else {
       out = std::make_unique<NullBuf>();
     }
-    if (fd_err != -1) {
+    if (fd_err != -1 && RE2::FullMatch(*job_label_str, *WakeConfig::get()->label_filter)) {
       err = std::make_unique<StatusBuf>(task.job->stream_err, job_label_str, color_err,
                                         *jobtable->imp->term_bufs[fd_err].get());
     } else {

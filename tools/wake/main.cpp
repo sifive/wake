@@ -58,7 +58,6 @@
 #include "timeline.h"
 #include "types/data.h"
 #include "types/sums.h"
-#include "util/config.h"
 #include "util/diagnostic.h"
 #include "util/execpath.h"
 #include "util/file.h"
@@ -311,7 +310,14 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (!WakeConfig::init(".wakeroot")) {
+  // Now check for any flags that override config options
+  WakeConfigOverrides config_override;
+  if (clo.label_filter)
+    config_override.label_filter = wcl::some(wcl::make_some<std::string>(clo.label_filter));
+  if (clo.log_header) config_override.log_header = wcl::make_some<std::string>(clo.log_header);
+  config_override.log_header_source_width = clo.log_header_source_width;
+
+  if (!WakeConfig::init(".wakeroot", config_override)) {
     return 1;
   }
 

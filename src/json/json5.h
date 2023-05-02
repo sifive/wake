@@ -116,8 +116,13 @@ struct JAST {
     }
     return {};
   }
-  wcl::optional<std::string> expect_string(std::string key);
-  wcl::optional<int64_t> expect_integer(std::string key);
+
+  wcl::optional<int64_t> expect_integer() const {
+    if (kind == JSON_INTEGER) {
+      return wcl::make_some<int64_t>(std::stol(value));
+    }
+    return {};
+  }
 };
 
 std::ostream &operator<<(std::ostream &os, const JAST &jast);

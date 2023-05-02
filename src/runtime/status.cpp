@@ -44,7 +44,7 @@
 
 #include "compat/sigwinch.h"
 #include "job.h"
-#include "util/config.h"
+#include "runtime/config.h"
 #include "util/term.h"
 #include "wcl/defer.h"
 
@@ -169,7 +169,7 @@ void StatusBuf::emit_header() {
 
   // Now output the format the user requested.
   out << fmt_vec[0];
-  const size_t extra_width = WakeConfig::get()->log_header_extra_width;
+  const size_t extra_width = WakeConfig::get()->log_header_source_width;
   for (size_t i = 1; i < fmt_vec.size(); i += 2) {
     const std::string &var = fmt_vec[i];
 
@@ -198,7 +198,7 @@ void StatusBuf::emit_header() {
       continue;
     }
 
-    if (var == "extra") {
+    if (var == "source") {
       // TODO: Make this configurable
       std::string tmp_extra;
       if (extra) {

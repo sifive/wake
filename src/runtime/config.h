@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <re2/re2.h>
+
 #include <map>
 #include <set>
 #include <string>
@@ -24,7 +26,17 @@
 #include "json/json5.h"
 
 // For future work, currently empty
-struct WakeConfigOverrides {};
+struct WakeConfigOverrides {
+  wcl::optional<std::string> log_header;
+  wcl::optional<int64_t> log_header_source_width;
+
+  // if label_filter == {} then we don't override
+  // if label_filter == {{}} then we do override but the filter accepts everything
+  // if label_filter == {{filter}} then
+  // these semantics fall out of the normal way overrides work, this comment
+  // is just to make this unusual type's meaning clear.
+  wcl::optional<wcl::optional<std::string>> label_filter;
+};
 
 template <class T>
 using Override = wcl::optional<T> WakeConfigOverrides::*;
@@ -34,27 +46,92 @@ using Override = wcl::optional<T> WakeConfigOverrides::*;
  *********************************************************************/
 
 struct VersionPolicy {
+  using type = std::string;
+  using input_type = type;
   static constexpr const char* key = "version";
   static constexpr bool allowed_in_wakeroot = true;
   static constexpr bool allowed_in_userconfig = false;
-  std::string version = "";
-  static constexpr std::string VersionPolicy::*value = &VersionPolicy::version;
-  static constexpr Override<std::string> override_value = nullptr;
+  type version = "";
+  static constexpr type VersionPolicy::*value = &VersionPolicy::version;
+  static constexpr Override<input_type> override_value = nullptr;
 
   VersionPolicy() = default;
   static void set(VersionPolicy& p, const JAST& json);
+  static void set_input(VersionPolicy& p, const input_type& v) { p.*value = v; }
+  static void emit(const VersionPolicy& p, std::ostream& os) { os << p.*value; }
 };
 
 struct UserConfigPolicy {
+  using type = std::string;
+  using input_type = type;
   static constexpr const char* key = "user_config";
   static constexpr bool allowed_in_wakeroot = true;
   static constexpr bool allowed_in_userconfig = false;
-  std::string user_config;
-  static constexpr std::string UserConfigPolicy::*value = &UserConfigPolicy::user_config;
-  static constexpr Override<std::string> override_value = nullptr;
+  type user_config;
+  static constexpr type UserConfigPolicy::*value = &UserConfigPolicy::user_config;
+  static constexpr Override<input_type> override_value = nullptr;
 
   UserConfigPolicy();
   static void set(UserConfigPolicy& p, const JAST& json);
+  static void set_input(UserConfigPolicy& p, const input_type& v) { p.*value = v; }
+  static void emit(const UserConfigPolicy& p, std::ostream& os) { os << p.*value; }
+};
+
+struct LogHeaderPolicy {
+  using type = std::string;
+  using input_type = type;
+  static constexpr const char* key = "log_header";
+  static constexpr bool allowed_in_wakeroot = true;
+  static constexpr bool allowed_in_userconfig = true;
+  type log_header = "[$stream] $source: ";
+  static constexpr type LogHeaderPolicy::*value = &LogHeaderPolicy::log_header;
+  static constexpr Override<input_type> override_value = &WakeConfigOverrides::log_header;
+
+  LogHeaderPolicy() = default;
+  static void set(LogHeaderPolicy& p, const JAST& json);
+  static void set_input(LogHeaderPolicy& p, const input_type& v) { p.*value = v; }
+  static void emit(const LogHeaderPolicy& p, std::ostream& os) { os << p.*value; }
+};
+
+struct LogHeaderSourceWidthPolicy {
+  using type = int64_t;
+  using input_type = type;
+  static constexpr const char* key = "log_header_source_width";
+  static constexpr bool allowed_in_wakeroot = true;
+  static constexpr bool allowed_in_userconfig = true;
+  type log_header_source_width = 25;
+  static constexpr type LogHeaderSourceWidthPolicy::*value =
+      &LogHeaderSourceWidthPolicy::log_header_source_width;
+  static constexpr Override<input_type> override_value =
+      &WakeConfigOverrides::log_header_source_width;
+
+  LogHeaderSourceWidthPolicy() {}
+  static void set(LogHeaderSourceWidthPolicy& p, const JAST& json);
+  static void set_input(LogHeaderSourceWidthPolicy& p, const input_type& v) { p.*value = v; }
+  static void emit(const LogHeaderSourceWidthPolicy& p, std::ostream& os) { os << p.*value; }
+};
+
+struct LabelFilterPolicy {
+  using type = std::unique_ptr<re2::RE2>;
+  using input_type = wcl::optional<std::string>;
+  static constexpr const char* key = "label_filter";
+  static constexpr bool allowed_in_wakeroot = false;
+  static constexpr bool allowed_in_userconfig = false;
+  type label_filter;
+  static constexpr type LabelFilterPolicy::*value = &LabelFilterPolicy::label_filter;
+  static constexpr Override<input_type> override_value = &WakeConfigOverrides::label_filter;
+
+  LabelFilterPolicy() : label_filter(std::make_unique<re2::RE2>(".*")) {}
+
+  static void set(LabelFilterPolicy& p, const JAST& json) {}
+  static void set_input(LabelFilterPolicy& p, const input_type& v) {
+    if (v) {
+      p.*value = std::make_unique<re2::RE2>(*v);
+    }
+  }
+  static void emit(const LabelFilterPolicy& p, std::ostream& os) {
+    os << p.label_filter->pattern();
+  }
 };
 
 /********************************************************************
@@ -98,7 +175,9 @@ struct WakeConfigImpl : public Polcies... {
     if (iter != provenance.end()) {
       p = iter->second;
     }
-    os << "  " << P::key << " = '" << this->*P::value << "' (" << to_string(p) << ")" << std::endl;
+    os << "  " << P::key << " = '";
+    P::emit(*this, os);
+    os << "' (" << to_string(p) << ")" << std::endl;
     return {};
   }
 
@@ -138,7 +217,7 @@ struct WakeConfigImpl : public Polcies... {
   void_t override_policy(const WakeConfigOverrides& overrides) {
     if (P::override_value && overrides.*P::override_value) {
       provenance[P::key] = WakeConfigProvenance::CommandLine;
-      this->*P::value = *(overrides.*P::override_value);
+      P::set_input(*this, *(overrides.*P::override_value));
     }
     return {};
   }
@@ -172,7 +251,8 @@ struct WakeConfigImpl : public Polcies... {
   }
 };
 
-using WakeConfigImplFull = WakeConfigImpl<UserConfigPolicy, VersionPolicy>;
+using WakeConfigImplFull = WakeConfigImpl<UserConfigPolicy, VersionPolicy, LogHeaderPolicy,
+                                          LogHeaderSourceWidthPolicy, LabelFilterPolicy>;
 
 struct WakeConfig final : public WakeConfigImplFull {
   static bool init(const std::string& wakeroot_path, const WakeConfigOverrides& overrides);
