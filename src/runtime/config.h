@@ -22,6 +22,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <functional>
 
 #include "json/json5.h"
 
@@ -174,85 +175,90 @@ struct WakeConfigImpl : public Polcies... {
   }
 
   template <class P>
-  void_t emit_each(std::ostream& os) const {
-    auto iter = provenance.find(P::key);
-    auto p = WakeConfigProvenance::Default;
-    if (iter != provenance.end()) {
-      p = iter->second;
-    }
-    os << "  " << P::key << " = '";
-    P::emit(*this, os);
-    os << "' (" << to_string(p) << ")" << std::endl;
-    return {};
+  auto emit_each(std::ostream& os) const {
+    return [&os, this]() {
+      auto iter = provenance.find(P::key);
+      auto p = WakeConfigProvenance::Default;
+      if (iter != provenance.end()) {
+        p = iter->second;
+      }
+      os << "  " << P::key << " = '";
+      P::emit(*this, os);
+      os << "' (" << to_string(p) << ")" << std::endl;
+    };
   }
 
   template <class P>
-  static void_t add_wakeroot_key(std::set<std::string>& out) {
-    if (P::allowed_in_wakeroot) {
-      out.emplace(P::key);
-    }
-    return {};
+  static auto add_wakeroot_key(std::set<std::string>& out) {
+    return [&out]() {
+      if (P::allowed_in_wakeroot) {
+        out.emplace(P::key);
+      }
+    };
   }
 
   template <class P>
-  static void_t add_userconfig_key(std::set<std::string>& out) {
-    if (P::allowed_in_userconfig) {
-      out.emplace(P::key);
-    }
-    return {};
+  static auto add_userconfig_key(std::set<std::string>& out) {
+    return [&out]() {
+      if (P::allowed_in_userconfig) {
+        out.emplace(P::key);
+      }
+    };
   }
 
   template <WakeConfigProvenance p, class P>
-  void_t set_policy(const JAST& json) {
-    if (p == WakeConfigProvenance::WakeRoot && !P::allowed_in_wakeroot) {
-      return {};
-    }
-    if (p == WakeConfigProvenance::UserConfig && !P::allowed_in_userconfig) {
-      return {};
-    }
-    auto opt_value = json.get_opt(P::key);
-    if (opt_value) {
-      provenance[P::key] = p;
-      P::set(*this, **opt_value);
-    }
-    return {};
+  auto set_policy(const JAST& json) {
+    return [&json, this]() {
+      if (p == WakeConfigProvenance::WakeRoot && !P::allowed_in_wakeroot) {
+        return;
+      }
+      if (p == WakeConfigProvenance::UserConfig && !P::allowed_in_userconfig) {
+        return;
+      }
+      auto opt_value = json.get_opt(P::key);
+      if (opt_value) {
+        provenance[P::key] = p;
+        P::set(*this, **opt_value);
+      }
+    };
   }
 
   template <class P>
-  void_t override_policy(const WakeConfigOverrides& overrides) {
-    if (P::override_value && overrides.*P::override_value) {
-      provenance[P::key] = WakeConfigProvenance::CommandLine;
-      P::set_input(*this, *(overrides.*P::override_value));
-    }
-    return {};
+  auto override_policy(const WakeConfigOverrides& overrides) {
+    return [&overrides, this]() {
+      if (P::override_value && overrides.*P::override_value) {
+        provenance[P::key] = WakeConfigProvenance::CommandLine;
+        P::set_input(*this, *(overrides.*P::override_value));
+      }
+    };
   }
 
  protected:
   static std::set<std::string> wakeroot_allowed_keys() {
     std::set<std::string> out;
-    call_all([&out]() { add_wakeroot_key<Polcies>(out); }...);
+    call_all(add_wakeroot_key<Polcies>(out)...);
     return out;
   }
 
   static std::set<std::string> userconfig_allowed_keys() {
     std::set<std::string> out;
-    call_all([&out]() { add_userconfig_key<Polcies>(out); }...);
+    call_all(add_userconfig_key<Polcies>(out)...);
     return out;
   }
 
   template <WakeConfigProvenance p>
   void set_all(const JAST& json) {
-    call_all([this, &json]() { set_policy<p, Polcies>(json); }...);
+    call_all(set_policy<p, Polcies>(json)...);
   }
 
   void override_all(const WakeConfigOverrides& overrides) {
-    call_all([this, &overrides]() { override_policy<Polcies>(overrides); }...);
+    call_all(override_policy<Polcies>(overrides)...);
   }
 
  public:
   void emit(std::ostream& os) const {
     os << "Wake config:" << std::endl;
-    call_all([this, &os]() { emit_each<Polcies>(os); }...);
+    call_all(emit_each<Polcies>(os)...);
   }
 };
 
