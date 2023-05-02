@@ -19,10 +19,10 @@
 
 #include <re2/re2.h>
 
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
-#include <functional>
 
 #include "json/json5.h"
 
