@@ -230,29 +230,29 @@ struct WakeConfigImpl : public Polcies... {
  protected:
   static std::set<std::string> wakeroot_allowed_keys() {
     std::set<std::string> out;
-    call_all([&out](){ add_wakeroot_key<Polcies>(out); }...);
+    call_all([&out]() { add_wakeroot_key<Polcies>(out); }...);
     return out;
   }
 
   static std::set<std::string> userconfig_allowed_keys() {
     std::set<std::string> out;
-    call_all([&out](){ add_userconfig_key<Polcies>(out); }...);
+    call_all([&out]() { add_userconfig_key<Polcies>(out); }...);
     return out;
   }
 
   template <WakeConfigProvenance p>
   void set_all(const JAST& json) {
-    call_all([this, &json](){ set_policy<p, Polcies>(json); }...);
+    call_all([this, &json]() { set_policy<p, Polcies>(json); }...);
   }
 
   void override_all(const WakeConfigOverrides& overrides) {
-    call_all([this, &overrides](){ override_policy<Polcies>(overrides); }...);
+    call_all([this, &overrides]() { override_policy<Polcies>(overrides); }...);
   }
 
  public:
   void emit(std::ostream& os) const {
     os << "Wake config:" << std::endl;
-    call_all([this, &os](){ emit_each<Polcies>(os); }...);
+    call_all([this, &os]() { emit_each<Polcies>(os); }...);
   }
 };
 
