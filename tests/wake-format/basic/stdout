@@ -200,13 +200,13 @@ def t5 =
 def t7 =
     (
         x # comment
-        + 5
+        +
+        5
     )
 
 def t8 =
     (
-        x
-        + # comment
+        x + # comment
         5
     )
 
