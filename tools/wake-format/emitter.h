@@ -208,5 +208,4 @@ class Emitter {
   wcl::doc walk_error(ctx_t ctx, CSTElement node);
 
   wcl::doc walk_placeholder(ctx_t ctx, CSTElement node);
-  wcl::doc walk_unary_op(ctx_t ctx, CSTElement node);
 };

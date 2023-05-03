@@ -78,6 +78,27 @@ static inline bool is_expression(cst_id_t type) {
          type == CST_INTERPOLATE || type == CST_MATCH || type == CST_REQUIRE || type == CST_PRIM;
 }
 
+static inline bool is_primary_term(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                                   const token_traits_map_t& traits) {
+  switch (node.id()) {
+    case CST_ID:
+    case CST_PAREN:
+    case CST_HOLE:
+    case CST_LITERAL:
+    case CST_INTERPOLATE:
+    case CST_APP:
+      return true;
+
+    case CST_BINARY: {
+      CSTElement op = node.firstChildNode();
+      op.nextSiblingNode();
+      return op.firstChildElement().id() == TOKEN_OP_DOT;
+    }
+  }
+
+  return false;
+}
+
 // a floating comment is a comment bound to another comment
 static inline bool is_floating_comment(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                                        const token_traits_map_t& traits) {
@@ -2060,30 +2081,38 @@ wcl::doc Emitter::walk_type(ctx_t ctx, CSTElement node) {
   //              .concat(ctx));
 }
 
-wcl::doc Emitter::walk_unary_op(ctx_t ctx, CSTElement node) {
-  MEMO(ctx, node);
-  FMT_ASSERT(node.id() == CST_OP, node, "Expected CST_OP");
-
-  MEMO_RET(
-      fmt()
-          .fmt_if_else(TOKEN_OP_INEQUAL, fmt().walk(WALK_TOKEN).space(), fmt().walk(WALK_TOKEN))
-          .format(ctx, node.firstChildElement(), token_traits));
-}
-
 wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_UNARY, node, "Expected CST_UNARY");
 
-  // clang-format off
+  auto is_not_primary_term = [](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                                const token_traits_map_t& traits) {
+    return !is_primary_term(builder, ctx, node, traits);
+  };
+
+  auto is_child_postfix = [](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                             const token_traits_map_t& traits) {
+    CSTElement child = node.firstChildNode();
+    return node.id() == CST_UNARY && child.id() != CST_OP;
+  };
+
+  auto prefix_fmt = fmt()
+                        .walk(WALK_NODE)
+                        .consume_wsnlc()
+                        .fmt_if(is_not_primary_term, fmt().space())
+                        .walk(WALK_NODE)
+                        .consume_wsnlc();
+
+  auto postfix_fmt =
+      fmt()
+          .fmt_if_else(is_child_postfix, fmt().walk(WALK_NODE).space(), fmt().walk(WALK_NODE))
+          .consume_wsnlc()
+          .walk(WALK_NODE)
+          .consume_wsnlc();
+
   MEMO_RET(fmt()
-               // Unary op can be leading or trailing,
-               // add a space only before a leading binop
-               .fmt_if_else(CST_OP, fmt().walk(DISPATCH(walk_unary_op)), fmt().walk(WALK_NODE))
-               .consume_wsnlc()
-               .walk(WALK_NODE)
-               .consume_wsnlc()
+               .fmt_if_else(CST_OP, prefix_fmt, postfix_fmt)
                .format(ctx, node.firstChildElement(), token_traits));
-  // clang-format on
 }
 
 wcl::doc Emitter::walk_error(ctx_t ctx, CSTElement node) {
