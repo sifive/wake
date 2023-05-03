@@ -86,7 +86,6 @@ static inline bool is_primary_term(wcl::doc_builder& builder, ctx_t ctx, CSTElem
     case CST_HOLE:
     case CST_LITERAL:
     case CST_INTERPOLATE:
-    case CST_APP:
       return true;
 
     case CST_BINARY: {
