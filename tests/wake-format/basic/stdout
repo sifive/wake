@@ -635,9 +635,9 @@ def tarball Unit =
 
     def srcs =
         allSources
-        | filter (!matches `(debian/|wake.spec).*` _.getPathName) # omit packaging files
-        | filter (!matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
-        | filter (!matches `(.*/)*\.gitignore` _.getPathName) # omit git files
+        | filter (! matches `(debian/|wake.spec).*` _.getPathName) # omit packaging files
+        | filter (! matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
+        | filter (! matches `(.*/)*\.gitignore` _.getPathName) # omit git files
 
     def Pair testPaths wakePaths = splitBy (matches `tests/.*` _.getPathName) srcs
 
@@ -1470,3 +1470,20 @@ def x =
     d,
     # Comment 4
     e,
+
+def y =
+    def x = | & ! ≤ - * √2, ,
+    def x = -2, , ,
+    def x = (1 + 2),
+    def x = -(1 + 2)
+    def x = -(1 + 2),
+    def x = -a.b,
+    def x = -(a b c),
+    def xs = (2, fib 3,)
+    def x = x, y, 3 + 2,
+    def x = -a + b,
+    def x = ! a + b,
+    def x = !a.b,
+    def x = !(a + b),
+
+    0

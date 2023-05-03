@@ -1276,3 +1276,19 @@ def x =
     d,
     # Comment 4
     e,
+
+def y = 
+    def x = | & !  ≤ - * √ 2, ,
+    def x = -2, , ,
+    def x = (1+2),
+    def x = -(1+2)
+    def x = -(1+2),
+    def x = -a.b,
+    def x = -(a b c),
+    def xs = (2, fib 3,)
+    def x = x, y, 3 + 2,
+    def x = -a + b,
+    def x = !a + b,
+    def x = !a.b,
+    def x = !(a+b),
+    0
