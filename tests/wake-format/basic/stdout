@@ -137,8 +137,8 @@ def name Unit =
     another
 
 def t1 = match _
-    0 -> 0
-    n -> 2 + t (n - 1)
+    0 = 0
+    n = 2 + t (n - 1)
 
 # wake-format off
 def t1 =match _
@@ -148,10 +148,10 @@ def t1 =match _
 def t1 = match _
     # wake-format off
     0=0
-    n -> 2 + t (n - 1)
+    n = 2 + t (n - 1)
 
 def t1 = match _
-    0 -> 0
+    0 = 0
     # wake-format off
     n = 2+t(n-1)
 
@@ -169,7 +169,7 @@ def t1 = match _
     # many
     # more
     # comments
-    n -> 2 + t (n - 1)
+    n = 2 + t (n - 1)
 
 def t2 =
     ((x + 7) * 3)
@@ -305,12 +305,12 @@ def ff =
     .hhhhhhhhhhh
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
-    buildTestWake, Nil ->
+    buildTestWake, Nil =
         require Pass (Pair path visible) = buildTestWake Unit
 
         Pass (Pair (simplify "{path}/..") visible)
-    Nil -> Pass (Pair "{wakePath}" Nil)
-    _ -> Fail (makeError "Two wake binaries declared for testing!")
+    Nil = Pass (Pair "{wakePath}" Nil)
+    _ = Fail (makeError "Two wake binaries declared for testing!")
 
 def x (var: String): Value =
     x
@@ -336,7 +336,7 @@ target someLongTargetName (variable1: Pair (Option String) Path) (variable2: Str
     Pass Nil
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
-    buildTestWake, Nil ->
+    buildTestWake, Nil =
         require (
             Pass
             # comment
@@ -344,8 +344,8 @@ def wakeToTestDir Unit = match (subscribe wakeTestBinary)
         ) = buildTestWake Unit
 
         Pass (Pair (simplify "{path}/..") visible)
-    Nil -> Pass (Pair "{wakePath}" Nil)
-    _ -> Fail (makeError "Two wake binaries declared for testing!")
+    Nil = Pass (Pair "{wakePath}" Nil)
+    _ = Fail (makeError "Two wake binaries declared for testing!")
 
 package test_wake
 
@@ -430,19 +430,19 @@ def app =
     hhhhhhhhhhhhhh
 
 def t1 = match _
-    0 -> 0
+    0 = 0
     n # comment
-    -> 2 + t (n - 1)
+    = 2 + t (n - 1)
 
 def t1 = match _
     # comment
-    0 -> 0
-    n -> 2 + t (n - 1)
+    0 = 0
+    n = 2 + t (n - 1)
 
 def t1 = match _
-    0 -> 0
+    0 = 0
     # comment
-    n -> 2 + t (n - 1)
+    n = 2 + t (n - 1)
 
 publish wakeTestBinary =
     defaultWake, Nil
@@ -457,13 +457,13 @@ publish compileC =
     makeCompileC "native-c11-debug" (which "cc") (c11Flags ++ debugCFlags)
 
 publish path = match (getenv "WAKE_PATH")
-    Some x -> tokenize `:` x
-    None -> Nil
+    Some x = tokenize `:` x
+    None = Nil
 
 publish path = match sysname
-    "Darwin" -> "/opt/local/bin", "/usr/local/bin", Nil
-    "FreeBSD" -> "/usr/local/bin", Nil
-    _ -> Nil
+    "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
+    "FreeBSD" = "/usr/local/bin", Nil
+    _ = Nil
 
 publish compileC =
     emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
@@ -497,9 +497,9 @@ target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run echo 
     runAlways cmd env dir stdin res usage finputs foutputs vis keep run echo stdout stderr label
 
 global export target fib n = match n
-    0 -> 1
-    1 -> 1
-    _ -> fib (n - 1) + fib (n - 2)
+    0 = 1
+    1 = 1
+    _ = fib (n - 1) + fib (n - 2)
 
 def buildRE2WASM Unit =
     def version = "2021-08-01"
@@ -541,31 +541,31 @@ def t5 =
     a.b.c
 
 def toVariant = match _
-    "default" -> Pass (Pair "native-cpp14-release" "native-c11-release")
-    "static" -> Pass (Pair "native-cpp14-static" "native-c11-static")
-    "debug" -> Pass (Pair "native-cpp14-debug" "native-c11-debug")
-    "wasm" -> Pass (Pair "wasm-cpp14-release" "wasm-c11-release")
-    s -> Fail "Unknown build target ({s})".makeError
+    "default" = Pass (Pair "native-cpp14-release" "native-c11-release")
+    "static" = Pass (Pair "native-cpp14-static" "native-c11-static")
+    "debug" = Pass (Pair "native-cpp14-debug" "native-c11-debug")
+    "wasm" = Pass (Pair "wasm-cpp14-release" "wasm-c11-release")
+    s = Fail "Unknown build target ({s})".makeError
 
 export def build: List String => Result String Error = match _
-    "tarball", Nil ->
+    "tarball", Nil =
         tarball Unit
         | rmap (\_ "TARBALL")
-    kind, Nil ->
+    kind, Nil =
         require Pass variant = toVariant kind
 
         all variant
         | rmap (\_ "BUILD")
-    _ -> Fail "no target specified (try: build default/debug/tarball)".makeError
+    _ = Fail "no target specified (try: build default/debug/tarball)".makeError
 
 export def install: List String => Result String Error = match _
-    dest, kind, Nil ->
+    dest, kind, Nil =
         doInstall (in cwd dest) kind
         | rmap (\_ "INSTALL")
-    dest, Nil ->
+    dest, Nil =
         doInstall (in cwd dest) "default"
         | rmap (\_ "INSTALL")
-    _ -> Fail "no directory specified (try: install /opt/local)".makeError
+    _ = Fail "no directory specified (try: install /opt/local)".makeError
 
 # Build all wake targets
 def targets =
@@ -794,17 +794,17 @@ def Pair _ _: Pair Integer String =
     Pair 44 "as"
 
 def f0 = match _ _
-    (x: Integer) (True: Boolean) -> x + 1
-    (x: Integer) (False: Boolean) -> x + 0
+    (x: Integer) (True: Boolean) = x + 1
+    (x: Integer) (False: Boolean) = x + 0
 
 def f0 =
     match aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ->
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa =
             x + 1
-        x b -> x + 0
+        x b = x + 0
 
 def x = match p
-    Something aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aa bb cc dd ->
+    Something aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aa bb cc dd =
         0
 
 export def vfoldl (combiningFn: accum => element => accum): accum => Vector element => accum =
@@ -993,8 +993,8 @@ def a name =
     # comment
     # comment
     match (a thing)
-        x, _ -> x, Nil
-        Nil -> Nil
+        x, _ = x, Nil
+        Nil = Nil
 
 def x =
     map (\(Pair a b) c a b)
@@ -1022,38 +1022,38 @@ def d =
 
 export def defaultJSONFormat: JSONFormat =
     def formatDouble d = match (dclass d)
-        DoubleInfinite if d <. 0e0 -> "-Infinity"
-        DoubleInfinite -> "Infinity"
-        DoubleNaN -> "NaN"
-        _ -> dstr d
+        DoubleInfinite if d <. 0e0 = "-Infinity"
+        DoubleInfinite = "Infinity"
+        DoubleNaN = "NaN"
+        _ = dstr d
 
     JSONFormat jsonEscape str formatDouble 0
 
 def longFunc param: Result (List Path) Error = match _
-    Nil -> Nil,
-    a, b ->
+    Nil = Nil,
+    a, b =
         def f = funcB b
 
         match f
-            Some x -> x
-            None -> x
-    c, e -> match f0
-        Some x -> x
-        None -> x
+            Some x = x
+            None = x
+    c, e = match f0
+        Some x = x
+        None = x
 
 export def !(x: Boolean): Boolean =
     if x then False else True
 
 export def mapPartial (f: a => Option b): (list: List a) => List b =
     def loop = match _
-        Nil -> Nil
-        h, t ->
+        Nil = Nil
+        h, t =
             # don't wait on f to process tail:
             def sub = loop t
 
             match (f h)
-                Some x -> x, sub
-                None -> sub
+                Some x = x, sub
+                None = sub
 
     loop
 
@@ -1063,13 +1063,13 @@ target writeImp inputs mode path content =
         def pre input = Pair input Unit
 
         def post = match _
-            Pair (Fail f) _ -> Fail f
-            Pair (Pass output) Unit ->
+            Pair (Fail f) _ = Fail f
+            Pair (Pass output) Unit =
                 if mode < 0 || mode > 0x1ff then
                     Fail (makeError "write {path}: Invalid mode ({strOctal mode})")
                 else match (imp mode path content)
-                    Fail f -> Fail (makeError f)
-                    Pass path -> Pass (editRunnerOutputOutputs (path, _) output)
+                    Fail f = Fail (makeError f)
+                    Pass path = Pass (editRunnerOutputOutputs (path, _) output)
 
         makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
 
