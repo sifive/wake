@@ -77,6 +77,10 @@ struct CommandLineOptions {
   const char *fd3;
   const char *fd4;
   const char *fd5;
+  const char *label_filter;  // TODO: Allow unions of multiple filters
+  const char *log_header;
+
+  wcl::optional<int64_t> log_header_source_width;
 
   std::vector<std::string> input_files = {};
   std::vector<std::string> output_files = {};
@@ -142,6 +146,9 @@ struct CommandLineOptions {
       {0, "fd:3", GOPT_ARGUMENT_REQUIRED},
       {0, "fd:4", GOPT_ARGUMENT_REQUIRED},
       {0, "fd:5", GOPT_ARGUMENT_REQUIRED},
+      {0, "label-filter", GOPT_ARGUMENT_REQUIRED},
+      {0, "log-header", GOPT_ARGUMENT_REQUIRED},
+      {0, "log-header-source-width", GOPT_ARGUMENT_REQUIRED},
       {':', "shebang", GOPT_ARGUMENT_REQUIRED},
       {0, 0, GOPT_LAST}
     };
@@ -200,6 +207,11 @@ struct CommandLineOptions {
     fd3 = arg(options, "fd:3")->argument;
     fd4 = arg(options, "fd:4")->argument;
     fd5 = arg(options, "fd:5")->argument;
+    label_filter = arg(options, "label-filter")->argument;
+    log_header = arg(options, "log-header")->argument;
+
+    auto lhsw_str = arg(options, "log-header-source-width")->argument;
+    if (lhsw_str) log_header_source_width = wcl::make_some<int64_t>(std::stol(lhsw_str));
 
     for (unsigned int i = 0; i < arg(options, "input")->count; i++) {
       input_files.emplace_back(std::string(input_files_buffer[i]));

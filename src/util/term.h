@@ -17,6 +17,9 @@
 
 #pragma once
 
+#include <wcl/optional.h>
+
+#include <stack>
 #include <streambuf>
 #include <vector>
 
@@ -47,17 +50,18 @@ class FdBuf : public std::streambuf {
   virtual int overflow(int c) override;
 };
 
-// A stringbuf that translates xterm-256color into
-// whatever the current terminal is. All 8-bit colors
-// for both foreground and background are handled.
-// In reality, it is imperfect in its current state and
-// is going to get some of these escape codes wrong.
-// Many cases are currently known to be wrong but
-// implementing the full state machine needed for
-// parsing is a longer process. This is just a
-// first pass that covers 99% of use cases and
-// should be viable in practice. We can add on
-// to it as we go.
+class NullBuf : public std::streambuf {
+ public:
+  virtual ~NullBuf() override {}
+  virtual int overflow(int c) override { return c; }
+};
+
+// A streambuf that translates xterm-256color into
+// whatever the current terminal is. Some escape
+// codes are ignored in some way either because
+// we can't implement them in this way (e.g. \b),
+// because terminfo doesn't support them, or because
+// we have chosen to ignore them for now.
 class TermInfoBuf : public std::streambuf {
  private:
   enum class State {
@@ -76,12 +80,19 @@ class TermInfoBuf : public std::streambuf {
   State state = State::default_state;
   int cur_code = -1;
   std::vector<int> codes;
+  std::string current_state;
+  std::stack<std::string> state_stack;
   std::streambuf &buf;
   bool dumb = false;
 
   // Puts a character to `buf`
   void put(char c);
+
+  // Puts a string into `buf`
   void putstr(const char *s);
+
+  // Puts a string into `buf` but updates current_state as well
+  void putstr_state(const char *s);
 
   // Updates `cur_code` with the next read digit
   void update_code(char digit);
@@ -104,6 +115,8 @@ class TermInfoBuf : public std::streambuf {
   virtual ~TermInfoBuf() override { sync(); }
   virtual int sync() override;
   virtual int overflow(int c) override;
+  void push_state() { state_stack.push(current_state); }
+  void pop_state();
 };
 
 bool term_init(bool tty_, bool skip_atty = false);

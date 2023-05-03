@@ -29,6 +29,9 @@ def tool (dir: String) (addHeaders: List Path) (variant: Pair String String) (ou
     def lib =
         flattenSysLibs libs
 
+    def wanted = cat $ map ("{_.getPathName}\n") lib.getSysLibObjects
+    def _ = if output ==~ "bin/wake" then println wanted else Unit
+
     require Pass headerPaths =
         sources here `.*\.h`
     def headers =

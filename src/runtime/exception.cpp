@@ -63,7 +63,7 @@ static PRIMFN(prim_unreachable) {
   STRING(arg0, 0);
   std::stringstream str;
   str << "REACHED UNREACHABLE CODE: " << arg0->c_str() << std::endl;
-  status_write(STREAM_ERROR, str.str());
+  status_get_generic_stream(STREAM_ERROR) << str.str() << std::endl;
   require_fail("", 1, runtime, scope);
 }
 

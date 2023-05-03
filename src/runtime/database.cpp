@@ -629,7 +629,7 @@ static void finish_stmt(const char *why, sqlite3_stmt *stmt, bool debug) {
     s << sqlite3_sql(stmt);
 #endif
     s << std::endl;
-    status_write(STREAM_LOG, s.str());
+    status_get_generic_stream(STREAM_LOG) << s.str() << std::endl;
   }
 
   ret = sqlite3_reset(stmt);
@@ -994,7 +994,7 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
       std::stringstream s;
       s << "Job " << job << " erroneously added input '" << input
         << "' which was not a visible file." << std::endl;
-      status_write(STREAM_ERROR, s.str());
+      status_get_generic_stream(STREAM_ERROR) << s.str() << std::endl;
     } else {
       bind_integer(why, imp->insert_tree, 1, INPUT);
       bind_integer(why, imp->insert_tree, 2, job);
@@ -1031,7 +1031,7 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   while (sqlite3_step(imp->detect_overlap) == SQLITE_ROW) {
     std::stringstream s;
     s << "File output by multiple Jobs: " << rip_column(imp->detect_overlap, 0) << std::endl;
-    status_write(STREAM_ERROR, s.str());
+    status_get_generic_stream(STREAM_ERROR) << s.str() << std::endl;
     fail = true;
   }
   finish_stmt(why, imp->detect_overlap, imp->debugdb);
@@ -1110,19 +1110,13 @@ std::string Database::get_output(long job, int descriptor) const {
 void Database::replay_output(long job, const char *stdout, const char *stderr) {
   const char *why = "Could not replay job output";
   bind_integer(why, imp->replay_log, 1, job);
-  bool needlf[2] = {false, false};
   while (sqlite3_step(imp->replay_log) == SQLITE_ROW) {
     int fd = sqlite3_column_int64(imp->replay_log, 0);
     const char *str = static_cast<const char *>(sqlite3_column_blob(imp->replay_log, 1));
     int len = sqlite3_column_bytes(imp->replay_log, 1);
-    if (len > 0) {
-      status_write(fd == 2 ? stderr : stdout, str, len);
-      needlf[fd - 1] = str[len - 1] != '\n';
-    }
+    if (len) status_get_generic_stream(fd == 2 ? stderr : stdout) << std::string(str, len);
   }
   finish_stmt(why, imp->replay_log, imp->debugdb);
-  if (needlf[0]) status_write(stdout, "\n", 1);
-  if (needlf[1]) status_write(stderr, "\n", 1);
 }
 
 void Database::add_hash(const std::string &file, const std::string &hash, long modified) {

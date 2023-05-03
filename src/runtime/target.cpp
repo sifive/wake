@@ -92,7 +92,7 @@ Target::~Target() {
       if (!x.second.promise) {
         std::stringstream ss;
         ss << "Infinite recursion detected across " << location->c_str() << std::endl;
-        status_write(STREAM_ERROR, ss.str());
+        status_get_generic_stream(STREAM_ERROR) << ss.str() << std::endl;
         break;
       }
     }
@@ -235,7 +235,7 @@ void CTargetArgs::execute(Runtime &runtime) {
               "identical:"
            << std::endl;
     }
-    status_write(STREAM_WARNING, ss.str());
+    status_get_generic_stream(STREAM_WARNING) << ss.str() << std::endl;
   }
 
   if (ref.second)

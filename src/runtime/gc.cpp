@@ -172,7 +172,8 @@ void Heap::report() const {
         << std::setw(12) << std::right << (x.pads * sizeof(PadObject)) << std::endl;
     }
     s << "------------------------------------------" << std::endl;
-    status_write(STREAM_REPORT, s.str());
+    // TODO: Add that this is coming from profile
+    status_get_generic_stream(STREAM_REPORT) << s.str() << std::endl;
   }
 }
 
@@ -264,7 +265,8 @@ void Heap::GC(size_t requested_pads) {
           << std::endl;
       }
       s << "------------------------------------------" << std::endl;
-      status_write(STREAM_REPORT, s.str());
+      // TODO: Say that this is from profiling
+      status_get_generic_stream(STREAM_REPORT) << s.str() << std::endl;
     }
 
     if (imp->last_pads > imp->most_pads) {

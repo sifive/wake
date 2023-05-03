@@ -46,7 +46,7 @@ def doCompileC variant gcc flags headers cfile =
 
     def out =
       makeExecPlan cmdline (cfile, headers)
-      | setPlanLabel "compile: {replace `^.*/` '' gcc} {obj}"
+      | setPlanLabel "c++ {cfile.getPathName}"
       | setPlanIsAtty True
       | runJob
       | getJobOutputs

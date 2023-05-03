@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <math.h>
+#include <re2/re2.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <sys/mman.h>
@@ -51,6 +52,7 @@
 #include "compat/rusage.h"
 #include "compat/sigwinch.h"
 #include "compat/spawn.h"
+#include "config.h"
 #include "database.h"
 #include "prim.h"
 #include "status.h"
@@ -60,6 +62,7 @@
 #include "util/location.h"
 #include "util/poll.h"
 #include "util/shell.h"
+#include "util/term.h"
 #include "value.h"
 
 static job_cache::Cache *internal_job_cache = nullptr;
@@ -268,13 +271,20 @@ struct JobEntry {
   pid_t pid;             //  0 if merged
   int pipe_stdout;       // -1 if closed
   int pipe_stderr;       // -1 if closed
-  std::string stdout_buf;
-  std::string stderr_buf;
   std::string echo_line;
   std::list<Status>::iterator status;
+  std::unique_ptr<std::streambuf> stdout_linebuf;
+  std::unique_ptr<std::streambuf> stderr_linebuf;
 
-  JobEntry(JobTable::detail *imp_, RootPointer<Job> &&job_)
-      : imp(imp_), job(std::move(job_)), pid(0), pipe_stdout(-1), pipe_stderr(-1) {}
+  JobEntry(JobTable::detail *imp_, RootPointer<Job> &&job_, std::unique_ptr<std::streambuf> stdout,
+           std::unique_ptr<std::streambuf> stderr)
+      : imp(imp_),
+        job(std::move(job_)),
+        pid(0),
+        pipe_stdout(-1),
+        pipe_stderr(-1),
+        stdout_linebuf(std::move(stdout)),
+        stderr_linebuf(std::move(stderr)) {}
   ~JobEntry();
 
   double runtime(struct timespec now);
@@ -293,9 +303,9 @@ struct CriticalJob {
 struct JobTable::detail {
   Poll poll;
   long num_running;
-  std::map<pid_t, std::shared_ptr<JobEntry> > pidmap;
-  std::map<int, std::shared_ptr<JobEntry> > pipes;
-  std::vector<std::unique_ptr<Task> > pending;
+  std::map<pid_t, std::shared_ptr<JobEntry>> pidmap;
+  std::map<int, std::shared_ptr<JobEntry>> pipes;
+  std::vector<std::unique_ptr<Task>> pending;
   sigset_t block;  // signals that can race with poll.wait()
   Database *db;
   double active, limit;              // CPUs
@@ -308,6 +318,10 @@ struct JobTable::detail {
   bool batch;
   struct timespec wall;
   RUsage childrenUsage;
+  std::unordered_map<int, std::unique_ptr<std::streambuf>> fd_bufs;
+  std::unordered_map<int, std::unique_ptr<TermInfoBuf>> term_bufs;
+
+  detail() {}
 
   CriticalJob critJob(double nexttime) const;
 };
@@ -467,11 +481,9 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   // Double-check that ::parse() did not do something crazy.
   assert(imp->limit > 0);
 
-  std::stringstream s;
-  s << "wake: targeting utilization for " << imp->limit << " threads and "
-    << ResourceBudget::format(imp->phys_limit) << " of memory." << std::endl;
-  std::string out = s.str();
-  status_write("echo", out.data(), out.size());
+  status_get_generic_stream("echo")
+      << "wake: targeting utilization for " << imp->limit << " threads and "
+      << ResourceBudget::format(imp->phys_limit) << " of memory." << std::endl;
 
   // Wake creates files + dirs with explicit permissions.
   // We do not want the umask to interfere.
@@ -631,7 +643,8 @@ JobTable::~JobTable() {
     std::stringstream s;
     s << "Force killing " << i.first << " after " << TERM_ATTEMPTS << " attempts with SIGTERM"
       << std::endl;
-    status_write(STREAM_ERROR, s.str());
+    // TODO: Note that this is from wake
+    status_get_generic_stream(STREAM_ERROR) << s.str() << std::endl;
     kill(i.first, SIGKILL);
   }
 }
@@ -744,8 +757,57 @@ static void launch(JobTable *jobtable) {
     jobtable->imp->active += task.job->threads();
     jobtable->imp->phys_active += task.job->memory();
 
-    std::shared_ptr<JobEntry> entry =
-        std::make_shared<JobEntry>(jobtable->imp.get(), std::move(task.job));
+    int fd_out = status_get_fd(task.job->stream_out.c_str());
+    int color_out = status_get_colour(task.job->stream_out.c_str());
+    int fd_err = status_get_fd(task.job->stream_err.c_str());
+    int color_err = status_get_colour(task.job->stream_err.c_str());
+
+    // Make the raw output streams and the TermInfoBufs
+    // that jobs will use. We make one TermInfoBuf per
+    // file descriptor that we're outputting to.
+    // TODO: We could add file tee-ing here as well
+    if (!jobtable->imp->fd_bufs.count(fd_out)) {
+      std::unique_ptr<std::streambuf> fd_buf;
+      if (fd_out != -1) {
+        fd_buf = std::make_unique<FdBuf>(fd_out);
+      } else {
+        fd_buf = std::make_unique<NullBuf>();
+      }
+      jobtable->imp->term_bufs[fd_out] =
+          std::make_unique<TermInfoBuf>(fd_buf.get(), !isatty(fd_out));
+      jobtable->imp->fd_bufs[fd_out] = std::move(fd_buf);
+    }
+    if (!jobtable->imp->fd_bufs.count(fd_err)) {
+      std::unique_ptr<std::streambuf> fd_buf;
+      if (fd_err != -1) {
+        fd_buf = std::make_unique<FdBuf>(fd_err);
+      } else {
+        fd_buf = std::make_unique<NullBuf>();
+      }
+      jobtable->imp->term_bufs[fd_err] =
+          std::make_unique<TermInfoBuf>(fd_buf.get(), !isatty(fd_err));
+      jobtable->imp->fd_bufs[fd_err] = std::move(fd_buf);
+    }
+
+    // Now we need to figure out if we're outputting to a null buffer to avoid rendering
+    // or if we're going to output to a nicely rendered StatusBuf.
+    auto job_label_str = wcl::some(task.job->label->as_str());
+    std::unique_ptr<std::streambuf> out, err;
+    // TODO: Add a glob check here when picking the buffer
+    if (fd_out != -1 && RE2::FullMatch(*job_label_str, *WakeConfig::get()->label_filter)) {
+      out = std::make_unique<StatusBuf>(task.job->stream_out, job_label_str, color_out,
+                                        *jobtable->imp->term_bufs[fd_out].get());
+    } else {
+      out = std::make_unique<NullBuf>();
+    }
+    if (fd_err != -1 && RE2::FullMatch(*job_label_str, *WakeConfig::get()->label_filter)) {
+      err = std::make_unique<StatusBuf>(task.job->stream_err, job_label_str, color_err,
+                                        *jobtable->imp->term_bufs[fd_err].get());
+    } else {
+      err = std::make_unique<NullBuf>();
+    }
+    std::shared_ptr<JobEntry> entry = std::make_shared<JobEntry>(
+        jobtable->imp.get(), std::move(task.job), std::move(out), std::move(err));
 
     int stdout_stream[2];
     int stderr_stream[2];
@@ -811,25 +873,12 @@ static void launch(JobTable *jobtable) {
       if (!task.stdin_file.empty()) s << " < " << shell_escape(task.stdin_file);
     }
     s << std::endl;
-    std::string out = s.str();
+    std::string echo_line = s.str();
     if (jobtable->imp->batch) {
-      entry->echo_line = std::move(out);
+      entry->echo_line = std::move(echo_line);
     } else {
-      status_write(entry->job->echo.c_str(), out.data(), out.size());
+      status_get_generic_stream(entry->job->echo.c_str()) << echo_line.data() << std::endl;
     }
-
-#if 0
-    std::stringstream s;
-    s << "Scheduled " << entry->job->threads()
-      << " for a total of " << jobtable->imp->active
-      << " utilized cores and " << jobtable->imp->running.size()
-      << " running tasks." << std::endl;
-    std::string out = s.str();
-    status_write(2, out.data(), out.size());
-#endif
-
-    // entry->job->stdin_file.clear();
-    // entry->job->cmdline.clear();
 
     std::pop_heap(heap.begin(), heap.end());
     heap.resize(heap.size() - 1);
@@ -842,7 +891,8 @@ JobEntry::~JobEntry() {
   imp->active -= job->threads();
   imp->phys_active -= job->memory();
   if (imp->batch) {
-    if (!echo_line.empty()) status_write(job->echo.c_str(), echo_line.c_str(), echo_line.size());
+    if (!echo_line.empty())
+      status_get_generic_stream(job->echo.c_str()) << echo_line.c_str() << std::endl;
     imp->db->replay_output(job->job, job->stream_out.c_str(), job->stream_err.c_str());
   }
 }
@@ -911,21 +961,10 @@ bool JobTable::wait(Runtime &runtime) {
           runtime.heap.guarantee(WJob::reserve());
           runtime.schedule(WJob::claim(runtime.heap, entry->job.get()));
           ++done;
-          if (!imp->batch && !entry->stdout_buf.empty()) {
-            if (entry->stdout_buf.back() != '\n') entry->stdout_buf.push_back('\n');
-            status_write(entry->job->stream_out.c_str(), entry->stdout_buf.data(),
-                         entry->stdout_buf.size());
-            entry->stdout_buf.clear();
-          }
         } else {
           entry->job->db->save_output(entry->job->job, 1, buffer, got, entry->runtime(now));
           if (!imp->batch) {
-            entry->stdout_buf.append(buffer, got);
-            size_t dump = entry->stdout_buf.rfind('\n');
-            if (dump != std::string::npos) {
-              status_write(entry->job->stream_out.c_str(), entry->stdout_buf.data(), dump + 1);
-              entry->stdout_buf.erase(0, dump + 1);
-            }
+            entry->stdout_linebuf->sputn(buffer, got);
           }
         }
       }
@@ -941,21 +980,10 @@ bool JobTable::wait(Runtime &runtime) {
           runtime.heap.guarantee(WJob::reserve());
           runtime.schedule(WJob::claim(runtime.heap, entry->job.get()));
           ++done;
-          if (!imp->batch && !entry->stderr_buf.empty()) {
-            if (entry->stderr_buf.back() != '\n') entry->stderr_buf.push_back('\n');
-            status_write(entry->job->stream_err.c_str(), entry->stderr_buf.data(),
-                         entry->stderr_buf.size());
-            entry->stderr_buf.clear();
-          }
         } else {
           entry->job->db->save_output(entry->job->job, 2, buffer, got, entry->runtime(now));
           if (!imp->batch) {
-            entry->stderr_buf.append(buffer, got);
-            size_t dump = entry->stderr_buf.rfind('\n');
-            if (dump != std::string::npos) {
-              status_write(entry->job->stream_err.c_str(), entry->stderr_buf.data(), dump + 1);
-              entry->stderr_buf.erase(0, dump + 1);
-            }
+            entry->stderr_linebuf->sputn(buffer, got);
           }
         }
       }
@@ -1221,17 +1249,16 @@ static PRIMFN(prim_job_virtual) {
   if (!job->stdin_file->empty()) s << " < " << shell_escape(job->stdin_file->c_str());
   s << std::endl;
   std::string out = s.str();
-  status_write(job->echo.c_str(), out.data(), out.size());
+  // TODO: Clean up echo stuff
+  status_get_generic_stream(job->echo.c_str()) << out << std::endl;
 
   if (!stdout_payload->empty()) {
-    status_write(job->stream_out.c_str(), stdout_payload->c_str(), stdout_payload->size());
-    if (stdout_payload->c_str()[stdout_payload->size() - 1] != '\n')
-      status_write(job->stream_out.c_str(), "\n", 1);
+    // TODO: Add a job_id
+    status_get_generic_stream(job->stream_out.c_str()) << stdout_payload << std::endl;
   }
   if (!stderr_payload->empty()) {
-    status_write(job->stream_err.c_str(), stderr_payload->c_str(), stderr_payload->size());
-    if (stderr_payload->c_str()[stderr_payload->size() - 1] != '\n')
-      status_write(job->stream_err.c_str(), "\n", 1);
+    // TODO: Add a job_id
+    status_get_generic_stream(job->stream_err.c_str()) << stdout_payload << std::endl;
   }
 
   job->state = STATE_FORKED | STATE_STDOUT | STATE_STDERR | STATE_MERGED;

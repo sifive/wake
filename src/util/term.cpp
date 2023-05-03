@@ -29,6 +29,7 @@
 #include <unistd.h>
 
 #include <cstring>
+#include <iomanip>
 #include <iostream>
 #include <set>
 #include <sstream>
@@ -48,6 +49,12 @@ void TermInfoBuf::put(char c) { buf.sputc(c); }
 // Puts a string to `buf`
 void TermInfoBuf::putstr(const char *str) { buf.sputn(str, strlen(str)); }
 
+// Puts a string to `buf`
+void TermInfoBuf::putstr_state(const char *str) {
+  putstr(str);
+  current_state += str;
+}
+
 // Updates `cur_code` with the next read digit
 void TermInfoBuf::update_code(char digit) {
   if (cur_code < 0) cur_code = 0;
@@ -58,6 +65,23 @@ void TermInfoBuf::update_code(char digit) {
 void TermInfoBuf::next_code() {
   codes.push_back(cur_code);
   cur_code = -1;
+}
+
+void TermInfoBuf::pop_state() {
+  // Find the top that we want to restoe to
+  std::string restore_state = state_stack.top();
+
+  // Update the current state to what it is soon to be
+  current_state = restore_state;
+
+  // Reset to normal before proceeding
+  putstr(term_normal());
+
+  // Replay the current state
+  putstr(current_state.c_str());
+
+  // Finally discard this item of the stack
+  state_stack.pop();
 }
 
 // Uses terminfo to output strings for each code
@@ -75,6 +99,7 @@ void TermInfoBuf::output_codes() {
 
   // No code is interpreted as a reset
   if (output_codes.size() == 0) {
+    current_state = "";
     putstr(term_normal());
     return;
   }
@@ -86,28 +111,29 @@ void TermInfoBuf::output_codes() {
   if (output_codes.size() == 1) {
     switch (output_codes[0]) {
       case 0:  // Normal
+        current_state = "";
         putstr(term_normal());
         return;
       case 1:  // Bold
-        putstr(term_intensity(2));
+        putstr_state(term_intensity(2));
         return;
       case 2:  // Faint
-        putstr(term_intensity(1));
+        putstr_state(term_intensity(1));
         return;
       case 4:  // Underline
-        putstr(term_set_underline(true));
+        putstr_state(term_set_underline(true));
         return;
       case 7:  // Inverse (display as standout)
-        putstr(term_set_standout(true));
+        putstr_state(term_set_standout(true));
         return;
       case 21:  // Double-Underline (treat as single underline)
-        putstr(term_set_underline(true));
+        putstr_state(term_set_underline(true));
         return;
       case 24:  // Not Underline (or Double underline)
-        putstr(term_set_underline(false));
+        putstr_state(term_set_underline(false));
         return;
       case 27:  // Not standout
-        putstr(term_set_standout(false));
+        putstr_state(term_set_standout(false));
         return;
       case 30:
       case 31:
@@ -117,7 +143,7 @@ void TermInfoBuf::output_codes() {
       case 35:
       case 36:
       case 37: {
-        putstr(term_colour(output_codes[0] - 30));
+        putstr_state(term_colour(output_codes[0] - 30));
         return;
       }
       case 40:
@@ -128,7 +154,7 @@ void TermInfoBuf::output_codes() {
       case 45:
       case 46:
       case 47:
-        putstr(term_colour_background(output_codes[0] - 40));
+        putstr_state(term_colour_background(output_codes[0] - 40));
         return;
       case 90:
       case 91:
@@ -138,7 +164,7 @@ void TermInfoBuf::output_codes() {
       case 95:
       case 96:
       case 97:
-        putstr(term_colour(output_codes[0] - 90 + 8));
+        putstr_state(term_colour(output_codes[0] - 90 + 8));
         return;
       case 100:
       case 101:
@@ -148,7 +174,7 @@ void TermInfoBuf::output_codes() {
       case 105:
       case 106:
       case 107:
-        putstr(term_colour_background(output_codes[0] - 100 + 8));
+        putstr_state(term_colour_background(output_codes[0] - 100 + 8));
         return;
     }
   }
@@ -164,8 +190,8 @@ void TermInfoBuf::output_codes() {
       case 35:
       case 36:
       case 37:
-        putstr(term_intensity(2));
-        putstr(term_colour(color_code - 30));
+        putstr_state(term_intensity(2));
+        putstr_state(term_colour(color_code - 30));
         return;
       case 40:
       case 41:
@@ -175,8 +201,8 @@ void TermInfoBuf::output_codes() {
       case 45:
       case 46:
       case 47:
-        putstr(term_intensity(2));
-        putstr(term_colour_background(color_code - 40));
+        putstr_state(term_intensity(2));
+        putstr_state(term_colour_background(color_code - 40));
         return;
       case 90:
       case 91:
@@ -186,8 +212,8 @@ void TermInfoBuf::output_codes() {
       case 95:
       case 96:
       case 97:
-        putstr(term_intensity(2));
-        putstr(term_colour(color_code - 90 + 8));
+        putstr_state(term_intensity(2));
+        putstr_state(term_colour(color_code - 90 + 8));
         return;
       case 100:
       case 101:
@@ -197,8 +223,8 @@ void TermInfoBuf::output_codes() {
       case 105:
       case 106:
       case 107:
-        putstr(term_intensity(2));
-        putstr(term_colour(color_code - 100 + 8));
+        putstr_state(term_intensity(2));
+        putstr_state(term_colour(color_code - 100 + 8));
         return;
     }
   }
@@ -208,7 +234,7 @@ void TermInfoBuf::output_codes() {
     if (output_codes[1] != XTERM256_8BIT_ESCAPE) return;
     if (output_codes.size() != 3) return;
     // Nicely, terminfo and xterm-256color both use ANSI-256 colors
-    putstr(term_colour(output_codes[2]));
+    putstr_state(term_colour(output_codes[2]));
     return;
   }
 
@@ -217,7 +243,7 @@ void TermInfoBuf::output_codes() {
     if (output_codes[1] != XTERM256_8BIT_ESCAPE) return;
     if (output_codes.size() != 3) return;
     // Nicely, terminfo and xterm-256color both use ANSI-256 colors
-    putstr(term_colour_background(output_codes[2]));
+    putstr_state(term_colour_background(output_codes[2]));
     return;
   }
 }
