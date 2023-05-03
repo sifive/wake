@@ -1536,13 +1536,15 @@ wcl::doc Emitter::walk_flag_global(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_guard(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
+  MEMO_RET(walk_placeholder(ctx, node));
 
-  MEMO_RET(fmt()
-               .fmt_if(TOKEN_KW_IF,
-                       fmt().token(TOKEN_KW_IF).ws().prevent_explode(fmt().walk(WALK_NODE)).ws())
-               .fmt_if(TOKEN_P_ARROW, fmt().token(TOKEN_P_ARROW))
-               .fmt_if(TOKEN_P_EQUALS, fmt().token(TOKEN_P_EQUALS, symbolExample(TOKEN_P_ARROW)))
-               .format(ctx, node.firstChildElement(), token_traits));
+  // TODO: uncomment this after rolling out MVP
+  // MEMO_RET(fmt()
+  //              .fmt_if(TOKEN_KW_IF,
+  //                      fmt().token(TOKEN_KW_IF).ws().prevent_explode(fmt().walk(WALK_NODE)).ws())
+  //              .fmt_if(TOKEN_P_ARROW, fmt().token(TOKEN_P_ARROW))
+  //              .fmt_if(TOKEN_P_EQUALS, fmt().token(TOKEN_P_EQUALS, symbolExample(TOKEN_P_ARROW)))
+  //              .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_hole(ctx_t ctx, CSTElement node) {
