@@ -42,7 +42,7 @@ or that your colleagues already built, you might appreciate wake.
 
     While your build orchestration files describe a sequence of compilation
     steps, the wake language automatically extracts parallelism.  Everything
-    runs at once.  Only true data dependencies cause wake to sequence jobs. 
+    runs at once.  Only true data dependencies cause wake to sequence jobs.
     Wake handles parallelism for you, so you don't need to think about it.
 
   - shared build caching
@@ -87,14 +87,14 @@ On Mac OS with Mac Ports installed:
 On Mac OS with Home Brew installed:
 
     brew install gmp re2 pkgconfig dash
-    
+
 Fuse is slightly more complicated, it requires permissions.
 
     brew tap homebrew/cask
     brew cask install osxfuse
-    
+
 You should see something like the following, and MacOS may ask for your password.
-    
+
     You must reboot for the installation of osxfuse to take effect.
 
     System Extension Blocked
@@ -151,6 +151,8 @@ contain JSON5 source where the root object may contain the following keys.
 | ----------- | --------------------------------------------------------------------------- | -------- | ---------------------------- | --------- | ----------- | ------------------------------------------------------------------------------------------- |
 | version     | SemVer compatible  with the repo                                            | No       | SemVer string                | Yes       | No          | ""                                                                                          |
 | user_config | Path to user config for this repo. Allows a different config for each repo. | No       | shell expandable path string | Yes       | No          | `$XDG_CONFIG_HOME/wake.json` if `$XDG_CONFIG_HOME` set, `$HOME/.config/wake.json` otherwise |
+| log_header | A string containing `$stream` and `$source` that will prepend every line of a jobs output | No | An interpolated string | Yes      | Yes | `'[$stream] $source: '`
+| log_header_source_width | An integer that specifies the width of the `$source` variable in `log_header` | No | Positive Integer | Yes | Yes | 25
 
 Below is a full example
 
@@ -163,8 +165,8 @@ Below is a full example
 
 // ~/.config/wake.myrepo.json
 {
-  // Right now there are no implemented user keys so this file is always empty
-  // This will be updated once log verbosity or another user key is implemented
+  "log_header": "$stream: ",
+  "log_header_source_width": 30
 }
 ```
 
