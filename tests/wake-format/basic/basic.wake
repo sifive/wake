@@ -217,9 +217,6 @@ def x = (
   5
 )
 
-def x = aaaaaaaa ++ bbbbbbbb ++ cccccccc ++ dddddddd ++ eeeeeeee ++ ffffffff ++ gggggggg ++ hhhhhhhh ++ iiiiiiii ++ jjjjjjjj
-
-
 def name Unit = # wake-format off
   def other = here
   def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -256,6 +253,14 @@ def ff = aaaaaaaaaaaaa | bbbbbbbbbbbbbbbb | cccccccccccccccccc | ddddddddddddddd
 def ff = aaaaaaaaaaaaa $ bbbbbbbbbbbbbbbb $ cccccccccccccccccc $ ddddddddddddddddddd $ eeeeeeeeeeeeeee $ ffffffffff $ ggggggggggg $ hhhhhhhhhhh
 def ff = aaaaaaaaaaaaa , bbbbbbbbbbbbbbbb , cccccccccccccccccc , ddddddddddddddddddd , eeeeeeeeeeeeeee , ffffffffff , ggggggggggg , hhhhhhhhhhh
 def ff = aaaaaaaaaaaaa . bbbbbbbbbbbbbbbb . cccccccccccccccccc . ddddddddddddddddddd . eeeeeeeeeeeeeee . ffffffffff . ggggggggggg . hhhhhhhhhhh
+def ff = aaaaaaaaaaaaa + bbbbbbbbbbbbbbbb + cccccccccccccccccc + ddddddddddddddddddd + eeeeeeeeeeeeeee + ffffffffff + ggggggggggg + hhhhhhhhhhh
+def ff = aaaaaaaaaaaaa * bbbbbbbbbbbbbbbb * cccccccccccccccccc * ddddddddddddddddddd * eeeeeeeeeeeeeee * ffffffffff * ggggggggggg * hhhhhhhhhhh
+def ff = aaaaaaaaaaaaa || bbbbbbbbbbbbbbbb || cccccccccccccccccc || ddddddddddddddddddd || eeeeeeeeeeeeeee || ffffffffff || ggggggggggg || hhhhhhhhhhh
+def ff = aaaaaaaaaaaaa $$ bbbbbbbbbbbbbbbb $$ cccccccccccccccccc $$ ddddddddddddddddddd $$ eeeeeeeeeeeeeee $$ ffffffffff $$ ggggggggggg $$ hhhhhhhhhhh
+def ff = aaaaaaaaaaaaa ,, bbbbbbbbbbbbbbbb ,, cccccccccccccccccc ,, ddddddddddddddddddd ,, eeeeeeeeeeeeeee ,, ffffffffff ,, ggggggggggg ,, hhhhhhhhhhh
+def ff = aaaaaaaaaaaaa .. bbbbbbbbbbbbbbbb .. cccccccccccccccccc .. ddddddddddddddddddd .. eeeeeeeeeeeeeee .. ffffffffff .. ggggggggggg .. hhhhhhhhhhh
+def ff = aaaaaaaaaaaaa ++ bbbbbbbbbbbbbbbb ++ cccccccccccccccccc ++ ddddddddddddddddddd ++ eeeeeeeeeeeeeee ++ ffffffffff ++ ggggggggggg ++ hhhhhhhhhhh
+def ff = aaaaaaaaaaaaa ** bbbbbbbbbbbbbbbb ** cccccccccccccccccc ** ddddddddddddddddddd ** eeeeeeeeeeeeeee ** ffffffffff ** ggggggggggg ** hhhhhhhhhhh
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     buildTestWake, Nil =

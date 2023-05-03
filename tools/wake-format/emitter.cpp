@@ -166,20 +166,23 @@ static bool is_op_left_assoc(const CSTElement& op) {
   }
 }
 
-static bool is_op_suffix(const CSTElement& op) {
-  switch (op.id()) {
-    case TOKEN_OP_COMMA:
-    case TOKEN_OP_ADDSUB:
-      return true;
-
-    default:
-      return false;
-  }
-}
-
 // determines if a given binop matches a given type and string literal
 static inline bool is_binop_matching_str(const CSTElement& op, cst_id_t type, std::string lit) {
   return op.id() == type && op.fragment().segment().str() == lit;
+}
+
+static bool is_op_suffix(const CSTElement& op) {
+  switch (op.id()) {
+    case TOKEN_OP_DOLLAR:
+      return !is_binop_matching_str(op, TOKEN_OP_DOLLAR, "$");
+    case TOKEN_OP_OR:
+      return !is_binop_matching_str(op, TOKEN_OP_OR, "|");
+    case TOKEN_OP_DOT:
+      return false;
+
+    default:
+      return true;
+  }
 }
 
 static size_t count_leading_newlines(const token_traits_map_t& traits, const CSTElement& node) {
