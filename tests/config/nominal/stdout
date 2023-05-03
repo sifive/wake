@@ -1,6 +1,6 @@
 Wake config:
   user_config = './wake_user.json' (WakeRoot)
   version = '' (Default)
-  log_header = '' (WakeRoot)
-  log_header_source_width = '0' (WakeRoot)
+  log_header = 'foobar $source: ' (WakeRoot)
+  log_header_source_width = '13' (WakeRoot)
   label_filter = '.*' (Default)

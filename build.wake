@@ -70,7 +70,7 @@ def bootstrapTarget targetFn variant =
 
 # Build all wake targets
 def targets =
-    buildWake, buildWakeBox, buildFuseDaemon, buildShim, buildBSP, (bootstrapTarget buildLSP), buildWakeFormat, Nil
+    buildWake, buildWakeBox, buildFuseDaemon, buildShim, # buildBSP, (bootstrapTarget buildLSP), buildWakeFormat, Nil
 
 def all variant =
     require Pass x =

@@ -559,4 +559,14 @@ void status_set_colour(const char *name, int colour) {}
 void status_set_fd(const char *name, int fd) {}
 void status_set_bulk_fd(int fd, const char *streams) {}
 
+int status_get_colour(const char *name) { return 0; }
+
+int status_get_fd(const char *name) { return -1; }
+
+std::ostream &status_get_generic_stream(const char *name) { return std::cout; }
+
+void StatusBuf::emit_header() {}
+int StatusBuf::overflow(int c) { return 0; }
+StatusBuf::~StatusBuf() {}
+
 #endif

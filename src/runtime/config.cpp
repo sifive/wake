@@ -308,7 +308,7 @@ bool WakeConfig::init(const std::string& wakeroot_path, const WakeConfigOverride
     }
 
     // since the user config was missig, ignore it and return the config thus far
-    // before we do we need tohandle overrides
+    // before we do we need to handle overrides
     _config->override_all(overrides);
     return true;
   }

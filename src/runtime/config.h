@@ -26,14 +26,13 @@
 
 #include "json/json5.h"
 
-// For future work, currently empty
 struct WakeConfigOverrides {
   wcl::optional<std::string> log_header;
   wcl::optional<int64_t> log_header_source_width;
 
   // if label_filter == {} then we don't override
   // if label_filter == {{}} then we do override but the filter accepts everything
-  // if label_filter == {{filter}} then
+  // if label_filter == {{filter}} then only jobs matching the filter are accepted
   // these semantics fall out of the normal way overrides work, this comment
   // is just to make this unusual type's meaning clear.
   wcl::optional<wcl::optional<std::string>> label_filter;
