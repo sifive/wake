@@ -3,3 +3,6 @@
 
 # Fixup cases of bad auto formatting from 9db9154
 6e3504c5778b4c13f1e18c0bc2db013d0296516c
+
+# Format all wake code with wake-format
+014d57ca1ce291891be653aaa16964e14a84a58b
