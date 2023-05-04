@@ -200,13 +200,13 @@ def t5 =
 def t7 =
     (
         x # comment
-        + 5
+        +
+        5
     )
 
 def t8 =
     (
-        x
-        + # comment
+        x + # comment
         5
     )
 
@@ -216,6 +216,31 @@ def t9 =
     )
 
 def t10 =
+    (
+        x, # comment
+        5
+    )
+
+def x =
+    (
+        x # comment
+        | 5
+    )
+
+def x =
+    (
+        x # comment
+        $ 5
+    )
+
+def x =
+    (
+        x # comment
+        ,
+        5
+    )
+
+def x =
     (
         x, # comment
         5
@@ -303,6 +328,86 @@ def ff =
     .ffffffffff
     .ggggggggggg
     .hhhhhhhhhhh
+
+def ff =
+    aaaaaaaaaaaaa +
+    bbbbbbbbbbbbbbbb +
+    cccccccccccccccccc +
+    ddddddddddddddddddd +
+    eeeeeeeeeeeeeee +
+    ffffffffff +
+    ggggggggggg +
+    hhhhhhhhhhh
+
+def ff =
+    aaaaaaaaaaaaa *
+    bbbbbbbbbbbbbbbb *
+    cccccccccccccccccc *
+    ddddddddddddddddddd *
+    eeeeeeeeeeeeeee *
+    ffffffffff *
+    ggggggggggg *
+    hhhhhhhhhhh
+
+def ff =
+    aaaaaaaaaaaaa ||
+    bbbbbbbbbbbbbbbb ||
+    cccccccccccccccccc ||
+    ddddddddddddddddddd ||
+    eeeeeeeeeeeeeee ||
+    ffffffffff ||
+    ggggggggggg ||
+    hhhhhhhhhhh
+
+def ff =
+    aaaaaaaaaaaaa $$
+    bbbbbbbbbbbbbbbb $$
+    cccccccccccccccccc $$
+    ddddddddddddddddddd $$
+    eeeeeeeeeeeeeee $$
+    ffffffffff $$
+    ggggggggggg $$
+    hhhhhhhhhhh
+
+def ff =
+    aaaaaaaaaaaaa,,
+    bbbbbbbbbbbbbbbb,,
+    cccccccccccccccccc,,
+    ddddddddddddddddddd,,
+    eeeeeeeeeeeeeee,,
+    ffffffffff,,
+    ggggggggggg,,
+    hhhhhhhhhhh
+
+def ff =
+    aaaaaaaaaaaaa
+    ..bbbbbbbbbbbbbbbb
+    ..cccccccccccccccccc
+    ..ddddddddddddddddddd
+    ..eeeeeeeeeeeeeee
+    ..ffffffffff
+    ..ggggggggggg
+    ..hhhhhhhhhhh
+
+def ff =
+    aaaaaaaaaaaaa ++
+    bbbbbbbbbbbbbbbb ++
+    cccccccccccccccccc ++
+    ddddddddddddddddddd ++
+    eeeeeeeeeeeeeee ++
+    ffffffffff ++
+    ggggggggggg ++
+    hhhhhhhhhhh
+
+def ff =
+    aaaaaaaaaaaaa **
+    bbbbbbbbbbbbbbbb **
+    cccccccccccccccccc **
+    ddddddddddddddddddd **
+    eeeeeeeeeeeeeee **
+    ffffffffff **
+    ggggggggggg **
+    hhhhhhhhhhh
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     buildTestWake, Nil =

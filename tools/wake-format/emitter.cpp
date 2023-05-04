@@ -98,6 +98,14 @@ static inline bool is_primary_term(wcl::doc_builder& builder, ctx_t ctx, CSTElem
   return false;
 }
 
+// Returns true if the next emitted thing would be emitted to the leftmost position of the current
+// line
+static inline bool is_unindented(const wcl::doc_builder& builder, ctx_t ctx, const CSTElement& node,
+                                 const token_traits_map_t& traits) {
+  ctx_t c = ctx.sub(builder);
+  return c->has_newline() && c->last_width() == 0;
+}
+
 // a floating comment is a comment bound to another comment
 static inline bool is_floating_comment(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                                        const token_traits_map_t& traits) {
@@ -158,19 +166,23 @@ static bool is_op_left_assoc(const CSTElement& op) {
   }
 }
 
-static bool is_op_suffix(const CSTElement& op) {
-  switch (op.id()) {
-    case TOKEN_OP_COMMA:
-      return true;
-
-    default:
-      return false;
-  }
-}
-
 // determines if a given binop matches a given type and string literal
 static inline bool is_binop_matching_str(const CSTElement& op, cst_id_t type, std::string lit) {
   return op.id() == type && op.fragment().segment().str() == lit;
+}
+
+static bool is_op_suffix(const CSTElement& op) {
+  switch (op.id()) {
+    case TOKEN_OP_DOLLAR:
+      return !is_binop_matching_str(op, TOKEN_OP_DOLLAR, "$");
+    case TOKEN_OP_OR:
+      return !is_binop_matching_str(op, TOKEN_OP_OR, "|");
+    case TOKEN_OP_DOT:
+      return false;
+
+    default:
+      return true;
+  }
 }
 
 static size_t count_leading_newlines(const token_traits_map_t& traits, const CSTElement& node) {
@@ -488,11 +500,7 @@ auto Emitter::rhs_fmt(bool always_newline) {
     pred(requires_nl, full_fmt)
     // If for some reason (probably a comment) there is a newline after the '=' then we have to
     // use the full_fmt
-   .pred([](const wcl::doc_builder& builder, ctx_t ctx, const CSTElement& node,
-            const token_traits_map_t& traits) {
-      ctx_t c = ctx.sub(builder);
-      return c->has_newline() && c->last_width() == 0;
-   }, full_fmt)
+   .pred(is_unindented, full_fmt)
     // If the RHS has a leading comment then we must use the full_fmt
    .pred([this](const wcl::doc_builder& builder, ctx_t ctx, const CSTElement& node,
             const token_traits_map_t& traits) {
@@ -2149,7 +2157,13 @@ wcl::doc Emitter::place_binop(CSTElement op, bool is_flat, ctx_t ctx) {
     //
     // '''
     if (is_op_suffix(op)) {
-      return fmt().walk(WALK_TOKEN).freshline().compose(ctx, op, token_traits);
+      return fmt()
+          // A comment may force the operator onto a newline.
+          // It's not valid to emit there so we need to reindent
+          .fmt_if_else(is_unindented, fmt().freshline(), fmt().lit(binop_lhs_separator(op)))
+          .walk(WALK_TOKEN)
+          .freshline()
+          .compose(ctx, op, token_traits);
     }
 
     // FR OP FR
@@ -2167,7 +2181,13 @@ wcl::doc Emitter::place_binop(CSTElement op, bool is_flat, ctx_t ctx) {
   //
   // '''
   if (is_op_suffix(op)) {
-    return fmt().walk(WALK_TOKEN).freshline().compose(ctx, op, token_traits);
+    return fmt()
+        // A comment may force the operator onto a newline.
+        // It's not valid to emit there so we need to reindent
+        .fmt_if_else(is_unindented, fmt().freshline(), fmt().lit(binop_lhs_separator(op)))
+        .walk(WALK_TOKEN)
+        .freshline()
+        .compose(ctx, op, token_traits);
   }
 
   // FR OP rsep
