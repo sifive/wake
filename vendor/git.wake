@@ -14,9 +14,11 @@
 # limitations under the License.
 
 package build_wake
+
 from wake import _
 
 topic releaseAs: String
+
 def buildAs Unit = match (subscribe releaseAs)
     version, Nil = Pass version
     _ =
@@ -43,10 +45,12 @@ def buildAs Unit = match (subscribe releaseAs)
         | Pass
 
 topic releaseOn: String
+
 def buildOn Unit = match (subscribe releaseOn)
     date, Nil = Pass date
     _ =
         def cmdline = which "git", "show", "-s", "--format=%ci", "HEAD", Nil
+
         require Pass stdout =
             makeExecPlan cmdline Nil
             | setPlanLabel "buildOn: git show"
@@ -55,6 +59,7 @@ def buildOn Unit = match (subscribe releaseOn)
             | setPlanStdout logNever
             | runJob
             | getJobStdout
+
         Pass (replace `\n.*` '' stdout)
 
 # Process the version when the version number and commit count are adjacent.
@@ -74,7 +79,8 @@ def mk_node_semver_safe v =
     #                            |                          |        |
     #                            vvvvvvvvvvvvvvvvvvvvvvvvvv vvvvvvvv vvvv
     def unsafe_version_regex = `^(v?[0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-(.*)`
-    require True = matches unsafe_version_regex  v
+
+    require True = matches unsafe_version_regex v
     else v
 
     match (extract unsafe_version_regex v)

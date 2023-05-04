@@ -14,32 +14,27 @@
 # limitations under the License.
 
 package build_wake
+
 from wake import _
 from gcc_wake import _
 
 def re2 = match _
-  Pair "wasm-cpp14-release" _ = buildRE2WASM Unit
-  _ =
-    pkgConfig "re2"
-    | getOrElseFn (\Unit pkg "re2")
-    | editSysLibCFlags (filter (\x ! (matches `-std=.*` x))) # remove feature test manipulation
-    | Pass
+    Pair "wasm-cpp14-release" _ = buildRE2WASM Unit
+    _ =
+        pkgConfig "re2"
+        | getOrElseFn (\Unit pkg "re2")
+        | editSysLibCFlags (filter (\x !(matches `-std=.*` x))) # remove feature test manipulation
+        | Pass
 
 def buildRE2WASM Unit =
-    def version =
-        "2021-08-01"
+    def version = "2021-08-01"
 
-    require Some emmake =
-        emmake
-    else
-        failWithError "emmake is not available"
+    require Some emmake = emmake
+    else failWithError "emmake is not available"
 
-    def emsdk =
-        replace `/[^/]*$` "" emmake
+    def emsdk = replace `/[^/]*$` "" emmake
 
-    require Pass patch =
-        source "{here}/re2.patch"
-
+    require Pass patch = source "{@here}/re2.patch"
     require Pass buildDir = vendorBuildDir Unit
 
     def job =
@@ -48,29 +43,20 @@ def buildRE2WASM Unit =
             wget https://github.com/google/re2/archive/refs/tags/%{version}.tar.gz
             tar xvzf %{version}.tar.gz
             cd re2-%{version}
-            patch -p0 < ../../%{relative here patch.getPathName}
+            patch -p0 < ../../%{relative @here patch.getPathName}
             emmake make -j4 RE2_CXXFLAGS="-std=c++14 -I. -Wall -DNO_THREADS" CXXFLAGS="-O2" obj/libre2.a
         """
         | makePlan "compiling re2" (buildDir, patch, Nil)
         | editPlanEnvironment (addEnvironmentPath emsdk)
-        | setPlanDirectory here
+        | setPlanDirectory @here
         | setPlanShare False
         | runJob
 
-    require Pass outputs =
-        job.getJobOutputs
+    require Pass outputs = job.getJobOutputs
 
-    def headers =
-        filter (matches `.*\.h` _.getPathName) outputs
-
-    def objects =
-        filter (matches `.*\.o` _.getPathName) outputs
-
-    def cflags =
-        "-I{here}/.build/re2-{version}",
-        Nil
-
-    def lflags =
-        Nil
+    def headers = filter (matches `.*\.h` _.getPathName) outputs
+    def objects = filter (matches `.*\.o` _.getPathName) outputs
+    def cflags = "-I{@here}/.build/re2-{version}", Nil
+    def lflags = Nil
 
     Pass (SysLib "1.0" headers objects cflags lflags)

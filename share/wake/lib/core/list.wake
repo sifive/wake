@@ -38,15 +38,15 @@ package wake
 #   0, "1", Nil          # bad! This will trigger a type-check failure.
 # ```
 export data List a =
-# The empty list. Nil represents a list with no elements.
+    # The empty list. Nil represents a list with no elements.
     Nil
-# The prepend constructor. This is often called "cons".
-#
-# Examples:
-# ```
-#   10, list       # Add a number to `list`
-#   1, 2, 3, Nil   # Create a list of 3 elements
-# ```
+    # The prepend constructor. This is often called "cons".
+    #
+    # Examples:
+    # ```
+    #   10, list       # Add a number to `list`
+    #   1, 2, 3, Nil   # Create a list of 3 elements
+    # ```
     (head: a), (tail: List a)
 
 # Create a singleton list from a value. This
@@ -60,7 +60,8 @@ export data List a =
 #   1, 2, 3,                 # Create a list of 3 elements without using Nil
 #   (1, 2, 3,) ++ (4, 5, 6,) # append two lists
 # ```
-export def element, = element, Nil
+export def element, =
+    element, Nil
 
 # Report if the list contains no elements.
 # If you find yourself using the function, consider using match instead.
@@ -74,7 +75,7 @@ export def element, = element, Nil
 # ```
 export def empty: List a => Boolean = match _
     Nil = True
-    _   = False
+    _ = False
 
 # Retrieve the first element of the list, else None.
 # If you find yourself using the function, consider using match instead.
@@ -86,7 +87,7 @@ export def empty: List a => Boolean = match _
 #   head (seq 10) = Some 0
 # ```
 export def head: List a => Option a = match _
-    Nil  = None
+    Nil = None
     h, _ = Some h
 
 # Remove the first element from the List
@@ -100,7 +101,7 @@ export def head: List a => Option a = match _
 #   tail (pi, 1.0, Nil) = 1.0, Nil
 # ```
 export def tail: List a => List a = match _
-    Nil  = Nil
+    Nil = Nil
     _, t = t
 
 # Create a new List by applying the function `mapFn` to each element of `list`.
@@ -121,8 +122,9 @@ export def tail: List a => List a = match _
 # ```
 export def map (mapFn: a => b): (list: List a) => List b =
     def loop list = match list
-        Nil  = Nil
+        Nil = Nil
         h, t = mapFn h, loop t
+
     loop
 
 # Create a new List by applying a function f to each element and concatenating the output.
@@ -139,8 +141,9 @@ export def map (mapFn: a => b): (list: List a) => List b =
 # ```
 export def mapFlat (mapFn: a => List b): (list: List a) => List b =
     def loop = match _
-        Nil  = Nil
+        Nil = Nil
         h, t = mapFn h ++ loop t
+
     loop
 
 # Create a new List by applying a partial function to each element of a List.
@@ -159,13 +162,15 @@ export def mapFlat (mapFn: a => List b): (list: List a) => List b =
 # ```
 export def mapPartial (f: a => Option b): (list: List a) => List b =
     def loop = match _
-        Nil  = Nil
+        Nil = Nil
         h, t =
             # don't wait on f to process tail:
             def sub = loop t
+
             match (f h)
                 Some x = x, sub
-                None   = sub
+                None = sub
+
     loop
 
 # Combine the elements of a List front-to-back into a single value.
@@ -195,6 +200,7 @@ export def foldl (combiningFn: accumulator => element => accumulator): accumulat
     def loop accumulator = match _
         Nil = accumulator
         element, rest = loop (combiningFn accumulator element) rest
+
     loop
 
 # Create a new List from an accumulator run over the elements front-to-back.
@@ -224,6 +230,7 @@ export def scanl (combiningFn: accumulator => element => accumulator): accumulat
     def loop accumulator = match _
         Nil = accumulator, Nil
         element, rest = accumulator, loop (combiningFn accumulator element) rest
+
     loop
 
 # Combine the elements of a List back-to-front into a single value.
@@ -244,6 +251,7 @@ export def foldr (combiningFn: element => accumulator => accumulator): accumulat
     def loop accumulator = match _
         Nil = accumulator
         element, rest = combiningFn element (loop accumulator rest)
+
     loop
 
 # Create a new List from an accumulator run over the elements back-to-front.
@@ -274,9 +282,12 @@ export def scanr (combiningFn: element => accumulator => accumulator): accumulat
         Nil = accumulator, Nil
         element, rest =
             def tail = loop accumulator rest
+
             require acc, _ = tail
             else unreachable "scanr never returns an empty list"
+
             combiningFn element acc, tail
+
     loop
 
 # Concatenate two lists into one List.
@@ -293,9 +304,12 @@ export def scanr (combiningFn: element => accumulator => accumulator): accumulat
 #   Nil ++ x = x                                         # left identity
 #   x ++ Nil = x                                         # right identity
 # ```
-export def (l: List a) ++ (r: List a): List a = lcat r l
+export def (l: List a) ++ (r: List a): List a =
+    lcat r l
+
 # curried to expose recursive loop outside of ++
-def lcat = foldr (_,_)
+def lcat =
+    foldr (_, _)
 
 # Reverse the order of elements in a List
 #
@@ -311,7 +325,7 @@ def lcat = foldr (_,_)
 #   reverse (reverse x) = x
 # ```
 export def reverse: List a => List a =
-    foldl (\a\b b,a) Nil
+    foldl (\a \b b, a) Nil
 
 # Concatenate a List of Lists into a simple List
 #
@@ -323,7 +337,7 @@ export def reverse: List a => List a =
 #   flatten (x, y, Nil) = x ++ y
 # ```
 export def flatten: List (List a) => List a =
-    foldr (_++_) Nil
+    foldr (_ ++ _) Nil
 
 # Count the number of elements in a List
 #
@@ -334,7 +348,7 @@ export def flatten: List (List a) => List a =
 #   len (seq x) = x
 # ```
 export def len: List a => Integer =
-    foldl (\a\_ a+1) 0
+    foldl (\a \_ a + 1) 0
 
 # Add `item` to the start of `list`.
 # This is efficient no matter how large the list.
@@ -381,9 +395,10 @@ export def splitAt (index: Integer) (listToDivide: List a): Pair (List a) (List 
     if index <= 0 then
         Pair Nil listToDivide
     else match listToDivide
-        Nil  = Pair Nil Nil
+        Nil = Pair Nil Nil
         h, t =
-            def Pair u v = splitAt (index-1) t
+            def Pair u v = splitAt (index - 1) t
+
             Pair (h, u) v
 
 # Keep only the first `length` elements
@@ -399,8 +414,8 @@ export def take (length: Integer) (l: List a): List a =
     if length <= 0 then
         Nil
     else match l
-        Nil  = Nil
-        h, t = h, take (length-1) t
+        Nil = Nil
+        h, t = h, take (length - 1) t
 
 # Discard the first `num` elements
 #
@@ -416,7 +431,7 @@ export def drop (num: Integer) (l: List a): List a =
         l
     else match l
         Nil = Nil
-        _, t = drop (num-1) t
+        _, t = drop (num - 1) t
 
 # Extract the i-th element if it exists or else None
 #
@@ -445,13 +460,15 @@ export def at (i: Integer) (l: List a): Option a =
 # ```
 export def splitUntil (stopFn: a => Boolean): List a => Pair (List a) (List a) =
     def loop l = match l
-        Nil  = Pair Nil Nil
+        Nil = Pair Nil Nil
         h, t =
             if stopFn h then
                 Pair Nil l
             else
                 def Pair u v = loop t
+
                 Pair (h, u) v
+
     loop
 
 # Take the longest prefix of a list where `f` is False
@@ -467,9 +484,10 @@ export def splitUntil (stopFn: a => Boolean): List a => Pair (List a) (List a) =
 # ```
 export def takeUntil (f: a => Boolean): List a => List a =
     def loop = match _
-        Nil         = Nil
+        Nil = Nil
         h, _ if f h = Nil
-        h, t        = h, loop t
+        h, t = h, loop t
+
     loop
 
 # Discard elements from the list until 'f' returns True
@@ -485,9 +503,10 @@ export def takeUntil (f: a => Boolean): List a => List a =
 # ```
 export def dropUntil (f: a => Boolean): List a => List a =
     def loop l = match l
-        Nil         = Nil
+        Nil = Nil
         h, _ if f h = l
-        _, t        = loop t
+        _, t = loop t
+
     loop
 
 # Find the location of the first element accepted by `f`
@@ -505,9 +524,10 @@ export def dropUntil (f: a => Boolean): List a => List a =
 # ```
 export def find (f: a => Boolean): List a => Option (Pair a Integer) =
     def loop i = match _
-        Nil         = None
+        Nil = None
         h, _ if f h = Some (Pair h i)
-        _, t        = loop (i+1) t
+        _, t = loop (i + 1) t
+
     loop 0
 
 # Does `f` return True for any element in the list?
@@ -525,7 +545,8 @@ export def find (f: a => Boolean): List a => Option (Pair a Integer) =
 #   exists p xs = ! (forall (! p _) xs)
 # ```
 export def exists (f: a => Boolean): List a => Boolean =
-    find f _ | isSome
+    find f _
+    | isSome
 
 # Does `f` return True for all elements in the list?
 # Once `f` returns False, `f` is not evaulated on further elements.
@@ -544,6 +565,7 @@ export def exists (f: a => Boolean): List a => Boolean =
 # ```
 export def forall (f: a => Boolean): List a => Boolean =
     def not = ! f _
+
     ! exists not _
 
 # Partition one `list` into two Lists based on the output of `acceptFn`.
@@ -566,14 +588,16 @@ export def forall (f: a => Boolean): List a => Boolean =
 # ```
 export def splitBy (acceptFn: a => Boolean): (list: List a) => Pair (true: List a) (false: List a) =
     def loop list = match list
-        Nil  = Pair Nil Nil
+        Nil = Pair Nil Nil
         h, t =
             # don't wait on f to process tail:
             def Pair u v = loop t
+
             if acceptFn h then
                 Pair (h, u) v
             else
                 Pair u (h, v)
+
     loop
 
 # Keep only those elements in the List where `f` evaluates to True
@@ -589,13 +613,15 @@ export def splitBy (acceptFn: a => Boolean): (list: List a) => Pair (true: List 
 # ```
 export def filter (f: a => Boolean): List a => List a =
     def loop = match _
-        Nil  = Nil
+        Nil = Nil
         h, t =
             def sub = loop t
+
             if f h then
                 h, sub
             else
                 sub
+
     loop
 
 # Flip the 1st and 2nd indexes in a List of Lists
@@ -613,19 +639,23 @@ export def filter (f: a => Boolean): List a => List a =
 #   transpose (Nil, Nil) = (Nil, Nil)
 # ```
 export def transpose: List (List a) => List (List a) =
-    def innerHead =
-        mapPartial head
+    def innerHead = mapPartial head
+
     def innerTail = match _
         Nil = Nil
         Nil, t = innerTail t
         (_, b), t = b, innerTail t
+
     def outer l =
         def heads = innerHead l
+
         if heads.empty then
             Nil
         else
             def tails = innerTail l
+
             heads, outer tails
+
     outer
 
 # Given a less-than comparison function, sort the list.
@@ -647,12 +677,13 @@ export def transpose: List (List a) => List (List a) =
 #   sortBy (\x\y icmp y x) (1, 2, 3, Nil) = reverse (sortBy icmp (1, 2, 3, Nil)) = 3, 2, 1, Nil
 # ```
 export def sortBy (cmpFn: a => a => Order): (list: List a) => List a =
-    def sort =
-        vsortBy cmpFn
+    def sort = vsortBy cmpFn
+
     def top l =
         listToVector l
         | sort
         | vectorToList
+
     top
 
 # Keep only the first occurrence of a value
@@ -669,12 +700,13 @@ export def distinctBy (cmpFn: a => a => Order): List a => List a =
     def loop tree = match _
         Nil = Nil
         x, tail =
-            def sub =
-                loop (tinsert x tree) tail
+            def sub = loop (tinsert x tree) tail
+
             if x ∈ tree then
                 sub
             else
                 x, sub
+
     loop (tnew cmpFn)
 
 # Keep only the first occurrence in a run of equal values
@@ -688,10 +720,12 @@ export def distinctBy (cmpFn: a => a => Order): List a => List a =
 export def distinctRunBy (eqFn: a => a => Boolean): List a => List a =
     def loop l =
         require x, y, t = l
+
         if eqFn x y then
             loop (x, t)
         else
             x, loop (y, t)
+
     loop
 
 # Compare two lists using an Order comparator
@@ -717,11 +751,13 @@ export def distinctRunBy (eqFn: a => a => Boolean): List a => List a =
 export def cmp (cmpFn: a => b => Order): (l: List a) => (r: List b) => Order =
     def loop = match _ _
         Nil Nil = EQ
-        Nil _   = LT
-        _   Nil = GT
-        (lh,lt) (rh,rt) =
+        Nil _ = LT
+        _ Nil = GT
+        (lh, lt) (rh, rt) =
             require EQ = cmpFn lh rh
+
             loop lt rt
+
     loop
 
 # Create a list of specified size by calling `f` on the index to generate.
@@ -737,7 +773,8 @@ export def tab (f: Integer => a): Integer => List a =
         if n <= 0 then
             a
         else
-            loop (f (n-1), a) (n-1)
+            loop (f (n - 1), a) (n - 1)
+
     loop Nil
 
 # Create a List of specified length with value ascending from 0.
@@ -764,9 +801,9 @@ export def seq: Integer => List Integer =
 #   zip x Nil = Nil
 # ```
 export def zip (a: List a) (b: List b): List (Pair a b) = match a b
-    Nil _   = Nil
-    _   Nil = Nil
-    (lh,lt) (rh,rt) = Pair lh rh, zip lt rt
+    Nil _ = Nil
+    _ Nil = Nil
+    (lh, lt) (rh, rt) = Pair lh rh, zip lt rt
 
 # Turn a List of Pairs into a Pair of Lists
 #
@@ -784,6 +821,7 @@ export def unzip (list: List (Pair a b)): Pair (List a) (List b) = match list
     Nil = Pair Nil Nil
     Pair a b, t =
         def Pair u v = unzip t
+
         Pair (a, u) (b, v)
 
 # Group a list by some comparison function.
@@ -805,8 +843,9 @@ export def unzip (list: List (Pair a b)): Pair (List a) (List b) = match list
 # ```
 export def groupBy (cmpFn: a => a => Order) (list: List a): List (List a) =
     def sorted = sortBy cmpFn list
+
     def combo elem acc = match acc
-        (head, rest), tail if ! (cmpFn elem head | isLT) =
-            (elem, head, rest), tail
+        (head, rest), tail if !(cmpFn elem head | isLT) = (elem, head, rest), tail
         _ = (elem, Nil), acc
+
     foldr combo Nil sorted

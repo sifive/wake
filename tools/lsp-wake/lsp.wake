@@ -14,6 +14,7 @@
 # limitations under the License.
 
 package build_wake
+
 from wake import _
 
 target buildLSP variant: Result (List Path) Error = match variant
@@ -29,6 +30,5 @@ target buildLSP variant: Result (List Path) Error = match variant
             "--post-js", postJS.getPathName,
             "--pre-js", preJS.getPathName,
 
-        tool here Nil variant "lib/wake/lsp-wake" (dst, util,) (postJS, preJS,) extraLFlags
-    _ =
-        tool here Nil variant "lib/wake/lsp-wake" (dst, util,) Nil Nil
+        tool @here Nil variant "lib/wake/lsp-wake" (dst, util,) (postJS, preJS,) extraLFlags
+    _ = tool @here Nil variant "lib/wake/lsp-wake" (dst, util,) Nil Nil

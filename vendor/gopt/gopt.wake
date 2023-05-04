@@ -14,7 +14,8 @@
 # limitations under the License.
 
 package build_wake
+
 from wake import _
 
 target gopt variant =
-    vendor here variant "10.0" `.*\.h` `gopt(|-errors|-arg).c`
+    vendor @here variant "10.0" `.*\.h` `gopt(|-errors|-arg).c`

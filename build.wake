@@ -14,44 +14,57 @@
 # limitations under the License.
 
 package build_wake
+
 from wake import _
 
 # Useful build variants (arguments to all)
 def toVariant = match _
     "default" = Pass (Pair "native-cpp14-release" "native-c11-release")
-    "static"  = Pass (Pair "native-cpp14-static"  "native-c11-static")
-    "debug"   = Pass (Pair "native-cpp14-debug"   "native-c11-debug")
-    "wasm"    = Pass (Pair "wasm-cpp14-release"   "wasm-c11-release")
+    "static" = Pass (Pair "native-cpp14-static" "native-c11-static")
+    "debug" = Pass (Pair "native-cpp14-debug" "native-c11-debug")
+    "wasm" = Pass (Pair "wasm-cpp14-release" "wasm-c11-release")
     s = Fail "Unknown build target ({s})".makeError
 
 export def build: List String => Result String Error = match _
-    "tarball", Nil = tarball Unit | rmap (\_ "TARBALL")
+    "tarball", Nil =
+        tarball Unit
+        | rmap (\_ "TARBALL")
     kind, Nil =
         require Pass variant = toVariant kind
-        all variant | rmap (\_ "BUILD")
+
+        all variant
+        | rmap (\_ "BUILD")
     _ = Fail "no target specified (try: build default/debug/tarball)".makeError
 
 export def install: List String => Result String Error = match _
-    dest, kind, Nil = doInstall (in cwd dest) kind | rmap (\_ "INSTALL")
-    dest, Nil = doInstall (in cwd dest) "default" | rmap (\_ "INSTALL")
+    dest, kind, Nil =
+        doInstall (in cwd dest) kind
+        | rmap (\_ "INSTALL")
+    dest, Nil =
+        doInstall (in cwd dest) "default"
+        | rmap (\_ "INSTALL")
     _ = Fail "no directory specified (try: install /opt/local)".makeError
 
 def bootstrapTarget targetFn variant =
     require Pass paths = targetFn variant
 
-    require Some _ =
-        getenv "BOOTSTRAP_WAKE"
-    else
-        Pass paths
+    require Some _ = getenv "BOOTSTRAP_WAKE"
+    else Pass paths
 
     def cppSuffixRegex =
-        (".", variant.getPairFirst,) | cat | quote
+        (".", variant.getPairFirst,)
+        | cat
+        | quote
 
     def cSuffixRegex =
-        (".", variant.getPairSecond,) | cat | quote
+        (".", variant.getPairSecond,)
+        | cat
+        | quote
 
     def getInstallName path =
-        path.getPathName | replace cppSuffixRegex "" | replace cSuffixRegex ""
+        path.getPathName
+        | replace cppSuffixRegex ""
+        | replace cSuffixRegex ""
 
     def doInstall path =
         def location = getInstallName path
@@ -66,46 +79,57 @@ def bootstrapTarget targetFn variant =
             Pass (first, Nil) = Pass first
             _ = Fail "Unexpected arity in  bootstrap install".makeError
 
-    paths | map doInstall | findFail
+    paths
+    | map doInstall
+    | findFail
 
 # Build all wake targets
 def targets =
-    buildWake, buildWakeBox, buildFuseDaemon, buildShim, buildBSP, (bootstrapTarget buildLSP), buildWakeFormat, Nil
+    buildWake,
+    buildWakeBox,
+    buildFuseDaemon,
+    buildShim,
+    buildBSP,
+    (bootstrapTarget buildLSP),
+    buildWakeFormat,
+    Nil
 
 def all variant =
     require Pass x =
         map (_ variant) targets
         | findFail
+
     Pass (flatten x)
 
 # Install wake into a target location
 def doInstall dest kind =
     require Pass variant = toVariant kind
-    require Pass datfiles =
-        sources "{here}/share" `.*`
+    require Pass datfiles = sources "{@here}/share" `.*`
+
     def binfilesResult = all variant
     def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
-    require Pass datinstall =
-        findFailFn (installIn dest ".") datfiles
-    require Pass readmeSource =
-        source "README.md"
-    require Pass readme =
-        installIn "{dest}/share/doc/wake" "." readmeSource
+
+    require Pass datinstall = findFailFn (installIn dest ".") datfiles
+    require Pass readmeSource = source "README.md"
+    require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
     require Pass binfiles = binfilesResult
-    require Pass bininstall =
-        findFailFn releaseBin binfiles
+    require Pass bininstall = findFailFn releaseBin binfiles
+
     def outputs = readme, bininstall ++ datinstall
+
     Pass outputs
 
 # Replace @VERSION@ with 'release'
 def setVersion release file =
-    require Pass in =
-        source "{file}.in"
-    def script = "%
-        set -e
-        sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
-        mv "%{file}.tmp" "%{file}"
+    require Pass in = source "{file}.in"
+
+    def script =
+        "%
+            set -e
+            sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
+            mv "%{file}.tmp" "%{file}"
         %"
+
     makeShellPlan script (in, Nil)
     | setPlanLabel "release: replace placeholder with version number"
     | runJob
@@ -115,83 +139,112 @@ def setVersion release file =
 def tarball Unit =
     def releaseResult = buildAs Unit
     def timeResult = buildOn Unit
+
     require Pass release = releaseResult
     require Pass time = timeResult
+
     # Create debian + RedHat package files
-    require Pass changelog =
-        setVersion release "debian/changelog"
-    require Pass spec =
-        setVersion release "wake.spec"
+    require Pass changelog = setVersion release "debian/changelog"
+    require Pass spec = setVersion release "wake.spec"
+
     # Identify those sources files to include in the tarball
-    require Pass allSources =
-        sources "." `.*`
+    require Pass allSources = sources "." `.*`
+
     def srcs =
         allSources
         | filter (! matches `(debian/|wake.spec).*` _.getPathName) # omit packaging files
         | filter (! matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
         | filter (! matches `(.*/)*\.gitignore` _.getPathName) # omit git files
+
     def Pair testPaths wakePaths = splitBy (matches `tests/.*` _.getPathName) srcs
+
     def wakeSourcesString =
         wakePaths
         | map (_.getPathName.format)
         | foldr (_, ",\n  ", _) Nil
         | cat
+
     def testSourcesString =
         testPaths
         | map (getPathName _ | format | replace `^"tests/` '"{here}/')
         | foldr (_, ",\n  ", _) Nil
         | cat
-    def manifestStr = "%
-        # Generated by 'wake tarball Unit':
-        package build_wake
-        from wake import source , Nil
 
-        publish releaseAs = '%{release}', Nil
-        publish releaseOn = '%{time}', Nil
-        publish source =
-          %{wakeSourcesString}Nil
-        %"
-    def testsManifestStr = "%
-        # Generated by 'wake tarball Unit':
-        package test_wake
-        from wake import source , Nil
+    def manifestStr =
+        "%
+            # Generated by 'wake tarball Unit':
+            package build_wake
+            from wake import source , Nil
 
-        publish source =
-          %{testSourcesString}Nil
+            publish releaseAs = '%{release}', Nil
+            publish releaseOn = '%{time}', Nil
+            publish source =
+              %{wakeSourcesString}Nil
         %"
+
+    def testsManifestStr =
+        "%
+            # Generated by 'wake tarball Unit':
+            package test_wake
+            from wake import source , Nil
+
+            publish source =
+              %{testSourcesString}Nil
+        %"
+
     # Create a manifest which describes the release and source files
-    require Pass manifest =
-        write "manifest.wake" manifestStr
-    require Pass testManifest =
-        write "tests/manifest.wake" testsManifestStr
+    require Pass manifest = write "manifest.wake" manifestStr
+    require Pass testManifest = write "tests/manifest.wake" testsManifestStr
+
     # Execute tar to create a tarball of manifest + sources
     require Pass tarball =
         def cmd =
             def gnutar = which "gnutar"
             def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
-            def files = map getPathName (manifest, testManifest, spec, srcs) | sortBy scmp
-            tar, "--mtime={time}", "--transform=s@^@wake-{release}/@",
-            "--owner=0", "--group=0", "--numeric-owner", "-cJf",
-            "wake_{release}.tar.xz", files
+
+            def files =
+                map getPathName (manifest, testManifest, spec, srcs)
+                | sortBy scmp
+
+            tar,
+            "--mtime={time}",
+            "--transform=s@^@wake-{release}/@",
+            "--owner=0",
+            "--group=0",
+            "--numeric-owner",
+            "-cJf",
+            "wake_{release}.tar.xz",
+            files
+
         makeExecPlan cmd (manifest, testManifest, spec, srcs)
         | setPlanLabel "release: package wake source tarball"
         # Since this includes the current time, it's not going to benefit from caching.
         | setPlanKeep False
         | runJob
         | getJobOutput
+
     Pass (tarball, changelog, Nil)
 
 export def static _: Result Path Error =
     def filesResult = doInstall "tmp" "static"
     def releaseResult = buildAs Unit
     def timeResult = buildOn Unit
+
     require Pass release = releaseResult
     require Pass time = timeResult
     require Pass files = filesResult
+
     def cmd =
-        which "tar", "--mtime={time}", "--transform=s@^tmp/@wake-{release}/@",
-        "--owner=0", "--group=0", "--numeric-owner", "-cJf",
-        "wake-static_{release}.tar.xz", map getPathName files | sortBy scmp
+        which "tar",
+        "--mtime={time}",
+        "--transform=s@^tmp/@wake-{release}/@",
+        "--owner=0",
+        "--group=0",
+        "--numeric-owner",
+        "-cJf",
+        "wake-static_{release}.tar.xz",
+        map getPathName files | sortBy scmp
+
     makeExecPlan cmd files
     | setPlanLabel "release: package wake-static tarball"
     # Since this includes the current time, it's not going to benefit from caching.
@@ -201,11 +254,14 @@ export def static _: Result Path Error =
 
 from test_wake import topic wakeTestBinary
 from test_wake import topic wakeUnitTestBinary
-publish wakeTestBinary = defaultWake, Nil
-publish wakeUnitTestBinary = buildWakeUnit, Nil
+
+publish wakeTestBinary =
+    defaultWake, Nil
+
+publish wakeUnitTestBinary =
+    buildWakeUnit, Nil
 
 def defaultWake Unit =
-    require Pass wakeVisible =
-        doInstall "tmp" "default"
+    require Pass wakeVisible = doInstall "tmp" "default"
 
     Pass (Pair "tmp/bin/wake" wakeVisible)

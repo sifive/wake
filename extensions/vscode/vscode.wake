@@ -14,16 +14,18 @@
 # limitations under the License.
 
 package build_wake
+
 from wake import _
 
 def installRO path =
-    def dest =
-        "{here}/{path.getPathName}"
+    def dest = "{@here}/{path.getPathName}"
+
     require Pass destDir =
         simplify "{dest}/.."
         | mkdir
-    def inputs =
-        destDir, path, Nil
+
+    def inputs = destDir, path, Nil
+
     "install -m 444 {path.getPathName} {dest}"
     | makePlan "install: {dest}" inputs
     | runJob
@@ -31,36 +33,25 @@ def installRO path =
 
 def createStdlibJSON (stdlibSources: List Path): Result Path Error =
     def formatPath path =
-        getPathName path | replace `share/wake/lib` ""
-    def formattedPaths =
-        map formatPath stdlibSources
-    def content =
-        JObject ("files" :-> JArray (map JString formattedPaths), Nil)
-    write "{here}/stdlib.json" (prettyJSON content)
+        getPathName path
+        | replace `share/wake/lib` ""
+
+    def formattedPaths = map formatPath stdlibSources
+    def content = JObject ("files" :-> JArray (map JString formattedPaths), Nil)
+
+    write "{@here}/stdlib.json" (prettyJSON content)
 
 export def vscode _: Result Path Error =
-    require Pass variant =
-        toVariant "wasm"
+    require Pass variant = toVariant "wasm"
+    require Pass files = buildLSP variant
 
-    require Pass files =
-        buildLSP variant
+    require js, Nil = filter (matches `.*\.wasm-.*` _.getPathName) files
+    else failWithError "Did not find empscripten javascript output; got: {format files}"
 
-    require js, Nil =
-        filter (matches `.*\.wasm-.*` _.getPathName) files
-    else
-        failWithError "Did not find empscripten javascript output; got: {format files}"
-
-    require Pass jsFile =
-        installAs "{here}/lsp-server/wasm/lsp-wake.js" js
-
-    require Pass packageLockJSON =
-        source "{here}/package-lock.json"
-
-    require Pass release =
-        buildAs Unit
-
-    require Pass packageJSON =
-        setVersion (replace `~` "-" release) "{here}/package.json"
+    require Pass jsFile = installAs "{@here}/lsp-server/wasm/lsp-wake.js" js
+    require Pass packageLockJSON = source "{@here}/package-lock.json"
+    require Pass release = buildAs Unit
+    require Pass packageJSON = setVersion (replace `~` "-" release) "{@here}/package.json"
 
     require Pass npm =
         whichInEnvPath "npm"
@@ -78,26 +69,19 @@ export def vscode _: Result Path Error =
         | runJob
         | getJobOutputs
 
-    require Pass stdlibSources =
-        sources "share/wake/lib" `.*`
+    require Pass stdlibSources = sources "share/wake/lib" `.*`
+
     require Pass stdlib =
         stdlibSources
         | findFailFn installRO
-    require Pass stdlibJSON =
-        createStdlibJSON  stdlibSources
 
-    require Pass currentDirSources =
-        sources here `[^/]*`
-    require Pass imagesSources =
-        sources here `images/.*`
-    require Pass clientSources =
-        sources here `lsp-client/.*`
-    require Pass serverSources =
-        sources here `lsp-server/.*`
-    require Pass syntaxSources =
-        sources here `syntaxes/.*`
-    require Pass vsceStdin =
-        source "{@here}/vsce-stdin"
+    require Pass stdlibJSON = createStdlibJSON stdlibSources
+    require Pass currentDirSources = sources @here `[^/]*`
+    require Pass imagesSources = sources @here `images/.*`
+    require Pass clientSources = sources @here `lsp-client/.*`
+    require Pass serverSources = sources @here `lsp-server/.*`
+    require Pass syntaxSources = sources @here `syntaxes/.*`
+    require Pass vsceStdin = source "{@here}/vsce-stdin"
 
     def vsceFiles =
         vsceStdin,
@@ -120,15 +104,13 @@ export def vscode _: Result Path Error =
         makeExecPlan (npx, "@vscode/vsce@2.15.0", "package", Nil) vsceFiles
         | setPlanLabel "vsce: Package vsix extension"
         | editPlanEnvironment (addEnvironmentPath emsdkBinDir)
-        | setPlanDirectory here
+        | setPlanDirectory @here
         | setPlanStdin (relative @here vsceStdin.getPathName)
         | setPlanIsAtty True
         | runJob
         | getJobOutputs
 
-    require vsix, Nil =
-        filter (matches `.*\.vsix` _.getPathName) outputs
-    else
-        failWithError "vsce failed to produce vsix output; got: {format files}"
+    require vsix, Nil = filter (matches `.*\.vsix` _.getPathName) outputs
+    else failWithError "vsce failed to produce vsix output; got: {format files}"
 
     Pass vsix
