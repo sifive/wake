@@ -4,7 +4,7 @@ HERE="$( dirname -- "${0}"; )"
 WAKE_ROOT="${HERE}/../"
 
 if [[ ${1} == "all" ]]; then
-  SOURCE_FILES=$(find ${WAKE_ROOT} -type f \( -name "*.wake" \) | grep -v "tests/")
+  SOURCE_FILES=$(find ${WAKE_ROOT} -type f \( -name "*.wake" \) | grep -v "tests/" | grep -v "manifest.wake")
 
   echo $SOURCE_FILES
 
@@ -16,8 +16,8 @@ if [[ ${1} == "all" ]]; then
 fi
 
 if [[ ${1} == "changed" ]]; then
-  CHANGED_FILES=$(git --git-dir ${WAKE_ROOT}.git diff --name-only | grep '\.wake' | grep -v 'tests/')
-  STAGED_FILES=$(git --git-dir ${WAKE_ROOT}.git diff --name-only --cached | grep '\.wake' | grep -v 'tests/')
+  CHANGED_FILES=$(git --git-dir ${WAKE_ROOT}.git diff --name-only | grep '\.wake' | grep -v 'tests/' | grep -v "manifest.wake")
+  STAGED_FILES=$(git --git-dir ${WAKE_ROOT}.git diff --name-only --cached | grep '\.wake' | grep -v 'tests/' | grep -v "manifest.wake")
   MERGED="${CHANGED_FILES} ${STAGED_FILES}"
 
   echo ${MERGED}
