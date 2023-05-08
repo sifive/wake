@@ -100,7 +100,7 @@ create table if not exists total_size(
   total_size_id integer primary key,
   size          integer not null);
 
-insert into total_size (total_size_id, size) select 0, 0 where not exists (select * from total_size);
+insert into total_size (total_size_id, size) select 1, 0 where not exists (select * from total_size);
 
 -- We need to keep track of jobs as the come through so that
 -- have some idea of which ones to keep/not keep

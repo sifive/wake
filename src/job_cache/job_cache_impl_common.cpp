@@ -25,6 +25,7 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -211,9 +212,10 @@ void remove_backing_files(const std::string &dir, int64_t job_id) {
     if (!entry) {
       log_fatal("readdir(%s): %s", job_dir.c_str(), strerror(entry.error()));
     }
+    if (entry->name == "." || entry->name == "..") continue;
     if (entry->type != wcl::file_type::regular) {
       log_fatal("remove_backing_files(%s): found non-regular entry: %s", job_dir.c_str(),
-                entry->name);
+                entry->name.c_str());
     }
     unlink_no_fail(entry->name.c_str());
   }

@@ -1,0 +1,90 @@
+#! /bin/sh
+
+if [ $(uname) != Linux ] ; then
+  exit 0
+fi
+
+set -e
+WAKE="${1:+$1/wake}"
+rm wake.db || true
+rm -rf .cache-hit || true
+rm -rf .cache-misses || true
+rm -rf .job-cache || true
+rm one.txt || true
+rm two.txt || true
+rm three.txt || true
+rm four.txt || true
+DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
+rm wake.db
+rm -rf .cache-misses
+DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
+rm wake.db
+rm -rf .cache-misses
+DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test three
+rm wake.db
+rm -rf .cache-misses
+
+# We should still be under the limit here. This is to ensure we mark test one as used
+rm -rf .cache-hit || true
+DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
+rm wake.db
+rm -rf .cache-misses
+if [ -z "$(ls -A .cache-hit)" ]; then
+  echo "No cache hit found"
+  exit 1
+fi
+
+# Now we're going to go over. Hopefully dropping two and three, but keeping one and four
+DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test four
+rm wake.db
+rm -rf .cache-misses
+
+# Now make sure we still get a hit on 1
+rm -rf .cache-hit || true
+DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
+rm wake.db
+if [ -z "$(ls -A .cache-hit)" ]; then
+  echo "No cache hit found"
+  exit 1
+fi
+if [ -d ".cache-misses" ]; then
+  echo "Found a cache miss"
+  exit 1
+fi
+
+# And check four as well
+rm -rf .cache-hit
+DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test four
+rm wake.db
+if [ -z "$(ls -A .cache-hit)" ]; then
+  echo "No cache hit found"
+  exit 1
+fi
+if [ -d ".cache-misses" ]; then
+  echo "Found a cache miss"
+  exit 1
+fi
+
+# And check that we get misses on four and three
+DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
+rm wake.db
+if [ -z "$(ls -A .cache-misses)" ]; then
+  echo "Expected a chache miss!!"
+  exit 1
+fi
+rm -rf .cache-misses
+
+
+DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test three
+rm wake.db
+if [ -z "$(ls -A .cache-misses)" ]; then
+  echo "Expected a chache miss!!"
+  exit 1
+fi
+rm -rf .cache-misses
+
+# Cleanup
+rm one.txt
+rm two.txt
+rm three.txt
+rm four.txt
