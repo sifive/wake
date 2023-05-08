@@ -30,8 +30,7 @@ export def format (anyType: a): String =
 
     p anyType
 
-# LogLevel is a user-opaque type.
-# To construct a LogLevel, use makeLogLevel.
+# To construct a LogLevel
 export data LogLevel =
     LogLevel (name: String)
 
