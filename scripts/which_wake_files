@@ -1,0 +1,33 @@
+#! /bin/bash
+
+HERE="$( dirname -- "${0}"; )"
+WAKE_ROOT="${HERE}/../"
+
+if [[ ${1} == "all" ]]; then
+  SOURCE_FILES=$(find ${WAKE_ROOT} -type f \( -name "*.wake" \) | grep -v "tests/")
+
+  echo $SOURCE_FILES
+
+  # Flag if any files were found
+  if [ "$SOURCE_FILES" ]; then
+    exit 0
+  fi
+  exit 1
+fi
+
+if [[ ${1} == "changed" ]]; then
+  CHANGED_FILES=$(git --git-dir ${WAKE_ROOT}.git diff --name-only | grep '\.wake' | grep -v 'tests/')
+  STAGED_FILES=$(git --git-dir ${WAKE_ROOT}.git diff --name-only --cached | grep '\.wake' | grep -v 'tests/')
+  MERGED="${CHANGED_FILES} ${STAGED_FILES}"
+
+  echo ${MERGED}
+
+  # Flag if any files were found
+  if [ "${MERGED}" ]; then
+    exit 0
+  fi
+  exit 1
+fi
+
+echo "unknown parameter: '${1}'"
+exit 1

@@ -54,17 +54,23 @@ install:	all
 
 # Formats all .h and .cpp file under the current directory
 # It assumes clang is available on the PATH and will fail otherwise
-formatAll:
+formatAll:	wake.db
 	@clang-format -i --style=file $(shell ./scripts/which_clang_files all)
+	@bin/wake-format.native-cpp14-release -i $(shell ./scripts/which_wake_files all)
+
 
 # Formats all changed or staged .h or .cpp files
 # It assumes clang is available on the PATH and will fail otherwise
-format:
+format:		wake.db
 # || true is added after the if expression since it resolves with false when false
 # and we don't want make to report that as an error
 	@FILES=$$(./scripts/which_clang_files changed) && \
 	if [ "$$FILES" ]; then \
 		clang-format -i --style=file $$FILES; \
+	fi || true  && \
+	FILES=$$(./scripts/which_wake_files changed) && \
+	if [ "$$FILES" ]; then \
+		bin/wake-format.native-cpp14-release -i $$FILES; \
 	fi || true
 
 test:		wake.db
