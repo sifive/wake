@@ -686,7 +686,11 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
   }
 }
 
-Cache::Cache(std::string _dir) : dir(std::move(_dir)), rng(wcl::xoshiro_256::get_rng_seed()) {
+Cache::Cache(std::string _dir, uint64_t max, uint64_t low)
+    : dir(std::move(_dir)),
+      rng(wcl::xoshiro_256::get_rng_seed()),
+      max_cache_size(max),
+      low_cache_size(low) {
   mkdir_no_fail(dir.c_str());
   impl = std::make_unique<CacheDbImpl>(dir);
   launch_evict_loop();
@@ -982,7 +986,8 @@ void Cache::launch_evict_loop() {
 
     // Finally enter the eviction loop, if it exits cleanly
     // go ahead and exit with its result.
-    int result = eviction_loop(dir, std::make_unique<LRUEvictionPolicy>());
+    int result =
+        eviction_loop(dir, std::make_unique<LRUEvictionPolicy>(max_cache_size, low_cache_size));
     exit(result);
   }
 

@@ -239,7 +239,9 @@ void LRUEvictionPolicy::write(int job_id) {
   }
 }
 
-LRUEvictionPolicy::LRUEvictionPolicy() {}
+LRUEvictionPolicy::LRUEvictionPolicy(uint64_t max, uint64_t low)
+    : max_cache_size(max), low_cache_size(low) {}
+
 LRUEvictionPolicy::~LRUEvictionPolicy() {}
 
 int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> policy) {

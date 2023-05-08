@@ -36,6 +36,13 @@ struct WakeConfigOverrides {
   // these semantics fall out of the normal way overrides work, this comment
   // is just to make this unusual type's meaning clear.
   wcl::optional<wcl::optional<std::string>> label_filter;
+
+  // Determines the maximum size of the cache
+  wcl::optional<uint64_t> max_cache_size;
+
+  // Determines the size of the cache that collection
+  // tries to get us back to.
+  wcl::optional<uint64_t> low_cache_size;
 };
 
 template <class T>
@@ -43,7 +50,7 @@ using Override = wcl::optional<T> WakeConfigOverrides::*;
 
 /********************************************************************
  * Polcies
- *********************************************************************/
+ ********************************************************************/
 
 struct VersionPolicy {
   using type = std::string;
@@ -132,6 +139,36 @@ struct LabelFilterPolicy {
   static void emit(const LabelFilterPolicy& p, std::ostream& os) {
     os << p.label_filter->pattern();
   }
+};
+
+struct SharedCacheMaxSize {
+  using type = uint64_t;
+  using input_type = type;
+  static constexpr const char* key = "max_cache_size";
+  static constexpr bool allowed_in_wakeroot = true;
+  static constexpr bool allowed_in_userconfig = true;
+  type max_cache_size = 25ULL << 30ULL;
+  static constexpr type SharedCacheMaxSize::*value = &SharedCacheMaxSize::max_cache_size;
+  static constexpr Override<input_type> override_value = &WakeConfigOverrides::max_cache_size;
+
+  static void set(SharedCacheMaxSize& p, const JAST& json);
+  static void set_input(SharedCacheMaxSize& p, const input_type& v) { p.*value = v; }
+  static void emit(const SharedCacheMaxSize& p, std::ostream& os) { os << p.*value; }
+};
+
+struct SharedCacheLowSize {
+  using type = uint64_t;
+  using input_type = type;
+  static constexpr const char* key = "low_cache_size";
+  static constexpr bool allowed_in_wakeroot = true;
+  static constexpr bool allowed_in_userconfig = true;
+  type low_cache_size = 15ULL << 30ULL;
+  static constexpr type SharedCacheLowSize::*value = &SharedCacheLowSize::low_cache_size;
+  static constexpr Override<input_type> override_value = &WakeConfigOverrides::max_cache_size;
+
+  static void set(SharedCacheLowSize& p, const JAST& json);
+  static void set_input(SharedCacheLowSize& p, const input_type& v) { p.*value = v; }
+  static void emit(const SharedCacheLowSize& p, std::ostream& os) { os << p.*value; }
 };
 
 /********************************************************************
@@ -261,8 +298,9 @@ struct WakeConfigImpl : public Polcies... {
   }
 };
 
-using WakeConfigImplFull = WakeConfigImpl<UserConfigPolicy, VersionPolicy, LogHeaderPolicy,
-                                          LogHeaderSourceWidthPolicy, LabelFilterPolicy>;
+using WakeConfigImplFull =
+    WakeConfigImpl<UserConfigPolicy, VersionPolicy, LogHeaderPolicy, LogHeaderSourceWidthPolicy,
+                   LabelFilterPolicy, SharedCacheMaxSize, SharedCacheLowSize>;
 
 struct WakeConfig final : public WakeConfigImplFull {
   static bool init(const std::string& wakeroot_path, const WakeConfigOverrides& overrides);

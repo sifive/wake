@@ -4,3 +4,5 @@ Wake config:
   log_header = '' (WakeRoot)
   log_header_source_width = '0' (WakeRoot)
   label_filter = '.*' (Default)
+  max_cache_size = '26843545600' (Default)
+  low_cache_size = '16106127360' (Default)

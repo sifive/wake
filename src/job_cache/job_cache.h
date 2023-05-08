@@ -162,6 +162,8 @@ class Cache {
   int evict_stdin;
   int evict_stdout;
   int evict_pid;
+  uint64_t max_cache_size;
+  uint64_t low_cache_size;
 
   void launch_evict_loop();
   void reap_evict_loop();
@@ -172,7 +174,7 @@ class Cache {
   Cache() = delete;
   Cache(const Cache &) = delete;
 
-  Cache(std::string _dir);
+  Cache(std::string _dir, uint64_t max, uint64_t low);
 
   wcl::optional<MatchingJob> read(const FindJobRequest &find_request);
   void add(const AddJobRequest &add_request);

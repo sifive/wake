@@ -53,9 +53,12 @@ struct LRUEvictionPolicyImpl;
 class LRUEvictionPolicy : public EvictionPolicy {
   // We need to touch the database so we use pimpl to hide the implementation
   std::unique_ptr<LRUEvictionPolicyImpl> impl;
+  uint64_t max_cache_size;
+  uint64_t low_cache_size;
 
  public:
-  LRUEvictionPolicy();
+  explicit LRUEvictionPolicy(uint64_t max_cache_size, uint64_t low_cache_size);
+  LRUEvictionPolicy() = delete;
   LRUEvictionPolicy(const LRUEvictionPolicy&) = delete;
   LRUEvictionPolicy(LRUEvictionPolicy&&) = delete;
   virtual ~LRUEvictionPolicy();

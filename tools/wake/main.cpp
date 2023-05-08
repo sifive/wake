@@ -347,7 +347,8 @@ int main(int argc, char **argv) {
   std::unique_ptr<job_cache::Cache> cache;
   const char *job_cache_dir = getenv("WAKE_EXPERIMENTAL_JOB_CACHE");
   if (job_cache_dir != nullptr) {
-    cache = std::make_unique<job_cache::Cache>(job_cache_dir);
+    cache = std::make_unique<job_cache::Cache>(job_cache_dir, WakeConfig::get()->max_cache_size,
+                                               WakeConfig::get()->low_cache_size);
     set_job_cache(cache.get());
   }
 

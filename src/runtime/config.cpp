@@ -212,6 +212,8 @@ POLCIY_STATIC_DEFINES(VersionPolicy)
 POLCIY_STATIC_DEFINES(LogHeaderPolicy)
 POLCIY_STATIC_DEFINES(LogHeaderSourceWidthPolicy)
 POLCIY_STATIC_DEFINES(LabelFilterPolicy)
+POLCIY_STATIC_DEFINES(SharedCacheMaxSize)
+POLCIY_STATIC_DEFINES(SharedCacheLowSize)
 
 /********************************************************************
  * Non-Trivial Defaults
@@ -248,6 +250,20 @@ void LogHeaderSourceWidthPolicy::set(LogHeaderSourceWidthPolicy& p, const JAST& 
   auto json_log_header_soruce_width = json.expect_integer();
   if (json_log_header_soruce_width) {
     p.log_header_source_width = *json_log_header_soruce_width;
+  }
+}
+
+void SharedCacheMaxSize::set(SharedCacheMaxSize& p, const JAST& json) {
+  auto json_max_cache_size = json.expect_integer();
+  if (json_max_cache_size) {
+    p.max_cache_size = *json_max_cache_size;
+  }
+}
+
+void SharedCacheLowSize::set(SharedCacheLowSize& p, const JAST& json) {
+  auto json_low_cache_size = json.expect_integer();
+  if (json_low_cache_size) {
+    p.low_cache_size = *json_low_cache_size;
   }
 }
 
