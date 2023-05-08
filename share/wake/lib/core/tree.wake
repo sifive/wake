@@ -16,91 +16,110 @@
 package wake
 
 # balanced order-statistic trees
-data Tree a = Tree (a => a => Order) (TreeNode a) # cmp root
+data Tree a =
+    Tree (a => a => Order) (TreeNode a) # cmp root
 
 from wake export type Tree
 
 data TreeNode a =
-  Tip
-  Bin Integer (TreeNode a) a (TreeNode a) # size left key right
+    Tip
+    Bin Integer (TreeNode a) a (TreeNode a) # size left key right
 
 # delta = 2.5, gamma = 1.5 for a reasonably tight balance
-def deltaQ = 5
-def deltaD = 2
-def ratioQ = 3
-def ratioD = 2
+def deltaQ =
+    5
+
+def deltaD =
+    2
+
+def ratioQ =
+    3
+
+def ratioD =
+    2
 
 # Create a new Tree, sorted by cmp.
-export def tnew cmp = Tree cmp Tip
+export def tnew cmp =
+    Tree cmp Tip
 
 # Convert a List to a Tree.
-export def listToTree cmp list = vectorToTree cmp (listToVector list)
-export def listToTreeMulti cmp list = vectorToTreeMulti cmp (listToVector list)
+export def listToTree cmp list =
+    vectorToTree cmp (listToVector list)
+
+export def listToTreeMulti cmp list =
+    vectorToTreeMulti cmp (listToVector list)
 
 export def vectorToTreeMulti cmp v =
-  Tree cmp (build (vsortBy cmp v))
+    Tree cmp (build (vsortBy cmp v))
 
 # Convert a Vector to a Tree.
 export def vectorToTree cmp v =
-  Tree cmp (build (vdistinctRunBy (cmp _ _ | isEQ) (vsortBy cmp v)))
+    Tree cmp (build (vdistinctRunBy (cmp _ _ | isEQ) (vsortBy cmp v)))
 
 def build v = match (vlen v)
-  0 = Tip
-  1 = Bin 1 Tip (vat_ 0 v) Tip
-  len =
-    def mid = len >> 1
-    def l = vtake mid v
-    def r = vdrop (mid+1) v
-    Bin len (build l) (vat_ mid v) (build r)
+    0 = Tip
+    1 = Bin 1 Tip (vat_ 0 v) Tip
+    len =
+        def mid = len >> 1
+        def l = vtake mid v
+        def r = vdrop (mid + 1) v
+
+        Bin len (build l) (vat_ mid v) (build r)
 
 # Returns the total length of the Tree.
 export def tlen (Tree _ root: Tree a): Integer =
-  size root
+    size root
+
 def size = match _
-  Tip         = 0
-  Bin s _ _ _ = s
+    Tip = 0
+    Bin s _ _ _ = s
 
 # Returns True if the Tree is empty, False otherwise.
 export def tempty (Tree _ root: Tree a): Boolean = match root
-  Tip = True
-  _   = False
+    Tip = True
+    _ = False
 
 # Insert y into the tree only if no other keys == y
 export def tinsert (y: a) (Tree cmp root: Tree a): Tree a =
-  def helper t = match t
-    Tip         = Bin 1 Tip y Tip
-    Bin _ l x r = match (cmp x y)
-      GT = balanceL (helper l) x r
-      EQ = t
-      LT = balanceR l x (helper r)
-  Tree cmp (helper root)
+    def helper t = match t
+        Tip = Bin 1 Tip y Tip
+        Bin _ l x r = match (cmp x y)
+            GT = balanceL (helper l) x r
+            EQ = t
+            LT = balanceR l x (helper r)
+
+    Tree cmp (helper root)
 
 # Insert y into the tree, removing any existing keys == y
 export def tinsertReplace (y: a) (tree: Tree a): Tree a =
-  def Tree cmp root = tree
-  def helper t = match t
-    Tip         = Bin 1 Tip y Tip
-    Bin _ l x r = match (cmp x y)
-      GT = join3 (helper l) x r
-      EQ = join3 (delete cmp y l) y (delete cmp y r)
-      LT = join3 l x (helper r)
-  Tree cmp (helper root)
+    def Tree cmp root = tree
+
+    def helper t = match t
+        Tip = Bin 1 Tip y Tip
+        Bin _ l x r = match (cmp x y)
+            GT = join3 (helper l) x r
+            EQ = join3 (delete cmp y l) y (delete cmp y r)
+            LT = join3 l x (helper r)
+
+    Tree cmp (helper root)
 
 # Insert y into the tree at the lowest rank of keys = y
 export def tinsertMulti (y: a) (Tree cmp root: Tree a): Tree a =
-  def helper = match _
-    Tip         = Bin 1 Tip y Tip
-    Bin _ l x r = match (cmp x y)
-      GT = balanceL (helper l) x r
-      _  = balanceR l x (helper r)
-  Tree cmp (helper root)
+    def helper = match _
+        Tip = Bin 1 Tip y Tip
+        Bin _ l x r = match (cmp x y)
+            GT = balanceL (helper l) x r
+            _ = balanceR l x (helper r)
+
+    Tree cmp (helper root)
 
 # Insert y into the tree, or the value resulting from fn on a collision
 # `y` is passed as the left-hand value of `fn`.
 export def tinsertWith (fn: (incoming: a) => (existing: a) => a) (y: a) (tree: Tree a): Tree a =
     def Tree cmp root = tree
+
     def helper = match _
-        Tip         = Bin 1 Tip y Tip
+        Tip = Bin 1 Tip y Tip
         Bin _ l x r = match (cmp x y)
             GT = join3 (helper l) x r
             LT = join3 l x (helper r)
@@ -111,10 +130,13 @@ export def tinsertWith (fn: (incoming: a) => (existing: a) => a) (y: a) (tree: T
                 def Triple rm re rg = split y cmp r
                 def m = join2 lm rm
                 def g = join2 lg rg
+
                 # Collapse all equal values into a single result.
                 def e = join3 le x re
                 def z = foldl fn y (Tree cmp e | treeToList)
+
                 join3 m z g
+
     Tree cmp (helper root)
 
 # Test if `a` is a subset of `b` (every element of `a` is also in `b`).
@@ -127,10 +149,9 @@ export def (a: Tree x) ⊆ (b: Tree x): Boolean =
 # Note that the comparison function of `b` is used to determine element
 # equality, if the two differ.
 export def (a: Tree x) ⊇ (b: Tree x): Boolean =
-    def Tree _ aroot =
-        a
-    def Tree cmp broot =
-        b
+    def Tree _ aroot = a
+    def Tree cmp broot = b
+
     tsubsetCmp broot aroot cmp
 
 # Test if `a` is *not* a superset of `b` (`a` is missing some element of `b`).
@@ -163,10 +184,9 @@ export def (a: Tree x) ⊋ (b: Tree x): Boolean =
 # Note that the comparison function of `b` is used to determine element
 # equality, if the two differ.
 export def tsubset (a: Tree x) (b: Tree x): Boolean =
-    def Tree _ aroot =
-        a
-    def Tree cmp broot =
-        b
+    def Tree _ aroot = a
+    def Tree cmp broot = b
+
     tsubsetCmp aroot broot cmp
 
 # Test if `aroot` is a subset of `broot` using an explicit comparison function.
@@ -175,39 +195,44 @@ export def tsubset (a: Tree x) (b: Tree x): Boolean =
 # syntax is introduced to ensure that that behaviour is at least consistent.
 def tsubsetCmp (aroot: TreeNode x) (broot: TreeNode x) (cmp: x => x => Order): Boolean =
     def helper a b = match a b
-        Tip _   = True
-        _   Tip = False
+        Tip _ = True
+        _ Tip = False
         _ (Bin _ bl bx br) =
-            def Triple al _ ag =
-                split bx cmp a
+            def Triple al _ ag = split bx cmp a
+
             helper al bl && helper ag br
+
     helper aroot broot
 
 # Deletes all keys that are equal to y.
 export def tdelete (y: a) (Tree cmp root: Tree a): Tree a =
-  Tree cmp (delete cmp y root)
+    Tree cmp (delete cmp y root)
+
 def delete cmp y t =
-  def helper = match _
-    Tip = Tip
-    Bin _ l x r = match (cmp x y)
-      GT = join3 (helper l) x r
-      EQ = join2 (helper l) (helper r)
-      LT = join3 l x (helper r)
-  helper t
+    def helper = match _
+        Tip = Tip
+        Bin _ l x r = match (cmp x y)
+            GT = join3 (helper l) x r
+            EQ = join2 (helper l) (helper r)
+            LT = join3 l x (helper r)
+
+    helper t
 
 # Folds from left to right.
 export def tfoldl f a (Tree _ root) =
-  def helper a = match _
-    Tip         = a
-    Bin _ l x r = helper (f (helper a l) x) r
-  helper a root
+    def helper a = match _
+        Tip = a
+        Bin _ l x r = helper (f (helper a l) x) r
+
+    helper a root
 
 # Folds from right to left.
 export def tfoldr f a (Tree _ root) =
-  def helper a = match _
-    Tip         = a
-    Bin _ l x r = helper (f x (helper a r)) l
-  helper a root
+    def helper a = match _
+        Tip = a
+        Bin _ l x r = helper (f x (helper a r)) l
+
+    helper a root
 
 # Transform and collapse all values in a `Tree` in parallel.
 #
@@ -221,273 +246,354 @@ export def tfoldr f a (Tree _ root) =
 #   * `tree`: The values from which the result should be derived.
 export def tfoldmap (combineFn: b => b => b) (base: b) (transformFn: a => b) (tree: Tree a): b =
     def Tree _ root = tree
+
     def helper a = match _
         Tip = a
         Bin _ l x r = combineFn (helper a l) (helper (transformFn x) r)
+
     helper base root
 
-export def tfold f a t = tfoldmap f a (_) t
+export def tfold f a t =
+    tfoldmap f a (_) t
 
 # Converts a Tree to a List.
-export def treeToList = tfoldr (_,_) Nil
+export def treeToList =
+    tfoldr (_, _) Nil
 
 export def tappi f (Tree _ root) =
-  def helper i = match _
-    Tip = Unit
-    Bin _ l x r =
-      def ix = i + size l
-      def _ = helper i l
-      def _ = helper (ix+1) r
-      def _ = f ix x
-      Unit
-  helper 0 root
+    def helper i = match _
+        Tip = Unit
+        Bin _ l x r =
+            def ix = i + size l
+            def _ = helper i l
+            def _ = helper (ix + 1) r
+            def _ = f ix x
+
+            Unit
+
+    helper 0 root
 
 # Extract the i-th ranked element
 export def tat (i: Integer) (Tree _ root: Tree a): Option a =
-  def helper i = match _
-    Tip = None
-    Bin _ l x r =
-      def sizeL = size l
-      match (icmp i sizeL)
-        LT = helper i l
-        EQ = Some x
-        GT = helper (i-sizeL-1) r
-  helper i root
+    def helper i = match _
+        Tip = None
+        Bin _ l x r =
+            def sizeL = size l
+
+            match (icmp i sizeL)
+                LT = helper i l
+                EQ = Some x
+                GT = helper (i - sizeL - 1) r
+
+    helper i root
 
 # Split elements ranked [0,i) and [i,inf) into two trees
 export def tsplitAt (i: Integer) (Tree cmp root: Tree a): Pair (Tree a) (Tree a) =
-  def helper i = match _
-    Tip = Pair Tip Tip
-    Bin _ l x r =
-      def sizeL = size l
-      if i > sizeL
-      then match (helper (i-sizeL-1) r)
-        Pair rl rr = Pair (join3 l x rl) rr
-      else match (helper i l)
-        Pair ll lr = Pair ll (join3 lr x r)
-  match (helper i root)
-    Pair l r = Pair (Tree cmp l) (Tree cmp r)
+    def helper i = match _
+        Tip = Pair Tip Tip
+        Bin _ l x r =
+            def sizeL = size l
 
-export def ttake i t = tsplitAt i t | getPairFirst
-export def tdrop i t = tsplitAt i t | getPairSecond
+            if i > sizeL then
+                match (helper (i - sizeL - 1) r)
+                    Pair rl rr = Pair (join3 l x rl) rr
+            else match (helper i l)
+                Pair ll lr = Pair ll (join3 lr x r)
+
+    match (helper i root)
+        Pair l r = Pair (Tree cmp l) (Tree cmp r)
+
+export def ttake i t =
+    tsplitAt i t
+    | getPairFirst
+
+export def tdrop i t =
+    tsplitAt i t
+    | getPairSecond
 
 # Lowest rank element where f x = True  => Option (Pair x rank)
 export def tfind f (Tree _ root) =
-  def helper = match _
-    Tip         = None
-    Bin s l x r = match (helper l) (f x) (helper r)
-      (Some p) _    _       = Some p
-      _        True _       = Some (Pair x (s-size r-1))
-      _ _ (Some (Pair x i)) = Some (Pair x (i+size l+1))
-      _        _    _       = None
-  helper root
+    def helper = match _
+        Tip = None
+        Bin s l x r = match (helper l) (f x) (helper r)
+            (Some p) _ _ = Some p
+            _ True _ = Some (Pair x (s - size r - 1))
+            _ _ (Some (Pair x i)) = Some (Pair x (i + size l + 1))
+            _ _ _ = None
 
-export def tsplitUntil f t =
-  match (tfind f t)
+    helper root
+
+export def tsplitUntil f t = match (tfind f t)
     None = match t
-      (Tree cmp _) = Pair t (Tree cmp Tip)
+        (Tree cmp _) = Pair t (Tree cmp Tip)
     Some (Pair _ i) = tsplitAt i t
 
-export def ttakeUntil f t = tsplitUntil f t | getPairFirst
-export def tdropUntil f t = tsplitUntil f t | getPairSecond
+export def ttakeUntil f t =
+    tsplitUntil f t
+    | getPairFirst
+
+export def tdropUntil f t =
+    tsplitUntil f t
+    | getPairSecond
 
 # Returns True if there exists an x in t where f x = True
 export def texists f t = match (tfind f t)
-  Some _ = True
-  None   = False
+    Some _ = True
+    None = False
 
-export def tforall f t = ! texists (! f _) t
+export def tforall f t =
+    ! texists (! f _) t
 
 # Split tree into those elements <, =, and > y
-export def tsplit y (Tree cmp root) =
-  match (split y cmp root)
+export def tsplit y (Tree cmp root) = match (split y cmp root)
     Triple l e g = Triple (Tree cmp l) (Tree cmp e) (Tree cmp g)
 
 def split y cmp root =
-  def helper = match _
-    Tip = Triple Tip Tip Tip
-    Bin _ l x r = match (cmp x y)
-      LT = match (helper r)
-        Triple rl re rg = Triple (join3 l x rl) re rg
-      GT = match (helper l)
-        Triple ll le lg = Triple ll le (join3 lg x r)
-      EQ = match (splitlt l) (splitgt r)
-        (Pair ll le) (Pair re rg) = Triple ll (join3 le x re) rg
-  def splitlt = match _
-    Tip = Pair Tip Tip
-    Bin _ l x r = match (cmp x y)
-      LT = match (splitlt r)
-        Pair rl re = Pair (join3 l x rl) re
-      _  = match (splitlt l)
-        Pair ll le = Pair ll (join3 le x r)
-  def splitgt = match _
-    Tip = Pair Tip Tip
-    Bin _ l x r = match (cmp x y)
-      GT = match (splitgt l)
-        Pair le lg = Pair le (join3 lg x r)
-      _  = match (splitgt r)
-        Pair re rg = Pair (join3 l x re) rg
-  helper root
+    def helper = match _
+        Tip = Triple Tip Tip Tip
+        Bin _ l x r = match (cmp x y)
+            LT = match (helper r)
+                Triple rl re rg = Triple (join3 l x rl) re rg
+            GT = match (helper l)
+                Triple ll le lg = Triple ll le (join3 lg x r)
+            EQ = match (splitlt l) (splitgt r)
+                (Pair ll le) (Pair re rg) = Triple ll (join3 le x re) rg
+
+    def splitlt = match _
+        Tip = Pair Tip Tip
+        Bin _ l x r = match (cmp x y)
+            LT = match (splitlt r)
+                Pair rl re = Pair (join3 l x rl) re
+            _ = match (splitlt l)
+                Pair ll le = Pair ll (join3 le x r)
+
+    def splitgt = match _
+        Tip = Pair Tip Tip
+        Bin _ l x r = match (cmp x y)
+            GT = match (splitgt l)
+                Pair le lg = Pair le (join3 lg x r)
+            _ = match (splitgt r)
+                Pair re rg = Pair (join3 l x re) rg
+
+    helper root
 
 # Split tree into those elements where f x = True and those where f x = False
 export def tsplitBy (f: a => Boolean) (Tree cmp root: Tree a): Pair (Tree a) (Tree a) =
-  def helper t = match t
-    Tip = Pair Tip Tip
-    Bin _ l x r = match (helper l) (helper r)
-      (Pair tl fl) (Pair tr fr) =
-        if f x
-        then Pair (join3 tl x tr) (join2 fl fr)
-        else Pair (join2 tl tr) (join3 fl x fr)
-  match (helper root)
-    Pair t f = Pair (Tree cmp t) (Tree cmp f)
+    def helper t = match t
+        Tip = Pair Tip Tip
+        Bin _ l x r = match (helper l) (helper r)
+            (Pair tl fl) (Pair tr fr) =
+                if f x then
+                    Pair (join3 tl x tr) (join2 fl fr)
+                else
+                    Pair (join2 tl tr) (join3 fl x fr)
+
+    match (helper root)
+        Pair t f = Pair (Tree cmp t) (Tree cmp f)
 
 # Remove all elements x such that f x = False.
 export def tfilter (f: a => Boolean) (Tree cmp root: Tree a): Tree a =
-  def helper t = match t
-    Tip = Tip
-    Bin _ l x r =
-      def l_ = helper l
-      def r_ = helper r
-      if f x then join3 l_ x r_ else join2 l_ r_
-  Tree cmp (helper root)
+    def helper t = match t
+        Tip = Tip
+        Bin _ l x r =
+            def l_ = helper l
+            def r_ = helper r
+
+            if f x then
+                join3 l_ x r_
+            else
+                join2 l_ r_
+
+    Tree cmp (helper root)
 
 # Return the smallest element in the tree.
-export def tmin (Tree _ root: Tree a): Option a = min_ root
+export def tmin (Tree _ root: Tree a): Option a =
+    min_ root
+
 def min_ root =
-  def none = match _
-    Tip         = None
-    Bin _ l x _ = some x l
-  def some x = match _
-    Tip         = Some x
-    Bin _ l y _ = some y l
-  none root
+    def none = match _
+        Tip = None
+        Bin _ l x _ = some x l
+
+    def some x = match _
+        Tip = Some x
+        Bin _ l y _ = some y l
+
+    none root
 
 # Return the largest element in the tree.
-export def tmax (Tree _ root: Tree a): Option a = max_ root
+export def tmax (Tree _ root: Tree a): Option a =
+    max_ root
+
 def max_ root =
-  def none = match _
-    Tip         = None
-    Bin _ _ x r = some x r
-  def some x = match _
-    Tip         = Some x
-    Bin _ _ y r = some y r
-  none root
+    def none = match _
+        Tip = None
+        Bin _ _ x r = some x r
+
+    def some x = match _
+        Tip = Some x
+        Bin _ _ y r = some y r
+
+    none root
 
 # Lowest rank element with x >= y, along with that rank.
 export def tlowerGE (y: a) (Tree cmp root: Tree a): Option (Pair a Integer) =
-  def f x = match (cmp x y)
-    LT = False
-    _  = True
-  lower f root
+    def f x = match (cmp x y)
+        LT = False
+        _ = True
+
+    lower f root
 
 # Lowest rank element with x > y, along with that rank.
 export def tlowerGT (y: a) (Tree cmp root: Tree a): Option (Pair a Integer) =
-  def f x = match (cmp x y)
-    GT = True
-    _  = False
-  lower f root
+    def f x = match (cmp x y)
+        GT = True
+        _ = False
+
+    lower f root
 
 # Lowest rank element f x = True   => Option (Pair x rank)
 def lower f root =
-  def none = match _
-    Tip         = None
-    Bin s l x r = if f x then someL x (size root - s) l else none r
-  def someR z i = match _ # i = size including self
-    Tip         = Some (Pair z i)
-    Bin s l x r = if f x then someL x (i-s) l else someR z i r
-  def someL z i = match _ # i = size left of self
-    Tip         = Some (Pair z i)
-    Bin s l x r = if f x then someL x i l else someR z (i+s) r
-  none root
+    def none = match _
+        Tip = None
+        Bin s l x r =
+            if f x then
+                someL x (size root - s) l
+            else
+                none r
+
+    def someR z i = match _ # i = size including self
+        Tip = Some (Pair z i)
+        Bin s l x r =
+            if f x then
+                someL x (i - s) l
+            else
+                someR z i r
+
+    def someL z i = match _ # i = size left of self
+        Tip = Some (Pair z i)
+        Bin s l x r =
+            if f x then
+                someL x i l
+            else
+                someR z (i + s) r
+
+    none root
 
 # Highest rank element with x < y, along with that rank.
 export def tupperLT (y: a) (Tree cmp root: Tree a): Option (Pair a Integer) =
-  def f x = match (cmp x y)
-    LT = False
-    _  = True
-  upper f root
+    def f x = match (cmp x y)
+        LT = False
+        _ = True
+
+    upper f root
 
 # Highest rank element with x <= y, along with that rank.
 export def tupperLE (y: a) (Tree cmp root: Tree a): Option (Pair a Integer) =
-  def f x = match (cmp x y)
-    GT = True
-    _  = False
-  upper f root
+    def f x = match (cmp x y)
+        GT = True
+        _ = False
+
+    upper f root
 
 # Highest rank element with f x = False  => Option (Pair x rank)
 def upper f root =
-  def none = match _
-    Tip         = None
-    Bin s l x r = if f x then none l else someR x s r
-  def someR z i = match _ # i = size including self
-    Tip         = Some (Pair z (i-1))
-    Bin s l x r = if f x then someL z (i-s) l else someR x i r
-  def someL z i = match _ # i = size left of self
-    Tip         = Some (Pair z (i-1))
-    Bin s l x r = if f x then someL z i l else someR x (i+s) r
-  none root
+    def none = match _
+        Tip = None
+        Bin s l x r =
+            if f x then
+                none l
+            else
+                someR x s r
+
+    def someR z i = match _ # i = size including self
+        Tip = Some (Pair z (i - 1))
+        Bin s l x r =
+            if f x then
+                someL z (i - s) l
+            else
+                someR x i r
+
+    def someL z i = match _ # i = size left of self
+        Tip = Some (Pair z (i - 1))
+        Bin s l x r =
+            if f x then
+                someL z i l
+            else
+                someR x (i + s) r
+
+    none root
 
 # Extract all elements from the tree which are equal to y
 # => Pair (matches: List x) (rank: Integer)
 export def tequal y (Tree cmp root) =
-  def helperR i out = match _ # i = size including self
-    Tip         = Pair out i
-    Bin s l x r = match (cmp x y)
-      LT = helperR i out r
-      GT = helperL (i-s) out l
-      EQ = helperL (i-s) (x, helperR i out r | getPairFirst) l
-  def helperL i out = match _ # i = size left of self
-    Tip         = Pair out i
-    Bin s l x r = match (cmp x y)
-      LT = helperR (i+s) out r
-      GT = helperL i out l
-      EQ = helperL i (x, helperR (i+s) out r | getPairFirst) l
-  helperL 0 Nil root
+    def helperR i out = match _ # i = size including self
+        Tip = Pair out i
+        Bin s l x r = match (cmp x y)
+            LT = helperR i out r
+            GT = helperL (i - s) out l
+            EQ = helperL (i - s) (x, helperR i out r | getPairFirst) l
+
+    def helperL i out = match _ # i = size left of self
+        Tip = Pair out i
+        Bin s l x r = match (cmp x y)
+            LT = helperR (i + s) out r
+            GT = helperL i out l
+            EQ = helperL i (x, helperR (i + s) out r | getPairFirst) l
+
+    helperL 0 Nil root
 
 # Returns True if x is an element of y, False otherwise.
-export def x ∈ y = tcontains x y
+export def x ∈ y =
+    tcontains x y
 
 # Returns True if x is NOT an element of y, False otherwise.
-export def x ∉ y = ! x ∈ y
+export def x ∉ y =
+    ! x ∈ y
 
 # Returns True if x contains y, False otherwise.
-export def x ∋ y = y ∈ x
+export def x ∋ y =
+    y ∈ x
 
 # Returns True if x does NOT contain y, False otherwise.
-export def x ∌ y = y ∉ x
+export def x ∌ y =
+    y ∉ x
 
-export def tcontains (y: a) (t: Tree a): Boolean =
-  match t (tupperLE y t)
-    (Tree _   _) None              = False
+export def tcontains (y: a) (t: Tree a): Boolean = match t (tupperLE y t)
+    (Tree _ _) None = False
     (Tree cmp _) (Some (Pair x _)) = match (cmp x y)
-      EQ = True
-      _  = False
+        EQ = True
+        _ = False
 
 # Eliminate duplicates, as identified by cmp
 export def tdistinctBy (cmp: a => a => Order) (t: Tree a): Tree a = match t
-  Tree tcmp _ = listToTree tcmp (distinctBy cmp (treeToList t))
+    Tree tcmp _ = listToTree tcmp (distinctBy cmp (treeToList t))
 
 # Eliminate duplicates, as identified by f
 export def tdistinctRunBy (f: a => a => Boolean) (t: Tree a): Tree a = match t
-  Tree cmp _ = Tree cmp (build (vdistinctRunBy f (treeToVector t)))
+    Tree cmp _ = Tree cmp (build (vdistinctRunBy f (treeToVector t)))
 
 # Returns the union of trees a and b, keeps only values from a if they are equal to values in b.
-export def a ∪ b = tunion a b
+export def a ∪ b =
+    tunion a b
 
 # Returns the union of two trees, given their roots.
 export def tunion (Tree _ aroot: Tree a) (Tree cmp broot: Tree a): Tree a =
-  Tree cmp (union cmp aroot broot)
+    Tree cmp (union cmp aroot broot)
+
 def union cmp aroot broot =
-  def helper a b = match a b
-    Tip _ = b
-    _ Tip = a
-    (Bin _ al ax ar) _ = match (split ax cmp b)
-      Triple bl _ bg = join3 (helper al bl) ax (helper ar bg)
-  helper aroot broot
+    def helper a b = match a b
+        Tip _ = b
+        _ Tip = a
+        (Bin _ al ax ar) _ = match (split ax cmp b)
+            Triple bl _ bg = join3 (helper al bl) ax (helper ar bg)
+
+    helper aroot broot
 
 export def tunionWith (fn: a => a => a) (left: Tree a) (right: Tree a): Tree a =
     def Tree _ leftRoot = left
     def Tree cmp rightRoot = right
+
     def unionWith a b = match a b
         Tip _ = b
         _ Tip = a
@@ -499,62 +605,83 @@ export def tunionWith (fn: a => a => a) (left: Tree a) (right: Tree a): Tree a =
             def Triple bl be bg = split ax cmp b
             def l = unionWith (join2 all arl) bl
             def g = unionWith (join2 alg arg) bg
+
             # Recombine all values, and get the one which was originally first.
             def e = join2 (join3 ale ax are) be
+
             require c1, cs = treeToList (Tree cmp e)
             else unreachable "Invariant reached in tunionWith"
+
             # Initialize the (potentially non-reflexive) fold with that value.
             def cx = foldl fn c1 cs
+
             join3 l cx g
+
     Tree cmp (unionWith leftRoot rightRoot)
 
 # Union of two trees, keeping equal values of a before equal values of b
-export def a ⊎ b = tunionMulti a b
+export def a ⊎ b =
+    tunionMulti a b
+
 export def tunionMulti (Tree _ aroot) (Tree cmp broot) =
-  Tree cmp (unionMulti cmp aroot broot)
+    Tree cmp (unionMulti cmp aroot broot)
 
 def unionMulti cmp aroot broot =
-  def helper a b = match a b
-    Tip _ = b
-    _ Tip = a
-    (Bin _ _ ax _) _ = match (split ax cmp a) (split ax cmp b)
-      (Triple al ae ag) (Triple bl be bg) =
-        def l = helper al bl
-        def r = helper ag bg
-        def r_ = join2 be r # fast if be=Tip
-        if size ae == 1
-        then join3 l ax r_
-        else join2 (join2 l ae) r_
-  helper aroot broot
+    def helper a b = match a b
+        Tip _ = b
+        _ Tip = a
+        (Bin _ _ ax _) _ = match (split ax cmp a) (split ax cmp b)
+            (Triple al ae ag) (Triple bl be bg) =
+                def l = helper al bl
+                def r = helper ag bg
+
+                def r_ =
+                    join2 be r # fast if be=Tip
+
+                if size ae == 1 then
+                    join3 l ax r_
+                else
+                    join2 (join2 l ae) r_
+
+    helper aroot broot
 
 # Returns the set difference of A and B, that is, a tree containing all elements of A which are not in B.
 export def tsubtract (Tree _ aroot: Tree a) (Tree cmp broot: Tree a): Tree a =
-  def helper a b = match a b
-    Tip _ = Tip
-    _ Tip = a
-    _ (Bin _ bl bx br) = match (split bx cmp a)
-      Triple al _ ag = join2 (helper al bl) (helper ag br)
-  Tree cmp (helper aroot broot)
+    def helper a b = match a b
+        Tip _ = Tip
+        _ Tip = a
+        _ (Bin _ bl bx br) = match (split bx cmp a)
+            Triple al _ ag = join2 (helper al bl) (helper ag br)
+
+    Tree cmp (helper aroot broot)
 
 # Returns a tree containing all elements of A which are also in B.
-export def a ∩ b = tintersect a b
+export def a ∩ b =
+    tintersect a b
+
 export def tintersect (Tree _ aroot) (Tree cmp broot) =
-  def helper a b = match a b
-    Tip _ = Tip
-    _ Tip = Tip
-    _ (Bin _ bl bx br) = match (split bx cmp a)
-      Triple al ae ag =
-        def l = helper al bl
-        def r = helper ag br
-        match ae
-          Tip = join2 l r
-          Bin aes _ aex _ =
-            if aes == 1 then join3 l aex r else join2 (join2 l ae) r
-  Tree cmp (helper aroot broot)
+    def helper a b = match a b
+        Tip _ = Tip
+        _ Tip = Tip
+        _ (Bin _ bl bx br) = match (split bx cmp a)
+            Triple al ae ag =
+                def l = helper al bl
+                def r = helper ag br
+
+                match ae
+                    Tip = join2 l r
+                    Bin aes _ aex _ =
+                        if aes == 1 then
+                            join3 l aex r
+                        else
+                            join2 (join2 l ae) r
+
+    Tree cmp (helper aroot broot)
 
 export def tintersectWith (fn: a => a => a) (left: Tree a) (right: Tree a): Tree a =
     def Tree _ leftRoot = left
     def Tree cmp rightRoot = right
+
     def intersectWith a b = match a b
         Tip _ = Tip
         _ Tip = Tip
@@ -566,16 +693,21 @@ export def tintersectWith (fn: a => a => a) (left: Tree a) (right: Tree a): Tree
             def Triple brl bre brg = split bx cmp br
             def l = intersectWith al (join2 bll brl)
             def g = intersectWith ag (join2 blg brg)
+
             # Recombine all values, and get the one which was originally first.
             def e = join2 ae (join3 ble bx bre)
+
             require c1, cs = treeToList (Tree cmp e)
             else unreachable "Invariant reached in tintersectWith"
+
             # Initialize the (potentially non-reflexive) fold with that value.
             def cx = foldl fn c1 cs
+
             match ae
                 # If nothing in a == bx, then cx was constructed only from b.
-                Tip         = join2 l g
+                Tip = join2 l g
                 Bin _ _ _ _ = join3 l cx g
+
     Tree cmp (intersectWith leftRoot rightRoot)
 
 # Pretty print the tree shape for debug
@@ -591,65 +723,72 @@ export def tintersectWith (fn: a => a => a) (left: Tree a) (right: Tree a): Tree
 
 # Create a balanced tree with with order: l:Tree x:Element r:Tree
 def join3 l x r = match l r
-  Tip _ = insertMin x r
-  _ Tip = insertMax x l
-  (Bin ls ll lx lr) (Bin rs rl rx rr) =
-    if deltaQ*ls < deltaD*rs then balanceL (join3 l x rl) rx rr else
-    if deltaQ*rs < deltaD*ls then balanceR ll lx (join3 lr x r) else
-    Bin (ls+rs+1) l x r
+    Tip _ = insertMin x r
+    _ Tip = insertMax x l
+    (Bin ls ll lx lr) (Bin rs rl rx rr) =
+        if deltaQ * ls < deltaD * rs then
+            balanceL (join3 l x rl) rx rr
+        else if deltaQ * rs < deltaD * ls then
+            balanceR ll lx (join3 lr x r)
+        else
+            Bin (ls + rs + 1) l x r
 
 # Create a balanced tree with with order: l:Tree r:Tree
 def join2 l r = match l
-  Tip = r
-  Bin _ ll lx lr = match (splitLast ll lx lr)
-    Pair l_ x_ = join3 l_ x_ r
+    Tip = r
+    Bin _ ll lx lr = match (splitLast ll lx lr)
+        Pair l_ x_ = join3 l_ x_ r
 
 def splitLast l x r = match r
-  Tip = Pair l x
-  Bin _ rl rx rr = match (splitLast rl rx rr)
-    Pair l_ x_ = Pair (join3 l x l_) x_
+    Tip = Pair l x
+    Bin _ rl rx rr = match (splitLast rl rx rr)
+        Pair l_ x_ = Pair (join3 l x l_) x_
 
 def insertMax x = match _
-  Tip = Bin 1 Tip x Tip
-  Bin _ l y r = balanceR l y (insertMax x r)
+    Tip = Bin 1 Tip x Tip
+    Bin _ l y r = balanceR l y (insertMax x r)
 
 def insertMin x = match _
-  Tip = Bin 1 Tip x Tip
-  Bin _ l y r = balanceL (insertMin x l) y r
+    Tip = Bin 1 Tip x Tip
+    Bin _ l y r = balanceL (insertMin x l) y r
 
 # Written while reading the Haskell Set implementation 
 def balanceL l x r = match l r
-  Tip Tip = Bin 1 Tip x Tip
-  (Bin ls ll lx lr) Tip = match ll lr
-    Tip Tip = Bin 2 l x Tip
-    ll  Tip = Bin 3 ll lx (Bin 1 Tip x Tip)
-    Tip (Bin _ _ lrx _) = Bin 3 (Bin 1 Tip lx Tip) lrx (Bin 1 Tip x Tip)
-    (Bin lls _ _ _) (Bin lrs lrl lrx lrr) = match (ratioD*lrs < ratioQ*lls)
-      True  = Bin (1+ls) ll lx (Bin (1+lrs) lr x Tip)
-      False = Bin (1+ls) (Bin (1+lls+size lrl) ll lx lrl) lrx (Bin (1+size lrr) lrr x Tip)
-  Tip (Bin rs _ _ _) = Bin (1+rs) Tip x r
-  (Bin ls ll lx lr) (Bin rs _ _ _) = match (ls*deltaD > deltaQ*rs)
-    True = match ll lr
-      (Bin lls _ _ _) (Bin lrs lrl lrx lrr) = match (ratioD*lrs < ratioQ*lls)
-        True  = Bin (1+ls+rs) ll lx (Bin (1+rs+lrs) lr x r)
-        False = Bin (1+ls+rs) (Bin (1+lls+size lrl) ll lx lrl) lrx (Bin (1+rs+size lrr) lrr x r)
-      _ _ = unreachable "tree balance invariant violated in Tree.balanceL"
-    False = Bin (1+ls+rs) l x r
+    Tip Tip = Bin 1 Tip x Tip
+    (Bin ls ll lx lr) Tip = match ll lr
+        Tip Tip = Bin 2 l x Tip
+        ll Tip = Bin 3 ll lx (Bin 1 Tip x Tip)
+        Tip (Bin _ _ lrx _) = Bin 3 (Bin 1 Tip lx Tip) lrx (Bin 1 Tip x Tip)
+        (Bin lls _ _ _) (Bin lrs lrl lrx lrr) = match (ratioD * lrs < ratioQ * lls)
+            True = Bin (1 + ls) ll lx (Bin (1 + lrs) lr x Tip)
+            False =
+                Bin (1 + ls) (Bin (1 + lls + size lrl) ll lx lrl) lrx (Bin (1 + size lrr) lrr x Tip)
+    Tip (Bin rs _ _ _) = Bin (1 + rs) Tip x r
+    (Bin ls ll lx lr) (Bin rs _ _ _) = match (ls * deltaD > deltaQ * rs)
+        True = match ll lr
+            (Bin lls _ _ _) (Bin lrs lrl lrx lrr) = match (ratioD * lrs < ratioQ * lls)
+                True = Bin (1 + ls + rs) ll lx (Bin (1 + rs + lrs) lr x r)
+                False =
+                    Bin (1 + ls + rs) (Bin (1 + lls + size lrl) ll lx lrl) lrx (Bin (1 + rs + size lrr) lrr x r)
+            _ _ = unreachable "tree balance invariant violated in Tree.balanceL"
+        False = Bin (1 + ls + rs) l x r
 
 def balanceR l x r = match l r
-  Tip Tip = Bin 1 Tip x Tip
-  Tip (Bin rs rl rx rr) = match rl rr
-    Tip Tip = Bin 2 Tip x r
-    Tip _   = Bin 3 (Bin 1 Tip x Tip) rx rr
-    (Bin _ _ rlx _) Tip = Bin 3 (Bin 1 Tip x Tip) rlx (Bin 1 Tip rx Tip)
-    (Bin rls rll rlx rlr) (Bin rrs _ _ _) = match (ratioD*rls < ratioQ*rrs)
-      True  = Bin (1+rs) (Bin (1+rls) Tip x rl) rx rr
-      False = Bin (1+rs) (Bin (1+size rll) Tip x rll) rlx (Bin (1+rrs+size rlr) rlr rx rr)
-  (Bin ls _ _ _) Tip = Bin (1+ls) l x Tip
-  (Bin ls _ _ _) (Bin rs rl rx rr) = match (deltaD*rs > deltaQ*ls)
-    True = match rl rr
-      (Bin rls rll rlx rlr) (Bin rrs _ _ _) = match (ratioD*rls < ratioQ*rrs)
-        True  = Bin (1+ls+rs) (Bin (1+ls+rls) l x rl) rx rr
-        False = Bin (1+ls+rs) (Bin (1+ls+size rll) l x rll) rlx (Bin (1+rrs+size rlr) rlr rx rr)
-      _ _ = unreachable "tree balance invariant violated in Tree.balanceR"
-    False = Bin (1+ls+rs) l x r
+    Tip Tip = Bin 1 Tip x Tip
+    Tip (Bin rs rl rx rr) = match rl rr
+        Tip Tip = Bin 2 Tip x r
+        Tip _ = Bin 3 (Bin 1 Tip x Tip) rx rr
+        (Bin _ _ rlx _) Tip = Bin 3 (Bin 1 Tip x Tip) rlx (Bin 1 Tip rx Tip)
+        (Bin rls rll rlx rlr) (Bin rrs _ _ _) = match (ratioD * rls < ratioQ * rrs)
+            True = Bin (1 + rs) (Bin (1 + rls) Tip x rl) rx rr
+            False =
+                Bin (1 + rs) (Bin (1 + size rll) Tip x rll) rlx (Bin (1 + rrs + size rlr) rlr rx rr)
+    (Bin ls _ _ _) Tip = Bin (1 + ls) l x Tip
+    (Bin ls _ _ _) (Bin rs rl rx rr) = match (deltaD * rs > deltaQ * ls)
+        True = match rl rr
+            (Bin rls rll rlx rlr) (Bin rrs _ _ _) = match (ratioD * rls < ratioQ * rrs)
+                True = Bin (1 + ls + rs) (Bin (1 + ls + rls) l x rl) rx rr
+                False =
+                    Bin (1 + ls + rs) (Bin (1 + ls + size rll) l x rll) rlx (Bin (1 + rrs + size rlr) rlr rx rr)
+            _ _ = unreachable "tree balance invariant violated in Tree.balanceR"
+        False = Bin (1 + ls + rs) l x r

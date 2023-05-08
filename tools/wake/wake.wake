@@ -14,7 +14,8 @@
 # limitations under the License.
 
 package build_wake
+
 from wake import _
 
 target buildWake variant =
-    tool here Nil variant "bin/wake" (runtime, gopt, Nil) Nil Nil
+    tool @here Nil variant "bin/wake" (runtime, gopt, Nil) Nil Nil

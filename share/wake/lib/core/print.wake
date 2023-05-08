@@ -27,11 +27,14 @@ package wake
 #   format (_)       = "<source-file.wake:line:column>"
 export def format (anyType: a): String =
     def p x = prim "format"
+
     p anyType
 
 # LogLevel is a user-opaque type.
 # To construct a LogLevel, use makeLogLevel.
-data LogLevel = LogLevel (name: String)
+data LogLevel =
+    LogLevel (name: String)
+
 from wake export type LogLevel
 
 # getLogLevelName: return the name of the LogLevel
@@ -78,6 +81,7 @@ export def logNever: LogLevel =
 #     | getOrElse 0
 export def tap (consumerFn: a => b) (value: a): a =
     def _ = consumerFn value
+
     value
 
 # printlnLevel: print a String with a newline on the given LogLevel.
@@ -86,6 +90,7 @@ export def tap (consumerFn: a => b) (value: a): a =
 #   def Unit = printlnLevel logWarning "hello"
 export def printlnLevel (LogLevel name) (message: String): Unit =
     def p stream outputStr = prim "print"
+
     p name "{message}\n"
 
 # println: print a colourless String with a newline, visible when run with -v.

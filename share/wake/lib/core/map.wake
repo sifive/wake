@@ -27,11 +27,11 @@ tuple Map k v =
     # features required, but is not always able to provide optimal retrieval
     # when only the key is known, without access to non-exported details.
     Data: Tree (Pair k v)
+
 from wake export type Map
 
 def makeCmpPair (cmpKey: k => k => Order) (left: Pair k v) (right: Pair k v): Order =
     cmpKey left.getPairFirst right.getPairFirst
-
 
 # Initialize an empty `Map` which will use the given total order function.
 #
@@ -81,7 +81,6 @@ export def vectorToMap (cmpKey: k => k => Order) (pairs: Vector (Pair k v)): Map
     vectorToTree (makeCmpPair cmpKey) pairs
     | Map cmpKey
 
-
 # Count how many key-value associations are contained in the `Map`.
 #
 # *Examples:*
@@ -101,7 +100,6 @@ export def msize (map: Map k v): Integer =
 #   ```
 export def mempty (map: Map k v): Boolean =
     tempty map.getMapData
-
 
 # Add a given value into the map under the key, if that key does not already exist.
 # Any pair with the same key which already exists in the map *remains unchanged*.
@@ -143,8 +141,8 @@ export def minsertReplace (key: k) (value: v) (map: Map k v): Map k v =
 #   ```
 export def minsertWith (fn: k => (incoming: v) => (existing: v) => v) (key: k) (value: v) (map: Map k v): Map k v =
     def pairFn (Pair k l) (Pair _ r) = Pair k (fn k l r)
-    editMapData (tinsertWith pairFn (Pair key value)) map
 
+    editMapData (tinsertWith pairFn (Pair key value)) map
 
 # Remove any value contained in the map under the given key.
 #
@@ -156,10 +154,11 @@ export def minsertWith (fn: k => (incoming: v) => (existing: v) => v) (key: k) (
 export def mdelete (key: k) (map: Map k v): Map k v =
     def deleteKey tree =
         def Tree cmpPair root = tree
+
         delete (map.getMapComparison _.getPairFirst _) key root
         | Tree cmpPair
-    editMapData deleteKey map
 
+    editMapData deleteKey map
 
 # Accumulate and combine every value in the map, starting from the "smallest" key.
 #
@@ -180,6 +179,7 @@ export def mdelete (key: k) (map: Map k v): Map k v =
 #   ```
 export def mfoldl (fn: k => a => v => a) (base: a) (map: Map k v): a =
     def pairFn a (Pair k v) = fn k a v
+
     tfoldl pairFn base map.getMapData
 
 # Accumulate and combine every value in the map, starting from the "largest" key.
@@ -201,6 +201,7 @@ export def mfoldl (fn: k => a => v => a) (base: a) (map: Map k v): a =
 #   ```
 export def mfoldr (fn: k => v => a => a) (base: a) (map: Map k v): a =
     def pairFn (Pair k v) a = fn k v a
+
     tfoldr pairFn base map.getMapData
 
 # Transform and combine every value in the map in parallel.
@@ -226,6 +227,7 @@ export def mfoldr (fn: k => v => a => a) (base: a) (map: Map k v): a =
 #   ```
 export def mfoldmap (combineFn: a => a => a) (base: a) (transformFn: k => v => a) (map: Map k v): a =
     def pairFn (Pair k v) = transformFn k v
+
     tfoldmap combineFn base pairFn map.getMapData
 
 # Flatten every key-value pair in the map into a simple list.
@@ -238,7 +240,6 @@ export def mfoldmap (combineFn: a => a => a) (base: a) (transformFn: k => v => a
 export def mapToList (map: Map k v): List (Pair k v) =
     treeToList map.getMapData
 
-
 # Apply some function to every value contained in the map.
 #
 # *Examples:*
@@ -249,12 +250,15 @@ export def mapToList (map: Map k v): List (Pair k v) =
 export def mmap (fn: k => v => w) (map: Map k v): Map k w =
     def tmap tree =
         def Tree _ root = tree
+
         def helper = match _
-            Tip                  = Tip
+            Tip = Tip
             # join3 and similar aren't required since the keys haven't changed.
             Bin i l (Pair x y) r = Bin i (helper l) (Pair x (fn x y)) (helper r)
+
         helper root
         | Tree (makeCmpPair map.getMapComparison)
+
     editMapData tmap map
 
 # Apply some failable function to every value, passing only if every computation does.
@@ -265,21 +269,25 @@ export def mmap (fn: k => v => w) (map: Map k v): Map k w =
 #   ```
 export def mmapPass (fn: k => v => Result w e) (map: Map k v): Result (Map k w) e =
     def Tree _ root = map.getMapData
+
     def helper = match _
-        Tip                  = Pass Tip
+        Tip = Pass Tip
         Bin i l (Pair x y) r =
             def lResult = helper l
             def wResult = fn x y
             def rResult = helper r
+
             require Pass l = lResult
             require Pass w = wResult
             require Pass r = rResult
+
             Pass (Bin i l (Pair x w) r)
+
     require Pass newRoot = helper root
+
     Tree (makeCmpPair map.getMapComparison) newRoot
     | (setMapData _ map)
     | Pass
-
 
 # Retrieve the "smallest" key from the map and its associated value.
 # This is determined according to the comparison function specified when the map
@@ -317,8 +325,8 @@ export def mmax (map: Map k v): Option (Pair k v) =
 #   ```
 export def mlowerGE (key: k) (map: Map k v): Option (Pair k v) =
     def Tree _ root = map.getMapData
-    def predicate t =
-        isGE (map.getMapComparison t.getPairFirst key)
+    def predicate t = isGE (map.getMapComparison t.getPairFirst key)
+
     lower predicate root
     | omap getPairFirst
 
@@ -334,8 +342,8 @@ export def mlowerGE (key: k) (map: Map k v): Option (Pair k v) =
 #   ```
 export def mlowerGT (key: k) (map: Map k v): Option (Pair k v) =
     def Tree _ root = map.getMapData
-    def predicate t =
-        isGT (map.getMapComparison t.getPairFirst key)
+    def predicate t = isGT (map.getMapComparison t.getPairFirst key)
+
     lower predicate root
     | omap getPairFirst
 
@@ -351,8 +359,8 @@ export def mlowerGT (key: k) (map: Map k v): Option (Pair k v) =
 #   ```
 export def mupperLT (key: k) (map: Map k v): Option (Pair k v) =
     def Tree _ root = map.getMapData
-    def predicate t =
-        isGE (map.getMapComparison t.getPairFirst key)
+    def predicate t = isGE (map.getMapComparison t.getPairFirst key)
+
     upper predicate root
     | omap getPairFirst
 
@@ -368,11 +376,10 @@ export def mupperLT (key: k) (map: Map k v): Option (Pair k v) =
 #   ```
 export def mupperLE (key: k) (map: Map k v): Option (Pair k v) =
     def Tree _ root = map.getMapData
-    def predicate t =
-        isGT (map.getMapComparison t.getPairFirst key)
+    def predicate t = isGT (map.getMapComparison t.getPairFirst key)
+
     upper predicate root
     | omap getPairFirst
-
 
 # Retrieve the value associated with a particular key in the map, if one exists.
 #
@@ -384,12 +391,11 @@ export def mupperLE (key: k) (map: Map k v): Option (Pair k v) =
 #   mnew scmp | minsert "a" 1 | mlookup "a" = Some 1
 #   listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "b" | mlookup "b" = None
 #   ```
-export def mlookup (key: k) (map: Map k v): Option v =
-    match (mupperLE key map)
-        None              = None
-        (Some (Pair l v)) = match (map.getMapComparison l key)
-            EQ = Some v
-            _  = None
+export def mlookup (key: k) (map: Map k v): Option v = match (mupperLE key map)
+    None = None
+    (Some (Pair l v)) = match (map.getMapComparison l key)
+        EQ = Some v
+        _ = None
 
 # Check whether some key is associated with any value in the map.
 #
@@ -412,8 +418,8 @@ export def mcontains (key: k) (map: Map k v): Boolean =
 #   ```
 export def mexists (fn: k => v => Boolean) (map: Map k v): Boolean =
     def pairFn (Pair k v) = fn k v
-    texists pairFn map.getMapData
 
+    texists pairFn map.getMapData
 
 # Divide the key-value pairs comprising one map into two according to some predicate.
 #
@@ -425,6 +431,7 @@ export def msplitBy (fn: k => v => Boolean) (map: Map k v): Pair (Map k v) (Map 
     def cmpKey = map.getMapComparison
     def pairFn (Pair k v) = fn k v
     def Pair trues falses = tsplitBy pairFn map.getMapData
+
     Pair (Map cmpKey trues) (Map cmpKey falses)
 
 # Discard any key-value pairs in the map for which the predicate fails.
@@ -436,8 +443,8 @@ export def msplitBy (fn: k => v => Boolean) (map: Map k v): Pair (Map k v) (Map 
 #   ```
 export def mfilter (fn: k => v => Boolean) (map: Map k v): Map k v =
     def pairFn (Pair k v) = fn k v
-    editMapData (tfilter pairFn) map
 
+    editMapData (tfilter pairFn) map
 
 # Collect all key-value associations in either of two maps into a single one.
 # If the same key occurs in both, the value from `left` is kept and the one from
@@ -458,9 +465,11 @@ export def mfilter (fn: k => v => Boolean) (map: Map k v): Map k v =
 #   ```
 export def munion (left: Map k v) (right: Map k v): Map k v =
     def Map _ leftTree = left
+
     # tunion uses the comparison function of the right tree, so similarly attach
     # the raw key comparison function of the right map to the output
     def Map cmpKey rightTree = right
+
     tunion leftTree rightTree
     | Map cmpKey
 
@@ -481,13 +490,17 @@ export def munion (left: Map k v) (right: Map k v): Map k v =
 #   ```
 export def munionWith (fn: k => v => v => v) (left: Map k v) (right: Map k v): Map k v =
     def Map _ leftTree = left
+
     # tunionWith uses the comparison function of the right tree, so similarly
     # attach the raw key comparison function of the right map to the output
     def Map cmpKey rightTree = right
+
     def pairFn l r =
         def Pair _ lv = l
         def Pair rk rv = r
+
         rk :-> fn rk lv rv
+
     tunionWith pairFn leftTree rightTree
     | Map cmpKey
 
@@ -506,9 +519,11 @@ export def munionWith (fn: k => v => v => v) (left: Map k v) (right: Map k v): M
 #   ```
 export def msubtract (left: Map k v) (right: Map k v): Map k v =
     def Map _ leftTree = left
+
     # tsubtract uses the comparison function of the right tree, so similarly
     # attach the raw key comparison function of the right map to the output
     def Map cmpKey rightTree = right
+
     tsubtract leftTree rightTree
     | Map cmpKey
 
@@ -531,9 +546,11 @@ export def msubtract (left: Map k v) (right: Map k v): Map k v =
 #   ```
 export def mintersect (left: Map k v) (right: Map k v): Map k v =
     def Map _ leftTree = left
+
     # tintersect uses the comparison function of the right tree, so similarly
     # attach the raw key comparison function of the right map to the output
     def Map cmpKey rightTree = right
+
     tintersect leftTree rightTree
     | Map cmpKey
 
@@ -554,12 +571,16 @@ export def mintersect (left: Map k v) (right: Map k v): Map k v =
 #   ```
 export def mintersectWith (fn: k => v => v => v) (left: Map k v) (right: Map k v): Map k v =
     def Map _ leftTree = left
+
     # tintersect uses the comparison function of the right tree, so similarly
     # attach the raw key comparison function of the right map to the output
     def Map cmpKey rightTree = right
+
     def pairFn l r =
         def Pair _ lv = l
         def Pair rk rv = r
+
         rk :-> fn rk lv rv
+
     tintersectWith pairFn leftTree rightTree
     | Map cmpKey

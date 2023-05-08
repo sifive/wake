@@ -14,7 +14,8 @@
 # limitations under the License.
 
 package build_wake
+
 from wake import _
 
 target buildWakeBox variant =
-    tool here Nil variant "bin/wakebox" (json, gopt, wakefs, util, Nil) Nil Nil
+    tool @here Nil variant "bin/wakebox" (json, gopt, wakefs, util, Nil) Nil Nil

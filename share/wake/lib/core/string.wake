@@ -23,6 +23,7 @@ package wake
 # To manipulate Strings, such as extract-ing a substring, use regular expressions.
 export def strlen (string: String): Integer =
     def p s = prim "strlen"
+
     p string
 
 # cat: concatenate a List of Strings into a String.
@@ -32,6 +33,7 @@ export def strlen (string: String): Integer =
 #   cat (x, ":", y, ":", z, Nil) = "{x}:{y}:{z}"
 export def cat (strings: List String): String =
     def p l = prim "lcat"
+
     p strings
 
 # catWith: concatenate a List of Strings with a separator.
@@ -54,6 +56,7 @@ export def catWith (separator: String) (strings: List String): String =
 #   explode "süß"   = "s", "ü", "ß", Nil
 export def explode (string: String): List String =
     def p s = prim "explode"
+
     p string
 
 # strbase: convert an Integer into a String using a given base.
@@ -72,11 +75,11 @@ export def explode (string: String): List String =
 # strbase   16  65535 = "ffff"
 # strbase (-15) 65535 = "FFFF"
 export def strbase (base: Integer): Option (Integer => String) =
-    def ok =
-        (  2 <= base && base <= 62) ||
-        (-36 <= base && base <= -2)
+    def ok = (2 <= base && base <= 62) || (-36 <= base && base <= -2)
+
     if ok then
         def p n integerToFormat = prim "str"
+
         Some (p base)
     else
         None
@@ -94,7 +97,9 @@ export def strbase (base: Integer): Option (Integer => String) =
 # For any other base (or an illegal input String), None is returned.
 export def intbase (base: Integer) (stringToParse: String): Option Integer =
     def p b s = prim "int"
-    p base stringToParse | head
+
+    p base stringToParse
+    | head
 
 # str: format an Integer to a String in decimal notation.
 #
@@ -102,6 +107,7 @@ export def intbase (base: Integer) (stringToParse: String): Option Integer =
 #   str 0xff = "256"
 export def str: Integer => String =
     def p n integerToFormat = prim "str"
+
     p 10
 
 # strHex: format an Integer to a String in hexadecimal notation.
@@ -110,6 +116,7 @@ export def str: Integer => String =
 #   strHex 0xff = "ff"
 export def strHex: Integer => String =
     def p n integerToFormat = prim "str"
+
     p 16
 
 # strOctal: format an Integer to a String in octal notation.
@@ -118,10 +125,12 @@ export def strHex: Integer => String =
 #   strOctal 0xff = "377"
 export def strOctal: Integer => String =
     def p n integerToFormat = prim "str"
+
     p 8
 
 export def filterTerminalCodes (str: String): String =
     def p s = prim "filter_term_codes"
+
     p str
 
 # int: convert a String into an Integer with the usual prefixes.
@@ -152,6 +161,7 @@ export def int (stringToParse: String): Option Integer =
 #   integerToUnicode 0 = "\x00"
 export def integerToUnicode (codepoint: Integer): String =
     def p x = prim "code2str"
+
     p codepoint
 
 # unicodeToInteger: convert the first codepoint in a String to an Integer.
@@ -164,6 +174,7 @@ export def integerToUnicode (codepoint: Integer): String =
 #   unicodeToInteger "\0a" = 0
 export def unicodeToInteger (firstCharacterToConvert: String): Integer =
     def p x = prim "str2code"
+
     p firstCharacterToConvert
 
 # integerToByte: convert an Integer into a String using raw binary.
@@ -181,6 +192,7 @@ export def unicodeToInteger (firstCharacterToConvert: String): Integer =
 #   "{integerToByte 0xc3}{integerToByte 0xa7}" = "ç"
 export def integerToByte (byte: Integer): String =
     def p b = prim "bin2str"
+
     p byte
 
 # byteToInteger: convert the first byte of a UTF-8-encoded String into an Integer.
@@ -192,6 +204,7 @@ export def integerToByte (byte: Integer): String =
 #   byteToInteger (integerToByte 231) = 231
 export def byteToInteger (firstByteToConvert: String): Integer =
     def p s = prim "str2bin"
+
     p firstByteToConvert
 
 # Version of wake
@@ -201,16 +214,19 @@ export def version: String =
 # unicodeCanonical: eliminate combining characters; C+◌̧ => Ç
 export def unicodeCanonical (str: String): String =
     def p s = prim "sNFC"
+
     p str
 
 # unicodeIdentifier: eliminate rendering distinctions; ¼i⁹ => 1/4i9
 export def unicodeIdentifier (str: String): String =
     def p s = prim "sNFKC"
+
     p str
 
 # unicodeLowercase: eliminate case distinctions; C => c
 export def unicodeLowercase (str: String): String =
     def p s = prim "scaseNFKC"
+
     p str
 
 # sortStrings: sort a list of strings as a human would judge them.
@@ -232,6 +248,7 @@ export def scmpLowercase (x: String) (y: String): Order =
 # Raw binary string comparison; no normalization performed
 export def scmp (x: String) (y: String): Order =
     def p x y = prim "scmp"
+
     p x y
 
 # NFKC order (fancy format removed) -- secure default
@@ -322,4 +339,5 @@ export def (x: String) !=* (y: String): Boolean =
 
 export def hashString (x: String): String =
     def hashStr x = prim "hash_str"
+
     hashStr x

@@ -18,4 +18,4 @@ package build_wake
 from wake import _
 
 target types variant =
-    src here variant (parser, util, Nil) Nil Nil
+    src @here variant (parser, util, Nil) Nil Nil

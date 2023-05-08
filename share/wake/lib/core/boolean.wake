@@ -29,10 +29,7 @@ export data Boolean =
 # !False = True
 # ```
 export def !(x: Boolean): Boolean =
-    if x then
-        False
-    else
-        True
+    if x then False else True
 
 # Binary operator for Boolean AND; `x && y`.
 # Both `x` and `y` must be True to return True.
@@ -46,10 +43,7 @@ export def !(x: Boolean): Boolean =
 # False && False = False
 # ```
 export def (x: Boolean) && (y: Boolean): Boolean =
-    if x then
-        y
-    else
-        False
+    if x then y else False
 
 # Binary operator for Boolean OR; `x || y`.
 # Either `x` or `y` must be True to return True.
@@ -63,10 +57,7 @@ export def (x: Boolean) && (y: Boolean): Boolean =
 # False || False = False
 # ```
 export def (x: Boolean) || (y: Boolean): Boolean =
-    if x then
-        True
-    else
-        y
+    if x then True else y
 
 # Binary operator for Boolean XOR/EOR; `eor x y`.
 # When `x` and `y` differ, returns True.
@@ -78,10 +69,7 @@ export def (x: Boolean) || (y: Boolean): Boolean =
 # eor False False = False
 # ```
 export def eor (x: Boolean) (y: Boolean): Boolean =
-    if x then
-        !y
-    else
-        y
+    if x then !y else y
 
 # Binary operator for Boolean XNOR/ENOR; `enor x y`.
 # When `x` and `y` are equal, returns True.
@@ -93,7 +81,4 @@ export def eor (x: Boolean) (y: Boolean): Boolean =
 # enor False False = True
 # ```
 export def enor (x: Boolean) (y: Boolean): Boolean =
-    if x then
-        y
-    else
-        !y
+    if x then y else !y

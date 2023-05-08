@@ -14,26 +14,23 @@
 # limitations under the License.
 
 package build_wake
+
 from wake import _
 from gcc_wake import _
 
-target vendorBuildDir Unit = mkdir "{@here}/.build"
+target vendorBuildDir Unit =
+    mkdir "{@here}/.build"
 
 def vendorDir =
-    here
+    @here
 
 def vendor (dir: String) (variant: Pair String String) (version: String) (headers: RegExp) (files: RegExp): Result SysLib Error =
-    def Pair _ cVariant =
-        variant
+    def Pair _ cVariant = variant
 
-    require Pass headerPaths =
-        sources dir headers
+    require Pass headerPaths = sources dir headers
+    require Pass sourcePaths = sources dir files
 
-    require Pass sourcePaths =
-        sources dir files
-
-    def compile =
-        compileC cVariant Nil headerPaths
+    def compile = compileC cVariant Nil headerPaths
 
     require Pass objects =
         map compile sourcePaths
@@ -43,4 +40,6 @@ def vendor (dir: String) (variant: Pair String String) (version: String) (header
 
 def pkg name = match (pkgConfig name)
     Some x = x
-    None   = makeSysLib "" | editSysLibLFlags ("-l{name}", _)
+    None =
+        makeSysLib ""
+        | editSysLibLFlags ("-l{name}", _)

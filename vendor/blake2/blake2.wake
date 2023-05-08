@@ -14,7 +14,8 @@
 # limitations under the License.
 
 package build_wake
+
 from wake import _
 
 target blake2 variant =
-    vendor here variant "1.0" `.*\.h` `.*\.c`
+    vendor @here variant "1.0" `.*\.h` `.*\.c`

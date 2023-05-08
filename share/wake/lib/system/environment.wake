@@ -15,7 +15,8 @@
 
 package wake
 
-def uname = prim "uname"
+def uname =
+    prim "uname"
 
 # sysname: build system's operating system.
 #
@@ -40,9 +41,7 @@ export def path: String =
 
 # Add PATH to the default environment
 publish environment =
-    "PATH={path}",
-    "TERM=xterm-256color",
-    Nil
+    "PATH={path}", "TERM=xterm-256color", Nil
 
 # Inject command-line specified path entries
 # Note: changing this value will likely cause a total workspace rebuild
@@ -51,14 +50,17 @@ publish path = match (getenv "WAKE_PATH")
     None = Nil
 
 # Setup a default path
-publish path = "/usr/bin", Nil
-publish path = "/bin", Nil
+publish path =
+    "/usr/bin", Nil
+
+publish path =
+    "/bin", Nil
 
 # On MacOS and FreeBSD, many important system binaries are not in /usr/bin
 publish path = match sysname
     "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
     "FreeBSD" = "/usr/local/bin", Nil
-    _        = Nil
+    _ = Nil
 
 # A topic used to globally add variables to the default environment of Plans
 export topic environment: String
@@ -71,15 +73,21 @@ export def environment: List String =
 # Use of this function can lead to unnecessary rebuilds!
 export def getenv (key: String): Option String =
     def p x = prim "getenv"
+
     head (p key)
 
-def test key = replace `=.*` "" _ ==* key
-def value pair = replace `^[^=]*=` "" pair
+def test key =
+    replace `=.*` "" _ ==* key
+
+def value pair =
+    replace `^[^=]*=` "" pair
 
 # Retrieve the value for 'key' from a KEY=VALUE environment list
 export def getEnvironment (key: String) (environment: List String): Option String =
     def clean (Pair eq _) = value eq
-    find (test key) environment | omap clean
+
+    find (test key) environment
+    | omap clean
 
 # Remove a key from a KEY=VALUE environment list
 #
@@ -102,6 +110,7 @@ export def setEnvironment (key: String) (value: String) (environment: List Strin
 # Only the first match (if any) is supplied to fn
 export def editEnvironment (key: String) (fn: Option String => Option String) (environment: List String): List String =
     def Pair eq rest = splitBy (test key) environment
+
     match (head eq | omap value | fn)
         Some v = "{key}={v}", rest
         None = rest
@@ -115,6 +124,7 @@ export def addEnvironmentPath (path: String) (environment: List String): List St
     def mod = match _
         None = Some path
         Some x = Some "{path}:{x}"
+
     editEnvironment "PATH" mod environment
 
 # Optionally add a component to the PATH in a KEY=VALUE environment

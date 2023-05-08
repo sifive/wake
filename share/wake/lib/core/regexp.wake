@@ -22,6 +22,7 @@ package wake
 # quote "hello[world]" = `hello\[world\]`
 export def quote (str: String): RegExp =
     def res str = prim "quote"
+
     match (res str).stringToRegExp
         Pass x = x
         Fail error = unreachable "quote primitive bug: {error.getErrorCause}"
@@ -31,9 +32,14 @@ export def quote (str: String): RegExp =
 # For simple expressions, use built-in RegExp interpolation `${x}${y}${z}`.
 # regExpCast (`abc`, `def`, Nil) = `abcdef`
 export def regExpCat (l: List RegExp): RegExp =
-    def res = l | map regExpToString | cat | stringToRegExp
+    def res =
+        l
+        | map regExpToString
+        | cat
+        | stringToRegExp
+
     match res
-        Pass regex  = regex
+        Pass regex = regex
         Fail error = unreachable "regexp parser bug post concatenation: {error.getErrorCause}"
 
 # Convert a String into a Regular expression.
@@ -42,6 +48,7 @@ export def regExpCat (l: List RegExp): RegExp =
 # stringToRegExp "a("  = Fail (Error "missing ): a(" _)
 export def stringToRegExp (str: String): Result RegExp Error =
     def p s = prim "re2"
+
     match (p str)
         Pass r = Pass r
         Fail e = failWithError e
@@ -56,6 +63,7 @@ export def stringToRegExp (str: String): Result RegExp Error =
 #   \*   matches a *
 export def globToRegExp (glob: String): RegExp =
     def glob2regexp glob = prim "glob2regexp"
+
     match (glob2regexp glob).stringToRegExp
         Pass x = x
         Fail error = unreachable "glob primitive bug: {error.getErrorCause}"
@@ -71,20 +79,20 @@ export def regExpToString (regExp: RegExp): String =
 # matches `a*` "ba" = False
 # matches `a*` "aa" = True
 export def matches (testRegExp: RegExp) (str: String): Boolean =
-    (\_\_ prim "match") testRegExp str
+    (\_ \_ prim "match") testRegExp str
 
 # Extract fields out of a String using a parenthetical regular expression.
 # extract `(.*)-(.*)` "hello-world-hello" = ("hello", "world-hello", Nil)
 # extract `(.*)-(.*)` "helloworldhello" = Nil
 export def extract (parensRegexp: RegExp) (str: String): List String =
-    (\_\_ prim "extract") parensRegexp str
+    (\_ \_ prim "extract") parensRegexp str
 
 # Replace all occurances of locatorRegExp in str with replacement.
 # replace `:` " " "a:b:c" = "a b c"
 export def replace (locatorRegExp: RegExp) (replacement: String) (str: String): String =
-    (\_\_\_ prim "replace") locatorRegExp replacement str
+    (\_ \_ \_ prim "replace") locatorRegExp replacement str
 
 # Remove all occurances of seperatorRegExp from str, creating a List of String fragments.
 # tokenize `:` "hello:there:friend" = ("hello", "there", "friend", Nil)
 export def tokenize (seperatorRegExp: RegExp) (str: String): List String =
-    (\_\_ prim "tokenize") seperatorRegExp str
+    (\_ \_ prim "tokenize") seperatorRegExp str

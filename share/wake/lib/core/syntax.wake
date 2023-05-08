@@ -19,8 +19,8 @@ package wake
 
 # Flip function and argument order.
 # fn obj.getXYZ = fn (getXYZ obj)
-export def (argument: a) . (memberFn: a => b): b =
-    memberFn argument 
+export def (argument: a).(memberFn: a => b): b =
+    memberFn argument
 
 # Flip function and argument order.
 # seq 10 | map str | catWith " " = catWith " " (map str (seq 10))
@@ -52,8 +52,9 @@ export def flip (f: a => b => c) (x: b) (y: a): c =
 # A 'match x' expression on list 'x' with different case results also acts like 'wait'.
 export def wait (f: a => b) (x: a): b =
     def imp x = prim "true"
+
     match (imp x)
-        True  = f x
+        True = f x
         False = unreachable "true returned false"
 
 # Tell the wake interpreter that it is impossible to reach this expression.
@@ -97,4 +98,5 @@ export def wait (f: a => b) (x: a): b =
 # ```
 export def unreachable (reason: String): a =
     def f x = prim "unreachable"
+
     f reason
