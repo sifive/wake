@@ -470,6 +470,9 @@ static int stream_color(std::string name) {
   if (name == "debug") {
     return 4;
   }
+  if (name == "bsp") {
+    return 2;
+  }
   if (name == "null") {
     return 0;
   }

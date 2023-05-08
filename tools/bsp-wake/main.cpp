@@ -140,6 +140,10 @@ ExecuteWakeProcess::ExecuteWakeProcess() : result(JSON_OBJECT), error(JSON_NULLV
   cmdline.push_back("--quiet");
   cmdline.push_back("--stdout=bsp");
   cmdline.push_back("--stderr=error");
+  cmdline.push_back("--log-header");
+  cmdline.push_back("");
+  cmdline.push_back("--log-header-source-width");
+  cmdline.push_back("0");
   cmdline.push_back("--fd:3=warning");
   if (quiet) {
     cmdline.push_back("--fd:4=info");

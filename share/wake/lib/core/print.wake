@@ -32,10 +32,8 @@ export def format (anyType: a): String =
 
 # LogLevel is a user-opaque type.
 # To construct a LogLevel, use makeLogLevel.
-data LogLevel =
+export data LogLevel =
     LogLevel (name: String)
-
-from wake export type LogLevel
 
 # getLogLevelName: return the name of the LogLevel
 export def getLogLevelName (LogLevel name): String =
@@ -66,6 +64,10 @@ export def logInfo: LogLevel =
 # logDebug: logged to stdout when run with -d (Blue)
 export def logDebug: LogLevel =
     LogLevel "debug" # (Some Blue)
+
+# logBSP: by default not logged. Used for implementing a bsp in wake.
+export def logBSP: LogLevel =
+    LogLevel "bsp" # (Some Green)
 
 # logNever: not logged to any stream
 export def logNever: LogLevel =
