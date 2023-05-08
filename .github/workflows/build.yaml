@@ -27,11 +27,11 @@ jobs:
         - name: Build Tarball
           run: make tarball
 
-        - name: Check Wake Formatting
-          run: ./bin/wake-format.native-cpp14-release -n $(./scripts/which_wake_files all)
-
         - name: Run Tests
           run: make test && make unittest
+
+        - name: Check Wake Formatting
+          run: ./bin/wake-format.native-cpp14-release -n $(./scripts/which_wake_files all)
 
         - name: Generate Docs
           run: mkdir www && ./bin/wake --no-workspace --html > www/index.html
