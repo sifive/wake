@@ -56,6 +56,7 @@ struct CommandLineOptions {
   bool timeline;
   bool clean;
   bool list_outputs;
+  wcl::optional<bool> log_header_align;
 
   const char *percent_str;
   const char *jobs_str;
@@ -149,6 +150,8 @@ struct CommandLineOptions {
       {0, "label-filter", GOPT_ARGUMENT_REQUIRED},
       {0, "log-header", GOPT_ARGUMENT_REQUIRED},
       {0, "log-header-source-width", GOPT_ARGUMENT_REQUIRED},
+      {0, "log-header-align", GOPT_ARGUMENT_FORBIDDEN},
+      {0, "no-log-header-align", GOPT_ARGUMENT_FORBIDDEN},
       {':', "shebang", GOPT_ARGUMENT_REQUIRED},
       {0, 0, GOPT_LAST}
     };
@@ -209,6 +212,14 @@ struct CommandLineOptions {
     fd5 = arg(options, "fd:5")->argument;
     label_filter = arg(options, "label-filter")->argument;
     log_header = arg(options, "log-header")->argument;
+
+    if (arg(options, "log-header-align")->count) {
+      log_header_align = wcl::some(true);
+    }
+
+    if (arg(options, "no-log-header-align")->count) {
+      log_header_align = wcl::some(false);
+    }
 
     auto lhsw_str = arg(options, "log-header-source-width")->argument;
     if (lhsw_str) log_header_source_width = wcl::make_some<int64_t>(std::stol(lhsw_str));

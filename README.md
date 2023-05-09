@@ -153,6 +153,7 @@ contain JSON5 source where the root object may contain the following keys.
 | user_config | Path to user config for this repo. Allows a different config for each repo. | No       | shell expandable path string | Yes       | No          | `$XDG_CONFIG_HOME/wake.json` if `$XDG_CONFIG_HOME` set, `$HOME/.config/wake.json` otherwise |
 | log_header | A string containing `$stream` and `$source` that will prepend every line of a jobs output | No | An interpolated string | Yes      | Yes | `'[$stream] $source: '`
 | log_header_source_width | An integer that specifies the width of the `$source` variable in `log_header` | No | Positive Integer | Yes | Yes | 25
+| log_header_align | A boolean that specifies whether or not to align log header output | No | Boolean | Yes | Yes | False
 
 Below is a full example
 
