@@ -43,6 +43,7 @@ struct WakeConfigOverrides {
   // Determines the size of the cache that collection
   // tries to get us back to.
   wcl::optional<uint64_t> low_cache_size;
+  wcl::optional<bool> log_header_align;
 };
 
 template <class T>
@@ -169,6 +170,28 @@ struct SharedCacheLowSize {
   static void set(SharedCacheLowSize& p, const JAST& json);
   static void set_input(SharedCacheLowSize& p, const input_type& v) { p.*value = v; }
   static void emit(const SharedCacheLowSize& p, std::ostream& os) { os << p.*value; }
+};
+
+struct LogHeaderAlignPolicy {
+  using type = bool;
+  using input_type = type;
+  static constexpr const char* key = "log_header_align";
+  static constexpr bool allowed_in_wakeroot = true;
+  static constexpr bool allowed_in_userconfig = true;
+  type log_header_align = false;
+  static constexpr type LogHeaderAlignPolicy::*value = &LogHeaderAlignPolicy::log_header_align;
+  static constexpr Override<input_type> override_value = &WakeConfigOverrides::log_header_align;
+
+  LogHeaderAlignPolicy() {}
+  static void set(LogHeaderAlignPolicy& p, const JAST& json);
+  static void set_input(LogHeaderAlignPolicy& p, const input_type& v) { p.*value = v; }
+  static void emit(const LogHeaderAlignPolicy& p, std::ostream& os) {
+    if (p.log_header_align) {
+      os << "true";
+    } else {
+      os << "false";
+    }
+  }
 };
 
 /********************************************************************
@@ -300,7 +323,7 @@ struct WakeConfigImpl : public Polcies... {
 
 using WakeConfigImplFull =
     WakeConfigImpl<UserConfigPolicy, VersionPolicy, LogHeaderPolicy, LogHeaderSourceWidthPolicy,
-                   LabelFilterPolicy, SharedCacheMaxSize, SharedCacheLowSize>;
+                   LabelFilterPolicy, SharedCacheMaxSize, SharedCacheLowSize, LogHeaderAlignPolicy>;
 
 struct WakeConfig final : public WakeConfigImplFull {
   static bool init(const std::string& wakeroot_path, const WakeConfigOverrides& overrides);

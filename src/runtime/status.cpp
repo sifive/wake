@@ -170,6 +170,7 @@ void StatusBuf::emit_header() {
   // Now output the format the user requested.
   out << fmt_vec[0];
   const size_t extra_width = WakeConfig::get()->log_header_source_width;
+  const bool should_align = WakeConfig::get()->log_header_align;
   for (size_t i = 1; i < fmt_vec.size(); i += 2) {
     const std::string &var = fmt_vec[i];
 
@@ -193,14 +194,17 @@ void StatusBuf::emit_header() {
     if (var == "stream") {
       // TODO: Make this configurable
       constexpr size_t stream_width = 7;
-      out << std::setw(stream_width);
+      if (should_align) {
+        out << std::setw(stream_width);
+      }
       out << name;
       continue;
     }
 
     if (var == "source") {
-      // TODO: Make this configurable
       std::string tmp_extra;
+
+      // We still cap the maximum length even if we don't align things
       if (extra) {
         if (extra->size() <= extra_width) {
           tmp_extra = *extra;
@@ -211,7 +215,9 @@ void StatusBuf::emit_header() {
           tmp_extra.append(extra->begin(), extra->begin() + extra_width);
         }
       }
-      out << std::setw(extra_width);
+      if (should_align) {
+        out << std::setw(extra_width);
+      }
       out << tmp_extra;
       continue;
     }

@@ -123,6 +123,16 @@ struct JAST {
     }
     return {};
   }
+
+  wcl::optional<bool> expect_boolean() const {
+    if (kind == JSON_TRUE) {
+      return wcl::some(true);
+    }
+    if (kind == JSON_FALSE) {
+      return wcl::some(false);
+    }
+    return {};
+  }
 };
 
 std::ostream &operator<<(std::ostream &os, const JAST &jast);
