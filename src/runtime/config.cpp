@@ -197,7 +197,7 @@ static std::vector<std::string> find_disallowed_keys(const JAST& json,
   return disallowed;
 }
 
-#define POLCIY_STATIC_DEFINES(Policy)           \
+#define POLICY_STATIC_DEFINES(Policy)           \
   constexpr const char* Policy::key;            \
   constexpr bool Policy::allowed_in_wakeroot;   \
   constexpr bool Policy::allowed_in_userconfig; \
@@ -207,14 +207,14 @@ static std::vector<std::string> find_disallowed_keys(const JAST& json,
  * Definition boilerplate
  *********************************************************************/
 
-POLCIY_STATIC_DEFINES(UserConfigPolicy)
-POLCIY_STATIC_DEFINES(VersionPolicy)
-POLCIY_STATIC_DEFINES(LogHeaderPolicy)
-POLCIY_STATIC_DEFINES(LogHeaderSourceWidthPolicy)
-POLCIY_STATIC_DEFINES(LabelFilterPolicy)
-POLCIY_STATIC_DEFINES(SharedCacheMaxSize)
-POLCIY_STATIC_DEFINES(SharedCacheLowSize)
-POLCIY_STATIC_DEFINES(LogHeaderAlignPolicy)
+POLICY_STATIC_DEFINES(UserConfigPolicy)
+POLICY_STATIC_DEFINES(VersionPolicy)
+POLICY_STATIC_DEFINES(LogHeaderPolicy)
+POLICY_STATIC_DEFINES(LogHeaderSourceWidthPolicy)
+POLICY_STATIC_DEFINES(LabelFilterPolicy)
+POLICY_STATIC_DEFINES(SharedCacheMaxSize)
+POLICY_STATIC_DEFINES(SharedCacheLowSize)
+POLICY_STATIC_DEFINES(LogHeaderAlignPolicy)
 
 /********************************************************************
  * Non-Trivial Defaults
