@@ -25,15 +25,19 @@
 #include <memory>
 #include <string>
 
+namespace job_cache {
+
 struct EvictionPolicy {
-  virtual void init() = 0;
+  virtual void init(const std::string& cache_dir) = 0;
   virtual void read(int id) = 0;
   virtual void write(int id) = 0;
   virtual ~EvictionPolicy() {}
 };
 
 struct NilEvictionPolicy : EvictionPolicy {
-  virtual void init() override { std::cerr << "NilEvictionPolicy::init()" << std::endl; }
+  virtual void init(const std::string& cache_dir) override {
+    std::cerr << "NilEvictionPolicy::init()" << std::endl;
+  }
 
   virtual void read(int id) override {
     std::cerr << "NilEvictionPolicy::read(" << id << ")" << std::endl;
@@ -44,4 +48,28 @@ struct NilEvictionPolicy : EvictionPolicy {
   }
 };
 
-int eviction_loop(std::unique_ptr<EvictionPolicy> policy);
+struct LRUEvictionPolicyImpl;
+
+class LRUEvictionPolicy : public EvictionPolicy {
+  // We need to touch the database so we use pimpl to hide the implementation
+  std::unique_ptr<LRUEvictionPolicyImpl> impl;
+  uint64_t max_cache_size;
+  uint64_t low_cache_size;
+
+ public:
+  explicit LRUEvictionPolicy(uint64_t max_cache_size, uint64_t low_cache_size);
+  LRUEvictionPolicy() = delete;
+  LRUEvictionPolicy(const LRUEvictionPolicy&) = delete;
+  LRUEvictionPolicy(LRUEvictionPolicy&&) = delete;
+  virtual ~LRUEvictionPolicy();
+
+  virtual void init(const std::string& cache_dir) override;
+
+  virtual void read(int id) override;
+
+  virtual void write(int id) override;
+};
+
+int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> policy);
+
+}  // namespace job_cache

@@ -1,5 +1,7 @@
 {
   "user_config": "./wake_user.json",
   "log_header": "foobar $source: ",
-  "log_header_source_width": 13
+  "log_header_source_width": 13,
+  "max_cache_size": 1024,
+  "low_cache_size": 512
 }

@@ -50,373 +50,15 @@
 #include <thread>
 #include <unordered_map>
 
+#include "db_helpers.h"
 #include "eviction_command.h"
 #include "eviction_policy.h"
+#include "job_cache_impl_common.h"
 #include "logging.h"
 
 namespace {
 
 using namespace job_cache;
-
-// moves the file or directory, crashes on error
-static void rename_no_fail(const char *old_path, const char *new_path) {
-  if (rename(old_path, new_path) < 0) {
-    log_fatal("rename(%s, %s): %s", old_path, new_path, strerror(errno));
-  }
-}
-
-// Ensures the the given directory has been created
-static void mkdir_no_fail(const char *dir) {
-  if (mkdir(dir, 0777) < 0 && errno != EEXIST) {
-    log_fatal("mkdir(%s): %s", dir, strerror(errno));
-  }
-}
-
-static void symlink_no_fail(const char *target, const char *symlink_path) {
-  if (symlink(target, symlink_path) == -1) {
-    log_fatal("symlink(%s, %s): %s", target, symlink_path, strerror(errno));
-  }
-}
-
-// Ensures the given file has been deleted
-static void unlink_no_fail(const char *file) {
-  if (unlink(file) < 0 && errno != ENOENT) {
-    log_fatal("unlink(%s): %s", file, strerror(errno));
-  }
-}
-
-// Ensures the the given directory no longer exists
-static void rmdir_no_fail(const char *dir) {
-  if (rmdir(dir) < 0 && errno != ENOENT) {
-    log_fatal("rmdir(%s): %s", dir, strerror(errno));
-  }
-}
-
-// For apple and emscripten fallback on a dumb slow implementation
-#if defined(__APPLE__) || defined(__EMSCRIPTEN__)
-
-static void copy(int src_fd, int dst_fd) {
-  FdBuf src(src_fd);
-  FdBuf dst(dst_fd);
-  std::ostream out(&dst);
-  std::istream in(&src);
-
-  struct stat buf = {};
-  // There's a race here between the fstat and the copy_file_range
-  if (fstat(src_fd, &buf) < 0) {
-    log_fatal("fstat(src_fd = %d): %s", src_fd, strerror(errno));
-  }
-
-  // TODO: This is very slow because FdBuf is very slow
-  // TODO: This will read large files into memory which is very bad
-  std::vector<char> data_buf(buf.st_size);
-  if (!in.read(data_buf.data(), buf.st_size)) {
-    log_fatal("copy.read(src_fd = %d, NULL, dst_fd = %d, size = %d): %s", src_fd, dst_fd,
-              buf.st_size, strerror(errno));
-  }
-
-  if (!out.write(data_buf.data(), buf.st_size)) {
-    log_fatal("copy.write(src_fd = %d, NULL, dst_fd = %d, size = %d): %s", src_fd, dst_fd,
-              buf.st_size, strerror(errno));
-  }
-}
-
-// For modern linux use copy_file_range
-#elif __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 27
-
-#include <linux/fs.h>
-
-// This function just uses `copy_file_range` to make
-// an efficent copy. It is however not atomic because
-// we have to `fstat` before we call `copy_file_range`.
-// This means that if an external party decides to mutate
-// the file (espeically changing its size) then this function
-// will not work as intended. External parties *are* allowed to
-// unlink this file but they're not allowed to modify it in any
-// other way or else this function will race with that external
-// modification.
-static void copy(int src_fd, int dst_fd) {
-  struct stat buf = {};
-  // There's a race here between the fstat and the copy_file_range
-  if (fstat(src_fd, &buf) < 0) {
-    log_fatal("fstat(src_fd = %d): %s", src_fd, strerror(errno));
-  }
-  if (copy_file_range(src_fd, nullptr, dst_fd, nullptr, buf.st_size, 0) < 0) {
-    log_fatal("copy_file_range(src_fd = %d, NULL, dst_fd = %d, size = %d, 0): %s", src_fd, dst_fd,
-              buf.st_size, strerror(errno));
-  }
-}
-
-// For older linux distros use Linux's sendfile
-#else
-
-#include <sys/sendfile.h>
-// This function just uses `sendfile` to make
-// an efficent copy. It is however not atomic because
-// we have to `fstat` before we call `sendfile`.
-// This means that if an external party decides to mutate
-// the file (espeically changing its size) then this function
-// will not work as intended. External parties *are* allowed to
-// unlink this file but they're not allowed to modify it in any
-// other way or else this function will race with that external
-// modification.
-
-static void copy(int src_fd, int dst_fd) {
-  struct stat buf = {};
-  // There's a race here between the fstat and the copy_file_range
-  if (fstat(src_fd, &buf) < 0) {
-    log_fatal("fstat(src_fd = %d): %s", src_fd, strerror(errno));
-  }
-  off_t idx = 0;
-  size_t size = buf.st_size;
-  do {
-    intptr_t written = sendfile(dst_fd, src_fd, &idx, size);
-    if (written < 0) {
-      log_fatal("sendfile(src_fd = %d, NULL, dst_fd = %d, size = %d, 0): %s", src_fd, dst_fd,
-                buf.st_size, strerror(errno));
-    }
-    idx = written;
-    size -= written;
-  } while (size != 0);
-}
-#endif
-
-#ifdef FICLONE
-
-static void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644,
-                            int extra_flags = 0) {
-  auto src_fd = wcl::unique_fd::open(src, O_RDONLY);
-  if (!src_fd) {
-    log_fatal("open(%s): %s", src, strerror(src_fd.error()));
-  }
-
-  auto dst_fd = wcl::unique_fd::open(dst, O_WRONLY | O_CREAT | extra_flags, mode);
-  if (!dst_fd) {
-    log_fatal("open(%s): %s", dst, strerror(dst_fd.error()));
-  }
-
-  if (ioctl(dst_fd->get(), FICLONE, src_fd->get()) < 0) {
-    if (errno != EINVAL && errno != EOPNOTSUPP && errno != EXDEV) {
-      log_fatal("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
-    }
-    copy(src_fd->get(), dst_fd->get());
-  }
-}
-
-#else
-
-static mode_t copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644,
-                              int extra_flags = 0) {
-  auto src_fd = wcl::unique_fd::open(src, O_RDONLY);
-  if (!src_fd) {
-    log_fatal("open(%s): %s", src, strerror(src_fd.error()));
-  }
-
-  auto dst_fd = wcl::unique_fd::open(dst, O_WRONLY | O_CREAT | extra_flags, mode);
-  if (!dst_fd) {
-    log_fatal("open(%s): %s", dst, strerror(dst_fd.error()));
-  }
-
-  copy(src_fd->get(), dst_fd->get());
-
-  return mode;
-}
-
-#endif
-
-// This is fairly critical to getting strong concurency.
-// Specifically adding in exponetial back off plus randomization.
-static int wait_handle(void *, int retries) {
-  // We don't ever want to wait more than ~4 seconds.
-  // If we wait more than ~4 seconds we fail.
-  constexpr int start_pow_2 = 6;
-  constexpr int end_pow_2 = 22;
-  if (retries > end_pow_2 - start_pow_2) return 0;
-
-  useconds_t base_wait = 1 << start_pow_2;
-  std::random_device rd;
-  // Wait exponetially longer the more times
-  // we've had to retry.
-  useconds_t wait = base_wait << retries;
-  // Randomize so we don't all retry at the same time.
-  wait += rd() & (wait - 1);
-  // Finally sleep, without waking up exactly when we're done.
-  // but we should never sleep longer than twice as long as we
-  // had to this way.
-  usleep(wait);
-
-  // Tell sqlite to retry
-  return 1;
-}
-
-class Database {
- private:
-  sqlite3 *db = nullptr;
-
- public:
-  Database(const Database &) = delete;
-  Database(Database &&) = delete;
-  Database() = delete;
-  ~Database() {
-    static int dystroy_counter = 0;
-    assert(++dystroy_counter == 1);
-    if (sqlite3_close(db) != SQLITE_OK) {
-      log_fatal("Could not close database: %s", sqlite3_errmsg(db));
-    }
-  }
-  Database(const std::string &cache_dir) {
-    static int construct_counter = 0;
-    assert(++construct_counter == 1);
-    // We want to keep a sql file that has proper syntax highlighting
-    // around instead of embeding the schema. In order to acomplish this
-    // we use C++11 raw strings and the preprocessor. Unfortuently
-    // since starting a sql file with `R("` causes it to all highlight
-    // as a string we need to work around that. In sql `--` is a comment
-    // starter but in C++ its decrement. We take advantage of this by
-    // adding `--dummy, R("` to the start of the sql file which allows
-    // it to be valid and have no effect in both languages. Thus
-    // this dummy variable is needed at the import site. Additionally
-    // because the comma is lower precedence than the '=' operator we
-    // have to put parens around the include to get this trick to work.
-    // clang-format off
-    int dummy = 0;
-    const char* cache_schema = (
-        #include "schema.sql"
-    );
-    // clang-format on
-
-    // Make sure the cache directory exists
-    mkdir_no_fail(cache_dir.c_str());
-
-    std::string db_path = wcl::join_paths(cache_dir, "/cache.db");
-    if (sqlite3_open_v2(db_path.c_str(), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
-                        nullptr) != SQLITE_OK) {
-      log_fatal("error: %s", sqlite3_errmsg(db));
-    }
-
-    if (sqlite3_busy_handler(db, wait_handle, nullptr)) {
-      log_fatal("error: failed to set sqlite3_busy_handler: %s", sqlite3_errmsg(db));
-    }
-
-    char *fail = nullptr;
-
-    int ret = sqlite3_exec(db, cache_schema, nullptr, nullptr, &fail);
-
-    if (ret == SQLITE_BUSY) {
-      log_fatal(
-          "warning: It appears another process is holding the database open, check `ps` for "
-          "suspended wake instances");
-    }
-    if (ret != SQLITE_OK) {
-      log_fatal("error: failed init stmt: %s: %s", fail, sqlite3_errmsg(db));
-    }
-  }
-
-  sqlite3 *get() const { return db; }
-};
-
-class PreparedStatement {
- private:
-  std::shared_ptr<Database> db = nullptr;
-  sqlite3_stmt *query_stmt = nullptr;
-  std::string why = "";
-
- public:
-  PreparedStatement() = delete;
-  PreparedStatement(const PreparedStatement &) = delete;
-  PreparedStatement(PreparedStatement &&pstmt) {
-    db = pstmt.db;
-    query_stmt = pstmt.query_stmt;
-    pstmt.db = nullptr;
-    query_stmt = nullptr;
-  }
-  PreparedStatement &operator=(PreparedStatement &&pstmt) {
-    db = pstmt.db;
-    query_stmt = pstmt.query_stmt;
-    pstmt.db = nullptr;
-    query_stmt = nullptr;
-    return *this;
-  }
-
-  PreparedStatement(std::shared_ptr<Database> db, const std::string &sql_str) : db(db) {
-    if (sqlite3_prepare_v2(db->get(), sql_str.c_str(), sql_str.size(), &query_stmt, nullptr) !=
-        SQLITE_OK) {
-      log_fatal("error: failed to prepare statement: %s", sqlite3_errmsg(db->get()));
-    }
-  }
-
-  ~PreparedStatement() {
-    if (query_stmt) {
-      int ret = sqlite3_finalize(query_stmt);
-      if (ret != SQLITE_OK) {
-        log_fatal("sqlite3_finalize: %s", sqlite3_errmsg(db->get()));
-      }
-      query_stmt = nullptr;
-    }
-  }
-
-  void set_why(std::string why) { this->why = std::move(why); }
-
-  void bind_integer(int64_t index, int64_t value) {
-    int ret = sqlite3_bind_int64(query_stmt, index, value);
-    if (ret != SQLITE_OK) {
-      log_fatal("%s: sqlite3_bind_int64(%d, %d): %s", why.c_str(), index, value,
-                sqlite3_errmsg(db->get()));
-    }
-  }
-
-  void bind_double(int64_t index, double value) {
-    int ret = sqlite3_bind_double(query_stmt, index, value);
-    if (ret != SQLITE_OK) {
-      log_fatal("%s: sqlite3_bind_double(%d, %d): %s", why.c_str(), index, value,
-                sqlite3_errmsg(db->get()));
-    }
-  }
-
-  void bind_string(int64_t index, const std::string &value) {
-    int ret = sqlite3_bind_text(query_stmt, index, value.c_str(), value.size(), SQLITE_TRANSIENT);
-    if (ret != SQLITE_OK) {
-      log_fatal("%s: sqlite3_bind_text(%d, %s): %s", why.c_str(), index, value.c_str(),
-                sqlite3_errmsg(sqlite3_db_handle(query_stmt)));
-    }
-  }
-
-  int64_t read_integer(int64_t index) { return sqlite3_column_int64(query_stmt, index); }
-
-  double read_double(int64_t index) { return sqlite3_column_double(query_stmt, index); }
-
-  std::string read_string(int64_t index) {
-    const char *str = reinterpret_cast<const char *>(sqlite3_column_text(query_stmt, index));
-    size_t size = sqlite3_column_bytes(query_stmt, index);
-    return std::string(str, size);
-  }
-
-  void reset() {
-    int ret;
-
-    ret = sqlite3_reset(query_stmt);
-    if (ret == SQLITE_LOCKED) {
-      log_fatal("error: sqlite3_reset: SQLITE_LOCKED");
-    }
-
-    if (ret != SQLITE_OK) {
-      log_fatal("error: %s; sqlite3_reset: %s", why.c_str(), sqlite3_errmsg(db->get()));
-    }
-
-    if (sqlite3_clear_bindings(query_stmt) != SQLITE_OK) {
-      log_fatal("error: %s; sqlite3_clear_bindings: %s", why.c_str(), sqlite3_errmsg(db->get()));
-    }
-  }
-
-  int step() {
-    int ret;
-    ret = sqlite3_step(query_stmt);
-    if (ret != SQLITE_DONE && ret != SQLITE_ROW) {
-      log_fatal("error: %s; sqlite3_step: %s", why.c_str(), sqlite3_errmsg(db->get()));
-    }
-    return ret;
-  }
-};
 
 // Database classes
 class InputFiles {
@@ -427,7 +69,7 @@ class InputFiles {
   static constexpr const char *insert_query =
       "insert into input_files (path, hash, job) values (?, ?, ?)";
 
-  InputFiles(std::shared_ptr<Database> db) : add_input_file(db, insert_query) {
+  InputFiles(std::shared_ptr<job_cache::Database> db) : add_input_file(db, insert_query) {
     add_input_file.set_why("Could not insert input file");
   }
 
@@ -448,7 +90,7 @@ class InputDirs {
   static constexpr const char *insert_query =
       "insert into input_dirs (path, hash, job) values (?, ?, ?)";
 
-  InputDirs(std::shared_ptr<Database> db) : add_input_dir(db, insert_query) {
+  InputDirs(std::shared_ptr<job_cache::Database> db) : add_input_dir(db, insert_query) {
     add_input_dir.set_why("Could not insert input directory");
   }
 
@@ -469,7 +111,7 @@ class OutputFiles {
   static constexpr const char *insert_query =
       "insert into output_files (path, hash, mode, job) values (?, ?, ?, ?)";
 
-  OutputFiles(std::shared_ptr<Database> db) : add_output_file(db, insert_query) {
+  OutputFiles(std::shared_ptr<job_cache::Database> db) : add_output_file(db, insert_query) {
     add_output_file.set_why("Could not insert output file");
   }
 
@@ -491,7 +133,7 @@ class OutputDirs {
   static constexpr const char *insert_query =
       "insert into output_dirs (path, mode, job) values (?, ?, ?)";
 
-  OutputDirs(std::shared_ptr<Database> db) : add_output_dir(db, insert_query) {
+  OutputDirs(std::shared_ptr<job_cache::Database> db) : add_output_dir(db, insert_query) {
     add_output_dir.set_why("Could not insert output dir");
   }
 
@@ -512,7 +154,7 @@ class OutputSymlinks {
   static constexpr const char *insert_query =
       "insert into output_symlinks (path, value, job) values (?, ?, ?)";
 
-  OutputSymlinks(std::shared_ptr<Database> db) : add_output_symlink(db, insert_query) {
+  OutputSymlinks(std::shared_ptr<job_cache::Database> db) : add_output_symlink(db, insert_query) {
     add_output_symlink.set_why("Could not insert output file");
   }
 
@@ -527,7 +169,7 @@ class OutputSymlinks {
 
 class JobTable {
  private:
-  std::shared_ptr<Database> db;
+  std::shared_ptr<job_cache::Database> db;
   PreparedStatement add_job;
   PreparedStatement add_output_info;
 
@@ -541,7 +183,7 @@ class JobTable {
       "(job, stdout, stderr, ret, runtime, cputime, mem, ibytes, obytes)"
       "values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-  JobTable(std::shared_ptr<Database> db)
+  JobTable(std::shared_ptr<job_cache::Database> db)
       : db(db), add_job(db, insert_query), add_output_info(db, add_output_info_query) {
     add_job.set_why("Could not insert job");
     add_output_info.set_why("Could not add output info");
@@ -603,29 +245,6 @@ struct RequestedJobFile {
 
 struct JobRequestResult {
   std::vector<RequestedJobFile> requested_files;
-};
-
-class Transaction {
- private:
-  PreparedStatement begin_txn_query;
-  PreparedStatement commit_txn_query;
-
- public:
-  static constexpr const char *sql_begin_txn = "begin immediate transaction";
-  static constexpr const char *sql_commit_txn = "commit transaction";
-
-  Transaction(std::shared_ptr<Database> db)
-      : begin_txn_query(db, sql_begin_txn), commit_txn_query(db, sql_commit_txn) {
-    begin_txn_query.set_why("Could not begin a transaction");
-    commit_txn_query.set_why("Could not commit a transaction");
-  }
-
-  template <class F>
-  void run(F f) {
-    begin_txn_query.step();
-    f();
-    commit_txn_query.step();
-  }
 };
 
 class SelectMatchingJobs {
@@ -742,7 +361,7 @@ class SelectMatchingJobs {
       "select stdout, stderr, ret, runtime, cputime, mem, ibytes, obytes from job_output_info "
       "where job = ?";
 
-  SelectMatchingJobs(std::shared_ptr<Database> db)
+  SelectMatchingJobs(std::shared_ptr<job_cache::Database> db)
       : find_jobs(db, sql_find_jobs),
         find_files(db, sql_find_files),
         find_dirs(db, sql_input_dirs),
@@ -864,7 +483,7 @@ namespace job_cache {
 
 struct CacheDbImpl {
  private:
-  std::shared_ptr<Database> db;
+  std::shared_ptr<job_cache::Database> db;
 
  public:
   JobTable jobs;
@@ -877,7 +496,7 @@ struct CacheDbImpl {
   SelectMatchingJobs matching_jobs;
 
   CacheDbImpl(const std::string &_dir)
-      : db(std::make_unique<Database>(_dir)),
+      : db(std::make_unique<job_cache::Database>(_dir)),
         jobs(db),
         input_files(db),
         input_dirs(db),
@@ -1067,10 +686,14 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
   }
 }
 
-Cache::Cache(std::string _dir) : dir(std::move(_dir)), rng(wcl::xoshiro_256::get_rng_seed()) {
+Cache::Cache(std::string _dir, uint64_t max, uint64_t low)
+    : dir(std::move(_dir)),
+      rng(wcl::xoshiro_256::get_rng_seed()),
+      max_cache_size(max),
+      low_cache_size(low) {
   mkdir_no_fail(dir.c_str());
   impl = std::make_unique<CacheDbImpl>(dir);
-  launch_evict_tool();
+  launch_evict_loop();
 }
 
 wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
@@ -1230,7 +853,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
   msg += '\0';
 
   if (write(evict_stdin, msg.data(), msg.size()) == -1) {
-    std::cerr << "Failed to send eviction update" << std::endl;
+    log_warning("Failed to send eviction update");
   }
 
   // TODO: We should really return a different thing here
@@ -1315,11 +938,11 @@ void Cache::add(const AddJobRequest &add_request) {
   msg += '\0';
 
   if (write(evict_stdin, msg.data(), msg.size()) == -1) {
-    std::cerr << "Failed to send eviction update" << std::endl;
+    log_warning("Failed to send eviction update");
   }
 }
 
-void Cache::launch_evict_tool() {
+void Cache::launch_evict_loop() {
   const size_t read_side = 0;
   const size_t write_side = 1;
 
@@ -1363,7 +986,8 @@ void Cache::launch_evict_tool() {
 
     // Finally enter the eviction loop, if it exits cleanly
     // go ahead and exit with its result.
-    int result = eviction_loop(std::make_unique<NilEvictionPolicy>());
+    int result =
+        eviction_loop(dir, std::make_unique<LRUEvictionPolicy>(max_cache_size, low_cache_size));
     exit(result);
   }
 
@@ -1378,7 +1002,7 @@ void Cache::launch_evict_tool() {
   }
 }
 
-void Cache::reap_evict_tool() {
+void Cache::reap_evict_loop() {
   close(evict_stdin);
   close(evict_stdout);
   waitpid(evict_pid, nullptr, 0);
@@ -1386,6 +1010,6 @@ void Cache::reap_evict_tool() {
 
 // This has to be here because the destructor code for std::unique_ptr<CacheDbImpl>
 // requires that the CacheDbImpl be complete.
-Cache::~Cache() { reap_evict_tool(); }
+Cache::~Cache() { reap_evict_loop(); }
 
 }  // namespace job_cache

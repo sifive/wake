@@ -95,5 +95,21 @@ create table if not exists output_symlinks(
   job            job_id  not null references jobs(job_id) on delete cascade);
 create index if not exists output_symlink_by_job on output_symlinks(job);
 
+-- We need to track the total size to know when to start collecting stuff
+create table if not exists total_size(
+  total_size_id integer primary key,
+  size          integer not null);
+
+insert into total_size (total_size_id, size) select 1, 0 where not exists (select * from total_size);
+
+-- We need to keep track of jobs as the come through so that
+-- have some idea of which ones to keep/not keep
+create table if not exists lru_stats(
+  job_id integer primary key references jobs(job_id) on delete cascade,
+  last_use integer not null);
+
+-- We need to order everything so that we can delete jobs in bulk efficently
+create index if not exists lru_stats_order on lru_stats(last_use);
+
 commit transaction;
 --)"
