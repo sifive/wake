@@ -6,14 +6,14 @@ fi
 
 set -e
 WAKE="${1:+$1/wake}"
-rm wake.db || true
-rm -rf .cache-hit || true
-rm -rf .cache-misses || true
-rm -rf .job-cache || true
-rm one.txt || true
-rm two.txt || true
-rm three.txt || true
-rm four.txt || true
+rm wake.db 2> /dev/null || true
+rm -rf .cache-hit 2> /dev/null || true
+rm -rf .cache-misses 2> /dev/null || true
+rm -rf .job-cache 2> /dev/null || true
+rm one.txt 2> /dev/null || true
+rm two.txt 2> /dev/null || true
+rm three.txt 2> /dev/null || true
+rm four.txt 2> /dev/null || true
 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
 rm wake.db
 rm -rf .cache-misses
@@ -25,7 +25,6 @@ rm wake.db
 rm -rf .cache-misses
 
 # We should still be under the limit here. This is to ensure we mark test one as used
-rm -rf .cache-hit || true
 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
 rm wake.db
 rm -rf .cache-misses
@@ -40,7 +39,7 @@ rm wake.db
 rm -rf .cache-misses
 
 # Now make sure we still get a hit on 1
-rm -rf .cache-hit || true
+rm -rf .cache-hit  2> /dev/null || true
 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
 rm wake.db
 if [ -z "$(ls -A .cache-hit)" ]; then
