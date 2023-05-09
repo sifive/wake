@@ -154,6 +154,8 @@ contain JSON5 source where the root object may contain the following keys.
 | log_header | A string containing `$stream` and `$source` that will prepend every line of a jobs output | No | An interpolated string | Yes      | Yes | `'[$stream] $source: '`
 | log_header_source_width | An integer that specifies the width of the `$source` variable in `log_header` | No | Positive Integer | Yes | Yes | 25
 | log_header_align | A boolean that specifies whether or not to align log header output | No | Boolean | Yes | Yes | False
+| max_cache_size | The number of bytes after which the shared cache will start a collection | No | Integer | Yes | Yes | 25GB
+| low_cache_size | The number of bytes that the cache tries to reach during a collection | No | Integer | Yes | Yes | 15 GB
 
 Below is a full example
 
