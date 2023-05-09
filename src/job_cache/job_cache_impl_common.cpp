@@ -76,6 +76,8 @@ void rmdir_no_fail(const char *dir) {
 // For apple and emscripten fallback on a dumb slow implementation
 #if defined(__APPLE__) || defined(__EMSCRIPTEN__)
 
+#include "util/term.h"
+
 static void copy(int src_fd, int dst_fd) {
   FdBuf src(src_fd);
   FdBuf dst(dst_fd);
