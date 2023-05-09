@@ -17,6 +17,10 @@
 
 #pragma once
 
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
