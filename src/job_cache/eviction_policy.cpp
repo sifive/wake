@@ -89,7 +89,9 @@ struct LRUEvictionPolicyImpl {
   job_cache::PreparedStatement update_size;
   job_cache::PreparedStatement reset_size;
   job_cache::PreparedStatement get_size;
-  job_cache::PreparedStatement update_last_use;
+  job_cache::PreparedStatement insert_last_use;
+  job_cache::PreparedStatement set_last_use;
+  job_cache::PreparedStatement get_last_use;
   job_cache::PreparedStatement find_least_recently_used;
   job_cache::PreparedStatement remove_least_recently_used;
   job_cache::Transaction transact;
@@ -109,11 +111,13 @@ struct LRUEvictionPolicyImpl {
   // Unconditionally returns the current total_size
   static constexpr const char* get_size_query = "select size from total_size";
 
-  // Takes two arguments, first is the latest time as an integer.
-  // second is the job_id to update.
-  static constexpr const char* update_last_use_query =
-      "insert into lru_stats (job_id, last_use) values (?, ?) "
-      "on conflict (job_id) do update set last_use=?2";
+  // We need 3 qurries to do an upset because sqlite only added support in 2018
+  // and we still test against very old CI bots.
+  static constexpr const char* get_last_use_query = "select * from lru_stats where job_id = ?";
+  static constexpr const char* insert_last_use_query =
+      "insert into lru_stats (job_id, last_use) values (?, ?)";
+  static constexpr const char* set_last_use_query =
+      "update lru_stats set last_use = ? where job_id = ?";
 
   // This is meant to be used as part of a transaction with remove_least_recently_used.
   // It simply returns the job_ids in last use order.
@@ -133,13 +137,16 @@ struct LRUEvictionPolicyImpl {
         update_size(db, update_size_query),
         reset_size(db, reset_size_query),
         get_size(db, get_size_query),
-        update_last_use(db, update_last_use_query),
+        insert_last_use(db, insert_last_use_query),
+        set_last_use(db, set_last_use_query),
+        get_last_use(db, get_last_use_query),
         find_least_recently_used(db, find_least_recently_used_query),
         remove_least_recently_used(db, remove_least_recently_used_query),
         transact(db) {
     update_size.set_why("Could not update total size");
     get_size.set_why("Could not get total size");
-    update_last_use.set_why("Could not update last use");
+    insert_last_use.set_why("Could not update last use");
+    set_last_use.set_why("Could not update last use");
     find_least_recently_used.set_why("Could not find least recently used");
     remove_least_recently_used.set_why("Could not remove least recently used");
   }
@@ -152,7 +159,6 @@ struct LRUEvictionPolicyImpl {
       update_size.reset();
       get_size.step();
       out = get_size.read_integer(0);
-      std::cerr << "out: " << out << std::endl;
       get_size.reset();
     });
     return out;
@@ -161,10 +167,24 @@ struct LRUEvictionPolicyImpl {
   void mark_new_use(uint64_t job_id) {
     timespec tp;
     clock_gettime(CLOCK_REALTIME, &tp);
-    update_last_use.bind_integer(1, job_id);
-    update_last_use.bind_integer(2, tp.tv_sec);
-    update_last_use.step();
-    update_last_use.reset();
+    // Older versions of sqlite don't have upserts so
+    // we have to do this junk.
+    transact.run([this, job_id, &tp]() {
+      get_last_use.bind_integer(1, job_id);
+      auto result = get_last_use.step();
+      get_last_use.reset();
+      if (result == SQLITE_ROW) {
+        set_last_use.bind_integer(1, tp.tv_sec);
+        set_last_use.bind_integer(2, job_id);
+        set_last_use.step();
+        set_last_use.reset();
+      } else {
+        insert_last_use.bind_integer(1, job_id);
+        insert_last_use.bind_integer(2, tp.tv_sec);
+        insert_last_use.step();
+        insert_last_use.reset();
+      }
+    });
   }
 
   void cleanup(uint64_t current_size, uint64_t bytes_to_remove) {
@@ -185,8 +205,6 @@ struct LRUEvictionPolicyImpl {
           last_use = find_least_recently_used.read_integer(0);
 
           jobs_to_remove.push_back(find_least_recently_used.read_integer(2));
-          std::cerr << "Removing job: " << jobs_to_remove.back();
-          std::cerr << " last used at: " << last_use << std::endl;
 
           removed_so_far += obytes;
 
@@ -213,7 +231,6 @@ struct LRUEvictionPolicyImpl {
       auto reset2 = wcl::make_defer([this]() { remove_least_recently_used.reset(); });
       remove_least_recently_used.bind_integer(1, last_use);
       remove_least_recently_used.step();
-      std::cerr << "Resetting size: " << (current_size - removed_so_far) << std::endl;
       reset_size.bind_integer(1, current_size - removed_so_far);
       reset_size.step();
     });
@@ -237,12 +254,10 @@ void LRUEvictionPolicy::read(int job_id) { impl->mark_new_use(job_id); }
 void LRUEvictionPolicy::write(int job_id) {
   impl->mark_new_use(job_id);
   uint64_t size = impl->add_job_size(job_id);
-  std::cerr << "write: size = " << size << std::endl;
   if (size > max_cache_size) {
     // TODO: Techically this is racy because the size
     //       can get out of sync. We should probably put
     //       these in a transaction.
-    std::cerr << "cleanup!!" << std::endl;
     impl->cleanup(size, max_cache_size - low_cache_size);
   }
 }
