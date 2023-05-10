@@ -219,10 +219,6 @@ jobs:
           if: always()
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'cat wake-*/wake.log'
 
-        - name: Debug
-          if: always()
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'cat wake.log'
-
         - name: Install
           run: install -D -t release/${{ matrix.target }} ${{ matrix.install_src_glob }}
 
