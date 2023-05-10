@@ -32,6 +32,7 @@
 #include <random>
 #include <set>
 #include <sstream>
+#include <fstream>
 
 #include "cli_options.h"
 #include "describe.h"
@@ -188,7 +189,10 @@ class TerminalReporter : public DiagnosticReporter {
 };
 
 int main(int argc, char **argv) {
-  std::cerr << "fex: 1" << std::endl;
+  std::ofstream sout;
+  sout.open("./wake.log");
+
+  sout << "fex: 1" << std::endl;
   auto start = std::chrono::steady_clock::now();
 
   TerminalReporter terminalReporter;
@@ -198,7 +202,7 @@ int main(int argc, char **argv) {
   for (int i = 1; i < argc; ++i) original_command_line += " " + shell_escape(argv[i]);
 
   CommandLineOptions clo(argc, argv);
-  std::cerr << "fex: 2" << std::endl;
+  sout << "fex: 2" << std::endl;
 
   if (clo.help) {
     print_help(clo.argv[0]);
@@ -223,9 +227,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  std::cerr << "fex: 3" << std::endl;
+  sout << "fex: 3" << std::endl;
   clo.tty = term_init(clo.tty);
-  std::cerr << "fex: 4" << std::endl;
+  sout << "fex: 4" << std::endl;
 
   double percent = 0.9;
 
@@ -315,25 +319,25 @@ int main(int argc, char **argv) {
   }
 
   // Now check for any flags that override config options
-  std::cerr << "fex: 5" << std::endl;
+  sout << "fex: 5" << std::endl;
   WakeConfigOverrides config_override;
-  std::cerr << "fex: 6" << std::endl;
+  sout << "fex: 6" << std::endl;
   if (clo.label_filter)
     config_override.label_filter = wcl::some(wcl::make_some<std::string>(clo.label_filter));
   if (clo.log_header) config_override.log_header = wcl::make_some<std::string>(clo.log_header);
   config_override.log_header_source_width = clo.log_header_source_width;
 
-  std::cerr << "fex: 7" << std::endl;
+  sout << "fex: 7" << std::endl;
   if (!WakeConfig::init(".wakeroot", config_override)) {
     return 1;
   }
-  std::cerr << "fex: 8" << std::endl;
+  sout << "fex: 8" << std::endl;
 
   if (clo.config) {
     std::cout << *WakeConfig::get();
     return 0;
   }
-  std::cerr << "fex: 9" << std::endl;
+  sout << "fex: 9" << std::endl;
 
   // if specified, check that .wakeroot is compatible with the wake version
   if (WakeConfig::get()->version != "") {
@@ -344,16 +348,16 @@ int main(int argc, char **argv) {
       return 1;
     }
   }
-  std::cerr << "fex: 10" << std::endl;
+  sout << "fex: 10" << std::endl;
 
   Database db(clo.debugdb);
-  std::cerr << "fex: 11" << std::endl;
+  sout << "fex: 11" << std::endl;
   std::string fail = db.open(clo.wait, !clo.workspace, clo.tty);
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
     return 1;
   }
-  std::cerr << "fex: 12" << std::endl;
+  sout << "fex: 12" << std::endl;
 
   // Open the job-cache if it exists
   std::unique_ptr<job_cache::Cache> cache;
@@ -362,7 +366,7 @@ int main(int argc, char **argv) {
     cache = std::make_unique<job_cache::Cache>(job_cache_dir);
     set_job_cache(cache.get());
   }
-  std::cerr << "fex: 13" << std::endl;
+  sout << "fex: 13" << std::endl;
 
   // If the user asked to list all files we *would* clean.
   // This is the same as asking for all output files.
@@ -543,7 +547,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  std::cerr << "fex: 14" << std::endl;
+  sout << "fex: 14" << std::endl;
   describe(intersected_jobs, policy);
 
   if (clo.tagdag) {
@@ -552,7 +556,7 @@ int main(int argc, char **argv) {
   }
 
   if (noparse) return 0;
-  std::cerr << "fex: 15" << std::endl;
+  sout << "fex: 15" << std::endl;
 
   FILE *user_warn = stdout;
   wcl::opt_defer user_warn_defer;
@@ -596,7 +600,7 @@ int main(int argc, char **argv) {
   // In order to support automated flows better we only emit it when
   // a terminal is being used, which is a good indicator of a human
   // using wake rather than an automated flow.
-  std::cerr << "fex: 16" << std::endl;
+  sout << "fex: 16" << std::endl;
   bool is_stdout_tty = isatty(1);
 
   for (size_t i = 0; i < wakefilenames.size(); i++) {
@@ -639,7 +643,7 @@ int main(int argc, char **argv) {
       }
     }
   }
-  std::cerr << "fex: 17" << std::endl;
+  sout << "fex: 17" << std::endl;
 
   if (!clo.quiet && alerted_slow_cache && is_stdout_tty) {
     std::cout << "Scanning " << wakefilenames.size() << "/" << wakefilenames.size()
@@ -661,7 +665,7 @@ int main(int argc, char **argv) {
   std::string export_package = top->def_package;
 
   if (!flatten_exports(*top)) ok = false;
-  std::cerr << "fex: 18" << std::endl;
+  sout << "fex: 18" << std::endl;
 
   std::vector<std::pair<std::string, std::string> > defs;
   std::set<std::string> types;
@@ -707,7 +711,7 @@ int main(int argc, char **argv) {
   char *none = nullptr;
   char **cmdline = &none;
   std::string command;
-  std::cerr << "fex: 19" << std::endl;
+  sout << "fex: 19" << std::endl;
 
   if (clo.exec) {
     command = clo.exec;
@@ -748,13 +752,13 @@ int main(int argc, char **argv) {
   status_set_bulk_fd(5, clo.fd5);
 
   /* Primitives */
-  std::cerr << "fex: 20" << std::endl;
+  sout << "fex: 20" << std::endl;
   JobTable jobtable(&db, memory_budget, cpu_budget, clo.debug, clo.verbose, clo.quiet, clo.check,
                     !clo.tty);
   StringInfo info(clo.verbose, clo.debug, clo.quiet, VERSION_STR, wcl::make_canonical(wake_cwd),
                   cmdline);
   PrimMap pmap = prim_register_all(&info, &jobtable);
-  std::cerr << "fex: 21" << std::endl;
+  sout << "fex: 21" << std::endl;
 
   bool isTreeBuilt = true;
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
@@ -837,11 +841,11 @@ int main(int argc, char **argv) {
   }
 
   // Convert AST to optimized SSA
-  std::cerr << "fex: 22" << std::endl;
+  sout << "fex: 22" << std::endl;
   std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root), runtime);
-  std::cerr << "fex: 23" << std::endl;
+  sout << "fex: 23" << std::endl;
   if (clo.optim) ssa = Term::optimize(std::move(ssa), runtime);
-  std::cerr << "fex: 24" << std::endl;
+  sout << "fex: 24" << std::endl;
 
   // Upon request, dump out the SSA
   if (clo.dumpssa) {
@@ -855,11 +859,11 @@ int main(int argc, char **argv) {
   // Exit without execution for these arguments
   if (noexecute) return 0;
 
-  std::cerr << "fex: 25" << std::endl;
+  sout << "fex: 25" << std::endl;
   db.prepare(original_command_line);
-  std::cerr << "fex: 26" << std::endl;
+  sout << "fex: 26" << std::endl;
   runtime.init(static_cast<RFun *>(ssa.get()));
-  std::cerr << "fex: 27" << std::endl;
+  sout << "fex: 27" << std::endl;
 
   // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
   std::cout << std::flush;
@@ -869,20 +873,20 @@ int main(int argc, char **argv) {
 
   runtime.abort = false;
 
-  std::cerr << "fex: 28" << std::endl;
+  sout << "fex: 28" << std::endl;
   status_init();
-  std::cerr << "fex: 29" << std::endl;
+  sout << "fex: 29" << std::endl;
   do {
     runtime.run();
   } while (!runtime.abort && jobtable.wait(runtime));
-  std::cerr << "fex: 30" << std::endl;
+  sout << "fex: 30" << std::endl;
   status_finish();
-  std::cerr << "fex: 31" << std::endl;
+  sout << "fex: 31" << std::endl;
 
   runtime.heap.report();
-  std::cerr << "fex: 32" << std::endl;
+  sout << "fex: 32" << std::endl;
   tree.report(clo.profile, command);
-  std::cerr << "fex: 33" << std::endl;
+  sout << "fex: 33" << std::endl;
 
   bool pass = true;
   if (runtime.abort) {
@@ -893,7 +897,7 @@ int main(int argc, char **argv) {
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
   } else {
-    std::cerr << "fex: in exe branch 34" << std::endl;
+    sout << "fex: in exe branch 34" << std::endl;
     HeapObject *v = runtime.output.get();
     if (!v) {
       pass = false;
@@ -912,8 +916,9 @@ int main(int argc, char **argv) {
     }
   }
 
-  std::cerr << "fex: 35" << std::endl;
+  sout << "fex: 35" << std::endl;
   db.clean();
-  std::cerr << "fex: 36" << std::endl;
+  sout << "fex: 36" << std::endl;
+  sout.close();
   return pass ? 0 : 1;
 }
