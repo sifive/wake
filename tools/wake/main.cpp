@@ -28,11 +28,11 @@
 
 #include <algorithm>
 #include <chrono>
+#include <fstream>
 #include <iostream>
 #include <random>
 #include <set>
 #include <sstream>
-#include <fstream>
 
 #include "cli_options.h"
 #include "describe.h"
