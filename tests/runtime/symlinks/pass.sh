@@ -45,5 +45,3 @@ echo "shex 18"
 rm -f datFile badLink goodLink .fuse.log
 echo "shex 19"
 echo "Symlinks work!"
-
-exit 1
