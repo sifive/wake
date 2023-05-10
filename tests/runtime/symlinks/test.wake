@@ -50,14 +50,22 @@ export def shouldFail2 Unit =
     | getJobInputs
 
 export def test _ =
+    def _ = println "wex: 1"
     require Pass link = badLink Unit
+    def _ = println "wex: 2"
     require True = getPathHash link !=* "BadHash"
     else failWithError "cannot hash a dangling symlink"
+    def _ = println "wex: 3"
     require Pass what = shouldWork Unit
+    def _ = println "wex: 4"
     require Fail _ = shouldFail1 Unit else failWithError "fail1 passed!"
+    def _ = println "wex: 5"
     require Fail _ = shouldFail2 Unit else failWithError "fail2 passed!"
+    def _ = println "wex: 6"
     require a, b, Nil = what
     else failWithError "did not detect both inputs ({format what})"
+    def _ = println "wex: 7"
     require True = getPathHash a !=* getPathHash b
     else failWithError "identical hashes should not be identical"
+    def _ = println "wex: 8"
     Pass 0
