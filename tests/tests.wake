@@ -237,8 +237,8 @@ def runTest (testScript: Path): Result Unit Error =
         True  True  = Pass Unit
         False False = Pass Unit
         True  False =
-            def _ = println jobStderr
-            def _ = println jobStdout
+            def _ = println "begin(stderr)\n{jobStderr}\nend(stderr)"
+            def _ = println "begin(stdout)\n{jobStdout}\nend(stdout)"
             def _ = println (format testJob.getJobStatus)
             Fail (makeError "Test failed ({format testJob.getJobStatus}) with '{replace `\n.*` "" jobStderr}'")
         False True  =
