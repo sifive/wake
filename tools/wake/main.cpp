@@ -192,7 +192,7 @@ int main(int argc, char **argv) {
   std::ofstream sout;
 
   std::string lpath = "./wake.log";
-  const char* lpathv = getenv("DEBUGNAME");
+  const char *lpathv = getenv("DEBUGNAME");
   if (lpathv != nullptr) {
     lpath = lpathv;
   }
