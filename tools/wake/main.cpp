@@ -190,7 +190,13 @@ class TerminalReporter : public DiagnosticReporter {
 
 int main(int argc, char **argv) {
   std::ofstream sout;
-  sout.open("./wake.log");
+
+  std::string lpath = "./wake.log";
+  const char* lpathv = getenv("DEBUGNAME");
+  if (lpathv != nullptr) {
+    lpath = lpathv;
+  }
+  sout.open(lpath);
 
   sout << "fex: 1" << std::endl;
   auto start = std::chrono::steady_clock::now();
