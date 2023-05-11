@@ -145,16 +145,20 @@ struct LRUEvictionPolicyImpl {
         transact(db) {
     update_size.set_why("Could not update total size");
     get_size.set_why("Could not get total size");
-    insert_last_use.set_why("Could not update last use");
+    insert_last_use.set_why("Could not insert new last use");
     set_last_use.set_why("Could not update last use");
+    get_last_use.set_why("Could not get last use");
     find_least_recently_used.set_why("Could not find least recently used");
     remove_least_recently_used.set_why("Could not remove least recently used");
+    reset_size.set_why("Could not reset size");
   }
 
   uint64_t add_job_size(uint64_t job_id) {
     uint64_t out = 0;
     transact.run([this, &out, job_id]() {
+      std::cerr << "update_size: About to bind" << std::endl;
       update_size.bind_integer(1, job_id);
+      std::cerr << "update_size: Now bound" << std::endl;
       update_size.step();
       update_size.reset();
       get_size.step();
@@ -170,19 +174,27 @@ struct LRUEvictionPolicyImpl {
     // Older versions of sqlite don't have upserts so
     // we have to do this junk.
     transact.run([this, job_id, &tp]() {
+      std::cerr << "set_last_use: About to bind" << std::endl;
+      set_last_use.bind_integer(1, tp.tv_sec);
+      std::cerr << "set_last_use: Now bound" << std::endl;
+      set_last_use.bind_integer(2, job_id);
+      set_last_use.step();
+      set_last_use.reset();
+      std::cerr << "get_last_use: About to bind" << std::endl;
       get_last_use.bind_integer(1, job_id);
+      std::cerr << "get_last_use: Now bound" << std::endl;
       auto result = get_last_use.step();
       get_last_use.reset();
-      if (result == SQLITE_ROW) {
-        set_last_use.bind_integer(1, tp.tv_sec);
-        set_last_use.bind_integer(2, job_id);
-        set_last_use.step();
-        set_last_use.reset();
-      } else {
+      if (result == SQLITE_DONE) {
+        std::cerr << "insert_last_use: About to bind" << std::endl;
         insert_last_use.bind_integer(1, job_id);
+        std::cerr << "insert_last_use: Now bound" << std::endl;
+        std::cerr << "job_id = " << job_id << std::endl;
         insert_last_use.bind_integer(2, tp.tv_sec);
         insert_last_use.step();
         insert_last_use.reset();
+      } else {
+        log_fatal("get_last_use result was unexpected: %d", result);
       }
     });
   }
@@ -228,10 +240,14 @@ struct LRUEvictionPolicyImpl {
       // the backing files to occur *after* this transaction completes.
       // Still, doing things in this order reduces the chance of a
       // failed read occuring.
-      auto reset2 = wcl::make_defer([this]() { remove_least_recently_used.reset(); });
+      auto reset2 = wcl::make_defer([this]() { remove_least_recently_used.reset(); reset_size.reset(); });
+      std::cerr << "before remove_least_recently_used" << std::endl;
       remove_least_recently_used.bind_integer(1, last_use);
+      std::cerr << "after remove_least_recently_used" << std::endl;
       remove_least_recently_used.step();
+      std::cerr << "before reset_size" << std::endl;
       reset_size.bind_integer(1, current_size - removed_so_far);
+      std::cerr << "after reset_size" << std::endl;
       reset_size.step();
     });
 
