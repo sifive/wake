@@ -132,32 +132,41 @@ jobs:
         - name: Build docker image
           run: docker build -f dockerfiles/${{ matrix.dockerfile }} ${{ matrix.extra_docker_build_args }} -t wake-${{ matrix.dockerfile }} .
 
+        - name: Make core
+          run: mkdir core
+
         - name: Build
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined ${{ matrix.extra_docker_run_args }} wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.build_cmd }}'
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse -v $PWD/core:/coredump --cap-add SYS_ADMIN --security-opt apparmor:unconfined ${{ matrix.extra_docker_run_args }} wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.build_cmd }}'
 
         - name: Test
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c '${{ matrix.test_cmd }}'
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse -v $PWD/core:/coredump --cap-add SYS_ADMIN --privileged --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'sysctl -w kernel.core_pattern=/coredump/core-%e.%p.%h.%t && ${{ matrix.test_cmd }}'
 
         - name: Debug
           if: always()
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'cat wake-*/wake.log'
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse -v $PWD/core:/coredump --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'cat wake-*/wake.log'
 
         - name: Debug
           if: always()
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'cat tests/runtime/symlinks/wake.test.symlink1.log'
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse -v $PWD/core:/coredump --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'cat tests/runtime/symlinks/wake.test.symlink1.log'
 
         - name: Debug
           if: always()
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'cat tests/runtime/symlinks/wake.test.symlink2.log'
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse -v $PWD/core:/coredump --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'cat tests/runtime/symlinks/wake.test.symlink2.log'
 
         - name: Debug
           if: always()
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'ls tests/runtime/symlinks/'
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse -v $PWD/core:/coredump --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'ls tests/runtime/symlinks/'
 
         - name: Debug
           if: always()
-          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'find . -name "*core*"'
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse -v $PWD/core:/coredump --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'ls core'
 
+        - name: Upload Core
+          if: always()
+          uses: actions/upload-artifact@v3
+          with:
+            name: core_file
+            path: core/core*
 
         - name: Install
           run: install -D -t release/${{ matrix.target }} ${{ matrix.install_src_glob }}
