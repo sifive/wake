@@ -127,9 +127,13 @@ tuple Plan =
     export RunnerFilter: Runner => Boolean
     # User-supplied usage prediction; overruled by database statistics (if any)
     export Usage: Usage
-    # Modify the Runner's reported inputs  (files read)
+    # Modify the Runner's reported inputs (files read)
     export FnInputs: (List String => List String)
-    # Modify the Runner's reported outputs (files created)
+    # Modify the Runner's reported outputs (files created). Use of this to modify files created by a job
+    # is discouraged. For the files that are left out of the filter, in addition to being excluded from
+    # the job's outputs, they are also hidden from the database (i.e., not treated as visible files). This
+    # should only be done in cases where there is a strong reason to hide files in this manner. Instead,
+    # most uses should filter the files returned in a Job's Outputs field.
     export FnOutputs: (List String => List String)
     # Determines if job should run in psuedoterminal
     export IsAtty: Boolean
