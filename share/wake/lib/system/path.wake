@@ -141,7 +141,7 @@ def computeHashes (files: List String): List String =
     def add f h = prim "add_hash"
 
     require Pass stdout =
-        hashPlan ("lib/wake/wake-hash", files)
+        hashPlan ("{wakePath}/../lib/wake/wake-hash", files)
         | setPlanLabel "batch-hash"
         | runJobWith localRunner
         | getJobStdout

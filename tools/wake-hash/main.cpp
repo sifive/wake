@@ -128,13 +128,16 @@ static Hash256 hash_link(const char* link) {
       std::cerr << "wake-hash: readlink(" << link << "): " << strerror(errno) << std::endl;
       exit(1);
     }
-    if (static_cast<size_t>(bytes_read) != buffer.size()) break;
+    if (static_cast<size_t>(bytes_read) != buffer.size()) {
+      buffer.resize(bytes_read);
+      break;
+    }
     buffer.resize(2 * buffer.size(), 0);
   }
 
   blake2b_init(&S, sizeof(hash));
   blake2b_update(&S, reinterpret_cast<uint8_t*>(buffer.data()), buffer.size());
-  blake2b_final(&S, hash, sizeof(hash));
+  blake2b_final(&S, &hash[0], sizeof(hash));
 
   return Hash256::from_hash(&hash);
 }
