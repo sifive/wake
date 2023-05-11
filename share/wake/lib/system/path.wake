@@ -147,6 +147,7 @@ def computeHashes (files: List String): List String =
         | getJobStdout
     else
         def _ = map (\f add f "BadHash")
+
         files
 
     def _ =
@@ -156,7 +157,6 @@ def computeHashes (files: List String): List String =
         | map (\(Pair file hash) add file hash)
 
     files
-
 
 #def addhash (f: String): String =
 #    def p = simplify f

@@ -29,19 +29,19 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <iostream>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <vector>
-#include <string>
 #include <future>
+#include <iostream>
+#include <string>
 #include <thread>
+#include <vector>
 
-#include "wcl/xoshiro_256.h"
 #include "blake2/blake2.h"
 #include "compat/nofollow.h"
+#include "wcl/xoshiro_256.h"
 
 // Can increase to 64 if needed
 #define HASH_BYTES 32
@@ -115,11 +115,9 @@ struct Hash256 {
   bool operator!=(Hash256 other) { return !(*this == other); }
 };
 
-static Hash256 hash_dir() {
-  return Hash256();
-}
+static Hash256 hash_dir() { return Hash256(); }
 
-static Hash256 hash_link(const char *link) {
+static Hash256 hash_link(const char* link) {
   blake2b_state S;
   uint8_t hash[HASH_BYTES];
   std::vector<char> buffer(8192, 0);
@@ -141,7 +139,7 @@ static Hash256 hash_link(const char *link) {
   return Hash256::from_hash(&hash);
 }
 
-static Hash256 hash_file(const char *file, int fd) {
+static Hash256 hash_file(const char* file, int fd) {
   blake2b_state S;
   uint8_t hash[HASH_BYTES], buffer[8192];
   ssize_t got;
@@ -158,7 +156,7 @@ static Hash256 hash_file(const char *file, int fd) {
   return Hash256::from_hash(&hash);
 }
 
-static Hash256 do_hash(const char *file) {
+static Hash256 do_hash(const char* file) {
   struct stat stat;
   int fd = open(file, O_RDONLY | O_NOFOLLOW);
 
@@ -181,7 +179,7 @@ static Hash256 do_hash(const char *file) {
   return hash_file(file, fd);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   // Find all the files we want to hash
   std::vector<const char*> files_to_hash;
   for (int i = 1; i < argc; ++i) {
@@ -190,10 +188,12 @@ int main(int argc, char **argv) {
 
   // Now hash them in parallel
   size_t num_vcores = std::thread::hardware_concurrency();
-  size_t threads = 2 * num_vcores; // Unclear what the optimal number is, we can play with it
-  size_t files_per_thread = std::max(16UL, files_to_hash.size() / threads + !!(files_to_hash.size() % threads));
+  size_t threads = 2 * num_vcores;  // Unclear what the optimal number is, we can play with it
+  size_t files_per_thread =
+      std::max(16UL, files_to_hash.size() / threads + !!(files_to_hash.size() % threads));
   std::vector<std::future<std::vector<Hash256>>> to_join;
-  for (size_t start_index = 0; start_index < files_to_hash.size(); start_index += files_per_thread) {
+  for (size_t start_index = 0; start_index < files_to_hash.size();
+       start_index += files_per_thread) {
     to_join.emplace_back(std::async([&files_to_hash, files_per_thread, start_index]() {
       std::vector<Hash256> out;
       for (size_t i = 0; i < files_per_thread; ++i) {
@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
   // Now join them outputting the hashes in the same order we received them
   for (auto& fut : to_join) {
     fut.wait();
-    std::vector<Hash256> result = fut.get(); // NOTE: This moves so we cannot call get again
+    std::vector<Hash256> result = fut.get();  // NOTE: This moves so we cannot call get again
     for (auto& hash : result) {
       std::cout << hash.to_hex() << std::endl;
     }
