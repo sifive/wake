@@ -41,6 +41,7 @@
 
 #include "blake2/blake2.h"
 #include "compat/nofollow.h"
+#include "wcl/unique_fd.h"
 #include "wcl/xoshiro_256.h"
 
 // Can increase to 64 if needed
@@ -161,16 +162,16 @@ static Hash256 hash_file(const char* file, int fd) {
 
 static Hash256 do_hash(const char* file) {
   struct stat stat;
-  int fd = open(file, O_RDONLY | O_NOFOLLOW);
+  auto fd = wcl::unique_fd::open(file, O_RDONLY | O_NOFOLLOW);
 
-  if (fd == -1) {
-    if (errno == EISDIR) return hash_dir();
-    if (errno == ELOOP || errno == EMLINK) return hash_link(file);
+  if (!fd) {
+    if (fd.error() == EISDIR) return hash_dir();
+    if (fd.error() == ELOOP || errno == EMLINK) return hash_link(file);
     std::cerr << "wake-hash open(" << file << "): " << strerror(errno);
     exit(1);
   }
 
-  if (fstat(fd, &stat) != 0) {
+  if (fstat(fd->get(), &stat) != 0) {
     if (errno == EISDIR) return hash_dir();
     std::cerr << "wake-hash fstat(" << file << "): " << strerror(errno);
     exit(1);
@@ -179,7 +180,7 @@ static Hash256 do_hash(const char* file) {
   if (S_ISDIR(stat.st_mode)) return hash_dir();
   if (S_ISLNK(stat.st_mode)) return hash_link(file);
 
-  return hash_file(file, fd);
+  return hash_file(file, fd->get());
 }
 
 int main(int argc, char** argv) {
