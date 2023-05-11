@@ -1,6 +1,6 @@
 #! /bin/sh
 
-set -x
+set -ex
 
 echo "shex 1"
 WAKE="${1:+$1/wake}"

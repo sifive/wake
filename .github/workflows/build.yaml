@@ -154,6 +154,11 @@ jobs:
           if: always()
           run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'ls tests/runtime/symlinks/'
 
+        - name: Debug
+          if: always()
+          run: docker run --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-${{ matrix.dockerfile }} /bin/sh -c 'find . -name "*core*"'
+
+
         - name: Install
           run: install -D -t release/${{ matrix.target }} ${{ matrix.install_src_glob }}
 
