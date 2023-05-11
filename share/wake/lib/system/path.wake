@@ -161,6 +161,7 @@ def computeHashes (files: List String): List String =
         | getJobStdout
     else
         # We set the files hash to BadHash if we fail
+        def _ = printlnLevel logError "BadHash: {format to_hash}"
         def _ = map (\f add f "BadHash") to_hash
 
         files
