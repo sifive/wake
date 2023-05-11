@@ -144,7 +144,7 @@ def computeHashes (files: List String): List String =
     def to_hash = mapPartial needsHashing files
 
     # Lots of jobs have no outputs at all, and some do not need to be rehashed
-    require _, _ = to_hash
+    require False = empty to_hash
     else files
 
     # Ok now we know we have a non-empty set of files that actully need to be hashed.
@@ -161,7 +161,7 @@ def computeHashes (files: List String): List String =
         | getJobStdout
     else
         # We set the files hash to BadHash if we fail
-        def _ = map (\f add f "BadHash")
+        def _ = map (\f add f "BadHash") to_hash
 
         files
 
@@ -169,7 +169,7 @@ def computeHashes (files: List String): List String =
     def _ =
         stdout
         | tokenize `\n`
-        | zip files
+        | zip to_hash
         | map (\(Pair file hash) add file hash)
 
     files
