@@ -57,6 +57,9 @@ class StatusBuf : public std::streambuf {
   int color;
   TermInfoBuf &buf;
   std::string line_buf;
+  std::string log_header;
+  int32_t log_header_source_width;
+  bool log_header_align;
 
   StatusBuf() = delete;
   StatusBuf(const StatusBuf &) = delete;
@@ -66,8 +69,7 @@ class StatusBuf : public std::streambuf {
 
  public:
   explicit StatusBuf(std::string name, wcl::optional<std::string> extra, int color,
-                     TermInfoBuf &buf)
-      : name(name), extra(extra), color(color), buf(buf) {}
+                     TermInfoBuf &buf);
 
   virtual ~StatusBuf() override;
 
