@@ -584,6 +584,8 @@ std::ostream &status_get_generic_stream(const char *name) { return std::cout; }
 
 void StatusBuf::emit_header() {}
 int StatusBuf::overflow(int c) { return 0; }
+StatusBuf::StatusBuf(std::string name, wcl::optional<std::string> extra, int color,
+                     TermInfoBuf &buf) {}
 StatusBuf::~StatusBuf() {}
 
 #endif
