@@ -34,6 +34,8 @@ compile_commands.json
 /lib/wake/fuse-waked.*
 /lib/wake/shim-wake
 /lib/wake/shim-wake.*
+/lib/wake/wake-hash
+/lib/wake/wake-hash.*
 /lib/wake/libpreload-wake.*
 /vendor/lemon/lemon.*
 /tmp

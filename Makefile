@@ -21,7 +21,7 @@ CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsql
 		$(shell pkg-config --silence-errors --libs re2 || echo -lre2)	\
 		$(shell pkg-config --silence-errors --libs ncurses tinfo || pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
-COMMON_DIRS := src/compat src/util src/json
+COMMON_DIRS := src/compat src/util src/json src/wcl
 COMMON_C    := $(foreach dir,$(COMMON_DIRS),$(wildcard $(dir)/*.c)) \
                vendor/whereami/whereami.c
 COMMON_CPP  := $(foreach dir,$(COMMON_DIRS),$(wildcard $(dir)/*.cpp))
@@ -46,7 +46,7 @@ clean:
 	rm -f bin/* lib/wake/* */*.o */*/*.o src/json/jlexer.cpp src/parser/lexer.cpp src/parser/parser.cpp src/parser/parser.h src/version.h wake.db
 	touch bin/stamp lib/wake/stamp
 
-wake.db:	bin/wake bin/wakebox lib/wake/fuse-waked lib/wake/shim-wake
+wake.db:	bin/wake bin/wakebox lib/wake/fuse-waked lib/wake/shim-wake lib/wake/wake-hash
 	test -f $@ || ./bin/wake --init .
 
 install:	all
@@ -102,6 +102,9 @@ lib/wake/fuse-waked:	tools/fuse-waked/main.cpp $(COMMON_OBJS)
 
 lib/wake/shim-wake:	tools/shim-wake/main.o vendor/blake2/blake2b-ref.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
+
+lib/wake/wake-hash: tools/wake-hash/main.o vendor/blake2/blake2b-ref.o $(COMMON_OBJS)
+	$(CXX) $(CFLAGS) -o $@ $^ $(LOCAL_CFLAGS) $(CXX_VERSION) $(LDFLAGS) $(CORE_LDFLAGS)
 
 %.o:	%.cpp	$(filter-out src/parser/parser.h,$(wildcard */*/*.h)) | src/parser/parser.h
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(CORE_CFLAGS) $(CXX_VERSION) -o $@ -c $<

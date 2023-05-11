@@ -130,11 +130,39 @@ def dirHash =
 export def getPathParent (path: Path): Path =
     Path (simplify "{getPathName path}/..") dirHash
 
-def addhash (f: String): String =
-    def p = simplify f
+def computeHashes (files: List String): List String =
+    # Lots of jobs have no output
+    require _, _ = files
+    else Nil
+
+    def hashPlan cmd =
+        Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun True Nil (\_ True) hashUsage id id False
+
     def add f h = prim "add_hash"
 
-    add p (hashcode p)
+    require Pass stdout =
+        hashPlan ("lib/wake/wake-hash", files)
+        | setPlanLabel "batch-hash"
+        | runJobWith localRunner
+        | getJobStdout
+    else
+        def _ = map (\f add f "BadHash")
+        files
+
+    def _ =
+        stdout
+        | tokenize `\n`
+        | zip files
+        | map (\(Pair file hash) add file hash)
+
+    files
+
+
+#def addhash (f: String): String =
+#    def p = simplify f
+#    def add f h = prim "add_hash"
+
+#    add p (hashcode p)
 
 def hashUsage =
     defaultUsage
