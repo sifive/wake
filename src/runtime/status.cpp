@@ -147,7 +147,7 @@ static std::vector<std::string> split_by_var(std::string fmt) {
 }
 
 void StatusBuf::emit_header() {
-  auto fmt_vec = split_by_var(WakeConfig::get()->log_header);
+  auto fmt_vec = split_by_var(log_header);
 
   // Push the current state so that we can overwrite
   // but restore it later
@@ -169,7 +169,8 @@ void StatusBuf::emit_header() {
 
   // Now output the format the user requested.
   out << fmt_vec[0];
-  const size_t extra_width = WakeConfig::get()->log_header_source_width;
+  const size_t extra_width = log_header_source_width;
+  const bool should_align = log_header_align;
   for (size_t i = 1; i < fmt_vec.size(); i += 2) {
     const std::string &var = fmt_vec[i];
 
@@ -230,6 +231,14 @@ int StatusBuf::overflow(int c) {
   }
 
   return 0;
+}
+
+StatusBuf::StatusBuf(std::string name, wcl::optional<std::string> extra, int color,
+                     TermInfoBuf &buf)
+    : name(name), extra(extra), color(color), buf(buf) {
+  log_header = WakeConfig::get()->log_header;
+  log_header_source_width = WakeConfig::get()->log_header_source_width;
+  log_header_align = WakeConfig::get()->log_header_align;
 }
 
 StatusBuf::~StatusBuf() {
