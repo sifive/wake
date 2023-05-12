@@ -131,21 +131,24 @@ export def getPathParent (path: Path): Path =
     Path (simplify "{getPathName path}/..") dirHash
 
 def computeHashes (files: List String): List String =
+    def simple_files = map simplify files
+
     # Many files will not even need to be rehashed because of their modtime
-    def needsHashing (file: String): Option String =
+    def needsHashing (file: String) =
         def get f = prim "get_hash"
 
         if get file ==* "" then
-            Some file
+            True
         else
-            None
+            False
 
     # Get just the files that we need to hash
-    def to_hash = mapPartial needsHashing files
+    def to_hash = filter needsHashing simple_files
+    def not_to_hash = filter (! needsHashing _) simple_files
 
     # Lots of jobs have no outputs at all, and some do not need to be rehashed
     require False = empty to_hash
-    else files
+    else not_to_hash
 
     # Ok now we know we have a non-empty set of files that actully need to be hashed.
     # We pass all of these to wake-hash and it does its thing
@@ -155,25 +158,20 @@ def computeHashes (files: List String): List String =
     def add f h = prim "add_hash"
 
     require Pass stdout =
-        hashPlan ("{wakePath}/../lib/wake/wake-hash", files)
+        hashPlan ("{wakePath}/../lib/wake/wake-hash", to_hash)
         | setPlanLabel "batch-hash"
         | runJobWith localRunner
         | getJobStdout
-    else
-        # We set the files hash to BadHash if we fail
-        def _ = printlnLevel logError "BadHash: {format to_hash}"
-        def _ = map (\f add f "BadHash") to_hash
-
-        files
+    else (map (add _ "BadHash") to_hash) ++ not_to_hash
 
     # Finally actully add all the hashes
-    def _ =
+    def hashed =
         stdout
         | tokenize `\n`
         | zip to_hash
         | map (\(Pair file hash) add file hash)
 
-    files
+    hashed ++ not_to_hash
 
 def hashUsage =
     defaultUsage
