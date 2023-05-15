@@ -278,7 +278,7 @@ static bool fuzz_loop(size_t number_of_steps, std::string cache_dir, std::string
 
   mkdir(cache_dir.c_str(), 0777);
   mkdir(dir.c_str(), 0777);
-  job_cache::Cache cache(cache_dir, 1ULL << 18ULL, (1 << 17ULL) + (1 << 16ULL));
+  job_cache::Cache cache(cache_dir, 1ULL << 24ULL, (1 << 23ULL) + (1 << 22ULL));
 
   int hit_count = 0;
   for (size_t i = 0; i < number_of_steps; ++i) {
