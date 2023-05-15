@@ -8,19 +8,6 @@
 #include "unit.h"
 #include "wcl/xoshiro_256.h"
 
-// TODO: 1) Make a way to generate a random job
-//       2) Add a queue of queue of random jobs to jump back to
-//       3) On each step with some probability either pick from the queue or generate a new job
-//       4) (if reuse) With some probability mutate the TestJob
-//       5) (if new job) With some probability pop a job form the queue (should be equal to 5)
-//       6) (if new job) With some probability add this job to the queue (should be equal to 4)
-//       7) Read the picked jobbed
-//       8) Check that all of its hashes match and clean up the files
-
-// V1 will have no extra directories or symlinks
-// V1 will test just lru eviction and cache misses will be ignored
-// V1 will be single threaded
-
 // Later features
 // 1) Add a mode for testing without eviction, demanding everything is a hit
 // 2) Add a mode where lru is used but hits are still demanded because the size cap is too high to

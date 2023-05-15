@@ -139,6 +139,7 @@ export def runUnitTests _: Result Unit Error =
         | setPlanLabel "testing: {testName}"
         | setPlanStdout logNever
         | setPlanStderr logNever
+        | setPlanLocalOnly True
         | setPlanShare False
         | runJob
 

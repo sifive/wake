@@ -189,15 +189,15 @@ struct LRUEvictionPolicyImpl {
       // If there was already a result, we can safely assume it was set and return
       if (result == SQLITE_ROW) return;
 
-      // If there wasn't however we need to insert the result
-      if (result == SQLITE_DONE) {
-        insert_last_use.bind_integer(1, job_id);
-        insert_last_use.bind_integer(2, tp.tv_sec);
-        insert_last_use.step();
-        insert_last_use.reset();
-      } else {
+      // Unless result is a row something awful has occured.
+      if (result != SQLITE_DONE) {
         log_fatal("get_last_use result was unexpected: %d", result);
       }
+
+      insert_last_use.bind_integer(1, job_id);
+      insert_last_use.bind_integer(2, tp.tv_sec);
+      insert_last_use.step();
+      insert_last_use.reset();
     });
   }
 
