@@ -159,7 +159,7 @@ def computeHashes (files: List String): List String =
 
     require Pass stdout =
         hashPlan ("{wakePath}/../lib/wake/wake-hash", to_hash)
-        | setPlanLabel "batch-hash"
+        | setPlanLabel "<hash>"
         | runJobWith localRunner
         | getJobStdout
     else (map (add _ "BadHash") to_hash) ++ not_to_hash
