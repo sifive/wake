@@ -573,7 +573,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
 
                 def output =
                     foutputs outputs
-                    | map addhash
+                    | computeHashes
                     | implode
 
                 finish job input output (implode outputs) status runtime cputime mem in out

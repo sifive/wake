@@ -89,6 +89,7 @@ def targets =
     buildWakeBox,
     buildFuseDaemon,
     buildShim,
+    buildHash,
     buildBSP,
     (bootstrapTarget buildLSP),
     buildWakeFormat,

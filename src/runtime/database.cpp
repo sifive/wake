@@ -400,15 +400,19 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
       "s.membytes, s.ibytes, s.obytes"
       " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
-      " where j.run_id==(select max(run_id) from jobs) and substr(cast(commandline as text),1,1) "
-      "<> '<' order by j.job_id";
+      " where j.run_id==(select max(run_id) from jobs)"
+      " and substr(cast(commandline as text),1,1) <> '<'"
+      " and label <> '<hash>'"
+      " order by j.job_id";
   const char *sql_find_last_use =
       "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
       "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
       "s.membytes, s.ibytes, s.obytes"
       " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
-      " where j.use_id==(select max(run_id) from jobs) and substr(cast(commandline as text),1,1) "
-      "<> '<' order by j.job_id";
+      " where j.use_id==(select max(run_id) from jobs)"
+      " and substr(cast(commandline as text),1,1) <> '<'"
+      " and label <> '<hash>'"
+      " order by j.job_id";
   const char *sql_find_failed =
       "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
       "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
@@ -461,7 +465,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       " and substr(cast(j.commandline as varchar), 1, 7) != '<claim>'"
       " and substr(cast(j.commandline as varchar), 1, 7) != '<mkdir>'"
       " and substr(cast(j.commandline as varchar), 1, 7) != '<write>'"
-      " and substr(cast(j.commandline as varchar), 1, 6) != '<hash>'";
+      " and substr(cast(j.commandline as varchar), 1, 6) != '<hash>'"
+      " and substr(cast(j.label       as varchar), 1, 6) != '<hash>'";
   const char *sql_get_file_access =
       "select access, job_id"
       " from filetree"
