@@ -853,7 +853,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
   msg += '\0';
 
   if (write(evict_stdin, msg.data(), msg.size()) == -1) {
-    log_fatal("Failed to send eviction update: %s", strerror(errno));
+    log_warning("Failed to send eviction update: %s", strerror(errno));
   }
 
   // TODO: We should really return a different thing here
@@ -938,7 +938,7 @@ void Cache::add(const AddJobRequest &add_request) {
   msg += '\0';
 
   if (write(evict_stdin, msg.data(), msg.size()) == -1) {
-    log_fatal("Failed to send eviction update: %s", strerror(errno));
+    log_warning("Failed to send eviction update: %s", strerror(errno));
   }
 }
 

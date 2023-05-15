@@ -105,7 +105,7 @@ insert into total_size (total_size_id, size) select 1, 0 where not exists (selec
 -- We need to keep track of jobs as the come through so that
 -- have some idea of which ones to keep/not keep
 create table if not exists lru_stats(
-  job_id references jobs(job_id) on delete cascade,
+  job_id integer primary key references jobs(job_id) on delete cascade,
   last_use integer not null);
 
 -- We need to order everything so that we can delete jobs in bulk efficently
