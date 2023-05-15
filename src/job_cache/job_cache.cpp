@@ -30,7 +30,9 @@
 #include <string.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <util/execpath.h>
@@ -55,956 +57,396 @@
 #include "eviction_policy.h"
 #include "job_cache_impl_common.h"
 #include "logging.h"
-
-namespace {
-
-using namespace job_cache;
-
-// Database classes
-class InputFiles {
- private:
-  PreparedStatement add_input_file;
-
- public:
-  static constexpr const char *insert_query =
-      "insert into input_files (path, hash, job) values (?, ?, ?)";
-
-  InputFiles(std::shared_ptr<job_cache::Database> db) : add_input_file(db, insert_query) {
-    add_input_file.set_why("Could not insert input file");
-  }
-
-  void insert(const std::string &path, Hash256 hash, int64_t job_id) {
-    add_input_file.bind_string(1, path);
-    add_input_file.bind_string(2, hash.to_hex());
-    add_input_file.bind_integer(3, job_id);
-    add_input_file.step();
-    add_input_file.reset();
-  }
-};
-
-class InputDirs {
- private:
-  PreparedStatement add_input_dir;
-
- public:
-  static constexpr const char *insert_query =
-      "insert into input_dirs (path, hash, job) values (?, ?, ?)";
-
-  InputDirs(std::shared_ptr<job_cache::Database> db) : add_input_dir(db, insert_query) {
-    add_input_dir.set_why("Could not insert input directory");
-  }
-
-  void insert(const std::string &path, Hash256 hash, int64_t job_id) {
-    add_input_dir.bind_string(1, path);
-    add_input_dir.bind_string(2, hash.to_hex());
-    add_input_dir.bind_integer(3, job_id);
-    add_input_dir.step();
-    add_input_dir.reset();
-  }
-};
-
-class OutputFiles {
- private:
-  PreparedStatement add_output_file;
-
- public:
-  static constexpr const char *insert_query =
-      "insert into output_files (path, hash, mode, job) values (?, ?, ?, ?)";
-
-  OutputFiles(std::shared_ptr<job_cache::Database> db) : add_output_file(db, insert_query) {
-    add_output_file.set_why("Could not insert output file");
-  }
-
-  void insert(const std::string &path, Hash256 hash, mode_t mode, int64_t job_id) {
-    add_output_file.bind_string(1, path);
-    add_output_file.bind_string(2, hash.to_hex());
-    add_output_file.bind_integer(3, mode);
-    add_output_file.bind_integer(4, job_id);
-    add_output_file.step();
-    add_output_file.reset();
-  }
-};
-
-class OutputDirs {
- private:
-  PreparedStatement add_output_dir;
-
- public:
-  static constexpr const char *insert_query =
-      "insert into output_dirs (path, mode, job) values (?, ?, ?)";
-
-  OutputDirs(std::shared_ptr<job_cache::Database> db) : add_output_dir(db, insert_query) {
-    add_output_dir.set_why("Could not insert output dir");
-  }
-
-  void insert(const std::string &path, mode_t mode, int64_t job_id) {
-    add_output_dir.bind_string(1, path);
-    add_output_dir.bind_integer(2, mode);
-    add_output_dir.bind_integer(3, job_id);
-    add_output_dir.step();
-    add_output_dir.reset();
-  }
-};
-
-class OutputSymlinks {
- private:
-  PreparedStatement add_output_symlink;
-
- public:
-  static constexpr const char *insert_query =
-      "insert into output_symlinks (path, value, job) values (?, ?, ?)";
-
-  OutputSymlinks(std::shared_ptr<job_cache::Database> db) : add_output_symlink(db, insert_query) {
-    add_output_symlink.set_why("Could not insert output file");
-  }
-
-  void insert(const std::string &path, const std::string &value, int64_t job_id) {
-    add_output_symlink.bind_string(1, path);
-    add_output_symlink.bind_string(2, value);
-    add_output_symlink.bind_integer(3, job_id);
-    add_output_symlink.step();
-    add_output_symlink.reset();
-  }
-};
-
-class JobTable {
- private:
-  std::shared_ptr<job_cache::Database> db;
-  PreparedStatement add_job;
-  PreparedStatement add_output_info;
-
- public:
-  static constexpr const char *insert_query =
-      "insert into jobs (directory, commandline, environment, stdin, bloom_filter)"
-      "values (?, ?, ?, ?, ?)";
-
-  static constexpr const char *add_output_info_query =
-      "insert into job_output_info"
-      "(job, stdout, stderr, ret, runtime, cputime, mem, ibytes, obytes)"
-      "values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-  JobTable(std::shared_ptr<job_cache::Database> db)
-      : db(db), add_job(db, insert_query), add_output_info(db, add_output_info_query) {
-    add_job.set_why("Could not insert job");
-    add_output_info.set_why("Could not add output info");
-  }
-
-  int64_t insert(const std::string &cwd, const std::string &cmd, const std::string &env,
-                 const std::string &stdin_str, BloomFilter bloom) {
-    int64_t bloom_integer = *reinterpret_cast<const int64_t *>(bloom.data());
-    add_job.bind_string(1, cwd);
-    add_job.bind_string(2, cmd);
-    add_job.bind_string(3, env);
-    add_job.bind_string(4, stdin_str);
-    add_job.bind_integer(5, bloom_integer);
-    add_job.step();
-    int64_t job_id = sqlite3_last_insert_rowid(db->get());
-    add_job.reset();
-    return job_id;
-  }
-
-  void insert_output_info(int64_t job_id, const std::string &stdout_str,
-                          const std::string &stderr_str, int ret_code, double runtime,
-                          double cputime, int64_t mem, int64_t ibytes, int64_t obytes) {
-    add_output_info.bind_integer(1, job_id);
-    add_output_info.bind_string(2, stdout_str);
-    add_output_info.bind_string(3, stderr_str);
-    add_output_info.bind_integer(4, ret_code);
-    add_output_info.bind_double(5, runtime);
-    add_output_info.bind_double(6, cputime);
-    add_output_info.bind_integer(7, mem);
-    add_output_info.bind_integer(8, ibytes);
-    add_output_info.bind_integer(9, obytes);
-    add_output_info.step();
-    add_output_info.reset();
-  }
-};
-
-// Returns the end of the parent directory in the path.
-static wcl::optional<std::pair<std::string, std::string>> parent_and_base(const std::string &str) {
-  // traverse backwards but using a normal iterator instead of a reverse
-  // iterator.
-  auto rbegin = str.end() - 1;
-  auto rend = str.begin();
-  for (; rbegin >= rend; --rbegin) {
-    if (*rbegin == '/') {
-      // Advance to the character past the slash
-      rbegin++;
-      // Now return the two strings
-      return {wcl::in_place_t{}, std::string(rend, rbegin), std::string(rbegin, str.end())};
-    }
-  }
-
-  return {};
-}
-
-struct RequestedJobFile {
-  std::string src;
-  std::string path;
-};
-
-struct JobRequestResult {
-  std::vector<RequestedJobFile> requested_files;
-};
-
-class SelectMatchingJobs {
- private:
-  PreparedStatement find_jobs;
-  PreparedStatement find_files;
-  PreparedStatement find_dirs;
-  PreparedStatement find_outputs;
-  PreparedStatement find_output_dirs;
-  PreparedStatement find_output_symlinks;
-  PreparedStatement find_job_output_info;
-
-  static wcl::optional<std::vector<std::string>> all_match(PreparedStatement &find, int64_t job_id,
-                                                           const FindJobRequest &find_job_request) {
-    auto defer_reset = wcl::make_defer([&find]() { find.reset(); });
-    find.bind_integer(1, job_id);
-    std::vector<std::string> out;
-    while (find.step() == SQLITE_ROW) {
-      std::string path = find.read_string(1);
-      Hash256 hash = Hash256::from_hex(find.read_string(2));
-      auto iter = find_job_request.visible.find(path);
-      if (iter == find_job_request.visible.end() || hash != iter->second) {
-        return {};
-      }
-      out.emplace_back(std::move(path));
-    }
-    return {wcl::in_place_t{}, std::move(out)};
-  }
-
-  std::vector<CachedOutputFile> read_outputs(int64_t job_id) {
-    auto defer_reset = wcl::make_defer([this]() { find_outputs.reset(); });
-    find_outputs.bind_integer(1, job_id);
-    std::vector<CachedOutputFile> out;
-    while (find_outputs.step() == SQLITE_ROW) {
-      CachedOutputFile file;
-      file.path = find_outputs.read_string(1);
-      file.hash = Hash256::from_hex(find_outputs.read_string(2));
-      file.mode = find_outputs.read_integer(3);
-      out.emplace_back(std::move(file));
-    }
-    return out;
-  }
-
-  std::vector<CachedOutputDir> read_output_dirs(int64_t job_id) {
-    auto defer_reset = wcl::make_defer([this]() { find_output_dirs.reset(); });
-    find_output_dirs.bind_integer(1, job_id);
-    std::vector<CachedOutputDir> out;
-    while (find_output_dirs.step() == SQLITE_ROW) {
-      CachedOutputDir dir;
-      dir.path = find_output_dirs.read_string(1);
-      dir.mode = find_output_dirs.read_integer(2);
-      out.emplace_back(std::move(dir));
-    }
-    // Sort them so that parents always proceed their children
-    std::sort(out.begin(), out.end(),
-              [](const auto &a, const auto &b) { return a.path.size() < b.path.size(); });
-    return out;
-  }
-
-  std::vector<CachedOutputSymlink> read_output_symlinks(int64_t job_id) {
-    auto defer_reset = wcl::make_defer([this]() { find_output_symlinks.reset(); });
-    find_output_symlinks.bind_integer(1, job_id);
-    std::vector<CachedOutputSymlink> out;
-    while (find_output_symlinks.step() == SQLITE_ROW) {
-      CachedOutputSymlink sym;
-      sym.path = find_output_symlinks.read_string(1);
-      sym.value = find_output_symlinks.read_string(2);
-      out.emplace_back(std::move(sym));
-    }
-    return out;
-  }
-
-  wcl::optional<JobOutputInfo> read_output_info(int64_t job_id) {
-    auto defer_reset = wcl::make_defer([this]() { find_job_output_info.reset(); });
-    find_job_output_info.bind_integer(1, job_id);
-    if (find_job_output_info.step() != SQLITE_ROW) {
-      return {};
-    }
-    JobOutputInfo out;
-    out.stdout_str = find_job_output_info.read_string(0);
-    out.stderr_str = find_job_output_info.read_string(1);
-    out.ret_code = find_job_output_info.read_integer(2);
-    out.runtime = find_job_output_info.read_double(3);
-    out.cputime = find_job_output_info.read_double(4);
-    out.mem = find_job_output_info.read_integer(5);
-    out.ibytes = find_job_output_info.read_integer(6);
-    out.obytes = find_job_output_info.read_integer(7);
-
-    return {wcl::in_place_t{}, std::move(out)};
-  }
-
- public:
-  // First we manually read everything in and we do additional
-  // processing on match.
-  static constexpr const char *sql_find_jobs =
-      "select job_id from jobs"
-      "  where directory = ?"
-      "  and   commandline = ?"
-      "  and   environment = ?"
-      "  and   stdin = ?"
-      "  and   bloom_filter & ~? = 0";
-
-  // When we find a match we check all of its input files and input directories
-  static constexpr const char *sql_find_files = "select * from input_files where job = ?";
-  static constexpr const char *sql_input_dirs = "select * from input_dirs where job = ?";
-
-  // Lastly if we find a job we need to read all of its outputs
-  static constexpr const char *sql_output_files = "select * from output_files where job = ?";
-  static constexpr const char *sql_output_dirs = "select * from output_dirs where job = ?";
-  static constexpr const char *sql_output_symlinks = "select * from output_symlinks where job = ?";
-
-  // When a matching job is found we need to read its other output info too
-  static constexpr const char *sql_job_output_info =
-      "select stdout, stderr, ret, runtime, cputime, mem, ibytes, obytes from job_output_info "
-      "where job = ?";
-
-  SelectMatchingJobs(std::shared_ptr<job_cache::Database> db)
-      : find_jobs(db, sql_find_jobs),
-        find_files(db, sql_find_files),
-        find_dirs(db, sql_input_dirs),
-        find_outputs(db, sql_output_files),
-        find_output_dirs(db, sql_output_dirs),
-        find_output_symlinks(db, sql_output_symlinks),
-        find_job_output_info(db, sql_job_output_info) {
-    find_jobs.set_why("Could not find matching jobs");
-    find_files.set_why("Could not find files of the given job");
-    find_dirs.set_why("Could not find dirs of the given job");
-  }
-
-  // NOTE: It is assumed that this is already running inside of a transaction
-  wcl::optional<MatchingJob> find(const FindJobRequest &find_job_request) {
-    wcl::optional<MatchingJob> out;
-
-    // These parts must match exactly
-    auto defer_reset = wcl::make_defer([this]() { find_jobs.reset(); });
-    find_jobs.bind_string(1, find_job_request.cwd);
-    find_jobs.bind_string(2, find_job_request.command_line);
-    find_jobs.bind_string(3, find_job_request.envrionment);
-    find_jobs.bind_string(4, find_job_request.stdin_str);
-
-    // The bloom filter of a matching job has to be a subset of this one
-    uint64_t bloom_integer = *reinterpret_cast<const uint64_t *>(find_job_request.bloom.data());
-    find_jobs.bind_integer(5, bloom_integer);
-
-    // Loop over all matching jobs
-    while (find_jobs.step() == SQLITE_ROW) {
-      // Having found a matching job we need to check all the files
-      // and directories have matching hashes.
-      int64_t job_id = find_jobs.read_integer(0);
-
-      // We need to find the extra output info as well but this should
-      // always work if the database added things correctly.
-      auto output_info = read_output_info(job_id);
-      if (!output_info) continue;
-
-      auto found_input_files = all_match(find_files, job_id, find_job_request);
-      if (!found_input_files) continue;
-      auto found_input_dirs = all_match(find_dirs, job_id, find_job_request);
-      if (!found_input_dirs) continue;
-
-      // Ok this is the job, it matches *exactly* so we should
-      // expect running it to produce exaxtly the same result.
-      MatchingJob result;
-      result.job_id = job_id;
-      result.output_files = read_outputs(job_id);
-      result.output_dirs = read_output_dirs(job_id);
-      result.output_symlinks = read_output_symlinks(job_id);
-      result.output_info = std::move(*output_info);
-      result.input_files = std::move(*found_input_files);
-      result.input_dirs = std::move(*found_input_dirs);
-
-      out = {wcl::in_place_t{}, std::move(result)};
-      break;
-    }
-
-    // Hopefully we found something
-    return out;
-  }
-};
-
-static Hash256 do_hash_file(const char *file, int fd) {
-  blake2b_state S;
-  uint8_t hash[32];
-  static thread_local uint8_t buffer[8192];
-  ssize_t got;
-
-  blake2b_init(&S, sizeof(hash));
-  while ((got = read(fd, &buffer[0], sizeof(buffer))) > 0) blake2b_update(&S, &buffer[0], got);
-  blake2b_final(&S, &hash[0], sizeof(hash));
-
-  if (got < 0) {
-    log_fatal("job-cache hash read(%s): %s", file, strerror(errno));
-  }
-
-  return Hash256::from_hash(&hash);
-}
-
-// join takes a sequence of strings and concats that
-// sequence with some seperator between it. It's like
-// python's join method on strings. So ", ".join(seq)
-// in python joins a list of strings with a comma. This
-// function is a C++ equivlent.
-template <class Iter>
-static std::string join(char sep, Iter begin, Iter end) {
-  std::string out;
-  for (; begin != end; ++begin) {
-    out += *begin;
-    if (begin + 1 != end) out += sep;
-  }
-  return out;
-}
-
-static std::vector<std::string> split_path(const std::string &path) {
-  std::vector<std::string> path_vec;
-  for (std::string node : wcl::make_filepath_range_ref(path)) {
-    path_vec.emplace_back(std::move(node));
-  }
-
-  return path_vec;
-}
-
-// The very last value is assumed to be a file and
-// is not created
-template <class Iter>
-static void mkdir_all(Iter begin, Iter end) {
-  std::string acc;
-  for (; begin + 1 != end; ++begin) {
-    acc += *begin + "/";
-    mkdir_no_fail(acc.c_str());
-  }
-}
-
-}  // namespace
+#include "message_parser.h"
 
 namespace job_cache {
 
-struct CacheDbImpl {
- private:
-  std::shared_ptr<job_cache::Database> db;
+// Helper to replace an existing file handle with
+// a new one. For instance to replace stdin with
+// /dev/null or stdout with a log file etc...
+static void replace_fd(int old_fd, int new_fd) {
+  if (dup2(new_fd, old_fd) == -1) {
+    log_fatal("dup2: %s", strerror(errno));
+  }
+}
 
- public:
-  JobTable jobs;
-  InputFiles input_files;
-  InputDirs input_dirs;
-  OutputFiles output_files;
-  OutputDirs output_dirs;
-  OutputSymlinks output_symlinks;
-  Transaction transact;
-  SelectMatchingJobs matching_jobs;
-
-  CacheDbImpl(const std::string &_dir)
-      : db(std::make_unique<job_cache::Database>(_dir)),
-        jobs(db),
-        input_files(db),
-        input_dirs(db),
-        output_files(db),
-        output_dirs(db),
-        output_symlinks(db),
-        transact(db),
-        matching_jobs(db) {}
-};
-
-AddJobRequest::AddJobRequest(const JAST &job_result_json) {
-  cwd = job_result_json.get("cwd").value;
-  command_line = job_result_json.get("command_line").value;
-  envrionment = job_result_json.get("envrionment").value;
-  stdin_str = job_result_json.get("stdin").value;
-  stdout_str = job_result_json.get("stdout").value;
-  stderr_str = job_result_json.get("stderr").value;
-  ret_code = std::stoi(job_result_json.get("status").value);
-  runtime = std::stod(job_result_json.get("runtime").value);
-  cputime = std::stod(job_result_json.get("cputime").value);
-  mem = std::stoull(job_result_json.get("mem").value);
-  ibytes = std::stoull(job_result_json.get("ibytes").value);
-  obytes = std::stoull(job_result_json.get("obytes").value);
-
-  // Read the input files
-  for (const auto &input_file : job_result_json.get("input_files").children) {
-    InputFile input;
-    input.path = input_file.second.get("path").value;
-    input.hash = Hash256::from_hex(input_file.second.get("hash").value);
-    bloom.add_hash(input.hash);
-    inputs.emplace_back(std::move(input));
+// Creates .log and .error.log in the given directory,
+// removes our access to stdin/stdout/stderr. stdout and
+// stderr are redirected to .log and .error.log respectivelly.
+// The process is then daemonized by double forking with a
+// setsid() in the middle. Lastly the sid and pid are logged.
+//
+// Returns true if the current process is the daemon.
+static bool daemonize(std::string dir) {
+  // first fork
+  int pid = fork();
+  if (pid == -1) {
+    log_fatal("fork1: %s", strerror(errno));
   }
 
-  // Read the input dirs
-  for (const auto &input_dir : job_result_json.get("input_dirs").children) {
-    InputDir input;
-    input.path = input_dir.second.get("path").value;
-    input.hash = Hash256::from_hex(input_dir.second.get("hash").value);
-    bloom.add_hash(input.hash);
-    directories.emplace_back(std::move(input));
+  if (pid != 0) {
+    return false;
   }
 
-  // TODO: I hate this loop but its the fastest path to a demo.
-  //       we need to figure out a path add things to the cache
-  //       only after the files have been hashed so we don't
-  //       need this loop. Since this job was just run, wake
-  //       will eventually hash all these files so the fact
-  //       that we have to re-hash them here is a shame.
-  // TODO: Use aio_read and do these hashes online and interleaveed
-  //       so that the IO can be in parallel despite the hashing being
-  //       serial.s. It would also be nice to figure out how to do
-  //       the hashing in parallel if we can't avoid it completely.
-  // Read the output files which requires kicking off a hash
-  for (const auto &output_file : job_result_json.get("output_files").children) {
-    struct stat buf = {};
-    const std::string &src = output_file.second.get("src").value;
-    if (lstat(src.c_str(), &buf) < 0) {
-      log_fatal("lstat(%s): %s", src.c_str(), strerror(errno));
+  {
+    // Replace stdin with /dev/null so we can't recivie input
+    auto null_fd = wcl::unique_fd::open("/dev/null", O_RDONLY);
+    if (!null_fd) {
+      log_fatal("open(%s): %s", "/dev/null", strerror(null_fd.error()));
     }
+    replace_fd(STDIN_FILENO, null_fd->get());
+  }
 
-    // Handle output directory
-    if (S_ISDIR(buf.st_mode)) {
-      OutputDirectory dir;
-      dir.mode = buf.st_mode;
-      dir.path = output_file.second.get("path").value;
-      output_dirs.emplace_back(std::move(dir));
+  {
+    // Replace stdout with dir/.log
+    std::string log_path = dir + "/.log";
+    auto log_fd = wcl::unique_fd::open(log_path.c_str(), O_CREAT | O_RDWR | O_APPEND, 0644);
+    if (!log_fd) {
+      log_fatal("open(%s): %s", log_path.c_str(), strerror(log_fd.error()));
+    }
+    replace_fd(STDOUT_FILENO, log_fd->get());
+  }
+
+  {
+    // Open the error log
+    std::string error_log_path = dir + "/.error.log";
+    auto err_log_fd = wcl::unique_fd::open(error_log_path.c_str(), O_CREAT | O_RDWR | O_APPEND,
+                                           0644);  // S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (!err_log_fd) {
+      log_fatal("open(%s): %s", error_log_path.c_str(), strerror(err_log_fd.error()));
+    }
+    replace_fd(STDERR_FILENO, err_log_fd->get());
+  }
+
+  // setsid so we're in our own group
+  int sid = setsid();
+  if (sid == -1) {
+    log_fatal("setsid: %s", strerror(errno));
+  }
+
+  // second fork so we can't undo any of the above
+  pid = fork();
+  if (pid == -1) {
+    log_fatal("fork2: %s", strerror(errno));
+  }
+
+  if (pid != 0) {
+    // Exit cleanly from orig parent
+    log_exit("fork2: success");
+  }
+
+  // Log success with our pid the log
+  pid = getpid();
+  log_info("Daemon successfully created: sid = %d, pid = %d", sid, pid);
+  return true;
+}
+
+wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
+  wcl::unique_fd socket_fd;
+  {
+    int local_socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (local_socket_fd == -1) {
+      log_fatal("socket(AF_UNIX, SOCK_STREAM, 0): %s\n", strerror(errno));
+    }
+    socket_fd = wcl::unique_fd(local_socket_fd);
+  }
+
+  std::string key_path = dir + "/.key";
+
+  char key[33] = {0};
+  auto fd = wcl::unique_fd::open(key_path.c_str(), O_RDONLY);
+  if (!fd) {
+    log_info("open(%s): %s", key_path.c_str(), strerror(fd.error()));
+    return {};
+  }
+
+  if (::read(fd->get(), key, sizeof(key)) == -1) {
+    log_fatal("read(%s): %s", key_path.c_str(), strerror(errno));
+  }
+
+  sockaddr_un addr = {0};
+  addr.sun_family = AF_UNIX;
+  addr.sun_path[0] = '\0';
+  log_info("key = %s, sizeof(key) = %d", key, sizeof(key));
+  memcpy(addr.sun_path + 1, key, sizeof(key));
+  if (connect(socket_fd.get(), reinterpret_cast<const sockaddr *>(&addr), sizeof(key)) == -1) {
+    log_info("connect(%s): %s", key, strerror(errno));
+    return {};
+  }
+
+  return wcl::make_some<wcl::unique_fd>(std::move(socket_fd));
+}
+
+Cache::Cache(std::string _dir, uint64_t max, uint64_t low) : _dir(_dir), max(max), low(low) {
+  mkdir_no_fail(_dir.c_str());
+
+  // launch the daemon
+  if (daemonize(_dir.c_str())) {
+    // We are the daemon
+    int ret_code = 1;
+    {
+      DaemonCache dcache(_dir, max, low);
+      ret_code = dcache.run();
+    }
+    exit(ret_code);
+  }
+
+  // connect to the daemon with backoff
+  wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
+  useconds_t backoff = 1000;
+  for (int i = 0; i < 10; i++) {
+    auto fd_opt = try_connect(_dir);
+    if (!fd_opt) {
+      std::uniform_int_distribution<useconds_t> variance(0, backoff);
+      usleep(backoff + variance(rng));
+      backoff *= 2;
       continue;
     }
 
-    // Handle symlink
-    if (S_ISLNK(buf.st_mode)) {
-      OutputSymlink sym;
-      static thread_local char link[4097];
-      int size = readlink(src.c_str(), link, sizeof(link));
-      if (size == -1) {
-        log_fatal("readlink(%s): %s", src.c_str(), strerror(errno));
-      }
-      sym.path = output_file.second.get("path").value;
-      sym.value = std::string(link, link + size);
-      output_symlinks.emplace_back(std::move(sym));
-      continue;
-    }
+    socket_fd = std::move(*fd_opt);
+    break;
+  }
 
-    // Handle regular files but ignore everything else.
-    if (!S_ISREG(buf.st_mode)) continue;
-    OutputFile output;
-    output.source = output_file.second.get("src").value;
-    output.path = output_file.second.get("path").value;
-    auto fd = wcl::unique_fd::open(output.source.c_str(), O_RDONLY);
-    if (!fd) {
-      log_fatal("open(%s): %s", output.source.c_str(), strerror(fd.error()));
-    }
-    output.hash = do_hash_file(output.source.c_str(), fd->get());
-    output.mode = buf.st_mode;
-    outputs.emplace_back(std::move(output));
+  if (socket_fd.get() == -1) {
+    log_fatal("could not connect to daemon. dir = %s", _dir);
+  }
+}
+
+CachedOutputFile::CachedOutputFile(const JAST &json) {
+  path = json.get("path").value;
+  hash = Hash256::from_hex(json.get("hash").value);
+  mode = std::stol(json.get("mode").value);
+}
+
+JAST CachedOutputFile::to_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("path", path);
+  json.add("hash", hash.to_hex());
+  json.add("mode", int64_t(mode));
+  return json;
+}
+
+CachedOutputSymlink::CachedOutputSymlink(const JAST &json) {
+  path = json.get("path").value;
+  value = json.get("value").value;
+}
+
+JAST CachedOutputSymlink::to_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("path", path);
+  json.add("value", value);
+  return json;
+}
+
+CachedOutputDir::CachedOutputDir(const JAST &json) {
+  path = json.get("path").value;
+  mode = std::stol(json.get("mode").value);
+}
+
+JAST CachedOutputDir::to_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("path", path);
+  json.add("mode", int64_t(mode));
+  return json;
+}
+
+JobOutputInfo::JobOutputInfo(const JAST &json) {
+  stdout_str = json.get("stdout").value;
+  stderr_str = json.get("stderr").value;
+  status = std::stoi(json.get("status").value);
+  runtime = std::stod(json.get("runtime").value);
+  cputime = std::stod(json.get("cputime").value);
+  mem = std::stoul(json.get("mem").value);
+  ibytes = std::stoul(json.get("ibytes").value);
+  obytes = std::stoul(json.get("obytes").value);
+}
+
+JAST JobOutputInfo::to_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("stdout", stdout_str);
+  json.add("stderr", stderr_str);
+  json.add("status", status);
+  json.add("runtime", runtime);
+  json.add("cputime", cputime);
+  json.add("mem", int64_t(mem));
+  json.add("ibytes", int64_t(ibytes));
+  json.add("obytes", int64_t(obytes));
+  return json;
+}
+
+MatchingJob::MatchingJob(const JAST &json) {
+  output_info = JobOutputInfo(json.get("output_info"));
+
+  for (const auto &output_file_json : json.get("output_files").children) {
+    output_files.push_back(CachedOutputFile(output_file_json.second));
+  }
+
+  for (const auto &output_dir_json : json.get("output_dirs").children) {
+    output_dirs.push_back(CachedOutputDir(output_dir_json.second));
+  }
+
+  for (const auto &output_symlink_json : json.get("output_symlinks").children) {
+    output_symlinks.push_back(CachedOutputSymlink(output_symlink_json.second));
+  }
+
+  for (const auto &input_file_json : json.get("input_files").children) {
+    input_files.push_back(input_file_json.second.value);
+  }
+
+  for (const auto &input_dir_json : json.get("input_dirs").children) {
+    input_dirs.push_back(input_dir_json.second.value);
   }
 }
 
 JAST MatchingJob::to_json() const {
-  JAST out(JSON_OBJECT);
+  JAST json(JSON_OBJECT);
+
+  json.add("output_info", output_info.to_json());
+
   JAST output_files_json(JSON_ARRAY);
-  JAST input_files_json(JSON_ARRAY);
-  JAST input_dirs_json(JSON_ARRAY);
-
-  // List the output files
-  // TODO: We need to make sure these are ordered the same way as they
-  //       were given to us to ensure wake code behaves the same. This
-  //       is for instance important for anyone that hashes the visible
-  //       list.
   for (const auto &output_file : output_files) {
-    // TODO: It's a shame we're throwing the hash out here :(
-    // It would be nice we could tell wake about this hash so
-    // that it didn't have to re-hash the file later. At this
-    // time there's no easy way to do that.
-    output_files_json.add(output_file.path);
+    output_files_json.add("", output_file.to_json());
   }
+  json.add("output_files", std::move(output_files_json));
+
+  JAST output_dirs_json(JSON_ARRAY);
   for (const auto &output_dir : output_dirs) {
-    output_files_json.add(output_dir.path);
+    output_dirs_json.add("", output_dir.to_json());
   }
-  for (const auto &output_sym : output_symlinks) {
-    output_files_json.add(output_sym.path);
-  }
+  json.add("output_dirs", std::move(output_dirs_json));
 
-  // List the input files
+  JAST output_symlinks_json(JSON_ARRAY);
+  for (const auto &output_symlink : output_symlinks) {
+    output_symlinks_json.add("", output_symlink.to_json());
+  }
+  json.add("output_symlinks", std::move(output_symlinks_json));
+
+  JAST input_files_json(JSON_ARRAY);
   for (const auto &input_file : input_files) {
-    input_files_json.add(input_file);
+    input_files_json.add("", input_file);
   }
+  json.add("input_files", std::move(input_files_json));
 
-  // List the input dirs
+  JAST input_dirs_json(JSON_ARRAY);
   for (const auto &input_dir : input_dirs) {
-    input_dirs_json.add(input_dir);
+    input_dirs_json.add("", input_dir);
   }
+  json.add("input_dirs", std::move(input_dirs_json));
 
-  // Add all the fields
-  out.add("output_files", std::move(output_files_json));
-  out.add("input_files", std::move(input_files_json));
-  out.add("input_dirs", std::move(input_dirs_json));
-  out.add("stdout", output_info.stdout_str);
-  out.add("stderr", output_info.stderr_str);
-  out.add("status", output_info.ret_code);
-  out.add("runtime", output_info.runtime);
-  out.add("cputime", output_info.cputime);
-  out.add("mem", static_cast<long long>(output_info.mem));
-  out.add("ibytes", static_cast<long long>(output_info.ibytes));
-  out.add("obytes", static_cast<long long>(output_info.obytes));
-
-  return out;
+  return json;
 }
 
-FindJobRequest::FindJobRequest(const JAST &find_job_json) {
-  cwd = find_job_json.get("cwd").value;
-  command_line = find_job_json.get("command_line").value;
-  envrionment = find_job_json.get("envrionment").value;
-  stdin_str = find_job_json.get("stdin").value;
-
-  // Read the input files, and compute the directory hashes as we go.
-  for (const auto &input_file : find_job_json.get("input_files").children) {
-    std::string path = input_file.second.get("path").value;
-    Hash256 hash = Hash256::from_hex(input_file.second.get("hash").value);
-    bloom.add_hash(hash);
-    visible[std::move(path)] = hash;
-  }
-
-  // Now accumulate the hashables in the directory.
-  std::unordered_map<std::string, std::string> dirs;
-  // NOTE: `visible` is already sorted because its an std::map.
-  // this means that we'll accumulate directories correctly.
-  for (const auto &input : visible) {
-    auto pair = parent_and_base(input.first);
-    if (!pair) continue;
-    std::string parent = std::move(pair->first);
-    std::string base = std::move(pair->second);
-    dirs[parent] += base;
-    dirs[parent] += ":";
-  }
-
-  // Now actually perform those hashes
-  for (auto dir : dirs) {
-    dir_hashes[dir.first] = Hash256::blake2b(dir.second);
-  }
-
-  // When outputting files we need to map sandbox dirs to output dirs.
-  // Collect those redirects here.
-  for (const auto &dir_redirect : find_job_json.get("dir_redirects").children) {
-    auto dir_range = wcl::make_filepath_range(dir_redirect.first);
-    dir_redirects.move_emplace(dir_range.begin(), dir_range.end(), dir_redirect.second.value);
-  }
+InputFile::InputFile(const JAST &json) {
+  path = json.get("path").value;
+  hash = Hash256::from_hex(json.get("hash").value);
 }
 
-Cache::Cache(std::string _dir, uint64_t max, uint64_t low)
-    : dir(std::move(_dir)),
-      rng(wcl::xoshiro_256::get_rng_seed()),
-      max_cache_size(max),
-      low_cache_size(low) {
-  mkdir_no_fail(dir.c_str());
-  impl = std::make_unique<CacheDbImpl>(dir);
-  launch_evict_loop();
+JAST InputFile::to_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("path", path);
+  json.add("hash", hash.to_hex());
+  return json;
+}
+
+InputDir::InputDir(const JAST &json) {
+  path = json.get("path").value;
+  hash = Hash256::from_hex(json.get("hash").value);
+}
+
+JAST InputDir::to_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("path", path);
+  json.add("hash", hash.to_hex());
+  return json;
+}
+
+OutputFile::OutputFile(const JAST &json) {
+  source = json.get("source").value;
+  path = json.get("path").value;
+  hash = Hash256::from_hex(json.get("hash").value);
+  mode = std::stol(json.get("mode").value);
+}
+
+JAST OutputFile::to_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("source", source);
+  json.add("path", path);
+  json.add("hash", hash.to_hex());
+  json.add("mode", int64_t(mode));
+  return json;
+}
+
+OutputDirectory::OutputDirectory(const JAST &json) {
+  path = json.get("path").value;
+  mode = std::stol(json.get("mode").value);
+}
+
+JAST OutputDirectory::to_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("path", path);
+  json.add("mode", int64_t(mode));
+  return json;
+}
+
+OutputSymlink::OutputSymlink(const JAST &json) {
+  path = json.get("path").value;
+  value = json.get("value").value;
+}
+
+JAST OutputSymlink::to_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("path", path);
+  json.add("value", value);
+  return json;
 }
 
 wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
-  wcl::optional<MatchingJob> result;
+  JAST request(JSON_OBJECT);
+  request.add("method", "cache/read");
+  request.add("params", find_request.to_json());
 
-  // We want to hold the database lock for as little time as possible
-  impl->transact.run(
-      [this, &find_request, &result]() { result = impl->matching_jobs.find(find_request); });
+  // serialize the request, send it, deserialize the response, return it
+  send_json_message(socket_fd.get(), request);
+  MessageParser parser(socket_fd.get());
+  std::vector<std::string> messages;
 
-  // Return early if there was no match.
-  if (!result) return {};
+  MessageParserState state = parser.read_messages(messages);
 
-  // We need a tmp directory to put these outputs into
-  std::string tmp_job_dir = wcl::join_paths(dir, "tmp_outputs_" + rng.unique_name());
-  mkdir_no_fail(tmp_job_dir.c_str());
-
-  // We also need to know what directory we're reading out of
-  uint8_t group_id = result->job_id & 0xFF;
-  std::string job_dir =
-      wcl::join_paths(dir, wcl::to_hex(&group_id), std::to_string(result->job_id));
-
-  // We then hard link each file to a new location atomically.
-  // If any of these hard links fail then we fail this read
-  // and clean up. This allows job cleanup to occur during
-  // a read. That would be an unfortunate situation but its
-  // very unlikely to occur so its better to commit the
-  // transaction early and suffer the consequences of unlinking
-  // one of the files just before we need it.
-  std::vector<std::tuple<std::string, std::string, mode_t>> to_copy;
-  bool success = true;
-  for (const auto &output_file : result->output_files) {
-    std::string hash_name = output_file.hash.to_hex();
-    std::string cur_file = wcl::join_paths(job_dir, hash_name);
-    std::string tmp_file = wcl::join_paths(tmp_job_dir, hash_name);
-    int ret = link(cur_file.c_str(), tmp_file.c_str());
-    if (ret < 0 && errno != EEXIST) {
-      success = false;
-      break;
-    }
-    to_copy.emplace_back(std::make_tuple(std::move(tmp_file), output_file.path, output_file.mode));
+  if (state == MessageParserState::StopFail) {
+    log_fatal("Cache::read(): failed receiving message");
   }
 
-  auto rewite_path = [&find_request](const std::string &sandbox_destination) {
-    std::vector<std::string> path_vec = split_path(sandbox_destination);
-    // So the file that the sandbox wrote to `sandbox_destination` currently
-    // lives at `tmp_file` and is safe from interference. The sandbox location
-    // needs to be redirected to some other output location however.
-    auto pair = find_request.dir_redirects.find_max(path_vec.begin(), path_vec.end());
-    if (pair.first == nullptr) {
-      std::string output_path = wcl::join_paths(".", sandbox_destination);
-      return std::make_pair<std::string, std::vector<std::string>>(std::move(output_path),
-                                                                   std::move(path_vec));
-    }
-    const auto &output_dir = *pair.first;
-    const auto &rel_path = join('/', pair.second, path_vec.end());
-    std::string output_path = wcl::join_paths(output_dir, rel_path);
-    std::vector<std::string> output_path_vec = split_path(output_path);
-    return std::make_pair<std::string, std::vector<std::string>>(std::move(output_path),
-                                                                 std::move(output_path_vec));
-  };
-
-  if (success) {
-    // First output all the directories (assumed to be sorted by length).
-    // This ensures that all directories are already made with the
-    // expected mode.
-    for (const auto &output_dir : result->output_dirs) {
-      // Rewrite the path based on the available rewrites
-      auto pair = rewite_path(output_dir.path);
-
-      // First make all the needed directories
-      mkdir(pair.first.c_str(), output_dir.mode);
-    }
-
-    // Now copy/reflink all output files into their final place
-    for (const auto &to_copy : to_copy) {
-      const auto &tmp_file = std::get<0>(to_copy);
-      const auto &sandbox_destination = std::get<1>(to_copy);
-      mode_t mode = std::get<2>(to_copy);
-
-      // Rewrite the path based on the available rewrites
-      auto pair = rewite_path(sandbox_destination);
-
-      // First make all the needed directories in case the output
-      // directories are missing. The mode of creation is assumed
-      // in this case.
-      mkdir_all(pair.second.begin(), pair.second.end());
-
-      // Finally copy the file (as efficently as we can) to
-      // the destination.
-      std::string tmp_dst = pair.first + "." + rng.unique_name();
-      copy_or_reflink(tmp_file.c_str(), tmp_dst.c_str(), mode, O_EXCL);
-      rename_no_fail(tmp_dst.c_str(), pair.first.c_str());
-    }
-
-    // Now create all the symlinks
-    for (const auto &output_symlink : result->output_symlinks) {
-      // Rewrite the path based on the available rewrites
-      auto pair = rewite_path(output_symlink.path);
-
-      // First make all the needed directories in case the output
-      // directories are missing. The mode of creation is assumed
-      // in this case.
-      mkdir_all(pair.second.begin(), pair.second.end());
-
-      // Lastly make the symlink
-      std::string tmp_link = pair.first + "." + rng.unique_name();
-      symlink_no_fail(output_symlink.value.c_str(), tmp_link.c_str());
-      rename_no_fail(tmp_link.c_str(), pair.first.c_str());
-    }
+  if (state == MessageParserState::StopSuccess && messages.empty()) {
+    log_fatal("Cache::read(): daemon exited without responding");
   }
 
-  // Now clean up those files in the tempdir
-  for (const auto &to_copy : to_copy) {
-    unlink_no_fail(std::get<0>(to_copy).c_str());
+  if (messages.size() != 1) {
+    log_fatal("Cache::read(): daemon responded with too many results");
   }
 
-  // Lastly clean up the tmp dir itself
-  rmdir_no_fail(tmp_job_dir.c_str());
+  log_info("Cache::read(): message rx: %s", messages[0].c_str());
 
-  // If we didn't link all the files over we need to return a failure.
-  if (!success) return {};
-
-  // The MatchingJob is currently using sandbox paths.
-  // We need to redirect those sandbox paths to non-sandbox paths
-  // here we redirect the output files.
-  auto redirect_path = [&find_request](std::string &path) {
-    std::vector<std::string> output_path_vec = split_path(path);
-    auto pair = find_request.dir_redirects.find_max(output_path_vec.begin(), output_path_vec.end());
-    if (!pair.first) return;
-    std::string rel_path = join('/', pair.second, output_path_vec.end());
-    path = wcl::join_paths(*pair.first, rel_path);
-  };
-
-  for (auto &output_file : result->output_files) {
-    redirect_path(output_file.path);
+  JAST json;
+  std::stringstream parseErrors;
+  if (!JAST::parse(messages[0], parseErrors, json)) {
+    log_fatal("Cache::read(): failed to parse daemon response");
   }
 
-  for (auto &output_dir : result->output_dirs) {
-    redirect_path(output_dir.path);
+  if (json.get("params").kind == JSON_NULLVAL) {
+    return {};
   }
 
-  for (auto &output_symlink : result->output_symlinks) {
-    redirect_path(output_symlink.path);
-  }
-
-  for (auto &input_file : result->input_files) {
-    redirect_path(input_file);
-  }
-
-  for (auto &input_dir : result->input_dirs) {
-    redirect_path(input_dir);
-  }
-
-  EvictionCommand cmd(EvictionCommandType::Read, result->job_id);
-
-  std::string msg = cmd.serialize();
-  msg += '\0';
-
-  if (write(evict_stdin, msg.data(), msg.size()) == -1) {
-    log_warning("Failed to send eviction update: %s", strerror(errno));
-  }
-
-  // TODO: We should really return a different thing here
-  //       that mentions the *output* locations but for
-  //       now this is good enough and we can assume
-  //       workspace relative paths everywhere.
-  return result;
+  return wcl::make_some<MatchingJob>(MatchingJob(json.get("params")));
 }
 
 void Cache::add(const AddJobRequest &add_request) {
-  // Create a unique name for the job dir (will rename later to correct name)
-  std::string tmp_job_dir = wcl::join_paths(dir, "/tmp_" + rng.unique_name());
-  mkdir_no_fail(tmp_job_dir.c_str());
+  // serialize the request, send it, deserialize the response, return it
+  JAST request(JSON_OBJECT);
+  request.add("method", "cache/add");
+  request.add("params", add_request.to_json());
 
-  // Copy the output files into the temp dir
-  for (const auto &output_file : add_request.outputs) {
-    // TODO(jake): See if this file already exists in another job to
-    //             avoid the copy by using a link and also save disk
-    //             space.
-    std::string blob_path = wcl::join_paths(tmp_job_dir, output_file.hash.to_hex());
-    copy_or_reflink(output_file.source.c_str(), blob_path.c_str());
-  }
-
-  // Start a transaction so that a job is never without its files.
-  int64_t job_id;
-  {
-    impl->transact.run([this, &add_request, &job_id]() {
-      job_id = impl->jobs.insert(add_request.cwd, add_request.command_line, add_request.envrionment,
-                                 add_request.stdin_str, add_request.bloom);
-
-      // Add additional info
-      impl->jobs.insert_output_info(job_id, add_request.stdout_str, add_request.stderr_str,
-                                    add_request.ret_code, add_request.runtime, add_request.cputime,
-                                    add_request.mem, add_request.ibytes, add_request.obytes);
-
-      // Input Files
-      for (const auto &input_file : add_request.inputs) {
-        impl->input_files.insert(input_file.path, input_file.hash, job_id);
-      }
-
-      // Input Dirs
-      for (const auto &input_dir : add_request.directories) {
-        impl->input_dirs.insert(input_dir.path, input_dir.hash, job_id);
-      }
-
-      // Output Files
-      for (const auto &output_file : add_request.outputs) {
-        impl->output_files.insert(output_file.path, output_file.hash, output_file.mode, job_id);
-      }
-
-      // Output Dirs
-      for (const auto &output_dir : add_request.output_dirs) {
-        impl->output_dirs.insert(output_dir.path, output_dir.mode, job_id);
-      }
-
-      // Output Symlinks
-      for (const auto &output_symlink : add_request.output_symlinks) {
-        impl->output_symlinks.insert(output_symlink.path, output_symlink.value, job_id);
-      }
-
-      // We commit the database without having moved the job directory.
-      // On *read* you have to be aware that the database can be in
-      // this kind of faulty state where the database is populated but
-      // file system is *not* populated. In such a case we interpret that
-      // as if it wasn't in the database and so it doesn't get used and
-      // will eventully be deleted.
-    });
-  }
-
-  // Finally we make sure the group directory exits and then
-  // atomically rename the temp job into place which completes
-  // the insertion. At that point reads should suceed.
-  uint8_t job_group = job_id & 0xFF;
-  std::string job_group_dir = wcl::join_paths(dir, wcl::to_hex<uint8_t>(&job_group));
-  mkdir_no_fail(job_group_dir.c_str());
-  std::string job_dir = wcl::join_paths(job_group_dir, std::to_string(job_id));
-  rename_no_fail(tmp_job_dir.c_str(), job_dir.c_str());
-
-  EvictionCommand cmd(EvictionCommandType::Write, job_id);
-
-  std::string msg = cmd.serialize();
-  msg += '\0';
-
-  if (write(evict_stdin, msg.data(), msg.size()) == -1) {
-    log_warning("Failed to send eviction update: %s", strerror(errno));
-  }
+  // serialize the request, send it, deserialize the response, return it
+  send_json_message(socket_fd.get(), request);
 }
-
-void Cache::launch_evict_loop() {
-  const size_t read_side = 0;
-  const size_t write_side = 1;
-
-  int stdinPipe[2];
-  int stdoutPipe[2];
-
-  if (pipe(stdinPipe) < 0) {
-    log_fatal("Failed to allocate eviction update: %s", strerror(errno));
-  }
-
-  if (pipe(stdoutPipe) < 0) {
-    log_fatal("Failed to allocate eviction update: %s", strerror(errno));
-  }
-
-  int pid = fork();
-
-  // error forking
-  if (pid < 0) {
-    log_fatal("Failed to fork eviction process: %s", strerror(errno));
-  }
-
-  // child
-  if (pid == 0) {
-    if (dup2(stdinPipe[read_side], STDIN_FILENO) == -1) {
-      log_fatal("Failed to dup2 stdin pipe for eviction process: %s", strerror(errno));
-    }
-
-    if (dup2(stdoutPipe[write_side], STDOUT_FILENO) == -1) {
-      log_fatal("Failed to dup2 stdin pipe for eviction process: %s", strerror(errno));
-    }
-
-    close(stdinPipe[read_side]);
-    close(stdinPipe[write_side]);
-    close(stdoutPipe[read_side]);
-    close(stdoutPipe[write_side]);
-
-    // Finally enter the eviction loop, if it exits cleanly
-    // go ahead and exit with its result.
-    int result =
-        eviction_loop(dir, std::make_unique<LRUEvictionPolicy>(max_cache_size, low_cache_size));
-    exit(result);
-  }
-
-  // parent
-  if (pid > 0) {
-    close(stdinPipe[read_side]);
-    close(stdoutPipe[write_side]);
-
-    evict_pid = pid;
-    evict_stdin = stdinPipe[write_side];
-    evict_stdout = stdoutPipe[read_side];
-  }
-}
-
-void Cache::reap_evict_loop() {
-  close(evict_stdin);
-  close(evict_stdout);
-  waitpid(evict_pid, nullptr, 0);
-}
-
-// This has to be here because the destructor code for std::unique_ptr<CacheDbImpl>
-// requires that the CacheDbImpl be complete.
-Cache::~Cache() { reap_evict_loop(); }
 
 }  // namespace job_cache

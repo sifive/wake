@@ -253,3 +253,23 @@ void remove_backing_files(std::string dir, const std::vector<int64_t> &job_ids,
     task.wait();
   }
 }
+
+void send_json_message(int fd, const JAST &json) {
+  std::stringstream s;
+  s << json;
+  std::string json_str = s.str();
+  json_str += '\0';
+
+  size_t start = 0;
+  while (start < json_str.size()) {
+    int res = write(fd, json_str.data() + start, json_str.size() - start);
+    if (res == -1) {
+      if (errno == EINTR) {
+        continue;
+      }
+      log_fatal("write(): %s", strerror(errno));
+    }
+
+    start += res;
+  }
+}

@@ -333,6 +333,11 @@ def jArray (fn: Result JValue Error => Result a Error) = match _
     Fail err = Fail err
     _ = failWithError "not an array"
 
+def getPath input =
+    require Pass elem = input
+    jField elem "path"
+    | jString
+
 export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
     def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
     def badlaunch job error = prim "job_fail_launch"
@@ -387,46 +392,57 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
                     True
 
                 require Pass match_info = jField jobCacheJsonOut "match"
+                require Pass output_info = jField match_info "output_info"
 
                 require Pass status =
-                    jField match_info "status"
+                    jField output_info "status"
                     | jInteger
 
                 require Pass runtime =
-                    jField match_info "runtime"
+                    jField output_info "runtime"
                     | jDouble
 
                 require Pass cputime =
-                    jField match_info "cputime"
+                    jField output_info "cputime"
                     | jDouble
 
                 require Pass mem =
-                    jField match_info "mem"
+                    jField output_info "mem"
                     | jInteger
 
                 require Pass ibytes =
-                    jField match_info "ibytes"
+                    jField output_info "ibytes"
                     | jInteger
 
                 require Pass obytes =
-                    jField match_info "obytes"
+                    jField output_info "obytes"
                     | jInteger
 
                 require Pass inputs =
                     jField match_info "input_files"
                     | jArray jString
 
-                require Pass outputs =
+                require Pass output_files =
                     jField match_info "output_files"
-                    | jArray jString
+                    | jArray getPath
+
+                require Pass output_dirs =
+                    jField match_info "output_dirs"
+                    | jArray getPath
+
+                require Pass output_symlinks =
+                    jField match_info "output_symlinks"
+                    | jArray getPath
 
                 require Pass stdout =
-                    jField match_info "stdout"
+                    jField output_info "stdout"
                     | jString
 
                 require Pass stderr =
-                    jField match_info "stderr"
+                    jField output_info "stderr"
                     | jString
+
+                def outputs = output_files ++ output_dirs ++ output_symlinks
 
                 def predict = Usage status runtime cputime mem ibytes obytes
                 def _ = virtual job stdout stderr status runtime cputime mem ibytes obytes

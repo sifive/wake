@@ -47,3 +47,11 @@ void mkdir_no_fail(const char *dir);
 void symlink_no_fail(const char *target, const char *symlink_path);
 void unlink_no_fail(const char *file);
 void rmdir_no_fail(const char *dir);
+
+#include <json/json5.h>
+
+#include <sstream>
+
+#include "logging.h"
+
+void send_json_message(int fd, const JAST &json);

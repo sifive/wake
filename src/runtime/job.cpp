@@ -1842,7 +1842,7 @@ static PRIMFN(prim_job_cache_add) {
   // TODO: This just fails if an issue occurs. Would be nice to fail
   //       with a bit more information. Right now we just use a simple
   //       string.
-  job_cache::AddJobRequest request(jast);
+  job_cache::AddJobRequest request = job_cache::AddJobRequest::from_implicit(jast);
   internal_job_cache->add(request);
   std::string result_json_str = "successfully added job";
   size_t need = String::reserve(result_json_str.size()) + reserve_result();

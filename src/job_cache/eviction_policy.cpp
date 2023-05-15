@@ -36,53 +36,9 @@
 #include "db_helpers.h"
 #include "eviction_command.h"
 #include "job_cache_impl_common.h"
+#include "message_parser.h"
 
 namespace job_cache {
-
-enum class CommandParserState { Continue, StopSuccess, StopFail };
-
-struct CommandParser {
-  std::string command_buff = "";
-
-  CommandParser() {}
-
-  CommandParserState read_commands(std::vector<std::string>& commands) {
-    commands = {};
-
-    while (true) {
-      uint8_t buffer[4096] = {};
-      ssize_t count = read(STDIN_FILENO, static_cast<void*>(buffer), 4096);
-      // Pipe has been closed. Stop processing
-      if (count == 0) {
-        return CommandParserState::StopSuccess;
-      }
-
-      // An error occured during read
-      if (count < 0) {
-        return CommandParserState::StopFail;
-      }
-
-      uint8_t* iter = buffer;
-      uint8_t* buffer_end = buffer + count;
-      while (iter < buffer_end) {
-        auto end = std::find(iter, buffer_end, 0);
-        command_buff.append(iter, end);
-        if (end != buffer_end) {
-          commands.emplace_back(std::move(command_buff));
-          command_buff = "";
-        }
-        iter = end + 1;
-      }
-
-      if (count < 4096) {
-        return CommandParserState::Continue;
-      }
-    }
-
-    // not actually reachable
-    return CommandParserState::Continue;
-  }
-};
 
 struct LRUEvictionPolicyImpl {
   std::string cache_dir;
@@ -287,14 +243,14 @@ LRUEvictionPolicy::~LRUEvictionPolicy() {}
 int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> policy) {
   policy->init(cache_dir);
 
-  CommandParser cmd_parser;
-  CommandParserState state;
+  MessageParser msg_parser(STDIN_FILENO);
+  MessageParserState state;
   do {
-    std::vector<std::string> cmds;
-    state = cmd_parser.read_commands(cmds);
+    std::vector<std::string> msgs;
+    state = msg_parser.read_messages(msgs);
 
-    for (const auto& c : cmds) {
-      auto cmd = EvictionCommand::parse(c);
+    for (const auto& m : msgs) {
+      auto cmd = EvictionCommand::parse(m);
       if (!cmd) {
         exit(EXIT_FAILURE);
       }
@@ -310,9 +266,9 @@ int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> 
           exit(EXIT_FAILURE);
       }
     }
-  } while (state == CommandParserState::Continue);
+  } while (state == MessageParserState::Continue);
 
-  exit(state == CommandParserState::StopSuccess ? EXIT_SUCCESS : EXIT_FAILURE);
+  exit(state == MessageParserState::StopSuccess ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 }  // namespace job_cache
