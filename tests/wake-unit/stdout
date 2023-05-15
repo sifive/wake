@@ -30,6 +30,7 @@ PASSED:
   filepath_range_one_node
   filepath_range_only_slash
   filepath_range_two_slash
+  job_cache_basic_fuzz
   option_assign1
   option_assign2
   option_copy

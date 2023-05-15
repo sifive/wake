@@ -92,6 +92,7 @@ struct LRUEvictionPolicyImpl {
   job_cache::PreparedStatement insert_last_use;
   job_cache::PreparedStatement set_last_use;
   job_cache::PreparedStatement get_last_use;
+  job_cache::PreparedStatement does_job_exist;
   job_cache::PreparedStatement find_least_recently_used;
   job_cache::PreparedStatement remove_least_recently_used;
   job_cache::Transaction transact;
@@ -118,6 +119,7 @@ struct LRUEvictionPolicyImpl {
       "insert into lru_stats (job_id, last_use) values (?, ?)";
   static constexpr const char* set_last_use_query =
       "update lru_stats set last_use = ? where job_id = ?";
+  static constexpr const char* does_job_exist_query = "select * from jobs where job_id = ?";
 
   // This is meant to be used as part of a transaction with remove_least_recently_used.
   // It simply returns the job_ids in last use order.
@@ -140,15 +142,18 @@ struct LRUEvictionPolicyImpl {
         insert_last_use(db, insert_last_use_query),
         set_last_use(db, set_last_use_query),
         get_last_use(db, get_last_use_query),
+        does_job_exist(db, does_job_exist_query),
         find_least_recently_used(db, find_least_recently_used_query),
         remove_least_recently_used(db, remove_least_recently_used_query),
         transact(db) {
     update_size.set_why("Could not update total size");
     get_size.set_why("Could not get total size");
-    insert_last_use.set_why("Could not update last use");
+    insert_last_use.set_why("Could not insert new last use");
     set_last_use.set_why("Could not update last use");
+    get_last_use.set_why("Could not get last use");
     find_least_recently_used.set_why("Could not find least recently used");
     remove_least_recently_used.set_why("Could not remove least recently used");
+    reset_size.set_why("Could not reset size");
   }
 
   uint64_t add_job_size(uint64_t job_id) {
@@ -170,20 +175,29 @@ struct LRUEvictionPolicyImpl {
     // Older versions of sqlite don't have upserts so
     // we have to do this junk.
     transact.run([this, job_id, &tp]() {
+      does_job_exist.bind_integer(1, job_id);
+      auto exists = does_job_exist.step();
+      does_job_exist.reset();
+      if (exists != SQLITE_ROW) return;
+      set_last_use.bind_integer(1, tp.tv_sec);
+      set_last_use.bind_integer(2, job_id);
+      set_last_use.step();
+      set_last_use.reset();
       get_last_use.bind_integer(1, job_id);
       auto result = get_last_use.step();
       get_last_use.reset();
-      if (result == SQLITE_ROW) {
-        set_last_use.bind_integer(1, tp.tv_sec);
-        set_last_use.bind_integer(2, job_id);
-        set_last_use.step();
-        set_last_use.reset();
-      } else {
-        insert_last_use.bind_integer(1, job_id);
-        insert_last_use.bind_integer(2, tp.tv_sec);
-        insert_last_use.step();
-        insert_last_use.reset();
+      // If there was already a result, we can safely assume it was set and return
+      if (result == SQLITE_ROW) return;
+
+      // Unless result is a row something awful has occured.
+      if (result != SQLITE_DONE) {
+        log_fatal("get_last_use result was unexpected: %d", result);
       }
+
+      insert_last_use.bind_integer(1, job_id);
+      insert_last_use.bind_integer(2, tp.tv_sec);
+      insert_last_use.step();
+      insert_last_use.reset();
     });
   }
 
@@ -228,7 +242,10 @@ struct LRUEvictionPolicyImpl {
       // the backing files to occur *after* this transaction completes.
       // Still, doing things in this order reduces the chance of a
       // failed read occuring.
-      auto reset2 = wcl::make_defer([this]() { remove_least_recently_used.reset(); });
+      auto reset2 = wcl::make_defer([this]() {
+        remove_least_recently_used.reset();
+        reset_size.reset();
+      });
       remove_least_recently_used.bind_integer(1, last_use);
       remove_least_recently_used.step();
       reset_size.bind_integer(1, current_size - removed_so_far);
