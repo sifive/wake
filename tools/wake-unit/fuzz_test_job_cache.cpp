@@ -1,11 +1,11 @@
+#include <fstream>
 #include <map>
 #include <random>
-#include <vector>
-#include <fstream>
 #include <sstream>
+#include <vector>
 
-#include "unit.h"
 #include "job_cache/job_cache.h"
+#include "unit.h"
 #include "wcl/xoshiro_256.h"
 
 // TODO: 1) Make a way to generate a random job
@@ -157,18 +157,18 @@ struct TestJob {
     if (dist(gen) < primary_key_mutate_prob) {
       std::uniform_int_distribution<> case_dist(0, 3);
       switch (case_dist(gen)) {
-      case 0:
-        to_mutate.cwd = gen.unique_name();
-        return;
-      case 1:
-        to_mutate.cmd = gen.unique_name();
-        return;
-      case 2:
-        to_mutate.env = gen.unique_name();
-        return;
-      case 3:
-        to_mutate.stdin = gen.unique_name();
-        return;
+        case 0:
+          to_mutate.cwd = gen.unique_name();
+          return;
+        case 1:
+          to_mutate.cmd = gen.unique_name();
+          return;
+        case 2:
+          to_mutate.env = gen.unique_name();
+          return;
+        case 3:
+          to_mutate.stdin = gen.unique_name();
+          return;
       }
       return;
     }
@@ -182,13 +182,11 @@ struct TestJob {
     // and input as well so we just return early in that case
     if (to_mutate.input_files.empty()) return;
 
-    //std::cerr << "Input files!!" << std::endl;
     for (int i = 0; i < inputs_to_mutate; ++i) {
       std::uniform_int_distribution<> num_to_mutate(0, to_mutate.input_files.size() - 1);
       to_mutate.input_files[num_to_mutate(gen)].content = gen.unique_name();
     }
 
-    //std::cerr << "Output files!!" << std::endl;
     if (to_mutate.output_files.empty()) return;
     for (int i = 0; i < outputs_to_mutate; ++i) {
       std::uniform_int_distribution<> num_to_mutate(0, to_mutate.output_files.size() - 1);
@@ -217,7 +215,6 @@ struct Pool {
     size_t last_idx = pool.size() - 1;
     std::uniform_int_distribution<size_t> index_to_reuse_dist(0, last_idx);
     size_t idx = index_to_reuse_dist(gen);
-    //std::cerr << "idx = " << idx << " last_idx = " << last_idx << " pool.size() = " << pool.size() << std::endl;
     return pool[idx];
   }
 
@@ -238,34 +235,26 @@ struct Pool {
 
     // If we're empty we can't reuse anything
     if (pool.size() <= reuse_threshold) {
-      //std::cerr << "dumb pool addition" << std::endl;
       pool.emplace_back(T::gen(gen));
       return pool.back();
     }
 
     // Make modifications to the pool
     if (dist(gen) < delete_prob) {
-      //std::cerr << "remove" << std::endl;
       remove(gen);
     }
 
     // Check if we want to reuse an existing job
     if (dist(gen) < reuse_prob) {
-      //std::cerr << "reuse" << std::endl;
       T& to_reuse = reuse(gen);
-      //std::cerr << "reuse done" << std::endl;
       if (dist(gen) < mutate_prob) {
-        //std::cerr << "mutate!" << std::endl;
         T to_mutate = to_reuse;
         T::mutate(to_mutate, gen);
-        //std::cerr << "mutate done" << std::endl;
         pool.emplace_back(to_mutate);
         return pool.back();
       }
       return to_reuse;
     }
-
-   // std::cerr << "non-reuse gen" << std::endl;
 
     // Otherwise we need to generate a new thing and add it to the pool
     pool.emplace_back(T::gen(gen));
@@ -273,7 +262,8 @@ struct Pool {
   }
 };
 
-static bool fuzz_loop(size_t number_of_steps, std::string cache_dir, std::string dir, wcl::xoshiro_256 gen) {
+static bool fuzz_loop(size_t number_of_steps, std::string cache_dir, std::string dir,
+                      wcl::xoshiro_256 gen) {
   Pool<TestJob> job_pool;
 
   mkdir(cache_dir.c_str(), 0777);
@@ -283,33 +273,22 @@ static bool fuzz_loop(size_t number_of_steps, std::string cache_dir, std::string
   int hit_count = 0;
   for (size_t i = 0; i < number_of_steps; ++i) {
     // First find the job that we care about
-    //std::cerr << "step" << std::endl;
     const TestJob& job = job_pool.step(gen);
-    //std::cerr << "step finish";
     auto find_job_request = job.generate_find_request(dir);
-    //std::cerr << "generate find request done" << std::endl;
     auto result = cache.read(find_job_request);
-    //std::cerr << "cache read done" << std::endl;
     if (result) {
-      //std::cerr << "hit" << std::endl;
       hit_count++;
       for (auto file : job.output_files) {
         std::ifstream t(dir + "/" + file.path);
         std::stringstream buffer;
         buffer << t.rdbuf();
-        //std::cerr << "buffer = " << buffer.str() << std::endl;
-        //std::cerr << "file.content = " << file.content << std::endl;
         if (buffer.str() != file.content) {
-          //std::cerr << "failure found" << std::endl;
           return false;
         }
       }
-      //std::cerr << "hit finish" << std::endl;
     } else {
-      //std::cerr << "add" << std::endl;
       auto add_job_request = job.generate_add_request(dir);
       cache.add(add_job_request);
-      //std::cerr << "add finish" << std::endl;
     }
   }
 

@@ -119,8 +119,7 @@ struct LRUEvictionPolicyImpl {
       "insert into lru_stats (job_id, last_use) values (?, ?)";
   static constexpr const char* set_last_use_query =
       "update lru_stats set last_use = ? where job_id = ?";
-  static constexpr const char* does_job_exist_query =
-      "select * from jobs where job_id = ?";
+  static constexpr const char* does_job_exist_query = "select * from jobs where job_id = ?";
 
   // This is meant to be used as part of a transaction with remove_least_recently_used.
   // It simply returns the job_ids in last use order.
@@ -160,9 +159,9 @@ struct LRUEvictionPolicyImpl {
   uint64_t add_job_size(uint64_t job_id) {
     uint64_t out = 0;
     transact.run([this, &out, job_id]() {
-      //std::cerr << "update_size: About to bind" << std::endl;
+      // std::cerr << "update_size: About to bind" << std::endl;
       update_size.bind_integer(1, job_id);
-      //std::cerr << "update_size: Now bound" << std::endl;
+      // std::cerr << "update_size: Now bound" << std::endl;
       update_size.step();
       update_size.reset();
       get_size.step();
@@ -178,20 +177,20 @@ struct LRUEvictionPolicyImpl {
     // Older versions of sqlite don't have upserts so
     // we have to do this junk.
     transact.run([this, job_id, &tp]() {
-      //std::cerr << "checking if the job exists" << std::endl;
+      // std::cerr << "checking if the job exists" << std::endl;
       does_job_exist.bind_integer(1, job_id);
       auto exists = does_job_exist.step();
       does_job_exist.reset();
       if (exists != SQLITE_ROW) return;
-      //std::cerr << "set_last_use: About to bind" << std::endl;
+      // std::cerr << "set_last_use: About to bind" << std::endl;
       set_last_use.bind_integer(1, tp.tv_sec);
-      //std::cerr << "set_last_use: Now bound" << std::endl;
+      // std::cerr << "set_last_use: Now bound" << std::endl;
       set_last_use.bind_integer(2, job_id);
       set_last_use.step();
       set_last_use.reset();
-      //std::cerr << "get_last_use: About to bind" << std::endl;
+      // std::cerr << "get_last_use: About to bind" << std::endl;
       get_last_use.bind_integer(1, job_id);
-      //std::cerr << "get_last_use: Now bound" << std::endl;
+      // std::cerr << "get_last_use: Now bound" << std::endl;
       auto result = get_last_use.step();
       get_last_use.reset();
       // If there was already a result, we can safely assume it was set and return
@@ -199,10 +198,10 @@ struct LRUEvictionPolicyImpl {
 
       // If there wasn't however we need to insert the result
       if (result == SQLITE_DONE) {
-        //std::cerr << "insert_last_use: About to bind" << std::endl;
+        // std::cerr << "insert_last_use: About to bind" << std::endl;
         insert_last_use.bind_integer(1, job_id);
-        //std::cerr << "insert_last_use: Now bound" << std::endl;
-        //std::cerr << "job_id = " << job_id << std::endl;
+        // std::cerr << "insert_last_use: Now bound" << std::endl;
+        // std::cerr << "job_id = " << job_id << std::endl;
         insert_last_use.bind_integer(2, tp.tv_sec);
         insert_last_use.step();
         insert_last_use.reset();
@@ -253,14 +252,17 @@ struct LRUEvictionPolicyImpl {
       // the backing files to occur *after* this transaction completes.
       // Still, doing things in this order reduces the chance of a
       // failed read occuring.
-      auto reset2 = wcl::make_defer([this]() { remove_least_recently_used.reset(); reset_size.reset(); });
-      //std::cerr << "before remove_least_recently_used" << std::endl;
+      auto reset2 = wcl::make_defer([this]() {
+        remove_least_recently_used.reset();
+        reset_size.reset();
+      });
+      // std::cerr << "before remove_least_recently_used" << std::endl;
       remove_least_recently_used.bind_integer(1, last_use);
-      //std::cerr << "after remove_least_recently_used" << std::endl;
+      // std::cerr << "after remove_least_recently_used" << std::endl;
       remove_least_recently_used.step();
-      //std::cerr << "before reset_size" << std::endl;
+      // std::cerr << "before reset_size" << std::endl;
       reset_size.bind_integer(1, current_size - removed_so_far);
-      //std::cerr << "after reset_size" << std::endl;
+      // std::cerr << "after reset_size" << std::endl;
       reset_size.step();
     });
 
