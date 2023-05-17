@@ -127,13 +127,11 @@ tuple Plan =
     export RunnerFilter: Runner => Boolean
     # User-supplied usage prediction; overruled by database statistics (if any)
     export Usage: Usage
-    # Modify the Runner's reported inputs (files read)
+    # Modify the Runner's reported inputs (files read). For advanced use only.
     export FnInputs: (List String => List String)
-    # Modify the Runner's reported outputs (files created). Use of this to modify files created by a job
-    # is discouraged. For the files that are left out of the filter, in addition to being excluded from
-    # the job's outputs, they are also hidden from the database (i.e., not treated as visible files). This
-    # should only be done in cases where there is a strong reason to hide files in this manner. Instead,
-    # most uses should filter the files returned in a Job's Outputs field.
+    # Modify the Runner's reported outputs (files created). Use this to provide a function to filter out
+    # files that you do not require use of. For normal use, use `setPlanFilterOutputs` to set this field.
+    # Setting this field directly is for advanced use only.
     export FnOutputs: (List String => List String)
     # Determines if job should run in psuedoterminal
     export IsAtty: Boolean
@@ -152,6 +150,7 @@ def isShare: Persistence => Boolean = match _
     _ = False
 
 # Convenience accessor methods
+
 export def getPlanOnce p =
     isOnce (getPlanPersistence p)
 
@@ -160,6 +159,20 @@ export def getPlanKeep p =
 
 export def getPlanShare p =
     isShare (getPlanPersistence p)
+
+# Convenience set methods
+
+# Sets the `FnOutputs` field in a `Plan` by using the given filter function to filter out unneeded files created
+# during a job. This function is recommended over directly setting the `FnOutputs` field with `setPlanFnOutputs`.
+#
+# Parameters:
+#  - `filterFn`: Determines whether to keep a file that was created or not. True means keep the file.
+export def setPlanFilterOutputs (filterFn: (file: String) => Boolean): Plan => Plan =
+    # This implementation prevents any unintentional abuse of the FnOutputs field, which can be used to
+    # actually add files. This method here only supports filtering.
+    def fnOutputs (files: List String): List String =
+        filter filterFn files
+    setPlanFnOutputs fnOutputs
 
 # If `Once` is set to `False`, no job deduplication is performed and so it must
 # *not* write any files (stdout/stderr are fine) or be guaranteed to only be
