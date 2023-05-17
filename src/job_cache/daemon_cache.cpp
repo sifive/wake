@@ -1080,7 +1080,7 @@ wcl::optional<MatchingJob> DaemonCache::read(const FindJobRequest &find_request)
   msg += '\0';
 
   if (write(evict_stdin, msg.data(), msg.size()) == -1) {
-    log_warning("Failed to send eviction update");
+    log_warning("Failed to send eviction update: %s", strerror(errno));
   }
 
   // TODO: We should really return a different thing here
@@ -1165,7 +1165,7 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   msg += '\0';
 
   if (write(evict_stdin, msg.data(), msg.size()) == -1) {
-    log_warning("Failed to send eviction update");
+    log_warning("Failed to send eviction update: %s", strerror(errno));
   }
 }
 
@@ -1177,33 +1177,28 @@ void DaemonCache::launch_evict_loop() {
   int stdoutPipe[2];
 
   if (pipe(stdinPipe) < 0) {
-    perror("Failed to allocate eviction pipe");
-    exit(EXIT_FAILURE);
+    log_fatal("Failed to allocate eviction pipe: %s", strerror(errno));
   }
 
   if (pipe(stdoutPipe) < 0) {
-    perror("Failed to allocate eviction pipe");
-    exit(EXIT_FAILURE);
+    log_fatal("Failed to allocate eviction pipe: %s", strerror(errno));
   }
 
   int pid = fork();
 
   // error forking
   if (pid < 0) {
-    perror("Failed to fork eviction process");
-    exit(EXIT_FAILURE);
+    log_fatal("Failed to fork eviction process: %s", strerror(errno));
   }
 
   // child
   if (pid == 0) {
     if (dup2(stdinPipe[read_side], STDIN_FILENO) == -1) {
-      perror("Failed to dup2 stdin pipe for eviction process");
-      exit(EXIT_FAILURE);
+      log_fatal("Failed to dup2 stdin pipe for eviction process: %s", strerror(errno));
     }
 
     if (dup2(stdoutPipe[write_side], STDOUT_FILENO) == -1) {
-      perror("Failed to dup2 stdout pipe for eviction process");
-      exit(EXIT_FAILURE);
+      log_fatal("Failed to dup2 stdin pipe for eviction process: %s", strerror(errno));
     }
 
     close(stdinPipe[read_side]);
