@@ -549,8 +549,10 @@ order to allow their execution to be cached.
 export def infoH _args =
     def cmdline =
         which "uname", "-sr", Nil
+    def plan =
+        makePlan "get kernel" Nil cmdline
     def os =
-        job cmdline Nil
+        runJob plan
     def str =
         getWhenFail "" os.getJobStdout
     def body =
@@ -575,11 +577,13 @@ most systems, `which "uname" = "/bin/uname"`, but this may not always be the
 case.  Using `which` buys us a bit of indirection and is usually good form to
 use with jobs.
 
-`job` is the main method wake uses to invoke a job.  It takes two arguments,
-a list of strings for the command-line and a list of paths of legal
-inputs.  We will see how the second is used later.
+`makePlan` is the main method wake uses to set up calls to external shell
+scripts or tools.  It takes three arguments: a readable name for what the job is
+doing, a list of paths of legal inputs, and a list of strings for the
+command-line.  We will go into more detail on that and `runJob` (which is where
+the command is actually invoked) in the next section.
 
-The values returned by `job` can be accessed in many ways. In this case, we use
+The values returned by `runJob` can be accessed in many ways. In this case, we use
 `getJobStdout` to get the standard output from the command; since an empty
 string is a reasonable default for our use, we use `getWhenFail ""` to recover
 in case the job failed. There is other information we can get from a `Job`
@@ -631,7 +635,7 @@ give different results, and that includes any local environment variables.
 
 ### Customizing job invocation
 
-Using `job`, we run processes with the default execution plan.
+Using `runJob`, we run processes with the default execution plan.
 This means that all environment variables are removed and the job is
 executed in the root of the workspace. However, it is possible to
 customize the environment used.
@@ -1167,7 +1171,8 @@ def curl url extension =
         url,
         Nil
     def curl =
-        job cmdline Nil
+        makePlan "download {url}" Nil cmdline
+        | runJob
     curl.getJobOutput
 
 export def downloadGithubRelease projectList =
