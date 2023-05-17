@@ -160,7 +160,7 @@ static wcl::result<JAST, std::pair<ReadJsonFileError, std::string>> read_json_fi
   std::ifstream file(path);
   if (!file) {
     return wcl::make_error<JAST, std::pair<ReadJsonFileError, std::string>>(
-        ReadJsonFileError::BadFile, "Failed  to read '" + path + "'");
+        ReadJsonFileError::BadFile, "Failed to read '" + path + "'");
   }
 
   std::stringstream buff;
@@ -297,14 +297,17 @@ bool WakeConfig::init(const std::string& wakeroot_path, const WakeConfigOverride
   // to our default constructor. Thus we are forced to use `new`
   _config = std::unique_ptr<WakeConfig>(new WakeConfig());
 
+  JAST wakeroot_json(JSON_OBJECT);
+
   // Parse .wakeroot
   auto wakeroot_res = read_json_file(wakeroot_path);
   if (!wakeroot_res) {
-    std::cerr << "Failed to load .wakeroot: " << wakeroot_res.error().second << std::endl;
-    return false;
+    std::cerr << "[WARNING] " << wakeroot_res.error().second << " using defaults instead."
+              << std::endl
+              << std::endl;
+  } else {
+    wakeroot_json = std::move(*wakeroot_res);
   }
-
-  JAST wakeroot_json = std::move(*wakeroot_res);
 
   // Check for disallowed keys
   {
