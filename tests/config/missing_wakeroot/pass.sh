@@ -2,6 +2,7 @@
 
 if [ $(uname) != Linux ] ; then
   cat stdout
+  cat stderr >&2
   exit 0
 fi
 
