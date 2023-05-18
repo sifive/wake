@@ -53,6 +53,12 @@ void mkdir_no_fail(const char *dir) {
   }
 }
 
+void chdir_no_fail(const char *dir) {
+  if (chdir(dir) < 0) {
+    log_fatal("chdir(%s): %s", dir, strerror(errno));
+  }
+}
+
 void symlink_no_fail(const char *target, const char *symlink_path) {
   if (symlink(target, symlink_path) == -1) {
     log_fatal("symlink(%s, %s): %s", target, symlink_path, strerror(errno));
@@ -267,7 +273,7 @@ void send_json_message(int fd, const JAST &json) {
       if (errno == EINTR) {
         continue;
       }
-      log_fatal("write(): %s", strerror(errno));
+      log_fatal("write(%d): %s", fd, strerror(errno));
     }
 
     start += res;

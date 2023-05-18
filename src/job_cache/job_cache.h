@@ -112,6 +112,9 @@ struct FindJobRequest {
   std::map<std::string, Hash256> visible;
   std::unordered_map<std::string, Hash256> dir_hashes;
 
+  // Property of the client, not the job
+  std::string client_cwd;
+
   FindJobRequest() = delete;
   FindJobRequest(const FindJobRequest &) = default;
   FindJobRequest(FindJobRequest &&) = default;
@@ -189,6 +192,9 @@ struct AddJobRequest {
   double runtime, cputime;
   uint64_t mem, ibytes, obytes;
 
+  // Property of the client, not the job
+  std::string client_cwd;
+
   AddJobRequest(const AddJobRequest &) = default;
   AddJobRequest(AddJobRequest &&) = default;
 
@@ -202,7 +208,6 @@ struct CacheDbImpl;
 
 class DaemonCache {
  private:
-  std::string dir;
   wcl::xoshiro_256 rng;
   std::unique_ptr<CacheDbImpl> impl;  // pimpl
   int evict_stdin;

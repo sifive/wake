@@ -648,6 +648,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
   req.mem = std::stoull(json.get("mem").value);
   req.ibytes = std::stoull(json.get("ibytes").value);
   req.obytes = std::stoull(json.get("obytes").value);
+  req.client_cwd = json.get("client_cwd").value;
 
   // Read the input files
   for (const auto &input_file : json.get("input_files").children) {
@@ -709,6 +710,11 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
     OutputFile output;
     output.source = output_file.second.get("src").value;
     output.path = output_file.second.get("path").value;
+
+    if (wcl::is_relative(output.source)) {
+      output.source = wcl::join_paths(req.client_cwd, output.source);
+    }
+
     auto fd = wcl::unique_fd::open(output.source.c_str(), O_RDONLY);
     if (!fd) {
       log_fatal("open(%s): %s", output.source.c_str(), strerror(fd.error()));
@@ -734,6 +740,7 @@ AddJobRequest::AddJobRequest(const JAST &json) {
   mem = std::stoull(json.get("mem").value);
   ibytes = std::stoull(json.get("ibytes").value);
   obytes = std::stoull(json.get("obytes").value);
+  client_cwd = json.get("client_cwd").value;
 
   // Read the input files
   for (const auto &input_file : json.get("input_files").children) {
@@ -779,6 +786,7 @@ JAST AddJobRequest::to_json() const {
   json.add("mem", int64_t(mem));
   json.add("ibytes", int64_t(ibytes));
   json.add("obytes", int64_t(obytes));
+  json.add("client_cwd", client_cwd);
 
   JAST input_files_json(JSON_ARRAY);
   for (const auto &input_file : inputs) {
@@ -818,6 +826,7 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
   command_line = find_job_json.get("command_line").value;
   envrionment = find_job_json.get("envrionment").value;
   stdin_str = find_job_json.get("stdin").value;
+  client_cwd = find_job_json.get("client_cwd").value;
 
   // Read the input files, and compute the directory hashes as we go.
   for (const auto &input_file : find_job_json.get("input_files").children) {
@@ -859,6 +868,7 @@ JAST FindJobRequest::to_json() const {
   json.add("command_line", command_line);
   json.add("envrionment", envrionment);
   json.add("stdin", stdin_str);
+  json.add("client_cwd", client_cwd);
 
   JAST input_files(JSON_ARRAY);
   for (const auto &input_file : visible) {
@@ -881,21 +891,19 @@ JAST FindJobRequest::to_json() const {
   return json;
 }
 
-DaemonCache::DaemonCache(std::string _dir, uint64_t max, uint64_t low)
-    : dir(std::move(_dir)),
-      rng(wcl::xoshiro_256::get_rng_seed()),
-      max_cache_size(max),
-      low_cache_size(low) {
+DaemonCache::DaemonCache(std::string dir, uint64_t max, uint64_t low)
+    : rng(wcl::xoshiro_256::get_rng_seed()), max_cache_size(max), low_cache_size(low) {
   mkdir_no_fail(dir.c_str());
-  impl = std::make_unique<CacheDbImpl>(dir);
-  std::tie(listen_socket_fd, key) = create_cache_socket(dir);
+  chdir_no_fail(dir.c_str());
+  impl = std::make_unique<CacheDbImpl>(".");
+  std::tie(listen_socket_fd, key) = create_cache_socket(".");
   launch_evict_loop();
 }
 
 int DaemonCache::run() {
-  auto cleanup = wcl::make_defer([dir = this->dir]() {
-    std::string key = dir + "/.key";
-    unlink_no_fail(key.c_str());
+  auto cleanup = wcl::make_defer([]() {
+    unlink_no_fail(".key");
+    log_info("Exiting run loop.");
   });
 
   poll.add(listen_socket_fd);
@@ -940,12 +948,12 @@ wcl::optional<MatchingJob> DaemonCache::read(const FindJobRequest &find_request)
   MatchingJob &result = matching_job->second;
 
   // We need a tmp directory to put these outputs into
-  std::string tmp_job_dir = wcl::join_paths(dir, "tmp_outputs_" + rng.unique_name());
+  std::string tmp_job_dir = "tmp_outputs_" + rng.unique_name();
   mkdir_no_fail(tmp_job_dir.c_str());
 
   // We also need to know what directory we're reading out of
   uint8_t group_id = job_id & 0xFF;
-  std::string job_dir = wcl::join_paths(dir, wcl::to_hex(&group_id), std::to_string(job_id));
+  std::string job_dir = wcl::join_paths(wcl::to_hex(&group_id), std::to_string(job_id));
 
   // We then hard link each file to a new location atomically.
   // If any of these hard links fail then we fail this read
@@ -975,13 +983,18 @@ wcl::optional<MatchingJob> DaemonCache::read(const FindJobRequest &find_request)
     // needs to be redirected to some other output location however.
     auto pair = find_request.dir_redirects.find_max(path_vec.begin(), path_vec.end());
     if (pair.first == nullptr) {
-      std::string output_path = wcl::join_paths(".", sandbox_destination);
+      std::string output_path = wcl::join_paths(find_request.client_cwd, sandbox_destination);
       return std::make_pair<std::string, std::vector<std::string>>(std::move(output_path),
                                                                    std::move(path_vec));
     }
     const auto &output_dir = *pair.first;
     const auto &rel_path = join('/', pair.second, path_vec.end());
     std::string output_path = wcl::join_paths(output_dir, rel_path);
+
+    if (wcl::is_relative(output_path)) {
+      output_path = wcl::join_paths(find_request.client_cwd, output_path);
+    }
+
     std::vector<std::string> output_path_vec = split_path(output_path);
     return std::make_pair<std::string, std::vector<std::string>>(std::move(output_path),
                                                                  std::move(output_path_vec));
@@ -1097,15 +1110,20 @@ wcl::optional<MatchingJob> DaemonCache::read(const FindJobRequest &find_request)
 
 void DaemonCache::add(const AddJobRequest &add_request) {
   // Create a unique name for the job dir (will rename later to correct name)
-  std::string tmp_job_dir = wcl::join_paths(dir, "/tmp_" + rng.unique_name());
+  std::string tmp_job_dir = "tmp_" + rng.unique_name();
   mkdir_no_fail(tmp_job_dir.c_str());
 
   // Copy the output files into the temp dir
-  for (const auto &output_file : add_request.outputs) {
+  for (auto output_file : add_request.outputs) {
     // TODO(jake): See if this file already exists in another job to
     //             avoid the copy by using a link and also save disk
     //             space.
     std::string blob_path = wcl::join_paths(tmp_job_dir, output_file.hash.to_hex());
+
+    if (wcl::is_relative(output_file.source)) {
+      output_file.source = wcl::join_paths(add_request.client_cwd, output_file.source);
+    }
+
     copy_or_reflink(output_file.source.c_str(), blob_path.c_str());
   }
 
@@ -1159,7 +1177,7 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   // atomically rename the temp job into place which completes
   // the insertion. At that point reads should suceed.
   uint8_t job_group = job_id & 0xFF;
-  std::string job_group_dir = wcl::join_paths(dir, wcl::to_hex<uint8_t>(&job_group));
+  std::string job_group_dir = wcl::to_hex<uint8_t>(&job_group);
   mkdir_no_fail(job_group_dir.c_str());
   std::string job_dir = wcl::join_paths(job_group_dir, std::to_string(job_id));
   rename_no_fail(tmp_job_dir.c_str(), job_dir.c_str());
@@ -1214,7 +1232,7 @@ void DaemonCache::launch_evict_loop() {
     // Finally enter the eviction loop, if it exits cleanly
     // go ahead and exit with its result.
     int result =
-        eviction_loop(dir, std::make_unique<LRUEvictionPolicy>(max_cache_size, low_cache_size));
+        eviction_loop(".", std::make_unique<LRUEvictionPolicy>(max_cache_size, low_cache_size));
     exit(result);
   }
 
@@ -1308,6 +1326,7 @@ void DaemonCache::handle_msg(int client_fd) {
     message_parsers.erase(client_fd);
     if (message_parsers.empty()) {
       exit_now = true;
+      log_info("All clients disconnected, exiting.");
     }
     return;
   }

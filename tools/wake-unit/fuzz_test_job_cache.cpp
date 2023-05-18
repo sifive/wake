@@ -1,3 +1,5 @@
+#include <unistd.h>
+
 #include <fstream>
 #include <map>
 #include <random>
@@ -56,6 +58,10 @@ struct TestJob {
     request.add("ibytes", 1024);
     request.add("obytes", 1024);
 
+    char path_buf[4096];
+    assert(getcwd(path_buf, sizeof(path_buf)) != NULL);
+    request.add("client_cwd", path_buf);
+
     // Add the input files
     JAST inputs(JSON_ARRAY);
     for (const auto& file : input_files) {
@@ -91,6 +97,10 @@ struct TestJob {
     request.add("command_line", cmd);
     request.add("envrionment", env);
     request.add("stdin", stdin);
+
+    char path_buf[4096];
+    assert(getcwd(path_buf, sizeof(path_buf)) != NULL);
+    request.add("client_cwd", path_buf);
 
     JAST inputs(JSON_ARRAY);
     for (const auto& file : input_files) {

@@ -280,4 +280,12 @@ inline std::string make_canonical(const std::string& x) {
   }
 }
 
+inline bool is_absolute(const char* x) { return x[0] == '/'; }
+
+inline bool is_absolute(const std::string& x) { return is_absolute(x.c_str()); }
+
+inline bool is_relative(const char* x) { return !is_absolute(x); }
+
+inline bool is_relative(const std::string& x) { return !is_absolute(x.c_str()); }
+
 }  // namespace wcl

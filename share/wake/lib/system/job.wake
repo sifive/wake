@@ -335,8 +335,15 @@ def jArray (fn: Result JValue Error => Result a Error) = match _
 
 def getPath input =
     require Pass elem = input
+
     jField elem "path"
     | jString
+
+target pwd Unit =
+    makePlan "get pwd" Nil "pwd"
+    | runJobWith localRunner
+    | getJobStdout
+    | rmap (replace `\n` "")
 
 export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
     def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
@@ -350,6 +357,8 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
 
             Fail e
         Pass (RunnerInput label cmd vis env dir stdin _ prefix _ _) =
+            require Pass client_cwd = pwd Unit
+
             def mkVisJson (Path path hash) =
                 JObject ("path" :-> JString path, "hash" :-> JString hash,)
 
@@ -363,6 +372,7 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
                     "envrionment" :-> JString env.implode,
                     "stdin" :-> JString stdin,
                     "input_files" :-> jobCacheVisible,
+                    "client_cwd" :-> JString client_cwd,
                     "dir_redirects" :-> JObject ("/workspace" :-> JString "./",),
                 )
 
@@ -443,7 +453,6 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
                     | jString
 
                 def outputs = output_files ++ output_dirs ++ output_symlinks
-
                 def predict = Usage status runtime cputime mem ibytes obytes
                 def _ = virtual job stdout stderr status runtime cputime mem ibytes obytes
 
@@ -493,6 +502,7 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
                     "obytes" :-> JInteger obytes,
                     "stdout" :-> JString stdout,
                     "stderr" :-> JString stderr,
+                    "client_cwd" :-> JString client_cwd,
                 )
 
             # We put this in a def so that it does not block the return below.

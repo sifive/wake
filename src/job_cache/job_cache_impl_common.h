@@ -44,6 +44,7 @@ void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644, int e
 // if we get an error we don't like.
 void rename_no_fail(const char *old_path, const char *new_path);
 void mkdir_no_fail(const char *dir);
+void chdir_no_fail(const char *dir);
 void symlink_no_fail(const char *target, const char *symlink_path);
 void unlink_no_fail(const char *file);
 void rmdir_no_fail(const char *dir);
