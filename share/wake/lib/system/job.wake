@@ -1001,19 +1001,3 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
                         Pass usage = Pass (RunnerOutput (getK `inputs`) (getK `outputs`) usage)
 
     makeRunner "json-{script}" score pre post localRunner
-
-# Whenever possible, use 'job' if:
-#   cmd can run under FUSE
-#   cmd guarantees to produce the same outputs given the same inputs
-# Examples:
-#   gcc
-# job only allows cmd access to 'visible', to prevent undeclared dependencies.
-# If you miss declared visible inputs, your build will fail so you can fix it.
-# If you declare too many visible inputs, cmd execution/replay will wait for unnecessary files.
-export def job (cmd: List String) (visible: List Path): Job =
-    makeExecPlan cmd visible
-    | runJob
-
-export def shellJob (script: String) (visible: List Path): Job =
-    makeShellPlan script visible
-    | runJob
