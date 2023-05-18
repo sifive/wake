@@ -304,7 +304,7 @@ bool WakeConfig::init(const std::string& wakeroot_path, const WakeConfigOverride
   if (!wakeroot_res) {
     std::cerr << "Failed to load .wakeroot: " << wakeroot_res.error().second;
 
-    // A missing .wakeroot is allowed, but other errors such and invalid json are not.
+    // A missing .wakeroot is allowed, but other errors such as invalid json are not.
     if (wakeroot_res.error().first != ReadJsonFileError::BadFile) {
       std::cerr << std::endl;
       return false;
