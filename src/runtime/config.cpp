@@ -302,9 +302,15 @@ bool WakeConfig::init(const std::string& wakeroot_path, const WakeConfigOverride
   // Parse .wakeroot
   auto wakeroot_res = read_json_file(wakeroot_path);
   if (!wakeroot_res) {
-    std::cerr << "[WARNING] " << wakeroot_res.error().second << " using defaults instead."
-              << std::endl
-              << std::endl;
+    std::cerr << "Failed to load .wakeroot: " << wakeroot_res.error().second;
+
+    // A missing .wakeroot is allowed, but other errors such and invalid json are not.
+    if (wakeroot_res.error().first != ReadJsonFileError::BadFile) {
+      std::cerr << std::endl;
+      return false;
+    }
+
+    std::cerr << ". Using default values instead." << std::endl;
   } else {
     wakeroot_json = std::move(*wakeroot_res);
   }
