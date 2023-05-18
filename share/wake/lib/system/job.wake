@@ -170,8 +170,8 @@ export def getPlanShare p =
 export def setPlanFilterOutputs (filterFn: (file: String) => Boolean): Plan => Plan =
     # This implementation prevents any unintentional abuse of the FnOutputs field, which can be used to
     # actually add files. This method here only supports filtering.
-    def fnOutputs (files: List String): List String =
-        filter filterFn files
+    def fnOutputs (files: List String): List String = filter filterFn files
+
     setPlanFnOutputs fnOutputs
 
 # If `Once` is set to `False`, no job deduplication is performed and so it must
