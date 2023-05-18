@@ -59,25 +59,26 @@ struct TestJob {
     // Add the input files
     JAST inputs(JSON_ARRAY);
     for (const auto& file : input_files) {
-      JAST json_file(JSON_OBJECT);
-      json_file.add("path", file.path);
-      auto hash = Hash256::blake2b(file.content);
-      json_file.add("hash", hash.to_hex());
-      inputs.add("", std::move(json_file));
+      job_cache::InputFile json_file;
+      json_file.path = file.path;
+      json_file.hash = Hash256::blake2b(file.content);
+      inputs.add("", json_file.to_json());
     }
     request.add("input_files", std::move(inputs));
 
-    // Add the output files and write the files as well
     JAST outputs(JSON_ARRAY);
     for (const auto& file : output_files) {
-      JAST json_file(JSON_OBJECT);
       std::string src = in_dir + "/" + file.path;
       std::ofstream out(src);
       out << file.content;
       out.close();
-      json_file.add("src", std::move(src));
-      json_file.add("path", "/workspace/" + file.path);
-      outputs.add("", std::move(json_file));
+
+      job_cache::OutputFile json_file;
+      json_file.path = file.path;
+      json_file.hash = Hash256::blake2b(file.content);
+      json_file.source = src;
+      json_file.mode = 0664;
+      outputs.add("", json_file.to_json());
     }
     request.add("output_files", std::move(outputs));
 
@@ -99,6 +100,7 @@ struct TestJob {
       json_file.add("hash", hash.to_hex());
       inputs.add("", std::move(json_file));
     }
+    request.add("input_files", std::move(inputs));
 
     JAST redirect(JSON_OBJECT);
     redirect.add("/workspace", out_dir);

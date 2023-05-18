@@ -924,14 +924,15 @@ wcl::optional<MatchingJob> DaemonCache::read(const FindJobRequest &find_request)
   wcl::optional<std::pair<int, MatchingJob>> matching_job;
 
   // We want to hold the database lock for as little time as possible
-  impl->transact.run(
-      [this, &find_request, &matching_job]() { matching_job = impl->matching_jobs.find(find_request); });
+  impl->transact.run([this, &find_request, &matching_job]() {
+    matching_job = impl->matching_jobs.find(find_request);
+  });
 
   // Return early if there was no match.
   if (!matching_job) return {};
 
   int job_id = matching_job->first;
-  MatchingJob& result = matching_job->second;
+  MatchingJob &result = matching_job->second;
 
   // We need a tmp directory to put these outputs into
   std::string tmp_job_dir = wcl::join_paths(dir, "tmp_outputs_" + rng.unique_name());
@@ -939,8 +940,7 @@ wcl::optional<MatchingJob> DaemonCache::read(const FindJobRequest &find_request)
 
   // We also need to know what directory we're reading out of
   uint8_t group_id = job_id & 0xFF;
-  std::string job_dir =
-      wcl::join_paths(dir, wcl::to_hex(&group_id), std::to_string(job_id));
+  std::string job_dir = wcl::join_paths(dir, wcl::to_hex(&group_id), std::to_string(job_id));
 
   // We then hard link each file to a new location atomically.
   // If any of these hard links fail then we fail this read

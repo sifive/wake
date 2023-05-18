@@ -156,7 +156,8 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   char key[33] = {0};
   auto fd = wcl::unique_fd::open(key_path.c_str(), O_RDONLY);
   if (!fd) {
-    log_info("open(%s): %s", key_path.c_str(), strerror(fd.error()));
+    // TODO: make a client log file
+    // log_info("open(%s): %s", key_path.c_str(), strerror(fd.error()));
     return {};
   }
 
@@ -167,7 +168,9 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   sockaddr_un addr = {0};
   addr.sun_family = AF_UNIX;
   addr.sun_path[0] = '\0';
-  log_info("key = %s, sizeof(key) = %d", key, sizeof(key));
+
+  // TODO: make a client log file
+  // log_info("key = %s, sizeof(key) = %d", key, sizeof(key));
   memcpy(addr.sun_path + 1, key, sizeof(key));
   if (connect(socket_fd.get(), reinterpret_cast<const sockaddr *>(&addr), sizeof(key)) == -1) {
     log_info("connect(%s): %s", key, strerror(errno));
@@ -424,7 +427,8 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
     log_fatal("Cache::read(): daemon responded with too many results");
   }
 
-  log_info("Cache::read(): message rx: %s", messages[0].c_str());
+  // TODO: make a client log file
+  // log_info("Cache::read(): message rx: %s", messages[0].c_str());
 
   JAST json;
   std::stringstream parseErrors;

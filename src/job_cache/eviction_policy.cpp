@@ -128,14 +128,15 @@ struct LRUEvictionPolicyImpl {
   void mark_new_use(uint64_t job_id) {
     timespec tp;
     clock_gettime(CLOCK_REALTIME, &tp);
+    int64_t time = 1000000ll * int64_t(tp.tv_sec) + tp.tv_nsec / 1000;
     // Older versions of sqlite don't have upserts so
     // we have to do this junk.
-    transact.run([this, job_id, &tp]() {
+    transact.run([this, job_id, &time]() {
       does_job_exist.bind_integer(1, job_id);
       auto exists = does_job_exist.step();
       does_job_exist.reset();
       if (exists != SQLITE_ROW) return;
-      set_last_use.bind_integer(1, tp.tv_sec);
+      set_last_use.bind_integer(1, time);
       set_last_use.bind_integer(2, job_id);
       set_last_use.step();
       set_last_use.reset();
@@ -151,7 +152,7 @@ struct LRUEvictionPolicyImpl {
       }
 
       insert_last_use.bind_integer(1, job_id);
-      insert_last_use.bind_integer(2, tp.tv_sec);
+      insert_last_use.bind_integer(2, time);
       insert_last_use.step();
       insert_last_use.reset();
     });
