@@ -214,6 +214,7 @@ class DaemonCache {
   int listen_socket_fd;
   Poll poll;
   std::unordered_map<int, MessageParser> message_parsers;
+  bool exit_now = false;
 
   void launch_evict_loop();
   void reap_evict_loop();

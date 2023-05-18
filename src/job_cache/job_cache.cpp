@@ -156,7 +156,6 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   char key[33] = {0};
   auto fd = wcl::unique_fd::open(key_path.c_str(), O_RDONLY);
   if (!fd) {
-    // TODO: make a client log file
     // log_info("open(%s): %s", key_path.c_str(), strerror(fd.error()));
     return {};
   }
@@ -173,7 +172,8 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   // log_info("key = %s, sizeof(key) = %d", key, sizeof(key));
   memcpy(addr.sun_path + 1, key, sizeof(key));
   if (connect(socket_fd.get(), reinterpret_cast<const sockaddr *>(&addr), sizeof(key)) == -1) {
-    log_info("connect(%s): %s", key, strerror(errno));
+    // TODO: make a client log file
+    // log_info("connect(%s): %s", key, strerror(errno));
     return {};
   }
 

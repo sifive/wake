@@ -893,8 +893,13 @@ DaemonCache::DaemonCache(std::string _dir, uint64_t max, uint64_t low)
 }
 
 int DaemonCache::run() {
+  auto cleanup = wcl::make_defer([dir = this->dir]() {
+    std::string key = dir + "/.key";
+    unlink_no_fail(key.c_str());
+  });
+
   poll.add(listen_socket_fd);
-  while (true) {
+  while (!exit_now) {
     // recieve and process messages
 
     struct timespec wait_until;
@@ -904,7 +909,7 @@ int DaemonCache::run() {
     auto fds = poll.wait(&wait_until, nullptr);
 
     if (fds.empty() && message_parsers.empty()) {
-      log_info("No activity for 10 mins, exiting.");
+      log_info("No initial connection for 10 mins, exiting.");
       return 0;
     }
 
@@ -917,7 +922,7 @@ int DaemonCache::run() {
     }
   }
 
-  return 1;
+  return 0;
 }
 
 wcl::optional<MatchingJob> DaemonCache::read(const FindJobRequest &find_request) {
@@ -1297,10 +1302,13 @@ void DaemonCache::handle_msg(int client_fd) {
 
   // If the file was closed, remove from epoll and close it.
   if (state == MessageParserState::StopSuccess) {
+    log_info("closing client fd = %d", client_fd);
     poll.remove(client_fd);
     close(client_fd);
     message_parsers.erase(client_fd);
-    log_info("closing client fd = %d", client_fd);
+    if (message_parsers.empty()) {
+      exit_now = true;
+    }
     return;
   }
 
