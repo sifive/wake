@@ -536,12 +536,11 @@ JAST FindJobResponse::to_json() const {
   JAST json(JSON_OBJECT);
 
   if (!match) {
-    json.add("found", static_cast<bool>(false));
-    json.add("match", JSON_NULLVAL);
+    json.add_bool("found", false);
     return json;
   }
 
-  json.add("found", static_cast<bool>(true));
+  json.add_bool("found", true);
   json.add("match", match->to_json());
   return json;
 }
