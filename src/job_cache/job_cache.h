@@ -46,7 +46,7 @@ class Cache {
 
   Cache(std::string dir, uint64_t max, uint64_t low);
 
-  wcl::optional<MatchingJob> read(const FindJobRequest &find_request);
+  FindJobResponse read(const FindJobRequest &find_request);
   void add(const AddJobRequest &add_request);
 };
 

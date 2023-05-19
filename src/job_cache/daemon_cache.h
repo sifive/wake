@@ -52,7 +52,7 @@ class DaemonCache {
   void launch_evict_loop();
   void reap_evict_loop();
 
-  wcl::optional<MatchingJob> read(const FindJobRequest &find_request);
+  FindJobResponse read(const FindJobRequest &find_request);
   void add(const AddJobRequest &add_request);
 
   void handle_new_client();

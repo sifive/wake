@@ -523,4 +523,27 @@ JAST FindJobRequest::to_json() const {
   return json;
 }
 
+FindJobResponse::FindJobResponse(JAST json) {
+  JAST found = json.get("found");
+  if (found.kind != JSON_TRUE) {
+    match = {};
+    return;
+  }
+  match = wcl::make_some<MatchingJob>(json.get("match"));
+}
+
+JAST FindJobResponse::to_json() const {
+  JAST json(JSON_OBJECT);
+
+  if (!match) {
+    json.add("found", static_cast<bool>(false));
+    json.add("match", JSON_NULLVAL);
+    return json;
+  }
+
+  json.add("found", static_cast<bool>(true));
+  json.add("match", match->to_json());
+  return json;
+}
+
 }  // namespace job_cache

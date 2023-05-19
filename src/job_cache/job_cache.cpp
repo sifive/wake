@@ -21,41 +21,17 @@
 
 #include "job_cache.h"
 
-#include <errno.h>
-#include <fcntl.h>
-#include <json/json5.h>
-#include <sqlite3.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/file.h>
-#include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/un.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <util/execpath.h>
-#include <util/mkdir_parents.h>
-#include <util/term.h>
-#include <wcl/defer.h>
-#include <wcl/filepath.h>
-#include <wcl/trie.h>
+#include <wcl/optional.h>
 #include <wcl/unique_fd.h>
 #include <wcl/xoshiro_256.h>
 
 #include <algorithm>
-#include <future>
-#include <iostream>
-#include <map>
-#include <random>
-#include <thread>
-#include <unordered_map>
+#include <string>
+#include <vector>
 
 #include "daemon_cache.h"
-#include "db_helpers.h"
-#include "eviction_command.h"
-#include "eviction_policy.h"
 #include "job_cache_impl_common.h"
 #include "logging.h"
 #include "message_parser.h"
@@ -216,7 +192,7 @@ Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
   }
 }
 
-wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
+FindJobResponse Cache::read(const FindJobRequest &find_request) {
   JAST request(JSON_OBJECT);
   request.add("method", "cache/read");
   request.add("params", find_request.to_json());
@@ -249,11 +225,7 @@ wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {
     log_fatal("Cache::read(): failed to parse daemon response");
   }
 
-  if (json.get("params").kind == JSON_NULLVAL) {
-    return {};
-  }
-
-  return wcl::make_some<MatchingJob>(MatchingJob(json.get("params")));
+  return FindJobResponse(json);
 }
 
 void Cache::add(const AddJobRequest &add_request) {

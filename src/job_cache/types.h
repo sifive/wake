@@ -110,6 +110,20 @@ struct FindJobRequest {
   JAST to_json() const;
 };
 
+struct FindJobResponse {
+  wcl::optional<MatchingJob> match;
+
+  FindJobResponse() = delete;
+  explicit FindJobResponse(wcl::optional<MatchingJob> job): match(std::move(job)) {}
+
+  // The (de)serialized keys are
+  //   - found: bool
+  //   - match: MatchingJob
+  // 'found' is determined implicitly based on if a MatchingJob is set and vice versa
+  explicit FindJobResponse(JAST json);
+  JAST to_json() const;
+};
+
 // JSON parsing stuff
 struct InputFile {
   std::string path;

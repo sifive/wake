@@ -21,37 +21,15 @@
 
 #include "daemon_cache.h"
 
-#include <errno.h>
-#include <fcntl.h>
-#include <json/json5.h>
 #include <sqlite3.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/file.h>
-#include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/un.h>
 #include <sys/wait.h>
-#include <unistd.h>
-#include <util/execpath.h>
-#include <util/mkdir_parents.h>
-#include <util/poll.h>
-#include <util/term.h>
 #include <wcl/defer.h>
+#include <wcl/optional.h>
 #include <wcl/filepath.h>
-#include <wcl/trie.h>
 #include <wcl/unique_fd.h>
 #include <wcl/xoshiro_256.h>
-
-#include <algorithm>
-#include <future>
-#include <iostream>
-#include <map>
-#include <random>
-#include <thread>
-#include <unordered_map>
 
 #include "db_helpers.h"
 #include "eviction_command.h"
@@ -159,7 +137,7 @@ static int open_abstract_domain_socket(const std::string &key) {
   return socket_fd;
 }
 
-static std::pair<int, std::string> create_cache_socket(const std::string &dir) {
+static std::pair<int, std::string> create_cache_socket(const std::string &dir, const std::string &key) {
   // Aquire a write lock so we know we're the only cache owner.
   // While this successfully stops multiple daemons from running,
   // it has another issue in that just because the lock is aquired,
@@ -175,15 +153,9 @@ static std::pair<int, std::string> create_cache_socket(const std::string &dir) {
   std::string key_path = dir + "/.key";
   unlink_no_fail(key_path.c_str());
 
-  // Get some random bits to name our domain socket with
-  wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
-  std::string key = rng.unique_name();
-  log_info("key = %s", key.c_str());
-
   // Create the key file that clients can read the domain
   // socket name from.
-  // TODO: Move this step to as late as possible to be more
-  // hygenic. The client
+  log_info("key = %s", key.c_str());
   std::string gen_path = dir + "/" + key;
   create_file(gen_path.c_str(), key_path.c_str(), key.data(), key.size());
 
@@ -603,10 +575,16 @@ struct CacheDbImpl {
 
 DaemonCache::DaemonCache(std::string dir, uint64_t max, uint64_t low)
     : rng(wcl::xoshiro_256::get_rng_seed()), max_cache_size(max), low_cache_size(low) {
+
   mkdir_no_fail(dir.c_str());
   chdir_no_fail(dir.c_str());
+
   impl = std::make_unique<CacheDbImpl>(".");
-  std::tie(listen_socket_fd, key) = create_cache_socket(".");
+
+  // Get some random bits to name our domain socket with
+  std::string key = rng.unique_name();
+  std::tie(listen_socket_fd, key) = create_cache_socket(".", key);
+
   launch_evict_loop();
 }
 
@@ -642,7 +620,7 @@ int DaemonCache::run() {
   return 0;
 }
 
-wcl::optional<MatchingJob> DaemonCache::read(const FindJobRequest &find_request) {
+FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
   wcl::optional<std::pair<int, MatchingJob>> matching_job;
 
   // We want to hold the database lock for as little time as possible
@@ -651,7 +629,7 @@ wcl::optional<MatchingJob> DaemonCache::read(const FindJobRequest &find_request)
   });
 
   // Return early if there was no match.
-  if (!matching_job) return {};
+  if (!matching_job) return FindJobResponse(wcl::optional<MatchingJob>{});
 
   int job_id = matching_job->first;
   MatchingJob &result = matching_job->second;
@@ -768,7 +746,7 @@ wcl::optional<MatchingJob> DaemonCache::read(const FindJobRequest &find_request)
   rmdir_no_fail(tmp_job_dir.c_str());
 
   // If we didn't link all the files over we need to return a failure.
-  if (!success) return {};
+  if (!success) return FindJobResponse(wcl::optional<MatchingJob>{});
 
   // The MatchingJob is currently using sandbox paths.
   // We need to redirect those sandbox paths to non-sandbox paths
@@ -814,7 +792,7 @@ wcl::optional<MatchingJob> DaemonCache::read(const FindJobRequest &find_request)
   //       that mentions the *output* locations but for
   //       now this is good enough and we can assume
   //       workspace relative paths everywhere.
-  return wcl::make_some<MatchingJob>(std::move(result));
+  return FindJobResponse(wcl::make_some<MatchingJob>(std::move(result)));
 }
 
 void DaemonCache::add(const AddJobRequest &add_request) {
@@ -1004,18 +982,8 @@ void DaemonCache::handle_msg(int client_fd) {
 
     if (json.get("method").value == "cache/read") {
       FindJobRequest req(json.get("params"));
-      auto match_opt = read(req);
-
-      JAST res(JSON_OBJECT);
-      res.add("method", "cache/read");
-
-      if (match_opt) {
-        res.add("params", match_opt->to_json());
-      } else {
-        res.add("params", JSON_NULLVAL);
-      }
-
-      send_json_message(client_fd, res);
+      FindJobResponse res = read(req);
+      send_json_message(client_fd, res.to_json());
     }
 
     if (json.get("method").value == "cache/add") {
