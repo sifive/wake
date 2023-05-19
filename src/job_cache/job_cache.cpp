@@ -52,6 +52,7 @@
 #include <thread>
 #include <unordered_map>
 
+#include "daemon_cache.h"
 #include "db_helpers.h"
 #include "eviction_command.h"
 #include "eviction_policy.h"
@@ -180,25 +181,25 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   return wcl::make_some<wcl::unique_fd>(std::move(socket_fd));
 }
 
-Cache::Cache(std::string _dir, uint64_t max, uint64_t low) : _dir(_dir), max(max), low(low) {
-  mkdir_no_fail(_dir.c_str());
+Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
+  mkdir_no_fail(dir.c_str());
 
   // launch the daemon
-  if (daemonize(_dir.c_str())) {
+  if (daemonize(dir.c_str())) {
     // We are the daemon
-    int ret_code = 1;
+    int status = 1;
     {
-      DaemonCache dcache(_dir, max, low);
-      ret_code = dcache.run();
+      DaemonCache dcache(dir, max, low);
+      status = dcache.run();
     }
-    exit(ret_code);
+    exit(status);
   }
 
   // connect to the daemon with backoff
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
   for (int i = 0; i < 10; i++) {
-    auto fd_opt = try_connect(_dir);
+    auto fd_opt = try_connect(dir);
     if (!fd_opt) {
       std::uniform_int_distribution<useconds_t> variance(0, backoff);
       usleep(backoff + variance(rng));
@@ -211,196 +212,8 @@ Cache::Cache(std::string _dir, uint64_t max, uint64_t low) : _dir(_dir), max(max
   }
 
   if (socket_fd.get() == -1) {
-    log_fatal("could not connect to daemon. dir = %s", _dir);
+    log_fatal("could not connect to daemon. dir = %s", dir);
   }
-}
-
-CachedOutputFile::CachedOutputFile(const JAST &json) {
-  path = json.get("path").value;
-  hash = Hash256::from_hex(json.get("hash").value);
-  mode = std::stol(json.get("mode").value);
-}
-
-JAST CachedOutputFile::to_json() const {
-  JAST json(JSON_OBJECT);
-  json.add("path", path);
-  json.add("hash", hash.to_hex());
-  json.add("mode", int64_t(mode));
-  return json;
-}
-
-CachedOutputSymlink::CachedOutputSymlink(const JAST &json) {
-  path = json.get("path").value;
-  value = json.get("value").value;
-}
-
-JAST CachedOutputSymlink::to_json() const {
-  JAST json(JSON_OBJECT);
-  json.add("path", path);
-  json.add("value", value);
-  return json;
-}
-
-CachedOutputDir::CachedOutputDir(const JAST &json) {
-  path = json.get("path").value;
-  mode = std::stol(json.get("mode").value);
-}
-
-JAST CachedOutputDir::to_json() const {
-  JAST json(JSON_OBJECT);
-  json.add("path", path);
-  json.add("mode", int64_t(mode));
-  return json;
-}
-
-JobOutputInfo::JobOutputInfo(const JAST &json) {
-  stdout_str = json.get("stdout").value;
-  stderr_str = json.get("stderr").value;
-  status = std::stoi(json.get("status").value);
-  runtime = std::stod(json.get("runtime").value);
-  cputime = std::stod(json.get("cputime").value);
-  mem = std::stoul(json.get("mem").value);
-  ibytes = std::stoul(json.get("ibytes").value);
-  obytes = std::stoul(json.get("obytes").value);
-}
-
-JAST JobOutputInfo::to_json() const {
-  JAST json(JSON_OBJECT);
-  json.add("stdout", stdout_str);
-  json.add("stderr", stderr_str);
-  json.add("status", status);
-  json.add("runtime", runtime);
-  json.add("cputime", cputime);
-  json.add("mem", int64_t(mem));
-  json.add("ibytes", int64_t(ibytes));
-  json.add("obytes", int64_t(obytes));
-  return json;
-}
-
-MatchingJob::MatchingJob(const JAST &json) {
-  output_info = JobOutputInfo(json.get("output_info"));
-
-  for (const auto &output_file_json : json.get("output_files").children) {
-    output_files.push_back(CachedOutputFile(output_file_json.second));
-  }
-
-  for (const auto &output_dir_json : json.get("output_dirs").children) {
-    output_dirs.push_back(CachedOutputDir(output_dir_json.second));
-  }
-
-  for (const auto &output_symlink_json : json.get("output_symlinks").children) {
-    output_symlinks.push_back(CachedOutputSymlink(output_symlink_json.second));
-  }
-
-  for (const auto &input_file_json : json.get("input_files").children) {
-    input_files.push_back(input_file_json.second.value);
-  }
-
-  for (const auto &input_dir_json : json.get("input_dirs").children) {
-    input_dirs.push_back(input_dir_json.second.value);
-  }
-}
-
-JAST MatchingJob::to_json() const {
-  JAST json(JSON_OBJECT);
-
-  json.add("output_info", output_info.to_json());
-
-  JAST output_files_json(JSON_ARRAY);
-  for (const auto &output_file : output_files) {
-    output_files_json.add("", output_file.to_json());
-  }
-  json.add("output_files", std::move(output_files_json));
-
-  JAST output_dirs_json(JSON_ARRAY);
-  for (const auto &output_dir : output_dirs) {
-    output_dirs_json.add("", output_dir.to_json());
-  }
-  json.add("output_dirs", std::move(output_dirs_json));
-
-  JAST output_symlinks_json(JSON_ARRAY);
-  for (const auto &output_symlink : output_symlinks) {
-    output_symlinks_json.add("", output_symlink.to_json());
-  }
-  json.add("output_symlinks", std::move(output_symlinks_json));
-
-  JAST input_files_json(JSON_ARRAY);
-  for (const auto &input_file : input_files) {
-    input_files_json.add("", input_file);
-  }
-  json.add("input_files", std::move(input_files_json));
-
-  JAST input_dirs_json(JSON_ARRAY);
-  for (const auto &input_dir : input_dirs) {
-    input_dirs_json.add("", input_dir);
-  }
-  json.add("input_dirs", std::move(input_dirs_json));
-
-  return json;
-}
-
-InputFile::InputFile(const JAST &json) {
-  path = json.get("path").value;
-  hash = Hash256::from_hex(json.get("hash").value);
-}
-
-JAST InputFile::to_json() const {
-  JAST json(JSON_OBJECT);
-  json.add("path", path);
-  json.add("hash", hash.to_hex());
-  return json;
-}
-
-InputDir::InputDir(const JAST &json) {
-  path = json.get("path").value;
-  hash = Hash256::from_hex(json.get("hash").value);
-}
-
-JAST InputDir::to_json() const {
-  JAST json(JSON_OBJECT);
-  json.add("path", path);
-  json.add("hash", hash.to_hex());
-  return json;
-}
-
-OutputFile::OutputFile(const JAST &json) {
-  source = json.get("source").value;
-  path = json.get("path").value;
-  hash = Hash256::from_hex(json.get("hash").value);
-  mode = std::stol(json.get("mode").value);
-}
-
-JAST OutputFile::to_json() const {
-  JAST json(JSON_OBJECT);
-  json.add("source", source);
-  json.add("path", path);
-  json.add("hash", hash.to_hex());
-  json.add("mode", int64_t(mode));
-  return json;
-}
-
-OutputDirectory::OutputDirectory(const JAST &json) {
-  path = json.get("path").value;
-  mode = std::stol(json.get("mode").value);
-}
-
-JAST OutputDirectory::to_json() const {
-  JAST json(JSON_OBJECT);
-  json.add("path", path);
-  json.add("mode", int64_t(mode));
-  return json;
-}
-
-OutputSymlink::OutputSymlink(const JAST &json) {
-  path = json.get("path").value;
-  value = json.get("value").value;
-}
-
-JAST OutputSymlink::to_json() const {
-  JAST json(JSON_OBJECT);
-  json.add("path", path);
-  json.add("value", value);
-  return json;
 }
 
 wcl::optional<MatchingJob> Cache::read(const FindJobRequest &find_request) {

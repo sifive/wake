@@ -19,6 +19,8 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include "daemon_cache.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <json/json5.h>
@@ -54,10 +56,10 @@
 #include "db_helpers.h"
 #include "eviction_command.h"
 #include "eviction_policy.h"
-#include "job_cache.h"
 #include "job_cache_impl_common.h"
 #include "logging.h"
 #include "message_parser.h"
+#include "types.h"
 
 namespace {
 
@@ -350,24 +352,6 @@ class JobTable {
   }
 };
 
-// Returns the end of the parent directory in the path.
-static wcl::optional<std::pair<std::string, std::string>> parent_and_base(const std::string &str) {
-  // traverse backwards but using a normal iterator instead of a reverse
-  // iterator.
-  auto rbegin = str.end() - 1;
-  auto rend = str.begin();
-  for (; rbegin >= rend; --rbegin) {
-    if (*rbegin == '/') {
-      // Advance to the character past the slash
-      rbegin++;
-      // Now return the two strings
-      return {wcl::in_place_t{}, std::string(rend, rbegin), std::string(rbegin, str.end())};
-    }
-  }
-
-  return {};
-}
-
 struct RequestedJobFile {
   std::string src;
   std::string path;
@@ -552,23 +536,6 @@ class SelectMatchingJobs {
   }
 };
 
-static Hash256 do_hash_file(const char *file, int fd) {
-  blake2b_state S;
-  uint8_t hash[32];
-  static thread_local uint8_t buffer[8192];
-  ssize_t got;
-
-  blake2b_init(&S, sizeof(hash));
-  while ((got = read(fd, &buffer[0], sizeof(buffer))) > 0) blake2b_update(&S, &buffer[0], got);
-  blake2b_final(&S, &hash[0], sizeof(hash));
-
-  if (got < 0) {
-    log_fatal("job-cache hash read(%s): %s", file, strerror(errno));
-  }
-
-  return Hash256::from_hash(&hash);
-}
-
 // join takes a sequence of strings and concats that
 // sequence with some seperator between it. It's like
 // python's join method on strings. So ", ".join(seq)
@@ -634,263 +601,6 @@ struct CacheDbImpl {
         matching_jobs(db) {}
 };
 
-AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
-  AddJobRequest req;
-  req.cwd = json.get("cwd").value;
-  req.command_line = json.get("command_line").value;
-  req.envrionment = json.get("envrionment").value;
-  req.stdin_str = json.get("stdin").value;
-  req.stdout_str = json.get("stdout").value;
-  req.stderr_str = json.get("stderr").value;
-  req.status = std::stoi(json.get("status").value);
-  req.runtime = std::stod(json.get("runtime").value);
-  req.cputime = std::stod(json.get("cputime").value);
-  req.mem = std::stoull(json.get("mem").value);
-  req.ibytes = std::stoull(json.get("ibytes").value);
-  req.obytes = std::stoull(json.get("obytes").value);
-  req.client_cwd = json.get("client_cwd").value;
-
-  // Read the input files
-  for (const auto &input_file : json.get("input_files").children) {
-    InputFile input(input_file.second);
-    req.bloom.add_hash(input.hash);
-    req.inputs.emplace_back(std::move(input));
-  }
-
-  // Read the input dirs
-  for (const auto &input_dir : json.get("input_dirs").children) {
-    InputDir input(input_dir.second);
-    req.bloom.add_hash(input.hash);
-    req.directories.emplace_back(std::move(input));
-  }
-
-  // TODO: I hate this loop but its the fastest path to a demo.
-  //       we need to figure out a path add things to the cache
-  //       only after the files have been hashed so we don't
-  //       need this loop. Since this job was just run, wake
-  //       will eventually hash all these files so the fact
-  //       that we have to re-hash them here is a shame.
-  // TODO: Use aio_read and do these hashes online and interleaveed
-  //       so that the IO can be in parallel despite the hashing being
-  //       serial.s. It would also be nice to figure out how to do
-  //       the hashing in parallel if we can't avoid it completely.
-  // Read the output files which requires kicking off a hash
-  for (const auto &output_file : json.get("output_files").children) {
-    struct stat buf = {};
-    const std::string &src = output_file.second.get("src").value;
-    if (lstat(src.c_str(), &buf) < 0) {
-      log_fatal("lstat(%s): %s", src.c_str(), strerror(errno));
-    }
-
-    // Handle output directory
-    if (S_ISDIR(buf.st_mode)) {
-      OutputDirectory dir;
-      dir.mode = buf.st_mode;
-      dir.path = output_file.second.get("path").value;
-      req.output_dirs.emplace_back(std::move(dir));
-      continue;
-    }
-
-    // Handle symlink
-    if (S_ISLNK(buf.st_mode)) {
-      OutputSymlink sym;
-      static thread_local char link[4097];
-      int size = readlink(src.c_str(), link, sizeof(link));
-      if (size == -1) {
-        log_fatal("readlink(%s): %s", src.c_str(), strerror(errno));
-      }
-      sym.path = output_file.second.get("path").value;
-      sym.value = std::string(link, link + size);
-      req.output_symlinks.emplace_back(std::move(sym));
-      continue;
-    }
-
-    // Handle regular files but ignore everything else.
-    if (!S_ISREG(buf.st_mode)) continue;
-    OutputFile output;
-    output.source = output_file.second.get("src").value;
-    output.path = output_file.second.get("path").value;
-
-    if (wcl::is_relative(output.source)) {
-      output.source = wcl::join_paths(req.client_cwd, output.source);
-    }
-
-    auto fd = wcl::unique_fd::open(output.source.c_str(), O_RDONLY);
-    if (!fd) {
-      log_fatal("open(%s): %s", output.source.c_str(), strerror(fd.error()));
-    }
-    output.hash = do_hash_file(output.source.c_str(), fd->get());
-    output.mode = buf.st_mode;
-    req.outputs.emplace_back(std::move(output));
-  }
-
-  return req;
-}
-
-AddJobRequest::AddJobRequest(const JAST &json) {
-  cwd = json.get("cwd").value;
-  command_line = json.get("command_line").value;
-  envrionment = json.get("envrionment").value;
-  stdin_str = json.get("stdin").value;
-  stdout_str = json.get("stdout").value;
-  stderr_str = json.get("stderr").value;
-  status = std::stoi(json.get("status").value);
-  runtime = std::stod(json.get("runtime").value);
-  cputime = std::stod(json.get("cputime").value);
-  mem = std::stoull(json.get("mem").value);
-  ibytes = std::stoull(json.get("ibytes").value);
-  obytes = std::stoull(json.get("obytes").value);
-  client_cwd = json.get("client_cwd").value;
-
-  // Read the input files
-  for (const auto &input_file : json.get("input_files").children) {
-    InputFile input(input_file.second);
-    bloom.add_hash(input.hash);
-    inputs.emplace_back(std::move(input));
-  }
-
-  // Read the input dirs
-  for (const auto &input_dir : json.get("input_dirs").children) {
-    InputDir input(input_dir.second);
-    bloom.add_hash(input.hash);
-    directories.emplace_back(std::move(input));
-  }
-
-  for (const auto &output_file : json.get("output_files").children) {
-    OutputFile output(output_file.second);
-    outputs.emplace_back(std::move(output));
-  }
-
-  for (const auto &output_directory : json.get("output_dirs").children) {
-    OutputDirectory dir(output_directory.second);
-    output_dirs.emplace_back(std::move(dir));
-  }
-
-  for (const auto &output_symlink : json.get("output_symlinks").children) {
-    OutputSymlink symlink(output_symlink.second);
-    output_symlinks.emplace_back(std::move(symlink));
-  }
-}
-
-JAST AddJobRequest::to_json() const {
-  JAST json(JSON_OBJECT);
-  json.add("cwd", cwd);
-  json.add("command_line", command_line);
-  json.add("envrionment", envrionment);
-  json.add("stdin", stdin_str);
-  json.add("stdout", stdout_str);
-  json.add("stderr", stderr_str);
-  json.add("status", status);
-  json.add("runtime", runtime);
-  json.add("cputime", cputime);
-  json.add("mem", int64_t(mem));
-  json.add("ibytes", int64_t(ibytes));
-  json.add("obytes", int64_t(obytes));
-  json.add("client_cwd", client_cwd);
-
-  JAST input_files_json(JSON_ARRAY);
-  for (const auto &input_file : inputs) {
-    input_files_json.add("", input_file.to_json());
-  }
-  json.add("input_files", std::move(input_files_json));
-
-  JAST input_dirs_json(JSON_ARRAY);
-  for (const auto &input_dir : directories) {
-    input_dirs_json.add("", input_dir.to_json());
-  }
-  json.add("input_dirs", std::move(input_dirs_json));
-
-  JAST output_files_json(JSON_ARRAY);
-  for (const auto &output_file : outputs) {
-    output_files_json.add("", output_file.to_json());
-  }
-  json.add("output_files", std::move(output_files_json));
-
-  JAST output_directories_json(JSON_ARRAY);
-  for (const auto &output_directory : output_dirs) {
-    output_directories_json.add("", output_directory.to_json());
-  }
-  json.add("output_dirs", std::move(output_directories_json));
-
-  JAST output_symlinks_json(JSON_ARRAY);
-  for (const auto &output_symlink : output_symlinks) {
-    output_symlinks_json.add("", output_symlink.to_json());
-  }
-  json.add("output_symlinks", std::move(output_symlinks_json));
-
-  return json;
-}
-
-FindJobRequest::FindJobRequest(const JAST &find_job_json) {
-  cwd = find_job_json.get("cwd").value;
-  command_line = find_job_json.get("command_line").value;
-  envrionment = find_job_json.get("envrionment").value;
-  stdin_str = find_job_json.get("stdin").value;
-  client_cwd = find_job_json.get("client_cwd").value;
-
-  // Read the input files, and compute the directory hashes as we go.
-  for (const auto &input_file : find_job_json.get("input_files").children) {
-    std::string path = input_file.second.get("path").value;
-    Hash256 hash = Hash256::from_hex(input_file.second.get("hash").value);
-    bloom.add_hash(hash);
-    visible[std::move(path)] = hash;
-  }
-
-  // Now accumulate the hashables in the directory.
-  std::unordered_map<std::string, std::string> dirs;
-  // NOTE: `visible` is already sorted because its an std::map.
-  // this means that we'll accumulate directories correctly.
-  for (const auto &input : visible) {
-    auto pair = parent_and_base(input.first);
-    if (!pair) continue;
-    std::string parent = std::move(pair->first);
-    std::string base = std::move(pair->second);
-    dirs[parent] += base;
-    dirs[parent] += ":";
-  }
-
-  // Now actually perform those hashes
-  for (auto dir : dirs) {
-    dir_hashes[dir.first] = Hash256::blake2b(dir.second);
-  }
-
-  // When outputting files we need to map sandbox dirs to output dirs.
-  // Collect those redirects here.
-  for (const auto &dir_redirect : find_job_json.get("dir_redirects").children) {
-    auto dir_range = wcl::make_filepath_range(dir_redirect.first);
-    dir_redirects.move_emplace(dir_range.begin(), dir_range.end(), dir_redirect.second.value);
-  }
-}
-
-JAST FindJobRequest::to_json() const {
-  JAST json(JSON_OBJECT);
-  json.add("cwd", cwd);
-  json.add("command_line", command_line);
-  json.add("envrionment", envrionment);
-  json.add("stdin", stdin_str);
-  json.add("client_cwd", client_cwd);
-
-  JAST input_files(JSON_ARRAY);
-  for (const auto &input_file : visible) {
-    JAST input_entry(JSON_OBJECT);
-    input_entry.add("path", input_file.first);
-    input_entry.add("hash", input_file.second.to_hex());
-    input_files.add("", std::move(input_entry));
-  }
-  json.add("input_files", std::move(input_files));
-
-  JAST dir_redirects_json(JSON_OBJECT);
-  dir_redirects.for_each(
-      [&dir_redirects_json](const std::vector<std::string> &prefix, const std::string &value) {
-        std::string path = join('/', prefix.begin(), prefix.end());
-        dir_redirects_json.add(path, value);
-      });
-
-  json.add("dir_redirects", std::move(dir_redirects_json));
-
-  return json;
-}
-
 DaemonCache::DaemonCache(std::string dir, uint64_t max, uint64_t low)
     : rng(wcl::xoshiro_256::get_rng_seed()), max_cache_size(max), low_cache_size(low) {
   mkdir_no_fail(dir.c_str());
@@ -909,7 +619,6 @@ int DaemonCache::run() {
   poll.add(listen_socket_fd);
   while (!exit_now) {
     // recieve and process messages
-
     struct timespec wait_until;
     wait_until.tv_sec = 60 * 10;
     wait_until.tv_nsec = 0;
@@ -1175,7 +884,7 @@ void DaemonCache::add(const AddJobRequest &add_request) {
 
   // Finally we make sure the group directory exits and then
   // atomically rename the temp job into place which completes
-  // the insertion. At that point reads should suceed.
+  // the insertion. At that point reads should succeed.
   uint8_t job_group = job_id & 0xFF;
   std::string job_group_dir = wcl::to_hex<uint8_t>(&job_group);
   mkdir_no_fail(job_group_dir.c_str());
@@ -1253,8 +962,6 @@ void DaemonCache::reap_evict_loop() {
   waitpid(evict_pid, nullptr, 0);
 }
 
-// This has to be here because the destructor code for std::unique_ptr<CacheDbImpl>
-// requires that the CacheDbImpl be complete.
 DaemonCache::~DaemonCache() { reap_evict_loop(); }
 
 void DaemonCache::handle_new_client() {
@@ -1287,7 +994,6 @@ void DaemonCache::handle_msg(int client_fd) {
   state = it->second.read_messages(msgs);
 
   for (const auto &msg : msgs) {
-    // TODO: parse and dispatch message event
     log_info("msg: %s", msg.c_str());
 
     JAST json;

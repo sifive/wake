@@ -15,13 +15,6 @@
  * limitations under the License.
  */
 
-// the `Cache` class provides the full interface
-// the the underlying complete cache directory.
-// This requires interplay between the file system and
-// the database and must be carefully orchestrated. This
-// class handles all those details and provides a simple
-// interface.
-
 #pragma once
 
 #define _XOPEN_SOURCE 700
