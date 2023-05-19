@@ -114,7 +114,7 @@ struct FindJobResponse {
   wcl::optional<MatchingJob> match;
 
   FindJobResponse() = delete;
-  explicit FindJobResponse(wcl::optional<MatchingJob> job): match(std::move(job)) {}
+  explicit FindJobResponse(wcl::optional<MatchingJob> job) : match(std::move(job)) {}
 
   // The (de)serialized keys are
   //   - found: bool

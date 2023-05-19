@@ -26,8 +26,8 @@
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <wcl/defer.h>
-#include <wcl/optional.h>
 #include <wcl/filepath.h>
+#include <wcl/optional.h>
 #include <wcl/unique_fd.h>
 #include <wcl/xoshiro_256.h>
 
@@ -542,7 +542,6 @@ struct CacheDbImpl {
 
 DaemonCache::DaemonCache(std::string dir, uint64_t max, uint64_t low)
     : rng(wcl::xoshiro_256::get_rng_seed()), max_cache_size(max), low_cache_size(low) {
-
   mkdir_no_fail(dir.c_str());
   chdir_no_fail(dir.c_str());
 

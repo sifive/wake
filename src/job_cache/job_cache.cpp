@@ -28,9 +28,9 @@
 #include <wcl/xoshiro_256.h>
 
 #include <algorithm>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <sstream>
 
 #include "daemon_cache.h"
 #include "job_cache_impl_common.h"

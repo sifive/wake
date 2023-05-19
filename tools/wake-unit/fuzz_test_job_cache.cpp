@@ -1,3 +1,4 @@
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <fstream>
@@ -269,14 +270,12 @@ static bool fuzz_loop(size_t number_of_steps, std::string cache_dir, std::string
   mkdir(dir.c_str(), 0777);
   job_cache::Cache cache(cache_dir, 1ULL << 24ULL, (1 << 23ULL) + (1 << 22ULL));
 
-  int hit_count = 0;
   for (size_t i = 0; i < number_of_steps; ++i) {
     // First find the job that we care about
     const TestJob& job = job_pool.step(gen);
     auto find_job_request = job.generate_find_request(dir);
     auto result = cache.read(find_job_request);
-    if (result) {
-      hit_count++;
+    if (result.match) {
       for (auto file : job.output_files) {
         std::ifstream t(dir + "/" + file.path);
         std::stringstream buffer;

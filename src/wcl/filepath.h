@@ -304,7 +304,7 @@ inline std::string join(char sep, Iter begin, Iter end) {
 }
 
 // Returns all the component parts of the given path.
-inline std::vector<std::string> split_path(const std::string &path) {
+inline std::vector<std::string> split_path(const std::string& path) {
   std::vector<std::string> path_vec;
   for (std::string node : wcl::make_filepath_range_ref(path)) {
     path_vec.emplace_back(std::move(node));
@@ -314,7 +314,7 @@ inline std::vector<std::string> split_path(const std::string &path) {
 }
 
 // Returns the end of the parent directory in the path.
-inline wcl::optional<std::pair<std::string, std::string>> parent_and_base(const std::string &str) {
+inline wcl::optional<std::pair<std::string, std::string>> parent_and_base(const std::string& str) {
   // traverse backwards but using a normal iterator instead of a reverse
   // iterator.
   auto rbegin = str.end() - 1;
@@ -330,6 +330,5 @@ inline wcl::optional<std::pair<std::string, std::string>> parent_and_base(const 
 
   return {};
 }
-
 
 }  // namespace wcl
