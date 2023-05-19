@@ -20,6 +20,7 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <sys/types.h>
 #include <json/json5.h>
 #include <wcl/trie.h>
 
