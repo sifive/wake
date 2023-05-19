@@ -20,6 +20,7 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <json/json5.h>
 
 #include <cstdint>
 #include <string>
@@ -49,10 +50,5 @@ void symlink_no_fail(const char *target, const char *symlink_path);
 void unlink_no_fail(const char *file);
 void rmdir_no_fail(const char *dir);
 
-#include <json/json5.h>
-
-#include <sstream>
-
-#include "logging.h"
-
+// Write the serialized JAST to fd with proper retries on failure
 void send_json_message(int fd, const JAST &json);

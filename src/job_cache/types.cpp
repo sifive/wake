@@ -28,39 +28,6 @@
 #include "logging.h"
 
 namespace job_cache {
-// join takes a sequence of strings and concats that
-// sequence with some seperator between it. It's like
-// python's join method on strings. So ", ".join(seq)
-// in python joins a list of strings with a comma. This
-// function is a C++ equivlent.
-template <class Iter>
-static std::string join(char sep, Iter begin, Iter end) {
-  std::string out;
-  for (; begin != end; ++begin) {
-    out += *begin;
-    if (begin + 1 != end) out += sep;
-  }
-  return out;
-}
-
-// Returns the end of the parent directory in the path.
-static wcl::optional<std::pair<std::string, std::string>> parent_and_base(const std::string &str) {
-  // traverse backwards but using a normal iterator instead of a reverse
-  // iterator.
-  auto rbegin = str.end() - 1;
-  auto rend = str.begin();
-  for (; rbegin >= rend; --rbegin) {
-    if (*rbegin == '/') {
-      // Advance to the character past the slash
-      rbegin++;
-      // Now return the two strings
-      return {wcl::in_place_t{}, std::string(rend, rbegin), std::string(rbegin, str.end())};
-    }
-  }
-
-  return {};
-}
-
 static Hash256 do_hash_file(const char *file, int fd) {
   blake2b_state S;
   uint8_t hash[32];
@@ -473,7 +440,7 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
   // NOTE: `visible` is already sorted because its an std::map.
   // this means that we'll accumulate directories correctly.
   for (const auto &input : visible) {
-    auto pair = parent_and_base(input.first);
+    auto pair = wcl::parent_and_base(input.first);
     if (!pair) continue;
     std::string parent = std::move(pair->first);
     std::string base = std::move(pair->second);
@@ -514,7 +481,7 @@ JAST FindJobRequest::to_json() const {
   JAST dir_redirects_json(JSON_OBJECT);
   dir_redirects.for_each(
       [&dir_redirects_json](const std::vector<std::string> &prefix, const std::string &value) {
-        std::string path = join('/', prefix.begin(), prefix.end());
+        std::string path = wcl::join('/', prefix.begin(), prefix.end());
         dir_redirects_json.add(path, value);
       });
 

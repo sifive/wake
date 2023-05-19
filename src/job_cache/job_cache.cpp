@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #include "daemon_cache.h"
 #include "job_cache_impl_common.h"

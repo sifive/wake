@@ -137,7 +137,7 @@ static int open_abstract_domain_socket(const std::string &key) {
   return socket_fd;
 }
 
-static std::pair<int, std::string> create_cache_socket(const std::string &dir, const std::string &key) {
+int create_cache_socket(const std::string &dir, const std::string &key) {
   // Aquire a write lock so we know we're the only cache owner.
   // While this successfully stops multiple daemons from running,
   // it has another issue in that just because the lock is aquired,
@@ -161,7 +161,7 @@ static std::pair<int, std::string> create_cache_socket(const std::string &dir, c
 
   // Create the socket to listen on. A
   int socket_fd = open_abstract_domain_socket(key);
-  return std::make_pair(socket_fd, std::move(key));
+  return socket_fd;
 }
 
 // Database classes
@@ -322,15 +322,6 @@ class JobTable {
     add_output_info.step();
     add_output_info.reset();
   }
-};
-
-struct RequestedJobFile {
-  std::string src;
-  std::string path;
-};
-
-struct JobRequestResult {
-  std::vector<RequestedJobFile> requested_files;
 };
 
 class SelectMatchingJobs {
@@ -508,30 +499,6 @@ class SelectMatchingJobs {
   }
 };
 
-// join takes a sequence of strings and concats that
-// sequence with some seperator between it. It's like
-// python's join method on strings. So ", ".join(seq)
-// in python joins a list of strings with a comma. This
-// function is a C++ equivlent.
-template <class Iter>
-static std::string join(char sep, Iter begin, Iter end) {
-  std::string out;
-  for (; begin != end; ++begin) {
-    out += *begin;
-    if (begin + 1 != end) out += sep;
-  }
-  return out;
-}
-
-static std::vector<std::string> split_path(const std::string &path) {
-  std::vector<std::string> path_vec;
-  for (std::string node : wcl::make_filepath_range_ref(path)) {
-    path_vec.emplace_back(std::move(node));
-  }
-
-  return path_vec;
-}
-
 // The very last value is assumed to be a file and
 // is not created
 template <class Iter>
@@ -582,8 +549,8 @@ DaemonCache::DaemonCache(std::string dir, uint64_t max, uint64_t low)
   impl = std::make_unique<CacheDbImpl>(".");
 
   // Get some random bits to name our domain socket with
-  std::string key = rng.unique_name();
-  std::tie(listen_socket_fd, key) = create_cache_socket(".", key);
+  key = rng.unique_name();
+  listen_socket_fd = create_cache_socket(".", key);
 
   launch_evict_loop();
 }
@@ -664,7 +631,7 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
   }
 
   auto rewite_path = [&find_request](const std::string &sandbox_destination) {
-    std::vector<std::string> path_vec = split_path(sandbox_destination);
+    std::vector<std::string> path_vec = wcl::split_path(sandbox_destination);
     // So the file that the sandbox wrote to `sandbox_destination` currently
     // lives at `tmp_file` and is safe from interference. The sandbox location
     // needs to be redirected to some other output location however.
@@ -675,14 +642,14 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
                                                                    std::move(path_vec));
     }
     const auto &output_dir = *pair.first;
-    const auto &rel_path = join('/', pair.second, path_vec.end());
+    const auto &rel_path = wcl::join('/', pair.second, path_vec.end());
     std::string output_path = wcl::join_paths(output_dir, rel_path);
 
     if (wcl::is_relative(output_path)) {
       output_path = wcl::join_paths(find_request.client_cwd, output_path);
     }
 
-    std::vector<std::string> output_path_vec = split_path(output_path);
+    std::vector<std::string> output_path_vec = wcl::split_path(output_path);
     return std::make_pair<std::string, std::vector<std::string>>(std::move(output_path),
                                                                  std::move(output_path_vec));
   };
@@ -752,10 +719,10 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
   // We need to redirect those sandbox paths to non-sandbox paths
   // here we redirect the output files.
   auto redirect_path = [&find_request](std::string &path) {
-    std::vector<std::string> output_path_vec = split_path(path);
+    std::vector<std::string> output_path_vec = wcl::split_path(path);
     auto pair = find_request.dir_redirects.find_max(output_path_vec.begin(), output_path_vec.end());
     if (!pair.first) return;
-    std::string rel_path = join('/', pair.second, output_path_vec.end());
+    std::string rel_path = wcl::join('/', pair.second, output_path_vec.end());
     path = wcl::join_paths(*pair.first, rel_path);
   };
 
