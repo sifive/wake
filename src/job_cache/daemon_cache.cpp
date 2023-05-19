@@ -500,10 +500,11 @@ class SelectMatchingJobs {
 };
 
 // The very last value is assumed to be a file and
-// is not created
+// is not created.
+// This function assumes Iter is an absolute path.
 template <class Iter>
 static void mkdir_all(Iter begin, Iter end) {
-  std::string acc;
+  std::string acc = "/";
   for (; begin + 1 != end; ++begin) {
     acc += *begin + "/";
     mkdir_no_fail(acc.c_str());
@@ -674,6 +675,10 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
       // Rewrite the path based on the available rewrites
       auto pair = rewite_path(sandbox_destination);
 
+      if (wcl::is_relative(pair.first)) {
+        log_fatal("'%s' must be an absolute path.", pair.first.c_str());
+      }
+
       // First make all the needed directories in case the output
       // directories are missing. The mode of creation is assumed
       // in this case.
@@ -690,6 +695,10 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
     for (const auto &output_symlink : result.output_symlinks) {
       // Rewrite the path based on the available rewrites
       auto pair = rewite_path(output_symlink.path);
+
+      if (wcl::is_relative(pair.first)) {
+        log_fatal("'%s' must be an absolute path.", pair.first.c_str());
+      }
 
       // First make all the needed directories in case the output
       // directories are missing. The mode of creation is assumed

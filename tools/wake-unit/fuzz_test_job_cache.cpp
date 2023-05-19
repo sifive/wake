@@ -1,5 +1,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
+#include <wcl/filepath.h>
 
 #include <fstream>
 #include <map>
@@ -67,7 +68,7 @@ struct TestJob {
     JAST inputs(JSON_ARRAY);
     for (const auto& file : input_files) {
       job_cache::InputFile json_file;
-      json_file.path = file.path;
+      json_file.path = wcl::join_paths("/workspace", file.path);
       json_file.hash = Hash256::blake2b(file.content);
       inputs.add("", json_file.to_json());
     }
@@ -75,13 +76,13 @@ struct TestJob {
 
     JAST outputs(JSON_ARRAY);
     for (const auto& file : output_files) {
-      std::string src = in_dir + "/" + file.path;
+      std::string src = wcl::join_paths(in_dir, file.path);
       std::ofstream out(src);
       out << file.content;
       out.close();
 
       job_cache::OutputFile json_file;
-      json_file.path = file.path;
+      json_file.path = wcl::join_paths("/workspace", file.path);
       json_file.hash = Hash256::blake2b(file.content);
       json_file.source = src;
       json_file.mode = 0664;
@@ -106,7 +107,7 @@ struct TestJob {
     JAST inputs(JSON_ARRAY);
     for (const auto& file : input_files) {
       JAST json_file(JSON_OBJECT);
-      json_file.add("path", "/workspace/" + file.path);
+      json_file.add("path", wcl::join_paths("/workspace", file.path));
       auto hash = Hash256::blake2b(file.content);
       json_file.add("hash", hash.to_hex());
       inputs.add("", std::move(json_file));
@@ -124,7 +125,7 @@ struct TestJob {
     TestJob out;
 
     // Generate our primary key
-    out.cwd = gen.unique_name();
+    out.cwd = "/workspace";
     out.cmd = gen.unique_name();
     out.env = gen.unique_name();
     out.stdin = gen.unique_name();
@@ -155,11 +156,8 @@ struct TestJob {
   static void mutate(TestJob& to_mutate, wcl::xoshiro_256& gen) {
     std::uniform_real_distribution<> dist(0.0, 1.0);
     if (dist(gen) < primary_key_mutate_prob) {
-      std::uniform_int_distribution<> case_dist(0, 3);
+      std::uniform_int_distribution<> case_dist(1, 3);
       switch (case_dist(gen)) {
-        case 0:
-          to_mutate.cwd = gen.unique_name();
-          return;
         case 1:
           to_mutate.cmd = gen.unique_name();
           return;
@@ -262,38 +260,39 @@ struct Pool {
   }
 };
 
-static bool fuzz_loop(size_t number_of_steps, std::string cache_dir, std::string dir,
-                      wcl::xoshiro_256 gen) {
+TEST_FUNC(void, fuzz_loop, size_t number_of_steps, std::string cache_dir, std::string dir,
+          wcl::xoshiro_256 gen) {
   Pool<TestJob> job_pool;
 
   mkdir(cache_dir.c_str(), 0777);
   mkdir(dir.c_str(), 0777);
   job_cache::Cache cache(cache_dir, 1ULL << 24ULL, (1 << 23ULL) + (1 << 22ULL));
 
+  std::string out_dir = wcl::join_paths(dir, "outputs");
   for (size_t i = 0; i < number_of_steps; ++i) {
     // First find the job that we care about
     const TestJob& job = job_pool.step(gen);
-    auto find_job_request = job.generate_find_request(dir);
+    auto find_job_request = job.generate_find_request(out_dir);
     auto result = cache.read(find_job_request);
     if (result.match) {
+      for (const auto& file : result.match->output_files) {
+        std::cerr << file.path << std::endl;
+      }
+
       for (auto file : job.output_files) {
-        std::ifstream t(dir + "/" + file.path);
+        std::ifstream t(wcl::join_paths(out_dir, file.path));
         std::stringstream buffer;
         buffer << t.rdbuf();
-        if (buffer.str() != file.content) {
-          return false;
-        }
+        ASSERT_EQUAL(buffer.str(), file.content);
       }
     } else {
       auto add_job_request = job.generate_add_request(dir);
       cache.add(add_job_request);
     }
   }
-
-  return true;
 }
 
 TEST(job_cache_basic_fuzz) {
   wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
-  ASSERT_TRUE(fuzz_loop(10000, ".job_cache_test", "job_cache_test", std::move(gen)));
+  TEST_FUNC_CALL(fuzz_loop, 10000, ".job_cache_test", "job_cache_test", std::move(gen));
 }
