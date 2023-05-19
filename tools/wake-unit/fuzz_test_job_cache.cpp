@@ -275,10 +275,6 @@ TEST_FUNC(void, fuzz_loop, size_t number_of_steps, std::string cache_dir, std::s
     auto find_job_request = job.generate_find_request(out_dir);
     auto result = cache.read(find_job_request);
     if (result.match) {
-      for (const auto& file : result.match->output_files) {
-        std::cerr << file.path << std::endl;
-      }
-
       for (auto file : job.output_files) {
         std::ifstream t(wcl::join_paths(out_dir, file.path));
         std::stringstream buffer;
