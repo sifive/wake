@@ -39,11 +39,10 @@ class unique_fd {
  private:
   int fd = -1;
 
-  explicit unique_fd(int fd) : fd(fd) {}
-
  public:
   unique_fd() = default;
   unique_fd(const unique_fd&) = delete;
+  explicit unique_fd(int fd) : fd(fd) {}
 
   unique_fd& operator=(unique_fd&& f) {
     fd = f.fd;

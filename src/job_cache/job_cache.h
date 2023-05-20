@@ -27,156 +27,26 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <json/json5.h>
-#include <sys/stat.h>
 #include <wcl/optional.h>
-#include <wcl/trie.h>
+#include <wcl/unique_fd.h>
 
-#include <map>
 #include <string>
-#include <unordered_map>
-#include <vector>
 
-#include "bloom.h"
-#include "hash.h"
+#include "types.h"
 
 namespace job_cache {
 
-struct CachedOutputFile {
-  std::string path;
-  Hash256 hash;
-  mode_t mode;
-};
-
-struct CachedOutputSymlink {
-  std::string path;
-  std::string value;
-};
-
-struct CachedOutputDir {
-  std::string path;
-  mode_t mode;
-};
-
-struct JobOutputInfo {
-  std::string stdout_str;
-  std::string stderr_str;
-  int ret_code;
-  double runtime, cputime;
-  uint64_t mem, ibytes, obytes;
-};
-
-struct MatchingJob {
-  int64_t job_id;
-  std::vector<CachedOutputFile> output_files;
-  std::vector<CachedOutputSymlink> output_symlinks;
-  std::vector<CachedOutputDir> output_dirs;
-  std::vector<std::string> input_files;
-  std::vector<std::string> input_dirs;
-  JobOutputInfo output_info;
-
-  JAST to_json() const;
-};
-
-struct FindJobRequest {
- public:
-  std::string cwd;
-  std::string command_line;
-  std::string envrionment;
-  std::string stdin_str;
-  wcl::trie<std::string, std::string> dir_redirects;
-  BloomFilter bloom;
-  // Using an ordered map is a neat trick here. It
-  // gives us repeatable hashes on directories
-  // later.
-  std::map<std::string, Hash256> visible;
-  std::unordered_map<std::string, Hash256> dir_hashes;
-
-  FindJobRequest() = delete;
-  FindJobRequest(const FindJobRequest &) = default;
-  FindJobRequest(FindJobRequest &&) = default;
-
-  explicit FindJobRequest(const JAST &find_job_json);
-};
-
-// JSON parsing stuff
-struct InputFile {
-  std::string path;
-  Hash256 hash;
-};
-
-struct InputDir {
-  std::string path;
-  Hash256 hash;
-};
-
-struct OutputFile {
-  std::string source;
-  std::string path;
-  Hash256 hash;
-  mode_t mode;
-};
-
-struct OutputDirectory {
-  std::string path;
-  mode_t mode;
-};
-
-struct OutputSymlink {
-  std::string value;
-  std::string path;
-};
-
-struct AddJobRequest {
- public:
-  std::string cwd;
-  std::string command_line;
-  std::string envrionment;
-  std::string stdin_str;
-  BloomFilter bloom;
-  std::vector<InputFile> inputs;
-  std::vector<InputDir> directories;
-  std::vector<OutputFile> outputs;
-  std::vector<OutputDirectory> output_dirs;
-  std::vector<OutputSymlink> output_symlinks;
-  std::string stdout_str;
-  std::string stderr_str;
-  int ret_code;
-  double runtime, cputime;
-  uint64_t mem, ibytes, obytes;
-
-  AddJobRequest() = delete;
-  AddJobRequest(const AddJobRequest &) = default;
-  AddJobRequest(AddJobRequest &&) = default;
-
-  explicit AddJobRequest(const JAST &job_result_json);
-};
-
-struct CacheDbImpl;
-
 class Cache {
  private:
-  std::string dir;
-  wcl::xoshiro_256 rng;
-  std::unique_ptr<CacheDbImpl> impl;  // pimpl
-  int evict_stdin;
-  int evict_stdout;
-  int evict_pid;
-  uint64_t max_cache_size;
-  uint64_t low_cache_size;
-
-  void launch_evict_loop();
-  void reap_evict_loop();
+  wcl::unique_fd socket_fd;
 
  public:
-  ~Cache();
-
   Cache() = delete;
   Cache(const Cache &) = delete;
 
-  Cache(std::string _dir, uint64_t max, uint64_t low);
+  Cache(std::string dir, uint64_t max, uint64_t low);
 
-  wcl::optional<MatchingJob> read(const FindJobRequest &find_request);
+  FindJobResponse read(const FindJobRequest &find_request);
   void add(const AddJobRequest &add_request);
 };
 

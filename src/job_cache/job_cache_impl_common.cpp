@@ -53,6 +53,12 @@ void mkdir_no_fail(const char *dir) {
   }
 }
 
+void chdir_no_fail(const char *dir) {
+  if (chdir(dir) < 0) {
+    log_fatal("chdir(%s): %s", dir, strerror(errno));
+  }
+}
+
 void symlink_no_fail(const char *target, const char *symlink_path) {
   if (symlink(target, symlink_path) == -1) {
     log_fatal("symlink(%s, %s): %s", target, symlink_path, strerror(errno));
@@ -251,5 +257,25 @@ void remove_backing_files(std::string dir, const std::vector<int64_t> &job_ids,
   // Now join the tasks
   for (auto &task : tasks) {
     task.wait();
+  }
+}
+
+void send_json_message(int fd, const JAST &json) {
+  std::stringstream s;
+  s << json;
+  std::string json_str = s.str();
+  json_str += '\0';
+
+  size_t start = 0;
+  while (start < json_str.size()) {
+    int res = write(fd, json_str.data() + start, json_str.size() - start);
+    if (res == -1) {
+      if (errno == EINTR) {
+        continue;
+      }
+      log_fatal("write(%d): %s", fd, strerror(errno));
+    }
+
+    start += res;
   }
 }

@@ -1772,32 +1772,14 @@ static PRIMFN(prim_job_cache_read) {
   // TODO: It's probably not great that wake hard-fails if this json isn't
   // valid. I should fix that.
   job_cache::FindJobRequest request(jast);
-  auto result = internal_job_cache->read(request);
-
-  // If nothing is found return a simple error message
-  if (!result) {
-    JAST out_json(JSON_OBJECT);
-    out_json.add_bool("found", static_cast<bool>(false));
-    std::stringstream result_json_stream;
-    result_json_stream << out_json;
-    std::string s = result_json_stream.str();
-    size_t need = String::reserve(s.size()) + reserve_result();
-    runtime.heap.reserve(need);
-    RETURN(claim_result(runtime.heap, true, String::claim(runtime.heap, s)));
-  }
-
-  // If a job is found however we need to return some information about it
-  JAST jast_result = result->to_json();
-  JAST out_json(JSON_OBJECT);
-  out_json.add_bool("found", static_cast<bool>(result));
-  out_json.add("match", result->to_json());
+  job_cache::FindJobResponse response = internal_job_cache->read(request);
 
   // Because I'm very lazy however we also return a string and not a JValue.
   // This is because the `measure_jast` function is defined in json.cpp and I
   // don't want to lift it or duplicate it right now.
   // TODO: lift the measure_jast function
   std::stringstream result_json_stream;
-  result_json_stream << out_json;
+  result_json_stream << response.to_json();
   std::string result_json_str = result_json_stream.str();
   size_t need = String::reserve(result_json_str.size()) + reserve_result();
   runtime.heap.reserve(need);
@@ -1842,7 +1824,7 @@ static PRIMFN(prim_job_cache_add) {
   // TODO: This just fails if an issue occurs. Would be nice to fail
   //       with a bit more information. Right now we just use a simple
   //       string.
-  job_cache::AddJobRequest request(jast);
+  job_cache::AddJobRequest request = job_cache::AddJobRequest::from_implicit(jast);
   internal_job_cache->add(request);
   std::string result_json_str = "successfully added job";
   size_t need = String::reserve(result_json_str.size()) + reserve_result();

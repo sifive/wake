@@ -69,7 +69,32 @@ class trie {
     return {};
   }
 
+  template <class F>
+  void for_each(F f, std::vector<Key>& prefix, const trie_node& node) const {
+    prefix.push_back(node.key);
+    if (node.value) {
+      f(const_cast<const std::vector<Key>&>(prefix), *node.value);
+    }
+
+    for (size_t index : node.child_indexes) {
+      for_each(f, prefix, nodes[index]);
+    }
+    prefix.pop_back();
+  }
+
  public:
+  template <class F>
+  void for_each(F f) const {
+    std::vector<Key> prefix = {};
+    if (empty_seq) {
+      f(const_cast<const std::vector<Key>&>(prefix), *empty_seq);
+    }
+
+    for (size_t start : starts) {
+      for_each(f, prefix, nodes[start]);
+    }
+  }
+
   // NOTE: This insert moves the keys and constructs the Value
   //       emplace.
 

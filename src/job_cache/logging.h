@@ -69,4 +69,15 @@ void log_fatal(Args &&...args) {
   exit(1);
 }
 
+// A logging function for logging and then exiting with
+// a success code.
+template <class... Args>
+void log_exit(Args &&...args) {
+  log_header(stdout);
+  fprintf(stdout, args...);
+  fprintf(stdout, "\n");
+  fflush(stdout);
+  exit(0);
+}
+
 }  // namespace

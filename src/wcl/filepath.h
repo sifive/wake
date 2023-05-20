@@ -280,4 +280,55 @@ inline std::string make_canonical(const std::string& x) {
   }
 }
 
+inline bool is_absolute(const char* x) { return x[0] == '/'; }
+
+inline bool is_absolute(const std::string& x) { return is_absolute(x.c_str()); }
+
+inline bool is_relative(const char* x) { return !is_absolute(x); }
+
+inline bool is_relative(const std::string& x) { return !is_absolute(x.c_str()); }
+
+// join takes a sequence of strings and concats that
+// sequence with some seperator between it. It's like
+// python's join method on strings. So ", ".join(seq)
+// in python joins a list of strings with a comma. This
+// function is a C++ equivlent.
+template <class Iter>
+inline std::string join(char sep, Iter begin, Iter end) {
+  std::string out;
+  for (; begin != end; ++begin) {
+    out += *begin;
+    if (begin + 1 != end) out += sep;
+  }
+  return out;
+}
+
+// Returns all the component parts of the given path.
+inline std::vector<std::string> split_path(const std::string& path) {
+  std::vector<std::string> path_vec;
+  for (std::string node : wcl::make_filepath_range_ref(path)) {
+    path_vec.emplace_back(std::move(node));
+  }
+
+  return path_vec;
+}
+
+// Returns the end of the parent directory in the path.
+inline wcl::optional<std::pair<std::string, std::string>> parent_and_base(const std::string& str) {
+  // traverse backwards but using a normal iterator instead of a reverse
+  // iterator.
+  auto rbegin = str.end() - 1;
+  auto rend = str.begin();
+  for (; rbegin >= rend; --rbegin) {
+    if (*rbegin == '/') {
+      // Advance to the character past the slash
+      rbegin++;
+      // Now return the two strings
+      return {wcl::in_place_t{}, std::string(rend, rbegin), std::string(rbegin, str.end())};
+    }
+  }
+
+  return {};
+}
+
 }  // namespace wcl
