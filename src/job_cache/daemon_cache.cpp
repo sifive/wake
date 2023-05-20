@@ -130,7 +130,7 @@ static int open_abstract_domain_socket(const std::string &key) {
   // Now we just need to set this socket to listen and we're good!
   // TODO: Decide what the backlog should actually be
   if (listen(socket_fd, 256) == -1) {
-    log_fatal("listen(%s): %s", key, strerror(errno));
+    log_fatal("listen(%s): %s", key.c_str(), strerror(errno));
   }
   log_info("Successfully set abstract socket %s to listen", key.c_str());
 
