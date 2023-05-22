@@ -393,7 +393,7 @@ export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Ru
                     "stdin" :-> JString stdin,
                     "input_files" :-> jobCacheVisible,
                     "client_cwd" :-> JString client_cwd,
-                    "dir_redirects" :-> JObject (workspace :-> JString "./",),
+                    "dir_redirects" :-> JObject (wakeroot :-> JString "./",),
                 )
 
             require Pass cacheResult =
@@ -492,7 +492,7 @@ export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Ru
             def inputsTree = listToTree scmpCanonical inputs
 
             def mkOutputFileJson src =
-                JObject ("src" :-> JString src, "path" :-> JString "{workspace}/{src}",)
+                JObject ("src" :-> JString src, "path" :-> JString "{wakeroot}/{src}",)
 
             def jobCacheOutputFiles = JArray (map mkOutputFileJson outputs)
 
