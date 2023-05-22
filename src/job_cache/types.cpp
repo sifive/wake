@@ -107,7 +107,8 @@ JAST JobOutputInfo::to_json() const {
   return json;
 }
 
-MatchingJob::MatchingJob(const std::string &client_cwd, const JAST &json) {
+MatchingJob::MatchingJob(const JAST &json) {
+  client_cwd = json.get("client_cwd").value;
   output_info = JobOutputInfo(json.get("output_info"));
 
   for (const auto &output_file_json : json.get("output_files").children) {
@@ -156,9 +157,10 @@ MatchingJob::MatchingJob(const std::string &client_cwd, const JAST &json) {
   }
 }
 
-JAST MatchingJob::to_json(const std::string &client_cwd) const {
+JAST MatchingJob::to_json() const {
   JAST json(JSON_OBJECT);
 
+  json.add("client_cwd", client_cwd);
   json.add("output_info", output_info.to_json());
 
   JAST output_files_json(JSON_ARRAY);
@@ -645,16 +647,16 @@ JAST FindJobRequest::to_json() const {
   return json;
 }
 
-FindJobResponse::FindJobResponse(const std::string &client_cwd, JAST json) {
+FindJobResponse::FindJobResponse(JAST json) {
   JAST found = json.get("found");
   if (found.kind != JSON_TRUE) {
     match = {};
     return;
   }
-  match = wcl::make_some<MatchingJob>(client_cwd, json.get("match"));
+  match = wcl::make_some<MatchingJob>(json.get("match"));
 }
 
-JAST FindJobResponse::to_json(const std::string &client_cwd) const {
+JAST FindJobResponse::to_json() const {
   JAST json(JSON_OBJECT);
 
   if (!match) {
@@ -663,7 +665,7 @@ JAST FindJobResponse::to_json(const std::string &client_cwd) const {
   }
 
   json.add_bool("found", true);
-  json.add("match", match->to_json(client_cwd));
+  json.add("match", match->to_json());
   return json;
 }
 

@@ -925,7 +925,7 @@ export def defaultRunner: Runner =
 
     # The fuseRunner does not actully mount over / and instead uses the
     # the host root as the sandbox root. This means that wakeroot will
-    # change from dpending on where wake is being run from. As a hack
+    # change from depending on where wake is being run from. As a hack
     # to work around this we abuse the fact that the fuseRunner only
     # works in relative paths to make different runs consistent. Ideally
     # you'd have a more complex sandbox that kept the wakeroot at a

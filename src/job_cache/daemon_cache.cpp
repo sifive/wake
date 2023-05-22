@@ -485,6 +485,7 @@ class SelectMatchingJobs {
       // Ok this is the job, it matches *exactly* so we should
       // expect running it to produce exaxtly the same result.
       MatchingJob result;
+      result.client_cwd = find_job_request.client_cwd;
       result.output_files = read_outputs(job_id);             // paths are sandbox-absolute here
       result.output_dirs = read_output_dirs(job_id);          // paths are sandbox-absolute here
       result.output_symlinks = read_output_symlinks(job_id);  // paths are sandbox-absolute here
@@ -963,7 +964,7 @@ void DaemonCache::handle_msg(int client_fd) {
     if (json.get("method").value == "cache/read") {
       FindJobRequest req(json.get("params"));
       FindJobResponse res = read(req);
-      send_json_message(client_fd, res.to_json(req.client_cwd));
+      send_json_message(client_fd, res.to_json());
     }
 
     if (json.get("method").value == "cache/add") {
