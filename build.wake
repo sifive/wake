@@ -93,6 +93,7 @@ def targets =
     buildBSP,
     (bootstrapTarget buildLSP),
     buildWakeFormat,
+    (bootstrapTarget buildJobCache),
     Nil
 
 def all variant =

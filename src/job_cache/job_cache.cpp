@@ -23,6 +23,8 @@
 
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <util/execpath.h>
+#include <wcl/filepath.h>
 #include <wcl/optional.h>
 #include <wcl/unique_fd.h>
 #include <wcl/xoshiro_256.h>
@@ -163,13 +165,14 @@ Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
 
   // launch the daemon
   if (daemonize(dir.c_str())) {
-    // We are the daemon
-    int status = 1;
-    {
-      DaemonCache dcache(dir, max, low);
-      status = dcache.run();
-    }
-    exit(status);
+    // We are the daemon, launch the cache
+
+    std::string job_cache = wcl::make_canonical(find_execpath() + "/../bin/job-cache");
+    std::string low_str = std::to_string(low);
+    std::string max_str = std::to_string(max);
+    execl(job_cache.c_str(), "job-cached", dir.c_str(), low_str.c_str(), max_str.c_str(), nullptr);
+    std::cerr << "exec(" << job_cache << "): " << strerror(errno) << std::endl;
+    exit(1);
   }
 
   // connect to the daemon with backoff
@@ -188,7 +191,7 @@ Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
     break;
   }
 
-  if (socket_fd.get() == -1) {
+  if (!socket_fd.valid()) {
     log_fatal("could not connect to daemon. dir = %s", dir.c_str());
   }
 }
