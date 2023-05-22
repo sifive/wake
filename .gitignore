@@ -25,6 +25,8 @@ compile_commands.json
 /bin/wakebox
 /bin/wakebox.*
 /bin/wake-format.*
+/bin/job-cache
+/bin/job-cache.*
 /src/version.h
 /lib/wake/bsp-wake
 /lib/wake/bsp-wake.*

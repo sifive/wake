@@ -543,6 +543,8 @@ struct CacheDbImpl {
 
 DaemonCache::DaemonCache(std::string dir, uint64_t max, uint64_t low)
     : rng(wcl::xoshiro_256::get_rng_seed()), max_cache_size(max), low_cache_size(low) {
+  log_info("Launching DaemonCache. dir = %s, max = %llu, low = %llu", dir.c_str(), max_cache_size,
+           low_cache_size);
   mkdir_no_fail(dir.c_str());
   chdir_no_fail(dir.c_str());
 
