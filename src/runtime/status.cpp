@@ -514,7 +514,7 @@ void status_set_fd(const char *name, int fd) {
   }
   auto &stream = settings[name];
   stream.fd = fd;
-  stream.istty = isatty(fd) == 1;
+  stream.istty = (fd == STDOUT_FILENO || fd == STDERR_FILENO) && isatty(fd) == 1;
   stream.colour = stream_color(name);
   stream.fd_buf = std::make_unique<FdBuf>(fd);
   stream.term_buf = std::make_unique<TermInfoBuf>(stream.fd_buf.get());
