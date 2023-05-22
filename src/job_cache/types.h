@@ -82,8 +82,8 @@ struct MatchingJob {
   JobOutputInfo output_info;
 
   MatchingJob() = default;
-  MatchingJob(const std::string& client_cwd, const JAST &json);
-  JAST to_json(const std::string& client_cwd) const;
+  MatchingJob(const std::string &client_cwd, const JAST &json);
+  JAST to_json(const std::string &client_cwd) const;
 };
 
 struct FindJobRequest {
@@ -121,8 +121,8 @@ struct FindJobResponse {
   //   - found: bool
   //   - match: MatchingJob
   // 'found' is determined implicitly based on if a MatchingJob is set and vice versa
-  FindJobResponse(const std::string& client_cwd, JAST json);
-  JAST to_json(const std::string& client_cwd) const;
+  FindJobResponse(const std::string &client_cwd, JAST json);
+  JAST to_json(const std::string &client_cwd) const;
 };
 
 // JSON parsing stuff

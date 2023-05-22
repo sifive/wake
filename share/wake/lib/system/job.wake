@@ -384,7 +384,11 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
             # TODO: Allow this to be configurable
             def workspace = "/workspace"
 
-            def abs_dir = if matches `/.*` dir then dir else "{workspace}/{dir}"
+            def abs_dir =
+                if matches `/.*` dir then
+                    dir
+                else
+                    "{workspace}/{dir}"
 
             def jobCacheJsonIn =
                 prettyJSON

@@ -133,8 +133,10 @@ class filepath_iterator {
   }
 
  public:
-  filepath_iterator(const filepath_iterator& other) : str(other.str), start(other.start), final(other.final) {}
-  filepath_iterator(filepath_iterator&& other) : str(other.str), start(other.start), final(other.final) {}
+  filepath_iterator(const filepath_iterator& other)
+      : str(other.str), start(other.start), final(other.final) {}
+  filepath_iterator(filepath_iterator&& other)
+      : str(other.str), start(other.start), final(other.final) {}
   explicit filepath_iterator(const std::string& str) : str(str), start(), final() { next(); }
 
   filepath_iterator(const std::string& str, size_t begin) : str(str), start(begin), final(begin) {
@@ -355,7 +357,8 @@ inline std::string relative_to(std::string relative, std::string path) {
   auto rel_range = make_filepath_range(relative);
   auto path_begin = path_range.begin();
   auto rel_begin = rel_range.begin();
-  while (path_begin != path_range.end() && rel_begin != rel_range.end() && *path_begin == *rel_begin) {
+  while (path_begin != path_range.end() && rel_begin != rel_range.end() &&
+         *path_begin == *rel_begin) {
     ++path_begin;
     ++rel_begin;
   }

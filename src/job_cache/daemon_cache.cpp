@@ -486,9 +486,9 @@ class SelectMatchingJobs {
       // expect running it to produce exaxtly the same result.
       // TODO, clean this shit up?
       MatchingJob result;
-      result.output_files = read_outputs(job_id); // paths are sandbox-absolute here
-      result.output_dirs = read_output_dirs(job_id); // paths are sandbox-absolute here
-      result.output_symlinks = read_output_symlinks(job_id); // paths are sandbox-absolute here
+      result.output_files = read_outputs(job_id);             // paths are sandbox-absolute here
+      result.output_dirs = read_output_dirs(job_id);          // paths are sandbox-absolute here
+      result.output_symlinks = read_output_symlinks(job_id);  // paths are sandbox-absolute here
       result.output_info = std::move(*output_info);
       result.input_files = std::move(*found_input_files);
       result.input_dirs = std::move(*found_input_dirs);

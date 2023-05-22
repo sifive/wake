@@ -107,7 +107,7 @@ JAST JobOutputInfo::to_json() const {
   return json;
 }
 
-MatchingJob::MatchingJob(const std::string& client_cwd, const JAST &json) {
+MatchingJob::MatchingJob(const std::string &client_cwd, const JAST &json) {
   output_info = JobOutputInfo(json.get("output_info"));
 
   for (const auto &output_file_json : json.get("output_files").children) {
@@ -156,7 +156,7 @@ MatchingJob::MatchingJob(const std::string& client_cwd, const JAST &json) {
   }
 }
 
-JAST MatchingJob::to_json(const std::string& client_cwd) const {
+JAST MatchingJob::to_json(const std::string &client_cwd) const {
   JAST json(JSON_OBJECT);
 
   json.add("output_info", output_info.to_json());
@@ -302,7 +302,8 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
   req.obytes = std::stoull(json.get("obytes").value);
   req.client_cwd = json.get("client_cwd").value;
   if (wcl::is_relative(req.client_cwd)) {
-    log_fatal("AddJobRequest::from_implicit: client_cwd cannot be relative. found: '%s'", req.client_cwd.c_str());
+    log_fatal("AddJobRequest::from_implicit: client_cwd cannot be relative. found: '%s'",
+              req.client_cwd.c_str());
   }
 
   // Read the input files
@@ -424,7 +425,8 @@ AddJobRequest::AddJobRequest(const JAST &json) {
   obytes = std::stoull(json.get("obytes").value);
   client_cwd = json.get("client_cwd").value;
   if (wcl::is_relative(client_cwd)) {
-    log_fatal("AddJobRequest::AddJobRequest: client_cwd cannot be relative. found: '%s'", client_cwd.c_str());
+    log_fatal("AddJobRequest::AddJobRequest: client_cwd cannot be relative. found: '%s'",
+              client_cwd.c_str());
   }
 
   // Read the input files
@@ -540,7 +542,8 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
   stdin_str = find_job_json.get("stdin").value;
   client_cwd = find_job_json.get("client_cwd").value;
   if (wcl::is_relative(client_cwd)) {
-    log_fatal("FindJobRequest::FindJobRequest: client_cwd cannot be relative. found: '%s'", client_cwd.c_str());
+    log_fatal("FindJobRequest::FindJobRequest: client_cwd cannot be relative. found: '%s'",
+              client_cwd.c_str());
   }
 
   // Read the input files, and compute the directory hashes as we go.
@@ -625,7 +628,7 @@ JAST FindJobRequest::to_json() const {
   return json;
 }
 
-FindJobResponse::FindJobResponse(const std::string& client_cwd, JAST json) {
+FindJobResponse::FindJobResponse(const std::string &client_cwd, JAST json) {
   JAST found = json.get("found");
   if (found.kind != JSON_TRUE) {
     match = {};
@@ -634,7 +637,7 @@ FindJobResponse::FindJobResponse(const std::string& client_cwd, JAST json) {
   match = wcl::make_some<MatchingJob>(client_cwd, json.get("match"));
 }
 
-JAST FindJobResponse::to_json(const std::string& client_cwd) const {
+JAST FindJobResponse::to_json(const std::string &client_cwd) const {
   JAST json(JSON_OBJECT);
 
   if (!match) {

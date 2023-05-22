@@ -339,5 +339,6 @@ TEST(filepath_relative_to) {
   ASSERT_EQUAL("../../bar/foo", wcl::relative_to("/baz/foo/bar", "/baz/bar/foo"));
   ASSERT_EQUAL("blurp", wcl::relative_to("/foo/bar/baz/blarg", "/foo/bar/baz/blarg/blurp"));
   ASSERT_EQUAL("../blurp", wcl::relative_to("/foo/bar/baz/blarg", "/foo/bar/baz/blurp"));
-  ASSERT_EQUAL("../blurp/blarg", wcl::relative_to("/foo/bar/baz/blarg", "/foo/bar/baz/blurp/blarg"));
+  ASSERT_EQUAL("../blurp/blarg",
+               wcl::relative_to("/foo/bar/baz/blarg", "/foo/bar/baz/blurp/blarg"));
 }
