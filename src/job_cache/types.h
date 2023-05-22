@@ -88,6 +88,7 @@ struct MatchingJob {
 
 struct FindJobRequest {
  public:
+  std::string wakeroot;
   std::string cwd;
   std::string command_line;
   std::string envrionment;
@@ -178,6 +179,7 @@ struct AddJobRequest {
   AddJobRequest() = default;
 
  public:
+  std::string wakeroot;
   std::string cwd;
   std::string command_line;
   std::string envrionment;

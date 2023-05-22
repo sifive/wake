@@ -112,7 +112,7 @@ MatchingJob::MatchingJob(const std::string &client_cwd, const JAST &json) {
 
   for (const auto &output_file_json : json.get("output_files").children) {
     CachedOutputFile output_file(output_file_json.second);
-    // Canoncolize matching jobs to use client-relative paths.
+    // Canonicalize matching jobs to use client-relative paths.
     if (wcl::is_absolute(output_file.path)) {
       output_file.path = wcl::relative_to(client_cwd, output_file.path);
     }
@@ -121,7 +121,7 @@ MatchingJob::MatchingJob(const std::string &client_cwd, const JAST &json) {
 
   for (const auto &output_dir_json : json.get("output_dirs").children) {
     CachedOutputDir output_dir(output_dir_json.second);
-    // Canoncolize matching jobs to use client-relative paths.
+    // Canonicalize matching jobs to use client-relative paths.
     if (wcl::is_absolute(output_dir.path)) {
       output_dir.path = wcl::relative_to(client_cwd, output_dir.path);
     }
@@ -130,7 +130,7 @@ MatchingJob::MatchingJob(const std::string &client_cwd, const JAST &json) {
 
   for (const auto &output_symlink_json : json.get("output_symlinks").children) {
     CachedOutputSymlink output_sym(output_symlink_json.second);
-    // Canoncolize matching jobs to use client-relative paths.
+    // Canonicalize matching jobs to use client-relative paths.
     if (wcl::is_absolute(output_sym.path)) {
       output_sym.path = wcl::relative_to(client_cwd, output_sym.path);
     }
@@ -138,7 +138,7 @@ MatchingJob::MatchingJob(const std::string &client_cwd, const JAST &json) {
   }
 
   for (const auto &input_file_json : json.get("input_files").children) {
-    // Canoncolize matching jobs to use client-relative paths.
+    // Canonicalize matching jobs to use client-relative paths.
     std::string input_path = input_file_json.second.value;
     if (wcl::is_absolute(input_path)) {
       input_path = wcl::relative_to(client_cwd, input_path);
@@ -147,7 +147,7 @@ MatchingJob::MatchingJob(const std::string &client_cwd, const JAST &json) {
   }
 
   for (const auto &input_dir_json : json.get("input_dirs").children) {
-    // Canoncolize matching jobs to use client-relative paths.
+    // Canonicalize matching jobs to use client-relative paths.
     std::string input_dir = input_dir_json.second.value;
     if (wcl::is_absolute(input_dir)) {
       input_dir = wcl::relative_to(client_cwd, input_dir);
@@ -163,7 +163,7 @@ JAST MatchingJob::to_json(const std::string &client_cwd) const {
 
   JAST output_files_json(JSON_ARRAY);
   for (const auto &output_file : output_files) {
-    // Canoncolize matching jobs to use client-relative paths.
+    // Canonicalize matching jobs to use client-relative paths.
     auto output = output_file;
     if (wcl::is_absolute(output.path)) {
       output.path = wcl::relative_to(client_cwd, output.path);
@@ -174,7 +174,7 @@ JAST MatchingJob::to_json(const std::string &client_cwd) const {
 
   JAST output_dirs_json(JSON_ARRAY);
   for (const auto &output_dir : output_dirs) {
-    // Canoncolize matching jobs to use client-relative paths.
+    // Canonicalize matching jobs to use client-relative paths.
     auto output = output_dir;
     if (wcl::is_absolute(output.path)) {
       output.path = wcl::relative_to(client_cwd, output.path);
@@ -185,7 +185,7 @@ JAST MatchingJob::to_json(const std::string &client_cwd) const {
 
   JAST output_symlinks_json(JSON_ARRAY);
   for (const auto &output_symlink : output_symlinks) {
-    // Canoncolize matching jobs to use client-relative paths.
+    // Canonicalize matching jobs to use client-relative paths.
     auto output = output_symlink;
     if (wcl::is_absolute(output.path)) {
       output.path = wcl::relative_to(client_cwd, output.path);
@@ -196,7 +196,7 @@ JAST MatchingJob::to_json(const std::string &client_cwd) const {
 
   JAST input_files_json(JSON_ARRAY);
   for (const auto &input_file : input_files) {
-    // Canoncolize matching jobs to use client-relative paths.
+    // Canonicalize matching jobs to use client-relative paths.
     auto input = input_file;
     if (wcl::is_absolute(input)) {
       input = wcl::relative_to(client_cwd, input);
@@ -207,7 +207,7 @@ JAST MatchingJob::to_json(const std::string &client_cwd) const {
 
   JAST input_dirs_json(JSON_ARRAY);
   for (const auto &input_dir : input_dirs) {
-    // Canoncolize matching jobs to use client-relative paths.
+    // Canonicalize matching jobs to use client-relative paths.
     auto input = input_dir;
     if (wcl::is_absolute(input)) {
       input = wcl::relative_to(client_cwd, input);
@@ -285,9 +285,14 @@ JAST OutputSymlink::to_json() const {
 
 AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
   AddJobRequest req;
+  req.wakeroot = json.get("wakeroot").value;
+  if (wcl::is_relative(req.wakeroot)) {
+    log_fatal("AddJobRequest::from_implicit: wakeroot cannot be relative. found: '%s'",
+              req.wakeroot.c_str());
+  }
   req.cwd = json.get("cwd").value;
   if (wcl::is_relative(req.cwd)) {
-    log_fatal("AddJobRequest::from_implicit: cwd cannot be relative. found: '%s'", req.cwd.c_str());
+    req.cwd = wcl::join_paths(req.wakeroot, req.cwd);
   }
   req.command_line = json.get("command_line").value;
   req.envrionment = json.get("envrionment").value;
@@ -311,7 +316,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
     InputFile input(input_file.second);
     // Canonicalize input file paths to sandbox-absolute paths.
     if (wcl::is_relative(input.path)) {
-      input.path = wcl::join_paths(req.cwd, input.path);
+      input.path = wcl::join_paths(req.wakeroot, input.path);
     }
     req.bloom.add_hash(input.hash);
     req.inputs.emplace_back(std::move(input));
@@ -322,7 +327,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
     InputDir input(input_dir.second);
     // Canonicalize input dir paths to sandbox-absolute paths.
     if (wcl::is_relative(input.path)) {
-      input.path = wcl::join_paths(req.cwd, input.path);
+      input.path = wcl::join_paths(req.wakeroot, input.path);
     }
     req.bloom.add_hash(input.hash);
     req.directories.emplace_back(std::move(input));
@@ -357,7 +362,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
       dir.path = output_file.second.get("path").value;
       // Canonicalize output dir paths to sandbox-absolute paths.
       if (wcl::is_relative(dir.path)) {
-        dir.path = wcl::join_paths(req.cwd, dir.path);
+        dir.path = wcl::join_paths(req.wakeroot, dir.path);
       }
       req.output_dirs.emplace_back(std::move(dir));
       continue;
@@ -374,7 +379,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
       sym.path = output_file.second.get("path").value;
       // Canonicalize output symlink paths to sandbox-absolute paths.
       if (wcl::is_relative(sym.path)) {
-        sym.path = wcl::join_paths(req.cwd, sym.path);
+        sym.path = wcl::join_paths(req.wakeroot, sym.path);
       }
       sym.value = std::string(link, link + size);
       req.output_symlinks.emplace_back(std::move(sym));
@@ -392,7 +397,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
     }
     // Canonicalize output file paths to sandbox-absolute paths.
     if (wcl::is_relative(output.path)) {
-      output.path = wcl::join_paths(req.cwd, output.path);
+      output.path = wcl::join_paths(req.wakeroot, output.path);
     }
 
     auto fd = wcl::unique_fd::open(output.source.c_str(), O_RDONLY);
@@ -408,9 +413,14 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
 }
 
 AddJobRequest::AddJobRequest(const JAST &json) {
+  wakeroot = json.get("wakeroot").value;
+  if (wcl::is_relative(wakeroot)) {
+    log_fatal("AddJobRequest::AddJobRequest: wakeroot cannot be relative. found: '%s'",
+              wakeroot.c_str());
+  }
   cwd = json.get("cwd").value;
   if (wcl::is_relative(cwd)) {
-    log_fatal("AddJobRequest::AddJobRequest: cwd cannot be relative. found: '%s'", cwd.c_str());
+    cwd = wcl::join_paths(wakeroot, cwd);
   }
   command_line = json.get("command_line").value;
   envrionment = json.get("envrionment").value;
@@ -434,7 +444,7 @@ AddJobRequest::AddJobRequest(const JAST &json) {
     InputFile input(input_file.second);
     // Canonicalize input file paths to sandbox-absolute paths.
     if (wcl::is_relative(input.path)) {
-      input.path = wcl::join_paths(cwd, input.path);
+      input.path = wcl::join_paths(wakeroot, input.path);
     }
     bloom.add_hash(input.hash);
     inputs.emplace_back(std::move(input));
@@ -445,7 +455,7 @@ AddJobRequest::AddJobRequest(const JAST &json) {
     InputDir input(input_dir.second);
     // Canonicalize input dir paths to sandbox-absolute paths.
     if (wcl::is_relative(input.path)) {
-      input.path = wcl::join_paths(cwd, input.path);
+      input.path = wcl::join_paths(wakeroot, input.path);
     }
     bloom.add_hash(input.hash);
     directories.emplace_back(std::move(input));
@@ -459,7 +469,7 @@ AddJobRequest::AddJobRequest(const JAST &json) {
     }
     // Canonicalize output file paths to sandbox-absolute paths.
     if (wcl::is_relative(output.path)) {
-      output.path = wcl::join_paths(cwd, output.path);
+      output.path = wcl::join_paths(wakeroot, output.path);
     }
     outputs.emplace_back(std::move(output));
   }
@@ -468,7 +478,7 @@ AddJobRequest::AddJobRequest(const JAST &json) {
     OutputDirectory dir(output_directory.second);
     // Canonicalize output dir paths to sandbox-absolute paths.
     if (wcl::is_relative(dir.path)) {
-      dir.path = wcl::join_paths(cwd, dir.path);
+      dir.path = wcl::join_paths(wakeroot, dir.path);
     }
     output_dirs.emplace_back(std::move(dir));
   }
@@ -477,7 +487,7 @@ AddJobRequest::AddJobRequest(const JAST &json) {
     OutputSymlink symlink(output_symlink.second);
     // Canonicalize output symlink paths to sandbox-absolute paths.
     if (wcl::is_relative(symlink.path)) {
-      symlink.path = wcl::join_paths(cwd, symlink.path);
+      symlink.path = wcl::join_paths(wakeroot, symlink.path);
     }
     output_symlinks.emplace_back(std::move(symlink));
   }
@@ -485,6 +495,7 @@ AddJobRequest::AddJobRequest(const JAST &json) {
 
 JAST AddJobRequest::to_json() const {
   JAST json(JSON_OBJECT);
+  json.add("wakeroot", wakeroot);
   json.add("cwd", cwd);
   json.add("command_line", command_line);
   json.add("envrionment", envrionment);
@@ -533,9 +544,14 @@ JAST AddJobRequest::to_json() const {
 }
 
 FindJobRequest::FindJobRequest(const JAST &find_job_json) {
+  wakeroot = find_job_json.get("wakeroot").value;
+  if (wcl::is_relative(wakeroot)) {
+    log_fatal("FindJobRequest::FindJobRequest: wakeroot cannot be relative. found: '%s'",
+              wakeroot.c_str());
+  }
   cwd = find_job_json.get("cwd").value;
   if (wcl::is_relative(cwd)) {
-    log_fatal("FindJobRequest::FindJobRequest: cwd cannot be relative. found: '%s'", cwd.c_str());
+    cwd = wcl::join_paths(wakeroot, cwd);
   }
   command_line = find_job_json.get("command_line").value;
   envrionment = find_job_json.get("envrionment").value;
@@ -552,7 +568,7 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
     // Canonicalize all input file paths to sandbox-absolute paths.
     // These paths are relative to the sandbox cwd.
     if (wcl::is_relative(path)) {
-      path = wcl::join_paths(cwd, path);
+      path = wcl::join_paths(wakeroot, path);
     }
     Hash256 hash = Hash256::from_hex(input_file.second.get("hash").value);
     bloom.add_hash(hash);
@@ -584,7 +600,7 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
     // These paths are relative to the sandbox cwd.
     std::string dir = dir_redirect.first;
     if (wcl::is_relative(dir)) {
-      dir = wcl::join_paths(cwd, dir);
+      dir = wcl::join_paths(wakeroot, dir);
     }
     auto dir_range = wcl::make_filepath_range(dir);
 
@@ -600,6 +616,7 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
 
 JAST FindJobRequest::to_json() const {
   JAST json(JSON_OBJECT);
+  json.add("wakeroot", wakeroot);
   json.add("cwd", cwd);
   json.add("command_line", command_line);
   json.add("envrionment", envrionment);

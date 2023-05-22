@@ -484,7 +484,6 @@ class SelectMatchingJobs {
 
       // Ok this is the job, it matches *exactly* so we should
       // expect running it to produce exaxtly the same result.
-      // TODO, clean this shit up?
       MatchingJob result;
       result.output_files = read_outputs(job_id);             // paths are sandbox-absolute here
       result.output_dirs = read_output_dirs(job_id);          // paths are sandbox-absolute here
@@ -773,7 +772,6 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
     log_warning("Failed to send eviction update: %s", strerror(errno));
   }
 
-  // The response we give back sends client-absolute paths but we'll
   return FindJobResponse(wcl::make_some<MatchingJob>(std::move(result)));
 }
 

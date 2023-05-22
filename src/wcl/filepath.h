@@ -207,28 +207,6 @@ inline filepath_range_ref make_filepath_range_ref(const std::string& str) {
   return filepath_range_ref(str);
 }
 
-inline std::string join_paths(std::string a, const std::string& b) {
-  if (a.back() != '/') a += '/';
-  auto begin = b.begin();
-  if (*begin == '/') ++begin;
-  a.insert(a.end(), begin, b.end());
-  return a;
-}
-
-inline std::string join_paths(std::string a, const std::string& b, const std::string& c) {
-  return join_paths(join_paths(a, b), c);
-}
-
-inline std::string join_paths(std::string a, const std::string& b, const std::string& c,
-                              const std::string& d) {
-  return join_paths(join_paths(join_paths(a, b), c), d);
-}
-
-inline std::string join_paths(std::string a, const std::string& b, const std::string& c,
-                              const std::string& d, const std::string& e) {
-  return join_paths(join_paths(join_paths(join_paths(a, b), c), d), e);
-}
-
 // Returns the canonicalized version of string x.
 //
 // Ex:
@@ -282,6 +260,33 @@ inline std::string make_canonical(const std::string& x) {
     for (auto i = tokens.begin() + 1; i != tokens.end(); ++i) str << "/" << *i;
     return str.str();
   }
+}
+
+inline std::string _join_paths(std::string a, const std::string& b) {
+  if (a.back() != '/') a += '/';
+  auto begin = b.begin();
+  if (*begin == '/') ++begin;
+  a.insert(a.end(), begin, b.end());
+  return a;
+}
+
+inline std::string _join_paths(std::string a, const std::string& b, const std::string& c) {
+  return _join_paths(_join_paths(a, b), c);
+}
+
+inline std::string _join_paths(std::string a, const std::string& b, const std::string& c,
+                               const std::string& d) {
+  return _join_paths(_join_paths(_join_paths(a, b), c), d);
+}
+
+inline std::string _join_paths(std::string a, const std::string& b, const std::string& c,
+                               const std::string& d, const std::string& e) {
+  return _join_paths(_join_paths(_join_paths(_join_paths(a, b), c), d), e);
+}
+
+template <class... Args>
+inline std::string join_paths(Args&&... args) {
+  return make_canonical(_join_paths(std::forward<Args>(args)...));
 }
 
 inline bool is_absolute(const char* x) { return x[0] == '/'; }
@@ -348,6 +353,7 @@ inline std::string relative_to(std::string relative, std::string path) {
   if (wcl::is_relative(path)) {
     return path;
   }
+  relative = make_canonical(relative);
 
   // Since we now know that the path is absolute and canonical it must have
   // no special parts like .. or . in it. By iterating parts of both until they stop
