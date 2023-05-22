@@ -191,7 +191,7 @@ Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
     break;
   }
 
-  if (socket_fd.get() == -1) {
+  if (!socket_fd.valid()) {
     log_fatal("could not connect to daemon. dir = %s", dir.c_str());
   }
 }
