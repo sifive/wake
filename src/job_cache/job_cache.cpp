@@ -226,7 +226,7 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
     log_fatal("Cache::read(): failed to parse daemon response");
   }
 
-  return FindJobResponse(json);
+  return FindJobResponse(find_request.client_cwd, json);
 }
 
 void Cache::add(const AddJobRequest &add_request) {

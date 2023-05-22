@@ -381,16 +381,21 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
 
             def jobCacheVisible = JArray (map mkVisJson vis)
 
+            # TODO: Allow this to be configurable
+            def workspace = "/workspace"
+
+            def abs_dir = if matches `/.*` dir then dir else "{workspace}/{dir}"
+
             def jobCacheJsonIn =
                 prettyJSON
                 $ JObject (
-                    "cwd" :-> JString dir,
+                    "cwd" :-> JString abs_dir,
                     "command_line" :-> JString cmd.implode,
                     "envrionment" :-> JString env.implode,
                     "stdin" :-> JString stdin,
                     "input_files" :-> jobCacheVisible,
                     "client_cwd" :-> JString client_cwd,
-                    "dir_redirects" :-> JObject ("/workspace" :-> JString "./",),
+                    "dir_redirects" :-> JObject (workspace :-> JString "./",),
                 )
 
             require Pass cacheResult =
@@ -504,7 +509,7 @@ export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
             def jobCacheAddJson =
                 prettyJSON
                 $ JObject (
-                    "cwd" :-> JString dir,
+                    "cwd" :-> JString abs_dir,
                     "command_line" :-> JString cmd.implode,
                     "envrionment" :-> JString env.implode,
                     "stdin" :-> JString stdin,

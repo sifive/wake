@@ -1779,7 +1779,7 @@ static PRIMFN(prim_job_cache_read) {
   // don't want to lift it or duplicate it right now.
   // TODO: lift the measure_jast function
   std::stringstream result_json_stream;
-  result_json_stream << response.to_json();
+  result_json_stream << response.to_json(request.client_cwd);
   std::string result_json_str = result_json_stream.str();
   size_t need = String::reserve(result_json_str.size()) + reserve_result();
   runtime.heap.reserve(need);
