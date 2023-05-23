@@ -156,21 +156,21 @@ export def runUnitTests _: Result Unit Error =
     require Pass _ = match testJob.isJobOk
         True  = Pass Unit
         False =
-            def _ = printlnLevel logError jobStderr
+            def _ = println jobStderr
             Fail (makeError "Test failed ({format testJob.getJobStatus}). See above for details")
 
     require Pass _ = match expectedStderr
         Some x if x ==* jobStderr = Pass Unit
         None = Pass Unit
         Some _ =
-            def _ = printlnLevel logError "Error: '{jobStderr}'"
+            def _ = println jobStderr
             Fail (makeError "Unexpected standard error. See above for details")
 
     match expectedStdout
         Some x if x ==* jobStdout = Pass Unit
         None = Pass Unit
         _ =
-            def _ = printlnLevel logError jobStdout
+            def _ = println jobStdout
             Fail (makeError "Unexpected standard output. See above for details")
 
 
@@ -245,9 +245,9 @@ def runTest (testScript: Path): Result Unit Error =
     require Pass _ = match expectedStderr
         Some x if x ==* jobStderr = Pass Unit
         None = Pass Unit
-        Some x =
+        Some _ =
             # TODO: use diff prim to compare jobStderr with expectedStderr
-            def _ = cat ("Test: ", testName, "\n  Expected:\n", x, "\n  Saw:\n", jobStderr,) | printlnLevel logError
+            def _ = cat (testName, "\n", jobStderr,) | println
             Fail (makeError "Unexpected standard error. See above for details")
 
     match expectedStdout
@@ -255,5 +255,5 @@ def runTest (testScript: Path): Result Unit Error =
         None = Pass Unit
         _ =
             # TODO: use diff prim to compare jobStdout with expectedStdout
-            def _ = cat (testName, "\n", jobStdout,) | printlnLevel logError
+            def _ = cat (testName, "\n", jobStdout,) | println
             Fail (makeError "Unexpected standard output. See above for details")

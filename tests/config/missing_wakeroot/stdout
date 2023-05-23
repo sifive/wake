@@ -1,9 +1,0 @@
-Wake config:
-  user_config = '/home/.config/wake.json' (Default)
-  version = '' (Default)
-  log_header = '[$stream] $source: ' (Default)
-  log_header_source_width = '25' (Default)
-  label_filter = '.*' (Default)
-  max_cache_size = '26843545600' (Default)
-  low_cache_size = '16106127360' (Default)
-  log_header_align = 'false' (Default)
