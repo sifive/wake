@@ -327,3 +327,18 @@ TEST(filepath_dir_range_basic) {
   }
   rmdir("test_dir");
 }
+
+TEST(filepath_relative_to) {
+  ASSERT_EQUAL("foo/bar", wcl::relative_to("/baz", "/baz/foo/bar"));
+  ASSERT_EQUAL("foo/bar", wcl::relative_to("/baz", "foo/bar"));
+  ASSERT_EQUAL("foo/bar", wcl::relative_to("/baz", "./foo/bar"));
+  ASSERT_EQUAL("../foo/bar", wcl::relative_to("/baz", "../foo/bar"));
+  ASSERT_EQUAL("foo/bar", wcl::relative_to("/x/y/z/w/e/f", "foo/bar"));
+  ASSERT_EQUAL("../foo", wcl::relative_to("/bar", "/foo"));
+  ASSERT_EQUAL("../bar", wcl::relative_to("/baz/foo", "/baz/bar"));
+  ASSERT_EQUAL("../../bar/foo", wcl::relative_to("/baz/foo/bar", "/baz/bar/foo"));
+  ASSERT_EQUAL("blurp", wcl::relative_to("/foo/bar/baz/blarg", "/foo/bar/baz/blarg/blurp"));
+  ASSERT_EQUAL("../blurp", wcl::relative_to("/foo/bar/baz/blarg", "/foo/bar/baz/blurp"));
+  ASSERT_EQUAL("../blurp/blarg",
+               wcl::relative_to("/foo/bar/baz/blarg", "/foo/bar/baz/blurp/blarg"));
+}

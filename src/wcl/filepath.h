@@ -133,6 +133,10 @@ class filepath_iterator {
   }
 
  public:
+  filepath_iterator(const filepath_iterator& other)
+      : str(other.str), start(other.start), final(other.final) {}
+  filepath_iterator(filepath_iterator&& other)
+      : str(other.str), start(other.start), final(other.final) {}
   explicit filepath_iterator(const std::string& str) : str(str), start(), final() { next(); }
 
   filepath_iterator(const std::string& str, size_t begin) : str(str), start(begin), final(begin) {
@@ -203,28 +207,6 @@ inline filepath_range_ref make_filepath_range_ref(const std::string& str) {
   return filepath_range_ref(str);
 }
 
-inline std::string join_paths(std::string a, const std::string& b) {
-  if (a.back() != '/') a += '/';
-  auto begin = b.begin();
-  if (*begin == '/') ++begin;
-  a.insert(a.end(), begin, b.end());
-  return a;
-}
-
-inline std::string join_paths(std::string a, const std::string& b, const std::string& c) {
-  return join_paths(join_paths(a, b), c);
-}
-
-inline std::string join_paths(std::string a, const std::string& b, const std::string& c,
-                              const std::string& d) {
-  return join_paths(join_paths(join_paths(a, b), c), d);
-}
-
-inline std::string join_paths(std::string a, const std::string& b, const std::string& c,
-                              const std::string& d, const std::string& e) {
-  return join_paths(join_paths(join_paths(join_paths(a, b), c), d), e);
-}
-
 // Returns the canonicalized version of string x.
 //
 // Ex:
@@ -280,6 +262,33 @@ inline std::string make_canonical(const std::string& x) {
   }
 }
 
+inline std::string _join_paths(std::string a, const std::string& b) {
+  if (a.back() != '/') a += '/';
+  auto begin = b.begin();
+  if (*begin == '/') ++begin;
+  a.insert(a.end(), begin, b.end());
+  return a;
+}
+
+inline std::string _join_paths(std::string a, const std::string& b, const std::string& c) {
+  return _join_paths(_join_paths(a, b), c);
+}
+
+inline std::string _join_paths(std::string a, const std::string& b, const std::string& c,
+                               const std::string& d) {
+  return _join_paths(_join_paths(_join_paths(a, b), c), d);
+}
+
+inline std::string _join_paths(std::string a, const std::string& b, const std::string& c,
+                               const std::string& d, const std::string& e) {
+  return _join_paths(_join_paths(_join_paths(_join_paths(a, b), c), d), e);
+}
+
+template <class... Args>
+inline std::string join_paths(Args&&... args) {
+  return make_canonical(_join_paths(std::forward<Args>(args)...));
+}
+
 inline bool is_absolute(const char* x) { return x[0] == '/'; }
 
 inline bool is_absolute(const std::string& x) { return is_absolute(x.c_str()); }
@@ -298,7 +307,9 @@ inline std::string join(char sep, Iter begin, Iter end) {
   std::string out;
   for (; begin != end; ++begin) {
     out += *begin;
-    if (begin + 1 != end) out += sep;
+    auto begin_copy = begin;
+    ++begin_copy;
+    if (begin_copy != end) out += sep;
   }
   return out;
 }
@@ -329,6 +340,46 @@ inline wcl::optional<std::pair<std::string, std::string>> parent_and_base(const 
   }
 
   return {};
+}
+
+inline std::string relative_to(std::string relative, std::string path) {
+  // TODO: Assert that relative is absolute
+  // First make the path canonical.
+  path = make_canonical(path);
+
+  // If the path is relative then we can just return it as we don't
+  // know what its relative to so we assume its already relative to
+  // `relative`
+  if (wcl::is_relative(path)) {
+    return path;
+  }
+  relative = make_canonical(relative);
+
+  // Since we now know that the path is absolute and canonical it must have
+  // no special parts like .. or . in it. By iterating parts of both until they stop
+  // matching we can eliminate as much of `relative` as possible and then prepend
+  // `..` for each remaining element of `relative` to get the relative path.
+  auto path_range = make_filepath_range(path);
+  auto rel_range = make_filepath_range(relative);
+  auto path_begin = path_range.begin();
+  auto rel_begin = rel_range.begin();
+  while (path_begin != path_range.end() && rel_begin != rel_range.end() &&
+         *path_begin == *rel_begin) {
+    ++path_begin;
+    ++rel_begin;
+  }
+
+  // Now prepend the ".." paths
+  std::string out;
+  while (rel_begin != rel_range.end()) {
+    out += "../";
+    ++rel_begin;
+  }
+
+  // And finally append the remainder of path.
+  out += join('/', path_begin, path_range.end());
+
+  return out;
 }
 
 }  // namespace wcl

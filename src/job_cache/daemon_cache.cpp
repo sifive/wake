@@ -485,9 +485,10 @@ class SelectMatchingJobs {
       // Ok this is the job, it matches *exactly* so we should
       // expect running it to produce exaxtly the same result.
       MatchingJob result;
-      result.output_files = read_outputs(job_id);
-      result.output_dirs = read_output_dirs(job_id);
-      result.output_symlinks = read_output_symlinks(job_id);
+      result.client_cwd = find_job_request.client_cwd;
+      result.output_files = read_outputs(job_id);             // paths are sandbox-absolute here
+      result.output_dirs = read_output_dirs(job_id);          // paths are sandbox-absolute here
+      result.output_symlinks = read_output_symlinks(job_id);  // paths are sandbox-absolute here
       result.output_info = std::move(*output_info);
       result.input_files = std::move(*found_input_files);
       result.input_dirs = std::move(*found_input_dirs);
@@ -725,17 +726,26 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
   // If we didn't link all the files over we need to return a failure.
   if (!success) return FindJobResponse(wcl::optional<MatchingJob>{});
 
-  // The MatchingJob is currently using sandbox paths.
-  // We need to redirect those sandbox paths to non-sandbox paths
-  // here we redirect the output files.
+  // The MatchingJob is currently using sandbox-absolute paths.
+  // We need to redirect those sandbox-absolute paths to client-absolute
+  // paths. After that, and in order to keep Wake code hygenic and simple,
+  // we convert those client-absolute paths to client-relative paths.
   auto redirect_path = [&find_request](std::string &path) {
+    // First we convert sandbox-absolute paths to client-absolute paths
     std::vector<std::string> output_path_vec = wcl::split_path(path);
     auto pair = find_request.dir_redirects.find_max(output_path_vec.begin(), output_path_vec.end());
     if (!pair.first) return;
     std::string rel_path = wcl::join('/', pair.second, output_path_vec.end());
     path = wcl::join_paths(*pair.first, rel_path);
+    // Then we convert client-absolute paths to client-relative paths
+    if (wcl::is_absolute(path)) {
+      path = wcl::relative_to(find_request.client_cwd, path);
+    }
   };
 
+  /***********************************************************************
+   * Now we convert all sandbox-absolute paths to client-relative paths. *
+   ***********************************************************************/
   for (auto &output_file : result.output_files) {
     redirect_path(output_file.path);
   }
@@ -765,10 +775,6 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
     log_warning("Failed to send eviction update: %s", strerror(errno));
   }
 
-  // TODO: We should really return a different thing here
-  //       that mentions the *output* locations but for
-  //       now this is good enough and we can assume
-  //       workspace relative paths everywhere.
   return FindJobResponse(wcl::make_some<MatchingJob>(std::move(result)));
 }
 

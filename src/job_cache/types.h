@@ -74,6 +74,7 @@ struct JobOutputInfo {
 };
 
 struct MatchingJob {
+  std::string client_cwd;
   std::vector<CachedOutputFile> output_files;
   std::vector<CachedOutputSymlink> output_symlinks;
   std::vector<CachedOutputDir> output_dirs;
@@ -88,6 +89,7 @@ struct MatchingJob {
 
 struct FindJobRequest {
  public:
+  std::string wakeroot;
   std::string cwd;
   std::string command_line;
   std::string envrionment;
@@ -178,6 +180,7 @@ struct AddJobRequest {
   AddJobRequest() = default;
 
  public:
+  std::string wakeroot;
   std::string cwd;
   std::string command_line;
   std::string envrionment;

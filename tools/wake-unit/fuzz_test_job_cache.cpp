@@ -43,7 +43,8 @@ struct TestJob {
 
   job_cache::AddJobRequest generate_add_request(const std::string& in_dir) const {
     JAST request(JSON_OBJECT);
-    request.add("cwd", cwd);
+    request.add("wakeroot", cwd);
+    request.add("cwd", ".");
     request.add("command_line", cmd);
     request.add("envrionment", env);
     request.add("stdin", stdin);
@@ -95,7 +96,8 @@ struct TestJob {
 
   job_cache::FindJobRequest generate_find_request(const std::string& out_dir) const {
     JAST request(JSON_OBJECT);
-    request.add("cwd", cwd);
+    request.add("wakeroot", cwd);
+    request.add("cwd", ".");
     request.add("command_line", cmd);
     request.add("envrionment", env);
     request.add("stdin", stdin);
