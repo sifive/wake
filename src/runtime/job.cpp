@@ -829,9 +829,17 @@ static void launch(JobTable *jobtable) {
     jobtable->imp->pipes[stdout_stream[0]] = entry;
     jobtable->imp->pipes[stderr_stream[0]] = entry;
     clock_gettime(CLOCK_REALTIME, &entry->job->start);
+    std::string stdin_file_str = "/dev/null";
+    int stdin_stream[2];
+    if (!task.stdin_file.empty()) {
+      stdin_file_str = task.stdin_file;
+    } else if (task.is_atty) {
+      create_psuedoterminal(stdin_stream);
+      stdin_file_str = "#" + std::to_string(stdin_stream[0]);
+    }
     std::stringstream prelude;
     prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
-            << (task.stdin_file.empty() ? "/dev/null" : task.stdin_file.c_str()) << '\0'
+            << stdin_file_str << '\0'
             << std::to_string(stdout_stream[1]) << '\0' << std::to_string(stderr_stream[1]) << '\0'
             << task.dir << '\0';
     std::string shim = prelude.str() + task.cmdline;
