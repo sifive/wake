@@ -999,7 +999,10 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
                     Fail f = Pair (Fail (makeError f)) ""
                     Pass inFile =
                         def outFile = "{build}/{prefix}.out.json"
-                        def cmd = script, "-I", "-p", inFile, "-o", outFile, extraArgs
+                        def always_args = "-I", "-p", inFile, "-o", outFile, extraArgs
+                        def optional_arg =
+                            if isatty then "-i", Nil else Nil
+                        def cmd = script, optional_arg ++ always_args
 
                         def proxy =
                             RunnerInput label cmd Nil (extraEnv ++ environment) "." "" Nil prefix (estimate record) isatty

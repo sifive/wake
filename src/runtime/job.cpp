@@ -835,7 +835,7 @@ static void launch(JobTable *jobtable) {
       stdin_file_str = task.stdin_file;
     } else if (task.is_atty) {
       create_psuedoterminal(stdin_stream);
-      stdin_file_str = "#" + std::to_string(stdin_stream[0]);
+      stdin_file_str = "#" + std::to_string(stdin_stream[1]);
     }
     std::stringstream prelude;
     prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
