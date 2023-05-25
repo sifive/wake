@@ -75,9 +75,8 @@ export def installAs (dest: String) (file: Path): Result Path Error =
     makeExecPlan cmd inputs
     | setPlanLabel "installAs: {dest} {file.getPathName}"
     | setPlanEnvironment Nil
-    | setPlanLocalOnly True
     | setPlanFnOutputs foutputs
-    | runJob
+    | runJobWith localRunner
     | getJobOutput
 
 # Copy a file from one directory subtree to another

@@ -28,7 +28,7 @@ def installRO path =
 
     "install -m 444 {path.getPathName} {dest}"
     | makePlan "install: {dest}" inputs
-    | runJob
+    | runJobWith defaultRunner
     | getJobOutput
 
 def createStdlibJSON (stdlibSources: List Path): Result Path Error =
@@ -66,7 +66,7 @@ export def vscode _: Result Path Error =
         | setPlanDirectory @here
         # NPM installs its dependencies from the web, and so can't be fully sandboxed.
         | setPlanShare False
-        | runJob
+        | runJobWith defaultRunner
         | getJobOutputs
 
     require Pass stdlibSources = sources "share/wake/lib" `.*`
@@ -107,7 +107,7 @@ export def vscode _: Result Path Error =
         | setPlanDirectory @here
         | setPlanStdin (relative @here vsceStdin.getPathName)
         | setPlanIsAtty True
-        | runJob
+        | runJobWith defaultRunner
         | getJobOutputs
 
     require vsix, Nil = filter (matches `.*\.vsix` _.getPathName) outputs

@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package wake
+package plan_scorer
+
+from wake import _
 
 target tarExe Unit =
     def gnutar = which "gnutar"
@@ -38,7 +40,6 @@ def targz output paths =
 
     require Pass tar =
         makePlan "incremental snapshot: {output}" paths script
-        | setPlanLocalOnly True
         | setPlanFnOutputs (\_ output, Nil)
         | runJobWith localRunner
         | getJobOutput

@@ -50,7 +50,7 @@ def buildRE2WASM Unit =
         | editPlanEnvironment (addEnvironmentPath emsdk)
         | setPlanDirectory @here
         | setPlanShare False
-        | runJob
+        | runJobWith defaultRunner
 
     require Pass outputs = job.getJobOutputs
 

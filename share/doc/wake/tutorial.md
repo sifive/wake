@@ -546,6 +546,9 @@ in the system shell.  Wake provides this ability through the job system, in
 order to allow their execution to be cached.
 
 ```wake
+from wake import _
+from plan_scorer import _
+
 export def infoH _args =
     def cmdline =
         which "uname", "-sr", Nil
@@ -641,6 +644,9 @@ executed in the root of the workspace. However, it is possible to
 customize the environment used.
 
 ```wake
+from wake import _
+from plan_scorer import _
+
 export def showEnv _ =
     def plan =
         "echo $HAX $FOO"
@@ -1159,6 +1165,9 @@ example that becomes very difficult very quickly in a system like make, but
 is fairly straight-forward in wake:
 
 ```wake
+from wake import _
+from plan_scorer import _
+
 def curl url extension =
     def outputFile =
         # This construction is somewhat specific to GitHub's url scheme, which

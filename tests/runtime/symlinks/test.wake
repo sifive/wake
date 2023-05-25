@@ -7,14 +7,14 @@ export def goodLink Unit =
     makeExecPlan ("ln", "-s", "datFile", "goodLink", Nil) (dat, Nil)
     | setPlanLabel "test (symlinks): goodLink"
     | setPlanShare False
-    | runJob
+    | runJobWith defaultRunner
     | getJobOutput
 
 export def badLink Unit =
     makeExecPlan ("ln", "-s", "badFile", "badLink", Nil) Nil
     | setPlanLabel "test (symlinks): badLink"
     | setPlanShare False
-    | runJob
+    | runJobWith defaultRunner
     | getJobOutput
 
 export def shouldWork Unit =
@@ -26,7 +26,7 @@ export def shouldWork Unit =
     | setPlanLabel "test (symlinks): cat goodLink"
     | editPlanEnvironment (setEnvironment "TEST" "1")
     | setPlanShare False
-    | runJob
+    | runJobWith defaultRunner
     | getJobInputs
 
 export def shouldFail1 Unit =
@@ -36,7 +36,7 @@ export def shouldFail1 Unit =
     | setPlanLabel "test (symlinks): cat goodLink shouldFail"
     | editPlanEnvironment (setEnvironment "TEST" "2")
     | setPlanShare False
-    | runJob
+    | runJobWith defaultRunner
     | getJobInputs
 
 export def shouldFail2 Unit =
@@ -46,7 +46,7 @@ export def shouldFail2 Unit =
     | setPlanLabel "test (symlinks): cat goodLink shouldFail2"
     | editPlanEnvironment (setEnvironment "TEST" "3")
     | setPlanShare False
-    | runJob
+    | runJobWith defaultRunner
     | getJobInputs
 
 export def test _ =

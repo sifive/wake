@@ -172,7 +172,6 @@ export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (des
 
         makeExecPlan cmdline visible
         | setPlanLabel "claim: {existingFile} -> {desiredWorkspacePath}"
-        | setPlanLocalOnly True
         | setPlanPersistence Once
         | setPlanFnOutputs (\_ desiredWorkspacePath, Nil)
         | runJobWith localRunner
