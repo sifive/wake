@@ -1,0 +1,18 @@
+#!/bin/sh
+rm -vrf bin/*
+rm -vrf lib/wake/* 
+rm -vrf $(find . -name '*\.o' -type f)
+rm -vf src/json/jlexer.cpp
+(cd src/parser; rm -vf lexer.cpp parser.cpp parser.h parser.out parser.c parser.y)
+rm -vf src/version.h
+rm -vf debian/changelog
+rm -vf wake.spec
+rm -vf $(find . -name wake.db -type f)
+rm -vrf $(find . -name .build -type d)
+rm -vrf $(find . -name .fuse -type d)
+rm -vrf tmp
+rm -vrf $(find . -name .job-cache -type d)
+rm -vrf $(find . -name .cache-hit -type d)
+rm -vf $(find . -name manifest.wake -type f)
+rm -vf $(find . -name '*.tar.*' -type f)
+rm -vf ./vendor/lemon/lemon.native-c11-release
