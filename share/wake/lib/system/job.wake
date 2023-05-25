@@ -93,7 +93,7 @@ export data Persistence =
     Share
 
 # A Plan describes a not-yet-executed Job
-tuple Plan =
+export tuple Plan =
     # The label used when showing the command during execution. This is recommended for efficient
     # debugging and locating job information. For example, the label will show up in the terminal during
     # job execution, in a job's progress bar in the terminal, when running the `wake --last` command,
@@ -665,7 +665,7 @@ export topic runner: Runner
 publish runner =
     localRunner, defaultRunner, Nil
 
-def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) (LogLevel stderr) isatty =
+export def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) (LogLevel stderr) isatty =
     if isOnce pers then
         runOnce
         cmd
@@ -705,59 +705,6 @@ def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (L
 
 export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs isatty) =
     runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run echo stdout stderr isatty
-
-data RunnerOption =
-    Accept (score: Double) (runnerFn: Job => Result RunnerInput Error => Result RunnerOutput Error)
-    Reject (why: String)
-
-# Run the job!
-export def runJob (p: Plan): Job = match p
-    Plan label cmd vis env dir stdin stdout stderr echo pers _lo res rf usage finputs foutputs isatty =
-        # Transform the 'List Runner' into 'List RunnerOption'
-        def qualify runner = match runner
-            Runner name _ _ if ! rf runner = Reject "{name}: rejected by Plan"
-            Runner name scorefn fn = match (scorefn p)
-                Pass x if x <=. 0.0 = Reject "{name}: non-positive score"
-                Pass x = Accept x fn
-                Fail x = Reject "{name} {x}"
-
-        def opts =
-            subscribe runner
-            | map qualify
-
-        def best acc = match _ acc
-            (Reject _) _ = acc
-            (Accept score fn) (Pair bests _bestr) =
-                if score >. bests then
-                    Pair score (Some fn)
-                else
-                    acc
-
-        match (opts | foldl best (Pair 0.0 None) | getPairSecond)
-            Some r =
-                runJobImp label cmd env dir stdin res usage finputs foutputs vis pers r echo stdout stderr isatty
-            None =
-                def create label dir stdin env cmd signature visible keep echo stdout stderr isatty =
-                    prim "job_create"
-
-                def badfinish job e = prim "job_fail_finish"
-                def badlaunch job e = prim "job_fail_launch"
-
-                def job =
-                    create label dir stdin env.implode cmd.implode 0 "" 0 "echo" "info" "error" (bToInt isatty)
-
-                def error =
-                    def pretty = match _
-                        Accept _ _ = ""
-                        Reject why = why
-
-                    makeError "No runner for '{job.getJobDescription}' available, because: {map pretty opts
-                    | catWith ", "}"
-
-                # Make sure badlaunch completes before badfinish
-                def _ = wait (\_ badfinish job error) (badlaunch job error)
-
-                job
 
 # Set the value of a tag on a Job
 # This is useful for post-build reflection into the database

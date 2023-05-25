@@ -3,6 +3,6 @@ export def test (_: List String): Result (List String) Error =
     else failWithError "$PAYLOAD was not set"
     require Pass outputs =
         makePlan "basic_test" Nil "echo {payload} > test.txt"
-        | runJob
+        | runJobWith defaultRunner
         | getJobOutputs
     Pass (map (_.getPathName) outputs)

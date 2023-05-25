@@ -27,7 +27,7 @@ def re2cOk Unit: Result String Error =
         | setPlanLabel "re2c: Get version number"
         | setPlanStdout logNever
         | setPlanStderr logNever
-        | runJob
+        | runJobWith defaultRunner
         | getJobStdout
         | getWhenFail ""
         | extract `re2c ([0-9.]+)\n`
@@ -50,7 +50,7 @@ def re2cReal re2c file =
     require Pass result =
         makeExecPlan cmdline (file, Nil)
         | setPlanLabel "re2c: {cpp}"
-        | runJob
+        | runJobWith defaultRunner
         | getJobOutput
 
     require Some "1" = getenv "UPGRADE_GENERATED"
@@ -61,7 +61,7 @@ def re2cReal re2c file =
     def zip =
         makeExecPlan compress (result, Nil)
         | setPlanLabel "re2c: compress generated file"
-        | runJob
+        | runJobWith defaultRunner
 
     match zip.getJobStatus
         Exited 0 = Pass result
@@ -87,7 +87,7 @@ def gunzip zip =
 
     makeShellPlan script (zip, Nil)
     | setPlanLabel "gzip: extract {zip.getPathName}"
-    | runJob
+    | runJobWith defaultRunner
     | getJobOutput
 
 def re2c (file: Path): Result Path Error = match (re2cOk Unit)
