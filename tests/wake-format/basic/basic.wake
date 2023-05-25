@@ -462,7 +462,7 @@ def buildRE2WASM Unit =
         | makePlan "compiling re2" (buildDir, patch, Nil)
         | editPlanEnvironment (addEnvironmentPath emsdk)
         | setPlanDirectory here
-        | runJob
+        | runJobWith defaultRunner
 
     require Pass outputs =
         job.getJobOutputs

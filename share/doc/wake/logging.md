@@ -95,7 +95,7 @@ When writing your wake code,
 you can control which loggers these `Job`-specific stdout and stderr are sent to.
 This will influence whether they appear on the `wake` process's own stdout,
 stderr, or other arbitrary file descriptors.
-These can be controlled with `setPlanStdout`, `setPlanStderr` before you `runJob`.
+These can be controlled with `setPlanStdout`, `setPlanStderr` before you `runJob`/`runJobWith`.
 These default to `logInfo` and `logWarning` respectively.
 
 Regardless of the logger to which you direct the `Job`'s `Stderr` and `Stdout`,

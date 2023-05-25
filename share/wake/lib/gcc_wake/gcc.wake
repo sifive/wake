@@ -56,7 +56,7 @@ def doCompileC variant gcc flags headers cfile =
         makeExecPlan cmdline (cfile, headers)
         | setPlanLabel "c++ {cfile.getPathName}"
         | setPlanIsAtty True
-        | runJob
+        | runJobWith defaultRunner
         | getJobOutputs
 
     require True = emitCompileCmd
@@ -87,7 +87,7 @@ def doLinkO variant linker flags objects targ extraFiles =
     makeExecPlan cmdline (destDir, objects ++ extraFiles)
     | setPlanLabel "link: {replace `^.*/` '' linker} {targ}"
     | setPlanIsAtty True
-    | runJob
+    | runJobWith defaultRunner
     | getJobOutputs
 
 export def makeCompileC variant gcc flags =

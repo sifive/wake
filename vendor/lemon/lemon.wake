@@ -33,7 +33,7 @@ def m4 (file: Path): Result Path Error =
         makeExecPlan (which "m4", file.getPathName, Nil) (file, Nil)
         | setPlanLabel "lemon: m4 {file.getPathName}"
         | setPlanStdout logNever
-        | runJob
+        | runJobWith defaultRunner
 
     require Pass stdout = run.getJobStdout
 
@@ -57,7 +57,7 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
     require Pass result =
         makeExecPlan cmdline (file, template, lemon)
         | setPlanLabel "lemon: {file.getPathName}"
-        | runJob
+        | runJobWith defaultRunner
         | getJobOutputs
 
     require Some (Pair cfile _) = find (matches `.*\.c` _.getPathName) result
@@ -76,7 +76,7 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
     def zip =
         makeExecPlan compress (cppfile, result)
         | setPlanLabel "lemon: compress generated files"
-        | runJob
+        | runJobWith defaultRunner
 
     match zip.getJobStatus
         Exited 0 = Pass (Pair cppfile hfile)
