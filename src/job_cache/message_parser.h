@@ -20,11 +20,11 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <unistd.h>
+
 #include <algorithm>
 #include <string>
 #include <vector>
-
-#include <unistd.h>
 
 namespace job_cache {
 
@@ -35,7 +35,7 @@ struct MessageParser {
   int fd;
 
   MessageParser() = delete;
-  MessageParser(int fd): fd(fd) {}
+  MessageParser(int fd) : fd(fd) {}
 
   MessageParserState read_messages(std::vector<std::string>& messages) {
     messages = {};
@@ -50,6 +50,10 @@ struct MessageParser {
 
       // An error occured during read
       if (count < 0) {
+        // There are some failures that could occur that just require us to retry.
+        // EINTR could occur on any fd type but EAGAIN and EWOULDBLOCK should
+        // only occur if the user gave us a non-blocking socket.
+        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue;
         return MessageParserState::StopFail;
       }
 
@@ -65,7 +69,11 @@ struct MessageParser {
         iter = end + 1;
       }
 
-      if (count < 4096) {
+      // If we get less than 4096 bytes we want to assume that the messages
+      // are done and exit. If however we still haven't received a full message
+      // yet, we want to keep going until the fd is closed. If we have a message
+      // to return however lets return and process that instead.
+      if (count < 4096 && messages.size() != 0) {
         return MessageParserState::Continue;
       }
     }
@@ -75,4 +83,4 @@ struct MessageParser {
   }
 };
 
-}
+}  // namespace job_cache

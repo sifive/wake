@@ -270,7 +270,10 @@ void send_json_message(int fd, const JAST &json) {
   while (start < json_str.size()) {
     int res = write(fd, json_str.data() + start, json_str.size() - start);
     if (res == -1) {
-      if (errno == EINTR) {
+      // If we get interuppted by a signal, or we get hit by a block, retry.
+      // Today we don't use non-blocking sockets but when we did this was required.
+      // It's strictly more correct for the function to do this so we keep it.
+      if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
         continue;
       }
       log_fatal("write(%d): %s", fd, strerror(errno));

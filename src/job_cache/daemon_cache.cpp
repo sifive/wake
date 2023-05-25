@@ -101,8 +101,7 @@ static void create_file(const char *tmp_path, const char *final_path, const char
   }
 }
 
-// Create a *blocking* domain socket. We intend on using
-// epoll later so we don't need anything to be non-blocking.
+// Create a *blocking* domain socket
 static int open_abstract_domain_socket(const std::string &key) {
   // Now we need to:
   //   1) Create a socket
@@ -926,11 +925,8 @@ void DaemonCache::reap_evict_loop() {
 DaemonCache::~DaemonCache() { reap_evict_loop(); }
 
 void DaemonCache::handle_new_client() {
-  // Accept the new client socket. Because of needing to perform
-  // multiple read's per client IO event, we have to make the client
-  // socket use non-blocking reads. This allows us to consume multiple
-  // read calls without blocking the other clients if one of them waits.
-  int accept_fd = accept4(listen_socket_fd, nullptr, nullptr, SOCK_CLOEXEC | SOCK_NONBLOCK);
+  // Accept the new client socket.
+  int accept_fd = accept4(listen_socket_fd, nullptr, nullptr, SOCK_CLOEXEC);
   if (accept_fd == -1) {
     log_fatal("accept(%s): %s", key.c_str(), strerror(errno));
   }
@@ -988,14 +984,8 @@ void DaemonCache::handle_msg(int client_fd) {
     return;
   }
 
-  // If there's an error, consider which one it is or fail
+  // If there's an error just fail.
   if (state == MessageParserState::StopFail) {
-    // These sockets are non-blocking because we have to try reading
-    // them multiple times. This means that often we'll wind up
-    // attempting N+1 reads and one of them will fail like this
-    // without closing.
-    if (errno == EAGAIN || errno == EWOULDBLOCK) return;
-    // Otherwise handle the error
     log_fatal("read(%d), key = %s:", strerror(errno));
   }
 }

@@ -140,6 +140,10 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
     return {};
   }
 
+  // TODO: We should make this read more robust. It's mostly fine if
+  //       it returns fewer bytes than we asked for but if it gives
+  //       us EINTR that could cause some strange failures that should
+  //       be avoided. That's quite unlikely however.
   if (::read(fd->get(), key, sizeof(key)) == -1) {
     log_fatal("read(%s): %s", key_path.c_str(), strerror(errno));
   }
@@ -175,7 +179,9 @@ Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
     exit(1);
   }
 
-  // connect to the daemon with backoff
+  // connect to the daemon with backoff.
+  // TODO: Put this into a function so that we can call it again if
+  // the daemon fails unexpectedly.
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
   for (int i = 0; i < 10; i++) {
@@ -206,18 +212,38 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
   MessageParser parser(socket_fd.get());
   std::vector<std::string> messages;
 
-  MessageParserState state = parser.read_messages(messages);
+  while (true) {
+    MessageParserState state = parser.read_messages(messages);
 
-  if (state == MessageParserState::StopFail) {
-    log_fatal("Cache::read(): failed receiving message");
-  }
+    if (state == MessageParserState::StopFail) {
+      // TODO: Try to reconnect to the daemon, launching our own if need be.
+      //       if that fails then depending on user preference either fail
+      //       or return a cache miss.
+      log_fatal("Cache::read(): failed receiving message");
+    }
 
-  if (state == MessageParserState::StopSuccess && messages.empty()) {
-    log_fatal("Cache::read(): daemon exited without responding");
-  }
+    if (state == MessageParserState::StopSuccess && messages.empty()) {
+      // TODO: Try to reconnect to the daemon, launching our own if need be.
+      //       if that fails then depending on user preference either fail
+      //       or return a cache miss.
+      log_fatal("Cache::read(): daemon exited without responding");
+    }
 
-  if (messages.size() != 1) {
-    log_fatal("Cache::read(): daemon responded with too many results");
+    // MessageParser tries to avoid this but we should defend against
+    // the case where no error has yet occured but messages is still empty.
+    if (state == MessageParserState::Continue && messages.empty()) {
+      continue;
+    }
+
+    if (messages.size() != 1) {
+      log_info("message.size() == %llu", messages.size());
+      for (const auto &message : messages) {
+        log_info("message.size() = %llu, message = '%s'", message.size(), message.c_str());
+      }
+      log_fatal("Cache::read(): daemon responded with too many results");
+    }
+
+    break;
   }
 
   // TODO: make a client log file
