@@ -147,10 +147,17 @@ int main(int argc, char **argv) {
     return 127;
   }
 
-  stdin_fd = open(argv[1], O_RDONLY);
-  if (stdin_fd == -1) {
-    fprintf(stderr, "open: %s: %s\n", argv[1], strerror(errno));
-    return 127;
+  // Because we want to be able to read in both file descirptors and
+  // files for stdin, we use a '#' to denote a file descriptor.
+  const char* stdin_file = argv[1];
+  if (stdin_file[0] == '#') {
+    stdin_fd = atoi(stdin_file + 1);
+  } else {
+    stdin_fd = open(stdin_file, O_RDONLY);
+    if (stdin_fd == -1) {
+      fprintf(stderr, "open: %s: %s\n", argv[1], strerror(errno));
+      return 127;
+    }
   }
 
   stdout_fd = atoi(argv[2]);
