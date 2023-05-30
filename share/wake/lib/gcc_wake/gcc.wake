@@ -31,16 +31,16 @@ export def debugLFlags =
     ("-lpthread", "-g", "-pg", Nil)
 
 export def releaseCFlags =
-    ("-Wall", "-Wno-format-security", "-O2", Nil)
+    ("-Wall", "-Wno-format-security", "-g", "-O2", Nil)
 
 export def releaseLFlags =
     ("-lpthread",)
 
 export def staticCFlags =
-    ("-Wall", "-Wno-format-security", "-O2", "-flto", Nil)
+    ("-Wall", "-Wno-format-security", "-g", "-O2", "-flto", Nil)
 
 export def staticLFlags =
-    ("-lpthread", "-flto", "-static", "-s", Nil)
+    ("-lpthread", "-flto", "-static", "-g", Nil)
 
 target pwd _ =
     makeExecPlan ("pwd",) Nil
