@@ -250,8 +250,7 @@ Runners are responsible for executing a Plan to run an external program. There a
 Runners are chosen for a given Plan based on the value returned by their `score` function and the plan's `RunnerFilter` field. Multiple runners may be able to run a given Plan, so the `score` function selects the most appropriate one. 
 
 * In `runJob`,  `subscribe runner` is called to retrieve the list of all published runners. The `RunnerFilter` function inside the Plan tuple can be set to filter out runners that the plan wants to exclude from consideration. Then the `score` function of each runner is called and runners that return Fail or a score <= 0.0 are excluded. Of the remaining runners, the one with the highest score is picked.
-* Local runners can only run when the Plan tuple has `LocalOnly` set to true
-* Default runners can only run when the Plan tuple has `LocalOnly` set to false
+* The local runners can only be used via `runJobWith localRunner`, or a custom wrapper.
 
 Runners are created using `makeRunner`. `makeRunner` is defined as follows:
 

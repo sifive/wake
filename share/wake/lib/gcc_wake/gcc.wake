@@ -42,13 +42,6 @@ export def staticCFlags =
 export def staticLFlags =
     ("-lpthread", "-flto", "-static", "-s", Nil)
 
-target pwd _ =
-    makeExecPlan ("pwd",) Nil
-    | setPlanLabel "pwd: Get workspace directory"
-    | setPlanLocalOnly True
-    | runJob
-    | getJobStdout
-
 def doCompileC variant gcc flags headers cfile =
     def obj = replace `\.c(pp)?$` ".{variant}.o" cfile.getPathName
     def cmdline = gcc, flags ++ ("-c", cfile.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
@@ -69,13 +62,9 @@ def doCompileC variant gcc flags headers cfile =
     require True = emitCompileCmd
     else out
 
-    require Pass pwd_out = pwd Unit
-
-    def dir = replace `[\n]` "" pwd_out
-
     def outJson =
         JObject (
-            "directory" :-> JString dir,
+            "directory" :-> JString workspace,
             "arguments" :-> JArray $ map JString cmdline,
             "file" :-> JString "cfile.getPathName",
         )

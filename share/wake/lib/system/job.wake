@@ -118,13 +118,9 @@ tuple Plan =
     export Echo: LogLevel
     # See Persistence table above
     export Persistence: Persistence
-    # <Deprecated>
-    export LocalOnly: Boolean
     # The resources a runner must provide to the job (licenses/etc).
     # These strings are uninterpreted and are only meaningful to the right runners.
     export Resources: List String
-    # Reject from consideration Runners which the Plan deems inappropriate
-    export RunnerFilter: Runner => Boolean
     # User-supplied usage prediction; overruled by database statistics (if any)
     export Usage: Usage
     # Modify the Runner's reported inputs (files read). For advanced use only.
@@ -231,7 +227,7 @@ export def editPlanShare (f: Boolean => Boolean): Plan => Plan =
 
 # Get a unique hash-code for the job
 export def getPlanHash (plan: Plan): Integer =
-    def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ isAtty = plan
+    def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ isAtty = plan
     def isAttyStr = if isAtty then "true" else "false"
     def sig = cat (isAttyStr, "\0\0", implode cmd, "\0\0", implode env, "\0\0", dir, "\0\0", stdin,)
 
@@ -266,24 +262,7 @@ def bToInt b =
 
 # Set reasonable defaults for all Plan arguments
 export def makeExecPlan (cmd: List String) (visible: List Path): Plan =
-    Plan
-    ""
-    cmd
-    visible
-    environment
-    "."
-    ""
-    logInfo
-    logWarning
-    logEcho
-    Share
-    False
-    Nil
-    (\_ True)
-    defaultUsage
-    id
-    id
-    False
+    Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share Nil defaultUsage id id False
 
 export def makeShellPlan (script: String) (visible: List Path): Plan =
     makeExecPlan (which "dash", "-c", script, Nil) visible
@@ -314,7 +293,7 @@ export def localRunner: Runner =
                 Pass reality = Pass (RunnerOutput (map getPathName vis) Nil reality)
                 Fail f = Fail f
 
-    def score plan = if plan.getPlanLocalOnly then Pass 1.0 else Fail "cannot detect outputs"
+    def score _ = Pass 1.0
 
     Runner "local" score doit
 
@@ -356,12 +335,6 @@ def getPath input =
     jField elem "path"
     | jString
 
-target pwd Unit =
-    makePlan "get pwd" Nil "pwd"
-    | runJobWith localRunner
-    | getJobStdout
-    | rmap (replace `\n` "")
-
 # wakeroot is the absolute sandbox-path from which input and output files will
 # be interpreted as being relative to if they're in fact relative.
 export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Runner): Runner =
@@ -376,8 +349,6 @@ export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Ru
 
             Fail e
         Pass (RunnerInput label cmd vis env dir stdin _ prefix _ _) =
-            require Pass client_cwd = pwd Unit
-
             def mkVisJson (Path path hash) =
                 JObject ("path" :-> JString path, "hash" :-> JString hash,)
 
@@ -392,7 +363,7 @@ export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Ru
                     "envrionment" :-> JString env.implode,
                     "stdin" :-> JString stdin,
                     "input_files" :-> jobCacheVisible,
-                    "client_cwd" :-> JString client_cwd,
+                    "client_cwd" :-> JString workspace,
                     "dir_redirects" :-> JObject (wakeroot :-> JString "./",),
                 )
 
@@ -523,7 +494,7 @@ export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Ru
                     "obytes" :-> JInteger obytes,
                     "stdout" :-> JString stdout,
                     "stderr" :-> JString stderr,
-                    "client_cwd" :-> JString client_cwd,
+                    "client_cwd" :-> JString workspace,
                 )
 
             # We put this in a def so that it does not block the return below.
@@ -663,7 +634,7 @@ target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run echo 
 export topic runner: Runner
 
 publish runner =
-    localRunner, defaultRunner, Nil
+    defaultRunner, Nil
 
 def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) (LogLevel stderr) isatty =
     if isOnce pers then
@@ -703,7 +674,7 @@ def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (L
         label
         isatty
 
-export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs isatty) =
+export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers res usage finputs foutputs isatty) =
     runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run echo stdout stderr isatty
 
 data RunnerOption =
@@ -712,10 +683,9 @@ data RunnerOption =
 
 # Run the job!
 export def runJob (p: Plan): Job = match p
-    Plan label cmd vis env dir stdin stdout stderr echo pers _lo res rf usage finputs foutputs isatty =
+    Plan label cmd vis env dir stdin stdout stderr echo pers res usage finputs foutputs isatty =
         # Transform the 'List Runner' into 'List RunnerOption'
         def qualify runner = match runner
-            Runner name _ _ if ! rf runner = Reject "{name}: rejected by Plan"
             Runner name scorefn fn = match (scorefn p)
                 Pass x if x <=. 0.0 = Reject "{name}: non-positive score"
                 Pass x = Accept x fn
@@ -901,7 +871,7 @@ export def wakePath: String =
 
 export def fuseRunner: Runner =
     def fuse = "{wakePath}/wakebox"
-    def score plan = if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
+    def score _ = Pass 2.0
 
     makeJSONRunnerPlan fuse score
     | editJSONRunnerPlanExtraEnv (editEnvironment "DEBUG_FUSE_WAKE" (\_ getenv "DEBUG_FUSE_WAKE"))

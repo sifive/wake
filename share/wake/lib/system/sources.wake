@@ -32,7 +32,7 @@ def got_sources =
 # Find files
 # WARNING! Use of this method can make a build unreproducible.
 # Depending on when the method is invoked, the results may vary!
-# This method is ntended to be used by the outputFn of LocalOnly Jobs.
+# This method is intended to be used by the outputFn of localRunner Jobs.
 export def files (dir: String) (regexp: RegExp): List String =
     def p d r = prim "files"
 
@@ -172,7 +172,6 @@ export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (des
 
         makeExecPlan cmdline visible
         | setPlanLabel "claim: {existingFile} -> {desiredWorkspacePath}"
-        | setPlanLocalOnly True
         | setPlanPersistence Once
         | setPlanFnOutputs (\_ desiredWorkspacePath, Nil)
         | runJobWith localRunner

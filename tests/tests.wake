@@ -139,9 +139,8 @@ export def runUnitTests _: Result Unit Error =
         | setPlanLabel "testing: {testName}"
         | setPlanStdout logNever
         | setPlanStderr logNever
-        | setPlanLocalOnly True
         | setPlanShare False
-        | runJob
+        | runJobWith localRunner
 
     def removeCarriageReturns = replace `\r` ""
 
@@ -219,12 +218,11 @@ def runTest (testScript: Path): Result Unit Error =
         makeExecPlan ("./{testScript.getPathName.inTestDir}", wakeDir.inTestDir, Nil) (visibleFiles ++ wakeVisible)
         | setPlanDirectory testDirectory
         | setPlanLabel "testing: {testName}"
-        | setPlanLocalOnly True # On OS/X you cannot mount fuse within fuse
         | setPlanEnvironment ("HOME={testDirectory}",)
         | setPlanStdout logNever
         | setPlanStderr logNever
         | setPlanShare False
-        | runJob
+        | runJobWith localRunner # On OS/X you cannot mount fuse within fuse
 
     require Pass jobStdout =
         testJob.getJobStdout

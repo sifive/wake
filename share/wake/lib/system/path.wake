@@ -153,7 +153,7 @@ def computeHashes (files: List String): List String =
     # Ok now we know we have a non-empty set of files that actully need to be hashed.
     # We pass all of these to wake-hash and it does its thing
     def hashPlan cmd =
-        Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun True Nil (\_ True) hashUsage id id False
+        Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun Nil hashUsage id id False
 
     def add f h = prim "add_hash"
 
@@ -185,7 +185,7 @@ target hashcode (f: String): String =
         reuse
     else
         def hashPlan cmd =
-            Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun True Nil (\_ True) hashUsage id id False
+            Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun Nil hashUsage id id False
 
         def job =
             hashPlan ("<hash>", f, Nil)

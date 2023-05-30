@@ -54,11 +54,10 @@ target pkgConfigImp flags pkgs =
     def result =
         makeExecPlan cmdline Nil
         | setPlanLabel "pkg-config: {pkgs | catWith " "}"
-        | setPlanLocalOnly True
         | setPlanStdout logNever
         | setPlanStderr logDebug
         | editPlanEnvironment addenv
-        | runJob
+        | runJobWith localRunner
 
     require Some output =
         result.getJobStdout
