@@ -29,6 +29,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -184,37 +185,64 @@ static Hash256 do_hash(const char* file) {
 }
 
 int main(int argc, char** argv) {
-  // Find all the files we want to hash
-  std::vector<const char*> files_to_hash;
-  for (int i = 1; i < argc; ++i) {
-    files_to_hash.push_back(argv[i]);
-  }
+  std::vector<std::string> files_to_hash;
 
-  // Now hash them in parallel
-  size_t num_vcores = std::thread::hardware_concurrency();
-  size_t threads = 2 * num_vcores;  // Unclear what the optimal number is, we can play with it
-  size_t files_per_thread =
-      std::max(16UL, files_to_hash.size() / threads + !!(files_to_hash.size() % threads));
-  std::vector<std::future<std::vector<Hash256>>> to_join;
-  for (size_t start_index = 0; start_index < files_to_hash.size();
-       start_index += files_per_thread) {
-    to_join.emplace_back(std::async([&files_to_hash, files_per_thread, start_index]() {
-      std::vector<Hash256> out;
-      for (size_t i = 0; i < files_per_thread; ++i) {
-        if (start_index + i >= files_to_hash.size()) break;
-        out.emplace_back(do_hash(files_to_hash[start_index + i]));
-      }
-      return out;
-    }));
-  }
-
-  // Now join them outputting the hashes in the same order we received them
-  for (auto& fut : to_join) {
-    fut.wait();
-    std::vector<Hash256> result = fut.get();  // NOTE: This moves so we cannot call get again
-    for (auto& hash : result) {
-      std::cout << hash.to_hex() << std::endl;
+  // Find all the files we want to hash. Sometimes there are too many
+  // files to hash and we cannot accept them via the command line. In this
+  // case we accept them via stdin
+  if (argc == 2 && std::string(argv[1]) == "@") {
+    std::string line;
+    while (std::getline(std::cin, line)) {
+      if (line == "\n") break;
+      files_to_hash.push_back(line);
     }
+  } else {
+    for (int i = 1; i < argc; ++i) {
+      files_to_hash.push_back(argv[i]);
+    }
+  }
+
+  std::atomic<size_t> counter{0};
+  // We have to pre-alocate all the hashes so that we can overwrite them each
+  // at anytime and maintain order
+  std::vector<Hash256> hashes(files_to_hash.size());
+  // The cost of thread creation is fairly low with Linux on x86 so we allow opening up-to one
+  // thread per-file.
+  size_t num_threads = std::min(size_t(std::thread::hardware_concurrency()), files_to_hash.size());
+  // We need to join all the threads at the end so we keep a to_join list
+  std::vector<std::future<void>> to_join;
+
+  // A common case is that we only hash one file so optimize for that case
+  if (num_threads == 1) {
+    hashes[0] = do_hash(files_to_hash[0].c_str());
+  } else {
+    // Now kick off our threads
+    for (size_t i = 0; i < num_threads; ++i) {
+      // In each thread we work steal a thing to hash
+      to_join.emplace_back(std::async([&counter, &hashes, &files_to_hash]() {
+        while (true) {
+          size_t idx = counter.fetch_add(1);
+          // No more work to do so we exit
+          if (idx >= files_to_hash.size()) {
+            return;
+          }
+          // Output the result directlty into the output location. This
+          // lets us maintain the output order while not worrying about
+          // the order in which things are added.
+          hashes[idx] = do_hash(files_to_hash[idx].c_str());
+        }
+      }));
+    }
+
+    // Now join all of our threads
+    for (auto& fut : to_join) {
+      fut.wait();
+    }
+  }
+
+  // Now output them in the same order that we received them
+  for (auto& hash : hashes) {
+    std::cout << hash.to_hex() << std::endl;
   }
 
   return 0;

@@ -130,48 +130,101 @@ def dirHash =
 export def getPathParent (path: Path): Path =
     Path (simplify "{getPathName path}/..") dirHash
 
-def computeHashes (files: List String): List String =
+# Previouslly we were using ++ to concat the hashed and non-hashed files
+# but this would cause non-determinitic behavoir with the hash order being
+# different on different runs depending on which files were touched. By
+# merging them this way we can maintain the existing order.
+def mergeSelect (existing_hashes: List Boolean) (hashed: List String) (not_to_hash: List String): List String =
+    match existing_hashes hashed not_to_hash
+        Nil Nil Nil -> Nil
+        (False, es) _ (path, ns) -> path, mergeSelect es hashed ns
+        (True, es) (path, hs) _ -> path, mergeSelect es hs not_to_hash
+        _ _ _ ->
+            unreachable "impossible hash merge occured ({format existing_hashes}), ({format hashed}), ({format not_to_hash})"
+
+def computeHashes (prefix: String) (files: List String): List String =
     def simple_files = map simplify files
 
     # Many files will not even need to be rehashed because of their modtime
     def needsHashing (file: String) =
         def get f = prim "get_hash"
+        def hash = get file
 
-        if get file ==* "" then
-            True
-        else
-            False
+        if hash ==* "" then True else False
 
     # Get just the files that we need to hash
-    def to_hash = filter needsHashing simple_files
-    def not_to_hash = filter (! needsHashing _) simple_files
+    def which_files_to_hash = map needsHashing simple_files
+
+    def (Pair hs ns) =
+        zip simple_files which_files_to_hash
+        | splitBy (_.getPairSecond)
+
+    def to_hash = map getPairFirst hs
+    def not_to_hash = map getPairFirst ns
 
     # Lots of jobs have no outputs at all, and some do not need to be rehashed
     require False = empty to_hash
     else not_to_hash
 
-    # Ok now we know we have a non-empty set of files that actully need to be hashed.
-    # We pass all of these to wake-hash and it does its thing
-    def hashPlan cmd =
-        Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun Nil hashUsage id id False
+    # if the number of files to hash is too long then execve will
+    # error out.
+    def to_hash_len = len to_hash
+    def to_hash_file_bytes = sum (map strlen to_hash)
 
+    # These numbers don't appear to be well documented in any easily computeable fashion for Linux.
+    # The problem is that the same error is returned for multiple cases, and many hard to compute
+    # things cause us to go over. These numbers appear to be safe in practice (found exact via binary search).
+    # To account for any other variance I backed off these numbers quite a bit.
+    def use_file = to_hash_file_bytes >= 1900000 || to_hash_len >= 12000
     def add f h = prim "add_hash"
 
+    def hashPlan cmd vis =
+        Plan "<hash>" cmd vis Nil "." "" logNever logError logDebug ReRun Nil hashUsage id id False
+
+    def stdin_file_path = "to_hash.{prefix}.stdin"
+
+    # We construct a different plan depending on if we could use command line arguments or not
+    require Pass plan = match use_file
+        True ->
+            require Pass stdin_file = write stdin_file_path (catWith "\n" to_hash)
+
+            hashPlan ("{wakePath}/../lib/wake/wake-hash", "@",) (stdin_file,)
+            | setPlanStdin stdin_file.getPathName
+            | Pass
+        False ->
+            hashPlan ("{wakePath}/../lib/wake/wake-hash", to_hash) Nil
+            | Pass
+    else mergeSelect which_files_to_hash (map (add _ "BadHash") to_hash) not_to_hash
+
     require Pass stdout =
-        hashPlan ("{wakePath}/../lib/wake/wake-hash", to_hash)
-        | setPlanLabel "<hash>"
+        plan
         | runJobWith localRunner
         | getJobStdout
-    else (map (add _ "BadHash") to_hash) ++ not_to_hash
+    else mergeSelect which_files_to_hash (map (add _ "BadHash") to_hash) not_to_hash
+
+    # We want a better error message if the number of lines do not match
+    # that are returned
+    def hash_lines =
+        stdout
+        | tokenize `\n`
+        | filter (_ !=* "")
+
+    require True = len hash_lines == to_hash_len
+    else unreachable "wake-hash returned {format hash_lines} lines but we expected {str to_hash_len} lines"
 
     # Finally actully add all the hashes
     def hashed =
-        stdout
-        | tokenize `\n`
+        hash_lines
         | zip to_hash
         | map (\(Pair file hash) add file hash)
 
-    hashed ++ not_to_hash
+    # Make sure to unlink the file if we created it
+    def unlink _ = prim "unlink"
+    def _ = if use_file then unlink stdin_file_path else Unit
+
+    # Finally we merge them back in the order we got them so that we don't
+    # get non-determinism in the hash order.
+    mergeSelect which_files_to_hash hashed not_to_hash
 
 def hashUsage =
     defaultUsage
