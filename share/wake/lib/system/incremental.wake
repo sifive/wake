@@ -38,7 +38,6 @@ def targz output paths =
 
     require Pass tar =
         makePlan "incremental snapshot: {output}" paths script
-        | setPlanLocalOnly True
         | setPlanFnOutputs (\_ output, Nil)
         | runJobWith localRunner
         | getJobOutput
