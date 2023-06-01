@@ -130,8 +130,8 @@ def dirHash =
 export def getPathParent (path: Path): Path =
     Path (simplify "{getPathName path}/..") dirHash
 
-# Previouslly we were using ++ to concat the hashed and non-hashed files
-# but this would cause non-determinitic behavoir with the hash order being
+# Previously we were using ++ to concat the hashed and non-hashed files
+# but this would cause non-deterministic behavior with the hash order being
 # different on different runs depending on which files were touched. By
 # merging them this way we can maintain the existing order.
 def mergeSelect (existing_hashes: List Boolean) (hashed: List String) (not_to_hash: List String): List String =
@@ -212,7 +212,7 @@ def computeHashes (prefix: String) (files: List String): List String =
     require True = len hash_lines == to_hash_len
     else unreachable "wake-hash returned {format hash_lines} lines but we expected {str to_hash_len} lines"
 
-    # Finally actully add all the hashes
+    # Finally actually add all the hashes
     def hashed =
         hash_lines
         | zip to_hash
