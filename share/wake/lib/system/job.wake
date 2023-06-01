@@ -97,7 +97,7 @@ tuple Plan =
     # The label used when showing the command during execution. This is recommended for efficient
     # debugging and locating job information. For example, the label will show up in the terminal during
     # job execution, in a job's progress bar in the terminal, when running the `wake --last` command,
-    # and in the `<..>.in.json` and `<...>.out.json` files in the `.build` directory.
+    # and in the `spec-<jobid>.json` and `result-<jobid>.json` files in the `.build` directory.
     export Label: String
     # The command-line arguments (the first is the command to run)
     export Command: List String
@@ -536,9 +536,6 @@ export def virtualRunner: Runner =
 
     Runner "virtual" (\_ Pass 0.0) doit
 
-def pid =
-    prim "pid"
-
 def implode l =
     cat (foldr (_, "\0", _) Nil l)
 
@@ -572,7 +569,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
             stderr
             (bToInt isatty)
 
-        def prefix = "{str pid}.{str (getJobId job)}"
+        def prefix = str (getJobId job)
 
         def usage =
             getJobRecord job
@@ -937,8 +934,6 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
         _ if !ok = Pair (Fail (makeError "Runner {script} is not executable")) ""
         Pass (RunnerInput label command visible environment directory stdin res prefix record isatty) =
             def Usage status runtime cputime membytes inbytes outbytes = record
-            def pmkdir m p = prim "mkdir"
-            def pwrite m p d = prim "write"
 
             def json =
                 JObject (
@@ -963,39 +958,40 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
                     Nil
                 )
 
-            match (pmkdir 0755 ".build")
-                Fail f = Pair (Fail (makeError f)) ""
-                Pass build = match (pwrite 0644 "{build}/{prefix}.in.json" (prettyJSON json))
-                    Fail f = Pair (Fail (makeError f)) ""
-                    Pass inFile =
-                        def outFile = "{build}/{prefix}.out.json"
-                        def cmd = script, "-I", "-p", inFile, "-o", outFile, extraArgs
+            require Pass build =
+                mkdir ".build"
+                | rmap getPathName
+            else Pair (Fail (makeError "Failed to 'mkdir .build'.")) ""
 
-                        def proxy =
-                            RunnerInput label cmd Nil (extraEnv ++ environment) "." "" Nil prefix (estimate record) isatty
+            def specFilePath = "{build}/spec-{prefix}.json"
 
-                        Pair (Pass proxy) inFile
+            require Pass inFile =
+                write specFilePath (prettyJSON json)
+                | rmap getPathName
+            else Pair (Fail (makeError "Failed to 'write {specFilePath}'.")) ""
+
+            def outFile = resultPath inFile
+            def cmd = script, "-I", "-p", inFile, "-o", outFile, extraArgs
+
+            def proxy =
+                RunnerInput label cmd Nil (extraEnv ++ environment) "." "" Nil prefix (estimate record) isatty
+
+            Pair (Pass proxy) inFile
+
+    def resultPath specPath = replace `spec-` "result-" specPath
 
     def post = match _
         Pair (Fail f) _ = Fail f
         Pair (Pass (RunnerOutput _ _ (Usage x _ _ _ _ _))) inFile if x != 0 =
             Fail (makeError "Non-zero exit status ({str x}) for JSON runner {script} on {inFile}")
         Pair (Pass _) inFile =
-            def unlink f =
-                def fn _ = prim "unlink"
-
-                match (getenv "WAKEBOX_KEEP_IO_FILES")
-                    Some "1" = Unit
-                    _ = fn f
-
-            def outFile = replace `\.in\.json$` ".out.json" inFile
+            def outFile = resultPath inFile
             def json = parseJSONFile (Path outFile "BadHash")
-            def _ = unlink inFile
 
             match json
                 Fail f = Fail f
                 Pass content =
-                    def _ = unlink outFile
+                    def _ = markFileCleanable outFile
 
                     def field name = match _ _
                         _ (Fail f) = Fail f

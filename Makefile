@@ -43,7 +43,7 @@ all:		wake.db
 	$(WAKE_ENV) BOOTSTRAP_WAKE=true ./bin/wake build default
 
 clean:
-	rm -f bin/* lib/wake/* */*.o */*/*.o src/json/jlexer.cpp src/parser/lexer.cpp src/parser/parser.cpp src/parser/parser.h src/version.h wake.db
+	rm -f .build/* bin/* lib/wake/* */*.o */*/*.o src/json/jlexer.cpp src/parser/lexer.cpp src/parser/parser.cpp src/parser/parser.h src/version.h wake.db
 	touch bin/stamp lib/wake/stamp
 
 wake.db:	bin/wake bin/wakebox lib/wake/fuse-waked lib/wake/shim-wake lib/wake/wake-hash
