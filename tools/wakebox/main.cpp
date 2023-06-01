@@ -193,7 +193,7 @@ int run_batch(const char *params_path, bool has_output, bool use_stdin_file, boo
   }
 
   // Open the output file
-  int out_fd = open(result_path, O_WRONLY | O_CREAT | O_CLOEXEC, 0664);
+  int out_fd = open(result_path, O_WRONLY | O_CREAT | O_CLOEXEC | O_TRUNC, 0664);
   if (out_fd < 0) {
     std::cerr << "open " << result_path << ": " << strerror(errno) << std::endl;
     return 1;
