@@ -978,8 +978,7 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
 
             Pair (Pass proxy) inFile
 
-    def resultPath specPath =
-        replace `spec-` "result-" specPath
+    def resultPath specPath = replace `spec-` "result-" specPath
 
     def post = match _
         Pair (Fail f) _ = Fail f
