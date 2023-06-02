@@ -72,15 +72,6 @@ static bool daemonize(std::string dir) {
   }
 
   {
-    // Reinitialize our logger to the logfile
-    // TODO: keep this in scope.
-    std::fstream log_file(dir + "/.log", std::ios::app);
-    wcl::log::clear_subscribers();
-    wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file.rdbuf()));
-    wcl::log::info("Reinitialized logging for job cache daemon");
-  }
-
-  {
     // Replace stdin with /dev/null so we can't receive input
     auto null_fd = wcl::unique_fd::open("/dev/null", O_RDONLY);
     if (!null_fd) {
@@ -112,6 +103,10 @@ static bool daemonize(std::string dir) {
     }
     replace_fd(STDERR_FILENO, err_log_fd->get());
   }
+
+  wcl::log::clear_subscribers();
+  wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(std::cout.rdbuf()));
+  wcl::log::info("Reinitialized logging for job cache daemon");
 
   // setsid so we're in our own group
   int sid = setsid();
