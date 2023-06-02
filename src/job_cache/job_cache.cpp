@@ -26,17 +26,18 @@
 #include <util/execpath.h>
 #include <wcl/filepath.h>
 #include <wcl/optional.h>
+#include <wcl/tracing.h>
 #include <wcl/unique_fd.h>
 #include <wcl/xoshiro_256.h>
 
 #include <algorithm>
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "daemon_cache.h"
 #include "job_cache_impl_common.h"
-#include "logging.h"
 #include "message_parser.h"
 
 namespace job_cache {
@@ -46,7 +47,8 @@ namespace job_cache {
 // /dev/null or stdout with a log file etc...
 static void replace_fd(int old_fd, int new_fd) {
   if (dup2(new_fd, old_fd) == -1) {
-    log_fatal("dup2: %s", strerror(errno));
+    wcl::log::error("dup2: %s", strerror(errno));
+    exit(1);
   }
 }
 
@@ -61,7 +63,8 @@ static bool daemonize(std::string dir) {
   // first fork
   int pid = fork();
   if (pid == -1) {
-    log_fatal("fork1: %s", strerror(errno));
+    wcl::log::error("fork1: %s", strerror(errno));
+    exit(1);
   }
 
   if (pid != 0) {
@@ -69,31 +72,43 @@ static bool daemonize(std::string dir) {
   }
 
   {
-    // Replace stdin with /dev/null so we can't recivie input
+    // Reinitialize our logger to the logfile
+    // TODO: keep this in scope.
+    std::fstream log_file(dir + "/.log", std::ios::app);
+    wcl::log::clear_subscribers();
+    wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file.rdbuf()));
+    wcl::log::info("Reinitialized logging for job cache daemon");
+  }
+
+  {
+    // Replace stdin with /dev/null so we can't receive input
     auto null_fd = wcl::unique_fd::open("/dev/null", O_RDONLY);
     if (!null_fd) {
-      log_fatal("open(%s): %s", "/dev/null", strerror(null_fd.error()));
+      wcl::log::error("open(%s): %s", "/dev/null", strerror(null_fd.error()));
+      exit(1);
     }
     replace_fd(STDIN_FILENO, null_fd->get());
   }
 
   {
-    // Replace stdout with dir/.log
-    std::string log_path = dir + "/.log";
+    // Replace stdout with dir/.stdout
+    std::string log_path = dir + "/.stdout";
     auto log_fd = wcl::unique_fd::open(log_path.c_str(), O_CREAT | O_RDWR | O_APPEND, 0644);
     if (!log_fd) {
-      log_fatal("open(%s): %s", log_path.c_str(), strerror(log_fd.error()));
+      wcl::log::error("open(%s): %s", log_path.c_str(), strerror(log_fd.error()));
+      exit(1);
     }
     replace_fd(STDOUT_FILENO, log_fd->get());
   }
 
   {
-    // Open the error log
-    std::string error_log_path = dir + "/.error.log";
+    // Replace stderr with dir/.stderr
+    std::string error_log_path = dir + "/.stderr";
     auto err_log_fd = wcl::unique_fd::open(error_log_path.c_str(), O_CREAT | O_RDWR | O_APPEND,
                                            0644);  // S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (!err_log_fd) {
-      log_fatal("open(%s): %s", error_log_path.c_str(), strerror(err_log_fd.error()));
+      wcl::log::error("open(%s): %s", error_log_path.c_str(), strerror(err_log_fd.error()));
+      exit(1);
     }
     replace_fd(STDERR_FILENO, err_log_fd->get());
   }
@@ -101,23 +116,26 @@ static bool daemonize(std::string dir) {
   // setsid so we're in our own group
   int sid = setsid();
   if (sid == -1) {
-    log_fatal("setsid: %s", strerror(errno));
+    wcl::log::error("setsid: %s", strerror(errno));
+    exit(1);
   }
 
   // second fork so we can't undo any of the above
   pid = fork();
   if (pid == -1) {
-    log_fatal("fork2: %s", strerror(errno));
+    wcl::log::error("fork2: %s", strerror(errno));
+    exit(1);
   }
 
   if (pid != 0) {
     // Exit cleanly from orig parent
-    log_exit("fork2: success");
+    wcl::log::info("fork2: success");
+    exit(0);
   }
 
   // Log success with our pid the log
   pid = getpid();
-  log_info("Daemon successfully created: sid = %d, pid = %d", sid, pid);
+  wcl::log::info("Daemon successfully created: sid = %d, pid = %d", sid, pid);
   return true;
 }
 
@@ -126,7 +144,8 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   {
     int local_socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (local_socket_fd == -1) {
-      log_fatal("socket(AF_UNIX, SOCK_STREAM, 0): %s\n", strerror(errno));
+      wcl::log::error("socket(AF_UNIX, SOCK_STREAM, 0): %s\n", strerror(errno));
+      exit(1);
     }
     socket_fd = wcl::unique_fd(local_socket_fd);
   }
@@ -136,7 +155,7 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   char key[33] = {0};
   auto fd = wcl::unique_fd::open(key_path.c_str(), O_RDONLY);
   if (!fd) {
-    // log_info("open(%s): %s", key_path.c_str(), strerror(fd.error()));
+    wcl::log::info("open(%s): %s", key_path.c_str(), strerror(fd.error()));
     return {};
   }
 
@@ -145,19 +164,18 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   //       us EINTR that could cause some strange failures that should
   //       be avoided. That's quite unlikely however.
   if (::read(fd->get(), key, sizeof(key)) == -1) {
-    log_fatal("read(%s): %s", key_path.c_str(), strerror(errno));
+    wcl::log::error("read(%s): %s", key_path.c_str(), strerror(errno));
+    exit(1);
   }
 
   sockaddr_un addr = {0};
   addr.sun_family = AF_UNIX;
   addr.sun_path[0] = '\0';
 
-  // TODO: make a client log file
-  // log_info("key = %s, sizeof(key) = %d", key, sizeof(key));
+  wcl::log::info("key = %s, sizeof(key) = %lu", key, sizeof(key));
   memcpy(addr.sun_path + 1, key, sizeof(key));
   if (connect(socket_fd.get(), reinterpret_cast<const sockaddr *>(&addr), sizeof(key)) == -1) {
-    // TODO: make a client log file
-    // log_info("connect(%s): %s", key, strerror(errno));
+    wcl::log::info("connect(%s): %s", key, strerror(errno));
     return {};
   }
 
@@ -198,7 +216,8 @@ Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
   }
 
   if (!socket_fd.valid()) {
-    log_fatal("could not connect to daemon. dir = %s", dir.c_str());
+    wcl::log::error("could not connect to daemon. dir = %s", dir.c_str());
+    exit(1);
   }
 }
 
@@ -219,14 +238,16 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
       // TODO: Try to reconnect to the daemon, launching our own if need be.
       //       if that fails then depending on user preference either fail
       //       or return a cache miss.
-      log_fatal("Cache::read(): failed receiving message");
+      wcl::log::error("Cache::read(): failed receiving message");
+      exit(1);
     }
 
     if (state == MessageParserState::StopSuccess && messages.empty()) {
       // TODO: Try to reconnect to the daemon, launching our own if need be.
       //       if that fails then depending on user preference either fail
       //       or return a cache miss.
-      log_fatal("Cache::read(): daemon exited without responding");
+      wcl::log::error("Cache::read(): daemon exited without responding");
+      exit(1);
     }
 
     // MessageParser tries to avoid this but we should defend against
@@ -236,23 +257,24 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
     }
 
     if (messages.size() != 1) {
-      log_info("message.size() == %llu", messages.size());
+      wcl::log::info("message.size() == %lu", messages.size());
       for (const auto &message : messages) {
-        log_info("message.size() = %llu, message = '%s'", message.size(), message.c_str());
+        wcl::log::info("message.size() = %lu, message = '%s'", message.size(), message.c_str());
       }
-      log_fatal("Cache::read(): daemon responded with too many results");
+      wcl::log::error("Cache::read(): daemon responded with too many results");
+      exit(1);
     }
 
     break;
   }
 
-  // TODO: make a client log file
-  // log_info("Cache::read(): message rx: %s", messages[0].c_str());
+  wcl::log::info("Cache::read(): message rx: %s", messages[0].c_str());
 
   JAST json;
   std::stringstream parseErrors;
   if (!JAST::parse(messages[0], parseErrors, json)) {
-    log_fatal("Cache::read(): failed to parse daemon response");
+    wcl::log::error("Cache::read(): failed to parse daemon response");
+    exit(1);
   }
 
   return FindJobResponse(json);

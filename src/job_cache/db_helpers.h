@@ -21,13 +21,13 @@
 //       IMPORTANTLY DO NOT INCLUDE THEM IN HEADERS IN THIS DIR!!!
 //       This file exposes sqlite3 which right now is abstracted away.
 #include <sqlite3.h>
+#include <wcl/filepath.h>
+#include <wcl/tracing.h>
 
 #include <random>
 #include <string>
 
 #include "job_cache_impl_common.h"
-#include "logging.h"
-#include "wcl/filepath.h"
 
 namespace job_cache {
 
@@ -66,7 +66,8 @@ class Database {
   Database() = delete;
   ~Database() {
     if (db && sqlite3_close(db) != SQLITE_OK) {
-      log_fatal("Could not close database: %s", sqlite3_errmsg(db));
+      wcl::log::error("Could not close database: %s", sqlite3_errmsg(db));
+      exit(1);
     }
   }
   Database(const std::string &cache_dir) {
@@ -94,11 +95,13 @@ class Database {
     std::string db_path = wcl::join_paths(cache_dir, "/cache.db");
     if (sqlite3_open_v2(db_path.c_str(), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
                         nullptr) != SQLITE_OK) {
-      log_fatal("error: %s", sqlite3_errmsg(db));
+      wcl::log::error("error: %s", sqlite3_errmsg(db));
+      exit(1);
     }
 
     if (sqlite3_busy_handler(db, wait_handle, nullptr)) {
-      log_fatal("error: failed to set sqlite3_busy_handler: %s", sqlite3_errmsg(db));
+      wcl::log::error("error: failed to set sqlite3_busy_handler: %s", sqlite3_errmsg(db));
+      exit(1);
     }
 
     char *fail = nullptr;
@@ -106,12 +109,14 @@ class Database {
     int ret = sqlite3_exec(db, cache_schema, nullptr, nullptr, &fail);
 
     if (ret == SQLITE_BUSY) {
-      log_fatal(
+      wcl::log::error(
           "warning: It appears another process is holding the database open, check `ps` for "
           "suspended wake instances");
+      exit(1);
     }
     if (ret != SQLITE_OK) {
-      log_fatal("error: failed init stmt: %s: %s", fail, sqlite3_errmsg(db));
+      wcl::log::error("error: failed init stmt: %s: %s", fail, sqlite3_errmsg(db));
+      exit(1);
     }
   }
 
@@ -144,7 +149,8 @@ class PreparedStatement {
   PreparedStatement(std::shared_ptr<job_cache::Database> db, const std::string &sql_str) : db(db) {
     if (sqlite3_prepare_v2(db->get(), sql_str.c_str(), sql_str.size(), &query_stmt, nullptr) !=
         SQLITE_OK) {
-      log_fatal("error: failed to prepare statement: %s", sqlite3_errmsg(db->get()));
+      wcl::log::error("error: failed to prepare statement: %s", sqlite3_errmsg(db->get()));
+      exit(1);
     }
   }
 
@@ -152,7 +158,8 @@ class PreparedStatement {
     if (query_stmt) {
       int ret = sqlite3_finalize(query_stmt);
       if (ret != SQLITE_OK) {
-        log_fatal("sqlite3_finalize: %s", sqlite3_errmsg(db->get()));
+        wcl::log::error("sqlite3_finalize: %s", sqlite3_errmsg(db->get()));
+        exit(1);
       }
       query_stmt = nullptr;
     }
@@ -163,24 +170,27 @@ class PreparedStatement {
   void bind_integer(int64_t index, int64_t value) {
     int ret = sqlite3_bind_int64(query_stmt, index, value);
     if (ret != SQLITE_OK) {
-      log_fatal("%s: sqlite3_bind_int64(%d, %d): %s", why.c_str(), index, value,
-                sqlite3_errmsg(db->get()));
+      wcl::log::error("%s: sqlite3_bind_int64(%ld, %ld): %s", why.c_str(), index, value,
+                      sqlite3_errmsg(db->get()));
+      exit(1);
     }
   }
 
   void bind_double(int64_t index, double value) {
     int ret = sqlite3_bind_double(query_stmt, index, value);
     if (ret != SQLITE_OK) {
-      log_fatal("%s: sqlite3_bind_double(%d, %d): %s", why.c_str(), index, value,
-                sqlite3_errmsg(db->get()));
+      wcl::log::error("%s: sqlite3_bind_double(%ld, %f): %s", why.c_str(), index, value,
+                      sqlite3_errmsg(db->get()));
+      exit(1);
     }
   }
 
   void bind_string(int64_t index, const std::string &value) {
     int ret = sqlite3_bind_text(query_stmt, index, value.c_str(), value.size(), SQLITE_TRANSIENT);
     if (ret != SQLITE_OK) {
-      log_fatal("%s: sqlite3_bind_text(%d, %s): %s", why.c_str(), index, value.c_str(),
-                sqlite3_errmsg(sqlite3_db_handle(query_stmt)));
+      wcl::log::error("%s: sqlite3_bind_text(%ld, %s): %s", why.c_str(), index, value.c_str(),
+                      sqlite3_errmsg(sqlite3_db_handle(query_stmt)));
+      exit(1);
     }
   }
 
@@ -199,15 +209,19 @@ class PreparedStatement {
 
     ret = sqlite3_reset(query_stmt);
     if (ret == SQLITE_LOCKED) {
-      log_fatal("error: sqlite3_reset: SQLITE_LOCKED");
+      wcl::log::error("error: sqlite3_reset: SQLITE_LOCKED");
+      exit(1);
     }
 
     if (ret != SQLITE_OK) {
-      log_fatal("error: %s; sqlite3_reset: %s", why.c_str(), sqlite3_errmsg(db->get()));
+      wcl::log::error("error: %s; sqlite3_reset: %s", why.c_str(), sqlite3_errmsg(db->get()));
+      exit(1);
     }
 
     if (sqlite3_clear_bindings(query_stmt) != SQLITE_OK) {
-      log_fatal("error: %s; sqlite3_clear_bindings: %s", why.c_str(), sqlite3_errmsg(db->get()));
+      wcl::log::error("error: %s; sqlite3_clear_bindings: %s", why.c_str(),
+                      sqlite3_errmsg(db->get()));
+      exit(1);
     }
   }
 
@@ -215,7 +229,8 @@ class PreparedStatement {
     int ret;
     ret = sqlite3_step(query_stmt);
     if (ret != SQLITE_DONE && ret != SQLITE_ROW) {
-      log_fatal("error: %s; sqlite3_step: %s", why.c_str(), sqlite3_errmsg(db->get()));
+      wcl::log::error("error: %s; sqlite3_step: %s", why.c_str(), sqlite3_errmsg(db->get()));
+      exit(1);
     }
     return ret;
   }
