@@ -116,6 +116,40 @@ void error(std::initializer_list<std::pair<const std::string, std::string>> list
   log_message(LOG_LEVEL_ERROR, list, fmt, args);
 }
 
+void fatal(const char* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  auto defer = make_defer([&]() { va_end(args); });
+  log_message(LOG_LEVEL_FATAL, {}, fmt, args);
+  ::exit(1);
+}
+
+void fatal(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
+           ...) {
+  va_list args;
+  va_start(args, fmt);
+  auto defer = make_defer([&]() { va_end(args); });
+  log_message(LOG_LEVEL_FATAL, list, fmt, args);
+  ::exit(1);
+}
+
+void exit(const char* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  auto defer = make_defer([&]() { va_end(args); });
+  log_message(LOG_LEVEL_EXIT, {}, fmt, args);
+  ::exit(0);
+}
+
+void exit(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
+          ...) {
+  va_list args;
+  va_start(args, fmt);
+  auto defer = make_defer([&]() { va_end(args); });
+  log_message(LOG_LEVEL_EXIT, list, fmt, args);
+  ::exit(0);
+}
+
 void FormatSubscriber::receive(const Event& e) {
   s << "[";
 

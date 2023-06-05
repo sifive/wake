@@ -148,8 +148,7 @@ struct LRUEvictionPolicyImpl {
 
       // Unless result is a row something awful has occured.
       if (result != SQLITE_DONE) {
-        wcl::log::error("get_last_use result was unexpected: %d", result);
-        exit(1);
+        wcl::log::fatal("get_last_use result was unexpected: %d", result);
       }
 
       insert_last_use.bind_integer(1, job_id);

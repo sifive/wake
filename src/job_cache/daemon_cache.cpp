@@ -47,8 +47,7 @@ using namespace job_cache;
 static int open_fd(const char *str, int flags, mode_t mode) {
   int fd = open(str, flags, mode);
   if (fd == -1) {
-    wcl::log::error("open(%s): %s", str, strerror(errno));
-    exit(1);
+    wcl::log::fatal("open(%s): %s", str, strerror(errno));
   }
   return fd;
 }
@@ -72,14 +71,12 @@ static void lock_file(const char *lock_path) {
   // Some other process has the lock, they are the daemon
   if (errno == EAGAIN || errno == EACCES) {
     int pid = getpid();
-    wcl::log::info("fcntl(F_SETLK, %s): %s -- assuming another daemon exists, closing pid=%d",
+    wcl::log::exit("fcntl(F_SETLK, %s): %s -- assuming another daemon exists, closing pid=%d",
                    lock_path, strerror(errno), pid);
-    exit(0);
   }
 
   // Something went wrong trying to grab the lock
-  wcl::log::error("fcntl(F_SETLK, %s): %s", lock_path, strerror(errno));
-  exit(1);
+  wcl::log::fatal("fcntl(F_SETLK, %s): %s", lock_path, strerror(errno));
 }
 
 static void create_file(const char *tmp_path, const char *final_path, const char *data,
@@ -90,19 +87,16 @@ static void create_file(const char *tmp_path, const char *final_path, const char
   {
     auto create_fd = wcl::unique_fd::open(tmp_path, O_CREAT | O_RDWR, 0644);
     if (!create_fd) {
-      wcl::log::error("open(%s): %s", tmp_path, strerror(create_fd.error()));
-      exit(1);
+      wcl::log::fatal("open(%s): %s", tmp_path, strerror(create_fd.error()));
     }
 
     if (write(create_fd->get(), data, size) == -1) {
-      wcl::log::error("write(%s): %s", tmp_path, strerror(errno));
-      exit(1);
+      wcl::log::fatal("write(%s): %s", tmp_path, strerror(errno));
     }
   }
 
   if (rename(tmp_path, final_path) == -1) {
-    wcl::log::error("rename(%s, %s): %s", tmp_path, final_path, strerror(errno));
-    exit(1);
+    wcl::log::fatal("rename(%s, %s): %s", tmp_path, final_path, strerror(errno));
   }
 }
 
@@ -115,8 +109,7 @@ static int open_abstract_domain_socket(const std::string &key) {
   //   5) Later some other code can accept in a loop (with epoll lets say)
   int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   if (socket_fd == -1) {
-    wcl::log::error("socket(AF_UNIX, SOCK_STREAM, 0): %s", strerror(errno));
-    exit(1);
+    wcl::log::fatal("socket(AF_UNIX, SOCK_STREAM, 0): %s", strerror(errno));
   }
 
   // By adding a null character to the start of this socket address we're creating
@@ -128,16 +121,14 @@ static int open_abstract_domain_socket(const std::string &key) {
 
   // The length needs to cover the whole path field so we add 1 to size of the key.
   if (bind(socket_fd, reinterpret_cast<const sockaddr *>(&addr), key.size() + 1)) {
-    wcl::log::error("bind(key = %s): %s", key.c_str(), strerror(errno));
-    exit(1);
+    wcl::log::fatal("bind(key = %s): %s", key.c_str(), strerror(errno));
   }
   wcl::log::info("Successfully bound abstract socket = %s", key.c_str());
 
   // Now we just need to set this socket to listen and we're good!
   // TODO: Decide what the backlog should actually be
   if (listen(socket_fd, 256) == -1) {
-    wcl::log::error("listen(%s): %s", key.c_str(), strerror(errno));
-    exit(1);
+    wcl::log::fatal("listen(%s): %s", key.c_str(), strerror(errno));
   }
   wcl::log::info("Successfully set abstract socket %s to listen", key.c_str());
 
@@ -686,8 +677,7 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
       auto pair = rewite_path(sandbox_destination);
 
       if (wcl::is_relative(pair.first)) {
-        wcl::log::error("'%s' must be an absolute path.", pair.first.c_str());
-        exit(1);
+        wcl::log::fatal("'%s' must be an absolute path.", pair.first.c_str());
       }
 
       // First make all the needed directories in case the output
@@ -708,8 +698,7 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
       auto pair = rewite_path(output_symlink.path);
 
       if (wcl::is_relative(pair.first)) {
-        wcl::log::error("'%s' must be an absolute path.", pair.first.c_str());
-        exit(1);
+        wcl::log::fatal("'%s' must be an absolute path.", pair.first.c_str());
       }
 
       // First make all the needed directories in case the output
@@ -879,33 +868,28 @@ void DaemonCache::launch_evict_loop() {
   int stdoutPipe[2];
 
   if (pipe(stdinPipe) < 0) {
-    wcl::log::error("Failed to allocate eviction pipe: %s", strerror(errno));
-    exit(1);
+    wcl::log::fatal("Failed to allocate eviction pipe: %s", strerror(errno));
   }
 
   if (pipe(stdoutPipe) < 0) {
-    wcl::log::error("Failed to allocate eviction pipe: %s", strerror(errno));
-    exit(1);
+    wcl::log::fatal("Failed to allocate eviction pipe: %s", strerror(errno));
   }
 
   int pid = fork();
 
   // error forking
   if (pid < 0) {
-    wcl::log::error("Failed to fork eviction process: %s", strerror(errno));
-    exit(1);
+    wcl::log::fatal("Failed to fork eviction process: %s", strerror(errno));
   }
 
   // child
   if (pid == 0) {
     if (dup2(stdinPipe[read_side], STDIN_FILENO) == -1) {
-      wcl::log::error("Failed to dup2 stdin pipe for eviction process: %s", strerror(errno));
-      exit(1);
+      wcl::log::fatal("Failed to dup2 stdin pipe for eviction process: %s", strerror(errno));
     }
 
     if (dup2(stdoutPipe[write_side], STDOUT_FILENO) == -1) {
-      wcl::log::error("Failed to dup2 stdin pipe for eviction process: %s", strerror(errno));
-      exit(1);
+      wcl::log::fatal("Failed to dup2 stdin pipe for eviction process: %s", strerror(errno));
     }
 
     close(stdinPipe[read_side]);
@@ -943,8 +927,7 @@ void DaemonCache::handle_new_client() {
   // Accept the new client socket.
   int accept_fd = accept4(listen_socket_fd, nullptr, nullptr, SOCK_CLOEXEC);
   if (accept_fd == -1) {
-    wcl::log::error("accept(%s): %s", key.c_str(), strerror(errno));
-    exit(1);
+    wcl::log::fatal("accept(%s): %s", key.c_str(), strerror(errno));
   }
 
   poll.add(accept_fd);
@@ -961,9 +944,8 @@ void DaemonCache::handle_msg(int client_fd) {
 
   auto it = message_parsers.find(client_fd);
   if (it == message_parsers.end()) {
-    wcl::log::error("unreachable: message_parsers out of sync with poll. client_fd = %d",
+    wcl::log::fatal("unreachable: message_parsers out of sync with poll. client_fd = %d",
                     client_fd);
-    exit(1);
   }
 
   state = it->second.read_messages(msgs);
@@ -974,8 +956,7 @@ void DaemonCache::handle_msg(int client_fd) {
     JAST json;
     std::stringstream parseErrors;
     if (!JAST::parse(msg, parseErrors, json)) {
-      wcl::log::error("DaemonCache::handle_msg(): failed to parse client request");
-      exit(1);
+      wcl::log::fatal("DaemonCache::handle_msg(): failed to parse client request");
     }
 
     if (json.get("method").value == "cache/read") {
@@ -1005,8 +986,7 @@ void DaemonCache::handle_msg(int client_fd) {
 
   // If there's an error just fail.
   if (state == MessageParserState::StopFail) {
-    wcl::log::error("read(%d), key = %s:", client_fd, strerror(errno));
-    exit(1);
+    wcl::log::fatal("read(%d), key = %s:", client_fd, strerror(errno));
   }
 }
 

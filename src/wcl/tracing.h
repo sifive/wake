@@ -42,6 +42,8 @@ static constexpr const char* LOG_PID = "pid";
 static constexpr const char* LOG_LEVEL_INFO = "info";
 static constexpr const char* LOG_LEVEL_WARNING = "warning";
 static constexpr const char* LOG_LEVEL_ERROR = "error";
+static constexpr const char* LOG_LEVEL_FATAL = "fatal";
+static constexpr const char* LOG_LEVEL_EXIT = "exit";
 static constexpr const char* LOG_MESSAGE = "message";
 
 struct Event {
@@ -92,6 +94,14 @@ void warning(std::initializer_list<std::pair<const std::string, std::string>> li
 void error(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
 void error(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
            ...) __attribute__((format(printf, 2, 3)));
+
+void fatal(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
+void fatal(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
+           ...) __attribute__((format(printf, 2, 3)));
+
+void exit(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
+void exit(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
+          ...) __attribute__((format(printf, 2, 3)));
 
 }  // namespace log
 }  // namespace wcl
