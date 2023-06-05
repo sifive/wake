@@ -46,7 +46,9 @@ target writeImp inputs mode path content =
     | runJobWith writeRunner
     | getJobOutput
 
-# Create all directories and the named file
+# Create all directories and the named file. The `content` string is written verbatim with no
+# processing. For example, a final terminating newline character is not appended to the end of
+# the string.
 export def write (path: String) (content: String): Result Path Error =
     def spath = simplify path
 
