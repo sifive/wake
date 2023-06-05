@@ -46,7 +46,10 @@ void publish(Event e) {
 static void log_message(const char* level,
                         std::initializer_list<std::pair<const std::string, std::string>> list,
                         const char* fmt, va_list args) {
-  size_t size = vsnprintf(NULL, 0, fmt, args);
+  va_list copy;
+  va_copy(copy, args);
+
+  size_t size = vsnprintf(NULL, 0, fmt, copy);
 
   std::vector<char> buffer(size + 1);
   vsnprintf(buffer.data(), buffer.size(), fmt, args);
