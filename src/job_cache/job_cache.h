@@ -40,6 +40,15 @@ class Cache {
  private:
   wcl::unique_fd socket_fd;
 
+  // Daemon parameters
+  std::string cache_dir;
+  uint64_t max_size;
+  uint64_t low_threshold;
+
+  void launch_daemon();
+  void backoff_try_connect();
+  FindJobResponse retry_read(const FindJobRequest &find_request, const char *err_msg);
+
  public:
   Cache() = delete;
   Cache(const Cache &) = delete;
