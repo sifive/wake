@@ -182,10 +182,10 @@ void Cache::launch_daemon() {
 }
 
 // Connect to the job cache daemon with backoff.
-void Cache::backoff_try_connect() {
+void Cache::backoff_try_connect(int attempts) {
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < attempts; i++) {
     auto fd_opt = try_connect(cache_dir);
     if (!fd_opt) {
       std::uniform_int_distribution<useconds_t> variance(0, backoff);
@@ -205,19 +205,16 @@ void Cache::backoff_try_connect() {
 
 Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
   cache_dir = dir;
+  max_size = max;
+  low_threshold = low;
+
   mkdir_no_fail(cache_dir.c_str());
 
   launch_daemon();
-  backoff_try_connect();
+  backoff_try_connect(14);
 }
 
-FindJobResponse Cache::retry_read(const FindJobRequest &find_request, const char *err_msg) {
-  wcl::log::info("Relaunching the daemon.");
-  launch_daemon();
-
-  wcl::log::info("Reconnecting to daemon.");
-  backoff_try_connect();
-
+wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest &find_request) {
   JAST request(JSON_OBJECT);
   request.add("method", "cache/read");
   request.add("params", find_request.to_json());
@@ -227,102 +224,81 @@ FindJobResponse Cache::retry_read(const FindJobRequest &find_request, const char
   MessageParser parser(socket_fd.get());
   std::vector<std::string> messages;
 
-  while (true) {
-    MessageParserState state = parser.read_messages(messages);
+  MessageParserState state = MessageParserState::Continue;
+  do {
+    state = parser.read_messages(messages);
 
     if (state == MessageParserState::StopFail) {
+      // TODO: Add config var to determine if fail is a cache miss
       if (false) {
-        return FindJobResponse(wcl::optional<MatchingJob>{});
+        return wcl::result_value<FindJobError>(FindJobResponse(wcl::optional<MatchingJob>{}));
       }
 
-      wcl::log::info("retry failed. msg = %s", err_msg);
-      wcl::log::fatal("Cache::read(): failed receiving message");
+      wcl::log::error("Cache::read(): failed receiving message");
+      return wcl::result_error<FindJobResponse>(FindJobError::FailedMessageReceive);
     }
 
     if (state == MessageParserState::StopSuccess && messages.empty()) {
+      // TODO: Add config var to determine if fail is a cache miss
       if (false) {
-        return FindJobResponse(wcl::optional<MatchingJob>{});
+        return wcl::result_value<FindJobError>(FindJobResponse(wcl::optional<MatchingJob>{}));
       }
 
-      wcl::log::info("retry failed. msg = %s", err_msg);
-      wcl::log::fatal("Cache::read(): daemon exited without responding");
+      wcl::log::error("Cache::read(): daemon exited without responding");
+      return wcl::result_error<FindJobResponse>(FindJobError::NoResponse);
     }
 
-    // MessageParser tries to avoid this but we should defend against
-    // the case where no error has yet occured but messages is still empty.
-    if (state == MessageParserState::Continue && messages.empty()) {
-      continue;
-    }
-
-    if (messages.size() != 1) {
+    if (messages.size() > 1) {
       wcl::log::info("message.size() == %lu", messages.size());
       for (const auto &message : messages) {
         wcl::log::info("message.size() = %lu, message = '%s'", message.size(), message.c_str());
       }
-      wcl::log::fatal("Cache::read(): daemon responded with too many results");
+      wcl::log::error("Cache::read(): daemon responded with too many results");
+      return wcl::result_error<FindJobResponse>(FindJobError::TooManyResponses);
     }
 
-    break;
-  }
+    // We have a singular valid response
+    if (messages.size() == 1) {
+      break;
+    }
+
+    // MessageParser tries to avoid this but we should defend against
+    // the case where no error has yet occured but messages is still empty.
+  } while (state == MessageParserState::Continue);
 
   wcl::log::info("Cache::read(): message rx: %s", messages[0].c_str());
 
   JAST json;
   std::stringstream parseErrors;
   if (!JAST::parse(messages[0], parseErrors, json)) {
-    wcl::log::fatal("Cache::read(): failed to parse daemon response");
+    wcl::log::error("Cache::read(): failed to parse daemon response");
+    return wcl::result_error<FindJobResponse>(FindJobError::FailedParseResponse);
   }
 
-  return FindJobResponse(json);
+  return wcl::result_value<FindJobError>(FindJobResponse(json));
 }
 
 FindJobResponse Cache::read(const FindJobRequest &find_request) {
-  JAST request(JSON_OBJECT);
-  request.add("method", "cache/read");
-  request.add("params", find_request.to_json());
-
-  // serialize the request, send it, deserialize the response, return it
-  send_json_message(socket_fd.get(), request);
-  MessageParser parser(socket_fd.get());
-  std::vector<std::string> messages;
-
-  while (true) {
-    MessageParserState state = parser.read_messages(messages);
-
-    if (state == MessageParserState::StopFail) {
-      return retry_read(find_request, "Cache::read(): failed receiving message");
+  for (int i = 0; i < 10; i++) {
+    auto response = read_impl(find_request);
+    if (response) {
+      return *response;
     }
 
-    if (state == MessageParserState::StopSuccess && messages.empty()) {
-      return retry_read(find_request, "Cache::read(): daemon exited without responding");
-    }
+    // Retry
+    wcl::log::info("Relaunching the daemon.");
+    launch_daemon();
 
-    // MessageParser tries to avoid this but we should defend against
-    // the case where no error has yet occured but messages is still empty.
-    if (state == MessageParserState::Continue && messages.empty()) {
-      continue;
-    }
-
-    if (messages.size() != 1) {
-      wcl::log::info("message.size() == %lu", messages.size());
-      for (const auto &message : messages) {
-        wcl::log::info("message.size() = %lu, message = '%s'", message.size(), message.c_str());
-      }
-      wcl::log::fatal("Cache::read(): daemon responded with too many results");
-    }
-
-    break;
+    wcl::log::info("Reconnecting to daemon.");
+    backoff_try_connect(10);
   }
 
-  wcl::log::info("Cache::read(): message rx: %s", messages[0].c_str());
-
-  JAST json;
-  std::stringstream parseErrors;
-  if (!JAST::parse(messages[0], parseErrors, json)) {
-    wcl::log::fatal("Cache::read(): failed to parse daemon response");
+  // TODO: Add config var to determine if fail is a cache miss
+  if (true) {
+    wcl::log::fatal("Cache::read(): Failed to read from daemon cache.");
   }
 
-  return FindJobResponse(json);
+  return FindJobResponse(wcl::optional<MatchingJob>{});
 }
 
 void Cache::add(const AddJobRequest &add_request) {
@@ -331,7 +307,7 @@ void Cache::add(const AddJobRequest &add_request) {
   request.add("method", "cache/add");
   request.add("params", add_request.to_json());
 
-  // serialize the request, send it, deserialize the response, return it
+  // serialize the request and send it
   send_json_message(socket_fd.get(), request);
 }
 

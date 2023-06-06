@@ -28,6 +28,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <wcl/optional.h>
+#include <wcl/result.h>
 #include <wcl/unique_fd.h>
 
 #include <string>
@@ -35,6 +36,13 @@
 #include "types.h"
 
 namespace job_cache {
+
+enum class FindJobError {
+  FailedMessageReceive,
+  NoResponse,
+  TooManyResponses,
+  FailedParseResponse,
+};
 
 class Cache {
  private:
@@ -46,8 +54,8 @@ class Cache {
   uint64_t low_threshold;
 
   void launch_daemon();
-  void backoff_try_connect();
-  FindJobResponse retry_read(const FindJobRequest &find_request, const char *err_msg);
+  void backoff_try_connect(int attempts);
+  wcl::result<FindJobResponse, FindJobError> read_impl(const FindJobRequest &find_request);
 
  public:
   Cache() = delete;
