@@ -9,6 +9,7 @@ compile_commands.json
 /.compile_commands
 /.vscode/*.log
 /**/wake.db*
+/**/wake.log
 /wake.db*
 /wake.spec
 /src/parser/lexer.cpp

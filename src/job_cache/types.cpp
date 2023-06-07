@@ -23,9 +23,8 @@
 
 #include <sys/stat.h>
 #include <wcl/filepath.h>
+#include <wcl/tracing.h>
 #include <wcl/unique_fd.h>
-
-#include "logging.h"
 
 namespace job_cache {
 static Hash256 do_hash_file(const char *file, int fd) {
@@ -39,7 +38,7 @@ static Hash256 do_hash_file(const char *file, int fd) {
   blake2b_final(&S, &hash[0], sizeof(hash));
 
   if (got < 0) {
-    log_fatal("job-cache hash read(%s): %s", file, strerror(errno));
+    wcl::log::fatal("job-cache hash read(%s): %s", file, strerror(errno));
   }
 
   return Hash256::from_hash(&hash);
@@ -289,8 +288,8 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
   AddJobRequest req;
   req.wakeroot = json.get("wakeroot").value;
   if (wcl::is_relative(req.wakeroot)) {
-    log_fatal("AddJobRequest::from_implicit: wakeroot cannot be relative. found: '%s'",
-              req.wakeroot.c_str());
+    wcl::log::fatal("AddJobRequest::from_implicit: wakeroot cannot be relative. found: '%s'",
+                    req.wakeroot.c_str());
   }
   req.cwd = json.get("cwd").value;
   if (wcl::is_relative(req.cwd)) {
@@ -309,8 +308,8 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
   req.obytes = std::stoull(json.get("obytes").value);
   req.client_cwd = json.get("client_cwd").value;
   if (wcl::is_relative(req.client_cwd)) {
-    log_fatal("AddJobRequest::from_implicit: client_cwd cannot be relative. found: '%s'",
-              req.client_cwd.c_str());
+    wcl::log::fatal("AddJobRequest::from_implicit: client_cwd cannot be relative. found: '%s'",
+                    req.client_cwd.c_str());
   }
 
   // Read the input files
@@ -354,7 +353,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
       src = wcl::join_paths(req.client_cwd, src);
     }
     if (lstat(src.c_str(), &buf) < 0) {
-      log_fatal("lstat(%s): %s", src.c_str(), strerror(errno));
+      wcl::log::fatal("lstat(%s): %s", src.c_str(), strerror(errno));
     }
 
     // Handle output directory
@@ -376,7 +375,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
       static thread_local char link[4097];
       int size = readlink(src.c_str(), link, sizeof(link));
       if (size == -1) {
-        log_fatal("readlink(%s): %s", src.c_str(), strerror(errno));
+        wcl::log::fatal("readlink(%s): %s", src.c_str(), strerror(errno));
       }
       sym.path = output_file.second.get("path").value;
       // Canonicalize output symlink paths to sandbox-absolute paths.
@@ -404,7 +403,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
 
     auto fd = wcl::unique_fd::open(output.source.c_str(), O_RDONLY);
     if (!fd) {
-      log_fatal("open(%s): %s", output.source.c_str(), strerror(fd.error()));
+      wcl::log::fatal("open(%s): %s", output.source.c_str(), strerror(fd.error()));
     }
     output.hash = do_hash_file(output.source.c_str(), fd->get());
     output.mode = buf.st_mode;
@@ -417,8 +416,8 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
 AddJobRequest::AddJobRequest(const JAST &json) {
   wakeroot = json.get("wakeroot").value;
   if (wcl::is_relative(wakeroot)) {
-    log_fatal("AddJobRequest::AddJobRequest: wakeroot cannot be relative. found: '%s'",
-              wakeroot.c_str());
+    wcl::log::fatal("AddJobRequest::AddJobRequest: wakeroot cannot be relative. found: '%s'",
+                    wakeroot.c_str());
   }
   cwd = json.get("cwd").value;
   if (wcl::is_relative(cwd)) {
@@ -437,8 +436,8 @@ AddJobRequest::AddJobRequest(const JAST &json) {
   obytes = std::stoull(json.get("obytes").value);
   client_cwd = json.get("client_cwd").value;
   if (wcl::is_relative(client_cwd)) {
-    log_fatal("AddJobRequest::AddJobRequest: client_cwd cannot be relative. found: '%s'",
-              client_cwd.c_str());
+    wcl::log::fatal("AddJobRequest::AddJobRequest: client_cwd cannot be relative. found: '%s'",
+                    client_cwd.c_str());
   }
 
   // Read the input files
@@ -548,8 +547,8 @@ JAST AddJobRequest::to_json() const {
 FindJobRequest::FindJobRequest(const JAST &find_job_json) {
   wakeroot = find_job_json.get("wakeroot").value;
   if (wcl::is_relative(wakeroot)) {
-    log_fatal("FindJobRequest::FindJobRequest: wakeroot cannot be relative. found: '%s'",
-              wakeroot.c_str());
+    wcl::log::fatal("FindJobRequest::FindJobRequest: wakeroot cannot be relative. found: '%s'",
+                    wakeroot.c_str());
   }
   cwd = find_job_json.get("cwd").value;
   if (wcl::is_relative(cwd)) {
@@ -560,8 +559,8 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
   stdin_str = find_job_json.get("stdin").value;
   client_cwd = find_job_json.get("client_cwd").value;
   if (wcl::is_relative(client_cwd)) {
-    log_fatal("FindJobRequest::FindJobRequest: client_cwd cannot be relative. found: '%s'",
-              client_cwd.c_str());
+    wcl::log::fatal("FindJobRequest::FindJobRequest: client_cwd cannot be relative. found: '%s'",
+                    client_cwd.c_str());
   }
 
   // Read the input files, and compute the directory hashes as we go.

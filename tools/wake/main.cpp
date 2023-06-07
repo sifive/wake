@@ -25,9 +25,11 @@
 #include <unistd.h>
 #include <wcl/defer.h>
 #include <wcl/filepath.h>
+#include <wcl/tracing.h>
 
 #include <algorithm>
 #include <chrono>
+#include <fstream>
 #include <iostream>
 #include <random>
 #include <set>
@@ -309,6 +311,13 @@ int main(int argc, char **argv) {
     std::cerr << "Unable to locate wake.db in any parent directory." << std::endl;
     return 1;
   }
+
+  // Initialize Wake logging subsystem
+  std::ofstream log_file("wake.log", std::ios::app);
+  auto log_file_defer = wcl::make_defer([&log_file]() { log_file.close(); });
+  wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file.rdbuf()));
+  wcl::log::subscribe(std::make_unique<wcl::log::FatalEventSubscriber>(std::cerr.rdbuf()));
+  wcl::log::info("Initialized logging");
 
   // Now check for any flags that override config options
   WakeConfigOverrides config_override;
