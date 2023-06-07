@@ -174,5 +174,24 @@ void FormatSubscriber::receive(const Event& e) {
   }
 }
 
+void FatalEventSubscriber::receive(const Event& e) {
+  auto level = e.get(LOG_LEVEL);
+  if (level == nullptr) {
+    return;
+  }
+
+  if (*level != LOG_LEVEL_FATAL) {
+    return;
+  }
+
+  auto msg = e.get(LOG_MESSAGE);
+  if (msg == nullptr) {
+    s << "Fatal log was triggered without a message" << std::endl;
+    return;
+  }
+
+  s << *msg;
+}
+
 }  // namespace log
 }  // namespace wcl

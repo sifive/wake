@@ -78,6 +78,16 @@ class FormatSubscriber : public Subscriber {
   ~FormatSubscriber() override{};
 };
 
+class FatalEventSubscriber : public Subscriber {
+ private:
+  std::ostream s;
+
+ public:
+  FatalEventSubscriber(std::streambuf* rdbuf) : s(rdbuf) {}
+  void receive(const Event& e) override;
+  ~FatalEventSubscriber() override{};
+};
+
 void subscribe(std::unique_ptr<Subscriber>);
 void clear_subscribers();
 
