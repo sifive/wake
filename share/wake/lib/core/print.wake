@@ -100,3 +100,18 @@ export def printlnLevel (LogLevel name) (message: String): Unit =
 #   def Unit = println "{integerToUnicode 0x1f600}"
 export def println: String => Unit =
     printlnLevel logReport
+
+# breadcrumb: Leaves an out of band message in the wake internal log
+#
+# This should primarily be used by core/standard libraries over normal user code.
+# However it can be useful for tracing or debugging wake code out of band. The contents
+# of the log may only be inspected outside of wake and thus any breakcrumbs are
+# "blackholed" from the perspective of wakelang.
+#
+#   # Emit a structured message to 'wake.log'
+#   def _ = breadcrumb "encountered failing event"
+export def breadcrumb (x: String): Unit =
+    def p s = prim "breadcrumb"
+
+    p x
+
