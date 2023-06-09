@@ -29,7 +29,7 @@
 		"keyword": {
 			"patterns": [{
 				"name": "keyword.control.wake",
-				"match": "\\b(_|def|tuple|data|global|target|publish|subscribe|prim|if|then|else|here|match|require|package|import|export|from|type|topic|unary|binary)\\b"
+				"match": "\\b(_|def|tuple|data|global|target|publish|subscribe|prim|if|then|else|here|@here|@line|@file|@!|match|require|package|import|export|from|type|topic|unary|binary)\\b"
 			}]
 		},
 		"operator": {
