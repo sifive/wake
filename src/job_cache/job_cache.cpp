@@ -278,12 +278,22 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
   return wcl::result_value<FindJobError>(FindJobResponse(json));
 }
 
+// TODO: track total number of times we've failed in order to
+// fail fast after some threshold when the users requests a
+// cache miss on fail
 FindJobResponse Cache::read(const FindJobRequest &find_request) {
+  wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
+  useconds_t backoff = 1000;
+
   for (int i = 0; i < 10; i++) {
     auto response = read_impl(find_request);
     if (response) {
       return *response;
     }
+
+    std::uniform_int_distribution<useconds_t> variance(0, backoff);
+    usleep(backoff + variance(rng));
+    backoff *= 2;
 
     // Retry
     wcl::log::info("Relaunching the daemon.");
