@@ -16,11 +16,12 @@
 #include "wcl/filepath.h"
 #include "wcl/xoshiro_256.h"
 
+// Set sane defaults to avoid subtle errors
 struct FuzzLoopConfig {
-  int max_vis;
-  int max_out;
-  int max_path_size;
-  size_t number_of_steps;
+  int max_vis = 5;
+  int max_out = 5;
+  int max_path_size = 16;
+  size_t number_of_steps = 1;
   std::string cache_dir;
   std::string dir;
 };
