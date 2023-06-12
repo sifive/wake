@@ -19,13 +19,12 @@ from wake import _
 
 # Run a job, via a Runner chosen based on 'score' functions.
 export def runJob (p: Plan): Job = match p
-    Plan label cmd vis env dir stdin stdout stderr echo pers _lo res rf usage finputs foutputs isatty =
+    Plan label cmd vis env dir stdin stdout stderr echo pers res usage finputs foutputs isatty =
         def implode l = cat (foldr (_, "\0", _) Nil l)
         def bToInt b = if b then 1 else 0
 
         # Transform the 'List Runner' into 'List RunnerOption'
         def qualify runner = match runner
-            Runner name _ _ if ! rf runner = Reject "{name}: rejected by Plan"
             Runner name scorefn fn = match (scorefn p)
                 Pass x if x <=. 0.0 = Reject "{name}: non-positive score"
                 Pass x = Accept x fn
