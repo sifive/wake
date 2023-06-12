@@ -316,8 +316,7 @@ int main(int argc, char **argv) {
   std::ofstream log_file("wake.log", std::ios::app);
   auto log_file_defer = wcl::make_defer([&log_file]() { log_file.close(); });
   wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file.rdbuf()));
-  wcl::log::subscribe(std::make_unique<wcl::log::FatalEventSubscriber>(std::cerr.rdbuf()));
-  wcl::log::info("Initialized logging");
+  wcl::log::info("Initialized logging")();
 
   // Now check for any flags that override config options
   WakeConfigOverrides config_override;

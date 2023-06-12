@@ -47,7 +47,8 @@ namespace job_cache {
 // /dev/null or stdout with a log file etc...
 static void replace_fd(int old_fd, int new_fd) {
   if (dup2(new_fd, old_fd) == -1) {
-    wcl::log::fatal("dup2: %s", strerror(errno));
+    wcl::log::error("dup2: %s", strerror(errno)).urgent()();
+    exit(1);
   }
 }
 
@@ -62,7 +63,8 @@ static bool daemonize(std::string dir) {
   // first fork
   int pid = fork();
   if (pid == -1) {
-    wcl::log::fatal("fork1: %s", strerror(errno));
+    wcl::log::error("fork1: %s", strerror(errno)).urgent()();
+    exit(1);
   }
 
   if (pid != 0) {
@@ -73,7 +75,8 @@ static bool daemonize(std::string dir) {
     // Replace stdin with /dev/null so we can't receive input
     auto null_fd = wcl::unique_fd::open("/dev/null", O_RDONLY);
     if (!null_fd) {
-      wcl::log::fatal("open(%s): %s", "/dev/null", strerror(null_fd.error()));
+      wcl::log::error("open(%s): %s", "/dev/null", strerror(null_fd.error())).urgent()();
+      exit(1);
     }
     replace_fd(STDIN_FILENO, null_fd->get());
   }
@@ -83,7 +86,8 @@ static bool daemonize(std::string dir) {
     std::string log_path = dir + "/.stdout";
     auto log_fd = wcl::unique_fd::open(log_path.c_str(), O_CREAT | O_RDWR | O_APPEND, 0644);
     if (!log_fd) {
-      wcl::log::fatal("open(%s): %s", log_path.c_str(), strerror(log_fd.error()));
+      wcl::log::error("open(%s): %s", log_path.c_str(), strerror(log_fd.error())).urgent()();
+      exit(1);
     }
     replace_fd(STDOUT_FILENO, log_fd->get());
   }
@@ -94,35 +98,38 @@ static bool daemonize(std::string dir) {
     auto err_log_fd = wcl::unique_fd::open(error_log_path.c_str(), O_CREAT | O_RDWR | O_APPEND,
                                            0644);  // S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (!err_log_fd) {
-      wcl::log::fatal("open(%s): %s", error_log_path.c_str(), strerror(err_log_fd.error()));
+      wcl::log::error("open(%s): %s", error_log_path.c_str(), strerror(err_log_fd.error()))
+          .urgent()();
+      exit(1);
     }
     replace_fd(STDERR_FILENO, err_log_fd->get());
   }
 
   wcl::log::clear_subscribers();
   wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(std::cout.rdbuf()));
-  wcl::log::info("Reinitialized logging for job cache daemon");
+  wcl::log::info("Reinitialized logging for job cache daemon")();
 
   // setsid so we're in our own group
   int sid = setsid();
   if (sid == -1) {
-    wcl::log::fatal("setsid: %s", strerror(errno));
+    wcl::log::error("setsid: %s", strerror(errno)).urgent()();
+    exit(1);
   }
 
   // second fork so we can't undo any of the above
   pid = fork();
   if (pid == -1) {
-    wcl::log::fatal("fork2: %s", strerror(errno));
+    wcl::log::error("fork2: %s", strerror(errno)).urgent()();
+    exit(1);
   }
 
   if (pid != 0) {
     // Exit cleanly from orig parent
-    wcl::log::exit("fork2: success");
+    wcl::log::info("fork2: success")();
+    exit(0);
   }
 
-  // Log success with our pid the log
-  pid = getpid();
-  wcl::log::info("Daemon successfully created: sid = %d, pid = %d", sid, pid);
+  wcl::log::info("Daemon successfully created: sid = %d", sid)();
   return true;
 }
 
@@ -131,7 +138,8 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   {
     int local_socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (local_socket_fd == -1) {
-      wcl::log::fatal("socket(AF_UNIX, SOCK_STREAM, 0): %s\n", strerror(errno));
+      wcl::log::error("socket(AF_UNIX, SOCK_STREAM, 0): %s\n", strerror(errno)).urgent()();
+      exit(1);
     }
     socket_fd = wcl::unique_fd(local_socket_fd);
   }
@@ -141,7 +149,7 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   char key[33] = {0};
   auto fd = wcl::unique_fd::open(key_path.c_str(), O_RDONLY);
   if (!fd) {
-    wcl::log::info("open(%s): %s", key_path.c_str(), strerror(fd.error()));
+    wcl::log::info("open(%s): %s", key_path.c_str(), strerror(fd.error()))();
     return {};
   }
 
@@ -150,17 +158,18 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   //       us EINTR that could cause some strange failures that should
   //       be avoided. That's quite unlikely however.
   if (::read(fd->get(), key, sizeof(key)) == -1) {
-    wcl::log::fatal("read(%s): %s", key_path.c_str(), strerror(errno));
+    wcl::log::error("read(%s): %s", key_path.c_str(), strerror(errno)).urgent()();
+    exit(1);
   }
 
   sockaddr_un addr = {0};
   addr.sun_family = AF_UNIX;
   addr.sun_path[0] = '\0';
 
-  wcl::log::info("key = %s, sizeof(key) = %lu", key, sizeof(key));
+  wcl::log::info("key = %s, sizeof(key) = %lu", key, sizeof(key))();
   memcpy(addr.sun_path + 1, key, sizeof(key));
   if (connect(socket_fd.get(), reinterpret_cast<const sockaddr *>(&addr), sizeof(key)) == -1) {
-    wcl::log::info("connect(%s): %s", key, strerror(errno));
+    wcl::log::info("connect(%s): %s", key, strerror(errno))();
     return {};
   }
 
@@ -177,7 +186,8 @@ void Cache::launch_daemon() {
     execl(job_cache.c_str(), "job-cached", cache_dir.c_str(), low_str.c_str(), max_str.c_str(),
           nullptr);
 
-    wcl::log::fatal("exec(%s): %s", job_cache.c_str(), strerror(errno));
+    wcl::log::error("exec(%s): %s", job_cache.c_str(), strerror(errno)).urgent()();
+    exit(1);
   }
 }
 
@@ -217,7 +227,8 @@ Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
   // TODO: Add config var to determine if fail is a cache miss
   auto error = backoff_try_connect(14);
   if (error && true) {
-    wcl::log::fatal("could not connect to daemon. dir = %s", cache_dir.c_str());
+    wcl::log::error("could not connect to daemon. dir = %s", cache_dir.c_str()).urgent()();
+    exit(1);
   }
 }
 
@@ -236,21 +247,21 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
     state = parser.read_messages(messages);
 
     if (state == MessageParserState::StopFail) {
-      wcl::log::error("Cache::read(): failed receiving message");
+      wcl::log::error("Cache::read(): failed receiving message")();
       return wcl::result_error<FindJobResponse>(FindJobError::FailedMessageReceive);
     }
 
     if (state == MessageParserState::StopSuccess && messages.empty()) {
-      wcl::log::error("Cache::read(): daemon exited without responding");
+      wcl::log::error("Cache::read(): daemon exited without responding")();
       return wcl::result_error<FindJobResponse>(FindJobError::NoResponse);
     }
 
     if (messages.size() > 1) {
-      wcl::log::info("message.size() == %lu", messages.size());
+      wcl::log::info("message.size() == %lu", messages.size())();
       for (const auto &message : messages) {
-        wcl::log::info("message.size() = %lu, message = '%s'", message.size(), message.c_str());
+        wcl::log::info("message.size() = %lu, message = '%s'", message.size(), message.c_str())();
       }
-      wcl::log::error("Cache::read(): daemon responded with too many results");
+      wcl::log::error("Cache::read(): daemon responded with too many results")();
       return wcl::result_error<FindJobResponse>(FindJobError::TooManyResponses);
     }
 
@@ -263,12 +274,12 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
     // the case where no error has yet occured but messages is still empty.
   } while (state == MessageParserState::Continue);
 
-  wcl::log::info("Cache::read(): message rx: %s", messages[0].c_str());
+  wcl::log::info("Cache::read(): message rx: %s", messages[0].c_str())();
 
   JAST json;
   std::stringstream parseErrors;
   if (!JAST::parse(messages[0], parseErrors, json)) {
-    wcl::log::error("Cache::read(): failed to parse daemon response");
+    wcl::log::error("Cache::read(): failed to parse daemon response")();
     return wcl::result_error<FindJobResponse>(FindJobError::FailedParseResponse);
   }
 
@@ -290,7 +301,7 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
 
     // TODO: Add config var to determine if fail is a cache miss
     if (lifetime_retries > 100 && false) {
-      wcl::log::warning("Cache::read(): reached maximum lifetime retries. Triggering cache miss");
+      wcl::log::warning("Cache::read(): reached maximum lifetime retries. Triggering cache miss")();
       return FindJobResponse(wcl::optional<MatchingJob>{});
     }
 
@@ -301,21 +312,22 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
     // Retry
     lifetime_retries++;
 
-    wcl::log::info("Relaunching the daemon.");
+    wcl::log::info("Relaunching the daemon.")();
     launch_daemon();
 
-    wcl::log::info("Reconnecting to daemon.");
+    wcl::log::info("Reconnecting to daemon.")();
     auto error = backoff_try_connect(10);
     failed_on_connect |= (bool)error;
   }
 
   if (failed_on_connect) {
-    wcl::log::error("Cache::read(): at least one connect failure occured");
+    wcl::log::error("Cache::read(): at least one connect failure occured")();
   }
 
   // TODO: Add config var to determine if fail is a cache miss
   if (true) {
-    wcl::log::fatal("Cache::read(): Failed to read from daemon cache.");
+    wcl::log::error("Cache::read(): Failed to read from daemon cache.").urgent()();
+    exit(1);
   }
 
   return FindJobResponse(wcl::optional<MatchingJob>{});

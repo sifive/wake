@@ -42,9 +42,8 @@ static constexpr const char* LOG_PID = "pid";
 static constexpr const char* LOG_LEVEL_INFO = "info";
 static constexpr const char* LOG_LEVEL_WARNING = "warning";
 static constexpr const char* LOG_LEVEL_ERROR = "error";
-static constexpr const char* LOG_LEVEL_FATAL = "fatal";
-static constexpr const char* LOG_LEVEL_EXIT = "exit";
 static constexpr const char* LOG_MESSAGE = "message";
+static constexpr const char* URGENT = "urgent";
 
 struct Event {
   std::unordered_map<std::string, std::string> items;
@@ -59,6 +58,20 @@ struct Event {
 
     return &it->second;
   }
+
+  Event message(const char* fmt, ...) && __attribute__((format(printf, 2, 3)));
+  Event message(const char* fmt, va_list args) &&;
+
+  Event urgent() && __attribute__((warn_unused_result));
+  Event time() && __attribute__((warn_unused_result));
+  Event pid() && __attribute__((warn_unused_result));
+
+  Event info() && __attribute__((warn_unused_result));
+  Event warning() && __attribute__((warn_unused_result));
+  Event error() && __attribute__((warn_unused_result));
+
+  void operator()() &&;
+  // TODO: initializer list operator()
 };
 
 // Abstract
@@ -78,40 +91,17 @@ class FormatSubscriber : public Subscriber {
   ~FormatSubscriber() override{};
 };
 
-class FatalEventSubscriber : public Subscriber {
- private:
-  std::ostream s;
-
- public:
-  FatalEventSubscriber(std::streambuf* rdbuf) : s(rdbuf) {}
-  void receive(const Event& e) override;
-  ~FatalEventSubscriber() override{};
-};
-
 void subscribe(std::unique_ptr<Subscriber>);
 void clear_subscribers();
 
-void publish(Event e);
+Event event() __attribute__((warn_unused_result));
 
-void info(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
-void info(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
-          ...) __attribute__((format(printf, 2, 3)));
-
-void warning(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
-void warning(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
-             ...) __attribute__((format(printf, 2, 3)));
-
-void error(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
-void error(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
-           ...) __attribute__((format(printf, 2, 3)));
-
-void fatal(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
-void fatal(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
-           ...) __attribute__((format(printf, 2, 3)));
-
-void exit(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
-void exit(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
-          ...) __attribute__((format(printf, 2, 3)));
+Event info(const char* fmt, ...) __attribute__((format(printf, 1, 2)))
+__attribute__((warn_unused_result));
+Event warning(const char* fmt, ...) __attribute__((format(printf, 1, 2)))
+__attribute__((warn_unused_result));
+Event error(const char* fmt, ...) __attribute__((format(printf, 1, 2)))
+__attribute__((warn_unused_result));
 
 }  // namespace log
 }  // namespace wcl
