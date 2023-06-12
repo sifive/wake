@@ -319,19 +319,20 @@ TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, wcl::xoshiro_256 gen) {
   }
 }
 
-/*
+
 TEST(job_cache_basic_fuzz) {
   wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
   FuzzLoopConfig config;
   config.max_path_size = 16;
   config.max_out = 5;
   config.max_vis = 5;
-  config.number_of_steps = 1000;
+  config.number_of_steps = 10000;
   config.cache_dir = ".job_cache_test";
   config.dir = "job_cache_test";
   TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
 }
 
+/*
 // This test appears to work but it takes quite a long time and
 // causes a lot of filesystem churn. Just test this on your own
 // occasionally as a debugging/repro tool for those kinds of issues.

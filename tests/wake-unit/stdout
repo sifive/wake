@@ -32,7 +32,6 @@ PASSED:
   filepath_range_two_slash
   filepath_relative_to
   job_cache_basic_fuzz
-  job_cache_basic_par_fuzz
   option_assign1
   option_assign2
   option_copy
