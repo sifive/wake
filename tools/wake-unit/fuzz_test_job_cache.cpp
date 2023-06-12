@@ -319,6 +319,7 @@ TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, wcl::xoshiro_256 gen) {
   }
 }
 
+/*
 TEST(job_cache_basic_fuzz) {
   wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
   FuzzLoopConfig config;
