@@ -155,7 +155,8 @@ export def runUnitTests _: Result Unit Error =
     require Pass _ = match testJob.isJobOk
         True  = Pass Unit
         False =
-            def _ = println jobStderr
+            def _ = println jobStdout
+            def _ = printlnLevel logError jobStderr
             Fail (makeError "Test failed ({format testJob.getJobStatus}). See above for details")
 
     require Pass _ = match expectedStderr
