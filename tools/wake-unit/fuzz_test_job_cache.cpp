@@ -365,6 +365,10 @@ TEST(job_cache_huge_message_fuzz) {
 }
 */
 
+// This test should work but running it causes Circle CI
+// and github actions to kill our tests for some
+// reason.
+/*
 TEST(job_cache_basic_par_fuzz) {
   FuzzLoopConfig config;
   config.max_out = 5;
