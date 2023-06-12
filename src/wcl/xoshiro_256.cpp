@@ -22,11 +22,11 @@
 
 #include "xoshiro_256.h"
 
-#include <cstring>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <cstring>
 #include <iostream>
 #include <tuple>
 

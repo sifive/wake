@@ -3,12 +3,12 @@
 #include <wcl/filepath.h>
 
 #include <fstream>
+#include <future>
 #include <map>
 #include <random>
 #include <sstream>
-#include <vector>
 #include <thread>
-#include <future>
+#include <vector>
 
 #include "job_cache/job_cache.h"
 #include "unit.h"
@@ -170,12 +170,14 @@ struct TestJob {
     //       kind.
     for (int i = 0; i < number_of_inputs; ++i) {
       out.input_files.emplace_back();
-      out.input_files.back().path = generate_long_string('/', gen.unique_name(), file_path_size(gen));
+      out.input_files.back().path =
+          generate_long_string('/', gen.unique_name(), file_path_size(gen));
       out.input_files.back().content = gen.unique_name();
     }
     for (int i = 0; i < number_of_outputs; ++i) {
       out.output_files.emplace_back();
-      out.output_files.back().path = generate_long_string('/', gen.unique_name(), file_path_size(gen));
+      out.output_files.back().path =
+          generate_long_string('/', gen.unique_name(), file_path_size(gen));
       out.output_files.back().content = gen.unique_name();
     }
 
@@ -363,7 +365,6 @@ TEST(job_cache_huge_message_fuzz) {
 }
 */
 
-
 TEST(job_cache_basic_par_fuzz) {
   FuzzLoopConfig config;
   config.max_out = 5;
@@ -387,7 +388,6 @@ TEST(job_cache_basic_par_fuzz) {
     }));
   }
   for (auto& fut : futs) {
-    if (fut.valid())
-      fut.wait();
+    if (fut.valid()) fut.wait();
   }
 }
