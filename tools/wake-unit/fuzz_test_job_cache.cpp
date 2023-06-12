@@ -325,7 +325,7 @@ TEST(job_cache_basic_fuzz) {
   config.max_path_size = 16;
   config.max_out = 5;
   config.max_vis = 5;
-  config.number_of_steps = 5000;
+  config.number_of_steps = 10000;
   config.cache_dir = ".job_cache_test";
   config.dir = "job_cache_test";
   TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
@@ -368,13 +368,14 @@ TEST(job_cache_huge_message_fuzz) {
 
 TEST(job_cache_basic_par_fuzz) {
   FuzzLoopConfig config;
+  config.max_path_size = 16;
   config.max_out = 5;
   config.max_vis = 5;
   config.number_of_steps = 500;
-  config.cache_dir = ".job_cache_test";
-  config.dir = "job_cache_test";
+  config.cache_dir = ".job_cache_test2";
+  config.dir = "job_cache_test2";
   std::vector<std::future<void>> futs;
-  for (int i = 0; i < 2; ++i) {
+  for (int i = 0; i < 20; ++i) {
     // Each thread will exit on ASSERT fail logging the error
     // and will correctly log failed EXPECTS. Because we wait
     // on all futures in this test there is no way for this to
@@ -393,12 +394,11 @@ TEST(job_cache_basic_par_fuzz) {
   }
 }
 
-// This test should work but it takes quite a long time and fails
-// CI due to either a timeout, or for using too much disk space. It
-// fails even the number of threads is set to 50 instead of 500.
+// This test should work but it takes quite a long time.
 /*
 TEST(job_cache_large_par_fuzz) {
   FuzzLoopConfig config;
+  config.max_path_size = 16;
   config.max_out = 5;
   config.max_vis = 5;
   config.number_of_steps = 1000;
