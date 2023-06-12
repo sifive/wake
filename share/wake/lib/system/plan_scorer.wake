@@ -17,6 +17,12 @@ package plan_scorer
 
 from wake import _
 
+# Runners usable by plan scorer.
+export topic runner: Runner
+
+publish runner =
+    defaultRunner, Nil
+
 # Run a job, via a Runner chosen based on 'score' functions.
 export def runJob (p: Plan): Job = match p
     Plan label cmd vis env dir stdin stdout stderr echo pers res usage finputs foutputs isatty =

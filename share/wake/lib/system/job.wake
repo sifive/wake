@@ -627,12 +627,6 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
 target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run echo stdout stderr label isatty =
     runAlways cmd env dir stdin res usage finputs foutputs vis keep run echo stdout stderr label isatty
 
-# Default runners provided by wake
-export topic runner: Runner
-
-publish runner =
-    defaultRunner, Nil
-
 export def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) (LogLevel stderr) isatty =
     if isOnce pers then
         runOnce
