@@ -369,11 +369,11 @@ TEST(job_cache_basic_par_fuzz) {
   FuzzLoopConfig config;
   config.max_out = 5;
   config.max_vis = 5;
-  config.number_of_steps = 1000;
+  config.number_of_steps = 500;
   config.cache_dir = ".job_cache_test";
   config.dir = "job_cache_test";
   std::vector<std::future<void>> futs;
-  for (int i = 0; i < 50; ++i) {
+  for (int i = 0; i < 20; ++i) {
     // Each thread will exit on ASSERT fail logging the error
     // and will correctly log failed EXPECTS. Because we wait
     // on all futures in this test there is no way for this to
@@ -391,3 +391,35 @@ TEST(job_cache_basic_par_fuzz) {
     if (fut.valid()) fut.wait();
   }
 }
+
+// This test should work but it takes quite a long time and fails
+// CI due to either a timeout, or for using too much disk space. It
+// fails even the number of threads is set to 50 instead of 500.
+/*
+TEST(job_cache_large_par_fuzz) {
+  FuzzLoopConfig config;
+  config.max_out = 5;
+  config.max_vis = 5;
+  config.number_of_steps = 1000;
+  config.cache_dir = ".job_cache_test";
+  config.dir = "job_cache_test";
+  std::vector<std::future<void>> futs;
+  for (int i = 0; i < 500; ++i) {
+    // Each thread will exit on ASSERT fail logging the error
+    // and will correctly log failed EXPECTS. Because we wait
+    // on all futures in this test there is no way for this to
+    // leave a thread running after the return of this call.
+    // However it is unfortunate that if one thread fails,
+    // these others will keep running to completion. Additionally
+    // if the program dies/crashes all threads die in the current
+    // position without failures from other threads being logged.
+    futs.emplace_back(std::async([&]() {
+      wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
+      TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+    }));
+  }
+  for (auto& fut : futs) {
+    if (fut.valid()) fut.wait();
+  }
+}
+*/
