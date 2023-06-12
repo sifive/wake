@@ -38,7 +38,6 @@
 namespace job_cache {
 
 enum class ConnectError {
-  FailedToLaunchDaemon,
   TooManyAttempts,
 };
 
