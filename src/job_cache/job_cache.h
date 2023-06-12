@@ -37,6 +37,11 @@
 
 namespace job_cache {
 
+enum class ConnectError {
+  FailedToLaunchDaemon,
+  TooManyAttempts,
+};
+
 enum class FindJobError {
   FailedMessageReceive,
   NoResponse,
@@ -53,8 +58,8 @@ class Cache {
   uint64_t max_size;
   uint64_t low_threshold;
 
-  void launch_daemon();
-  void backoff_try_connect(int attempts);
+  wcl::optional<ConnectError> launch_daemon();
+  wcl::optional<ConnectError> backoff_try_connect(int attempts);
   wcl::result<FindJobResponse, FindJobError> read_impl(const FindJobRequest &find_request);
 
  public:

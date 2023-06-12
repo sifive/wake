@@ -168,7 +168,7 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
 }
 
 // Launch the job cache daemon
-void Cache::launch_daemon() {
+wcl::optional<ConnectError> Cache::launch_daemon() {
   // We are the daemon, launch the cache
   if (daemonize(cache_dir.c_str())) {
     std::string job_cache = wcl::make_canonical(find_execpath() + "/../bin/job-cache");
@@ -177,12 +177,15 @@ void Cache::launch_daemon() {
     execl(job_cache.c_str(), "job-cached", cache_dir.c_str(), low_str.c_str(), max_str.c_str(),
           nullptr);
 
-    wcl::log::fatal("exec(%s): %s", job_cache.c_str(), strerror(errno));
+    wcl::log::error("exec(%s): %s", job_cache.c_str(), strerror(errno));
+    return wcl::make_some<ConnectError>(ConnectError::FailedToLaunchDaemon);
   }
+
+  return {};
 }
 
 // Connect to the job cache daemon with backoff.
-void Cache::backoff_try_connect(int attempts) {
+wcl::optional<ConnectError> Cache::backoff_try_connect(int attempts) {
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
   for (int i = 0; i < attempts; i++) {
@@ -199,8 +202,10 @@ void Cache::backoff_try_connect(int attempts) {
   }
 
   if (!socket_fd.valid()) {
-    wcl::log::fatal("could not connect to daemon. dir = %s", cache_dir.c_str());
+    return wcl::make_some<ConnectError>(ConnectError::TooManyAttempts);
   }
+
+  return {};
 }
 
 Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
@@ -210,8 +215,18 @@ Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
 
   mkdir_no_fail(cache_dir.c_str());
 
-  launch_daemon();
-  backoff_try_connect(14);
+  // TODO: Add config var to determine if fail is a cache miss
+  wcl::optional<ConnectError> error;
+
+  error = launch_daemon();
+  if (error && true) {
+    wcl::log::fatal("could not launch daemon. dir = %s", cache_dir.c_str());
+  }
+
+  error = backoff_try_connect(14);
+  if (error && true) {
+    wcl::log::fatal("could not connect to daemon. dir = %s", cache_dir.c_str());
+  }
 }
 
 wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest &find_request) {
@@ -229,21 +244,11 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
     state = parser.read_messages(messages);
 
     if (state == MessageParserState::StopFail) {
-      // TODO: Add config var to determine if fail is a cache miss
-      if (false) {
-        return wcl::result_value<FindJobError>(FindJobResponse(wcl::optional<MatchingJob>{}));
-      }
-
       wcl::log::error("Cache::read(): failed receiving message");
       return wcl::result_error<FindJobResponse>(FindJobError::FailedMessageReceive);
     }
 
     if (state == MessageParserState::StopSuccess && messages.empty()) {
-      // TODO: Add config var to determine if fail is a cache miss
-      if (false) {
-        return wcl::result_value<FindJobError>(FindJobResponse(wcl::optional<MatchingJob>{}));
-      }
-
       wcl::log::error("Cache::read(): daemon exited without responding");
       return wcl::result_error<FindJobResponse>(FindJobError::NoResponse);
     }
@@ -285,6 +290,8 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
 
+  bool failed_on_launch = false;
+  bool failed_on_connect = false;
   for (int i = 0; i < 10; i++) {
     auto response = read_impl(find_request);
     if (response) {
@@ -296,11 +303,23 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
     backoff *= 2;
 
     // Retry
+    wcl::optional<ConnectError> error;
+
     wcl::log::info("Relaunching the daemon.");
-    launch_daemon();
+    error = launch_daemon();
+    failed_on_launch |= (bool)error;
 
     wcl::log::info("Reconnecting to daemon.");
-    backoff_try_connect(10);
+    error = backoff_try_connect(10);
+    failed_on_connect |= (bool)error;
+  }
+
+  if (failed_on_launch) {
+    wcl::log::error("Cache::read(): at least one launch failure occured");
+  }
+
+  if (failed_on_connect) {
+    wcl::log::error("Cache::read(): at least one connect failure occured");
   }
 
   // TODO: Add config var to determine if fail is a cache miss
