@@ -168,7 +168,7 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
 }
 
 // Launch the job cache daemon
-wcl::optional<ConnectError> Cache::launch_daemon() {
+void Cache::launch_daemon() {
   // We are the daemon, launch the cache
   if (daemonize(cache_dir.c_str())) {
     std::string job_cache = wcl::make_canonical(find_execpath() + "/../bin/job-cache");
@@ -177,11 +177,8 @@ wcl::optional<ConnectError> Cache::launch_daemon() {
     execl(job_cache.c_str(), "job-cached", cache_dir.c_str(), low_str.c_str(), max_str.c_str(),
           nullptr);
 
-    wcl::log::error("exec(%s): %s", job_cache.c_str(), strerror(errno));
-    return wcl::make_some<ConnectError>(ConnectError::FailedToLaunchDaemon);
+    wcl::log::fatal("exec(%s): %s", job_cache.c_str(), strerror(errno));
   }
-
-  return {};
 }
 
 // Connect to the job cache daemon with backoff.
@@ -215,15 +212,10 @@ Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
 
   mkdir_no_fail(cache_dir.c_str());
 
+  launch_daemon();
+
   // TODO: Add config var to determine if fail is a cache miss
-  wcl::optional<ConnectError> error;
-
-  error = launch_daemon();
-  if (error && true) {
-    wcl::log::fatal("could not launch daemon. dir = %s", cache_dir.c_str());
-  }
-
-  error = backoff_try_connect(14);
+  auto error = backoff_try_connect(14);
   if (error && true) {
     wcl::log::fatal("could not connect to daemon. dir = %s", cache_dir.c_str());
   }
@@ -289,7 +281,6 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
 
-  bool failed_on_launch = false;
   bool failed_on_connect = false;
   for (int i = 0; i < 3; i++) {
     auto response = read_impl(find_request);
@@ -309,19 +300,13 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
 
     // Retry
     lifetime_retries++;
-    wcl::optional<ConnectError> error;
 
     wcl::log::info("Relaunching the daemon.");
-    error = launch_daemon();
-    failed_on_launch |= (bool)error;
+    launch_daemon();
 
     wcl::log::info("Reconnecting to daemon.");
-    error = backoff_try_connect(10);
+    auto error = backoff_try_connect(10);
     failed_on_connect |= (bool)error;
-  }
-
-  if (failed_on_launch) {
-    wcl::log::error("Cache::read(): at least one launch failure occured");
   }
 
   if (failed_on_connect) {

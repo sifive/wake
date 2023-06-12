@@ -58,7 +58,7 @@ class Cache {
   uint64_t max_size;
   uint64_t low_threshold;
 
-  wcl::optional<ConnectError> launch_daemon();
+  void launch_daemon();
   wcl::optional<ConnectError> backoff_try_connect(int attempts);
   wcl::result<FindJobResponse, FindJobError> read_impl(const FindJobRequest &find_request);
 
