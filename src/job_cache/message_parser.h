@@ -50,6 +50,11 @@ struct MessageParser {
 
       // An error occured during read
       if (count < 0) {
+        // Under some circumstances a connection can be closed by the client
+        // in such a way that ECONNRESET is returned. This should be treated
+        // as equivlient to a close which would normally appear as the count == 0
+        // case above.
+        if (errno == ECONNRESET) return MessageParserState::StopSuccess;
         // There are some failures that could occur that just require us to retry.
         // EINTR could occur on any fd type but EAGAIN and EWOULDBLOCK should
         // only occur if the user gave us a non-blocking socket.

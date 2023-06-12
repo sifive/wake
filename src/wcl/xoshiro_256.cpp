@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <cstring>
 #include <iostream>
 #include <tuple>
 
@@ -38,13 +39,13 @@ std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> xoshiro_256::get_rng_seed() {
 
   int rng_fd = open("/dev/urandom", O_RDONLY, 0644);
   if (rng_fd == -1) {
-    std::cerr << "Failed to open /dev/urandom" << std::endl;
+    std::cerr << "Failed to open /dev/urandom: " << strerror(errno) << std::endl;
     exit(1);
   }
 
   uint8_t seed_data[32] = {0};
   if (read(rng_fd, seed_data, sizeof(seed_data)) < 0) {
-    std::cerr << "Failed to read /dev/urandom" << std::endl;
+    std::cerr << "Failed to read /dev/urandom: " << strerror(errno) << std::endl;
     exit(1);
   }
   close(rng_fd);

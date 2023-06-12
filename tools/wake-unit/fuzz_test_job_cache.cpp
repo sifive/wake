@@ -3,14 +3,28 @@
 #include <wcl/filepath.h>
 
 #include <fstream>
+#include <future>
 #include <map>
 #include <random>
 #include <sstream>
+#include <thread>
 #include <vector>
 
 #include "job_cache/job_cache.h"
 #include "unit.h"
+#include "util/mkdir_parents.h"
+#include "wcl/filepath.h"
 #include "wcl/xoshiro_256.h"
+
+// Set sane defaults to avoid subtle errors
+struct FuzzLoopConfig {
+  int max_vis = 5;
+  int max_out = 5;
+  int max_path_size = 16;
+  size_t number_of_steps = 1;
+  std::string cache_dir;
+  std::string dir;
+};
 
 // Later features
 // 1) Add a mode for testing without eviction, demanding everything is a hit
@@ -32,6 +46,16 @@ struct TestFile {
   std::string path;
   std::string content;
 };
+
+std::string generate_long_string(char sep, std::string seed, int target_size) {
+  while (seed.size() <= size_t(target_size)) {
+    auto copy = seed;
+    seed += sep;
+    seed += copy;
+  }
+  seed.resize(target_size);
+  return seed;
+}
 
 struct TestJob {
   std::string cwd;
@@ -78,6 +102,9 @@ struct TestJob {
     JAST outputs(JSON_ARRAY);
     for (const auto& file : output_files) {
       std::string src = wcl::join_paths(in_dir, file.path);
+      auto pab = wcl::parent_and_base(src);
+      std::string parent_dir = pab->first;
+      mkdir_with_parents(parent_dir, 0777);
       std::ofstream out(src);
       out << file.content;
       out.close();
@@ -123,7 +150,7 @@ struct TestJob {
     return job_cache::FindJobRequest(request);
   }
 
-  static TestJob gen(wcl::xoshiro_256& gen) {
+  static TestJob gen(const FuzzLoopConfig& config, wcl::xoshiro_256& gen) {
     TestJob out;
 
     // Generate our primary key
@@ -133,8 +160,9 @@ struct TestJob {
     out.stdin = gen.unique_name();
 
     // Generate our input and output files
-    std::uniform_int_distribution<> number_of_inputs_dist(0, 5);
-    std::uniform_int_distribution<> number_of_outputs_dist(0, 5);
+    std::uniform_int_distribution<> number_of_inputs_dist(0, config.max_vis);
+    std::uniform_int_distribution<> number_of_outputs_dist(0, config.max_out);
+    std::uniform_int_distribution<> file_path_size(16, config.max_path_size);
     int number_of_inputs = number_of_inputs_dist(gen);
     int number_of_outputs = number_of_outputs_dist(gen);
 
@@ -143,12 +171,14 @@ struct TestJob {
     //       kind.
     for (int i = 0; i < number_of_inputs; ++i) {
       out.input_files.emplace_back();
-      out.input_files.back().path = gen.unique_name();
+      out.input_files.back().path =
+          generate_long_string('/', gen.unique_name(), file_path_size(gen));
       out.input_files.back().content = gen.unique_name();
     }
     for (int i = 0; i < number_of_outputs; ++i) {
       out.output_files.emplace_back();
-      out.output_files.back().path = gen.unique_name();
+      out.output_files.back().path =
+          generate_long_string('/', gen.unique_name(), file_path_size(gen));
       out.output_files.back().content = gen.unique_name();
     }
 
@@ -230,12 +260,13 @@ struct Pool {
   // TODO: When this is thread safe
   //       1) It will need to return a copy not a reference
   //       2) It will need to aquire the read/write lock early
-  const T& step(wcl::xoshiro_256& gen) {
+  template <class... Args>
+  const T& step(wcl::xoshiro_256& gen, Args&&... gen_args) {
     std::uniform_real_distribution<> dist(0.0, 1.0);
 
     // If we're empty we can't reuse anything
     if (pool.size() <= reuse_threshold) {
-      pool.emplace_back(T::gen(gen));
+      pool.emplace_back(T::gen(std::forward<Args>(gen_args)..., gen));
       return pool.back();
     }
 
@@ -257,23 +288,22 @@ struct Pool {
     }
 
     // Otherwise we need to generate a new thing and add it to the pool
-    pool.emplace_back(T::gen(gen));
+    pool.emplace_back(T::gen(std::forward<Args>(gen_args)..., gen));
     return pool.back();
   }
 };
 
-TEST_FUNC(void, fuzz_loop, size_t number_of_steps, std::string cache_dir, std::string dir,
-          wcl::xoshiro_256 gen) {
+TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, wcl::xoshiro_256 gen) {
   Pool<TestJob> job_pool;
 
-  mkdir(cache_dir.c_str(), 0777);
-  mkdir(dir.c_str(), 0777);
-  job_cache::Cache cache(cache_dir, 1ULL << 24ULL, (1 << 23ULL) + (1 << 22ULL));
+  mkdir(config.cache_dir.c_str(), 0777);
+  mkdir(config.dir.c_str(), 0777);
+  job_cache::Cache cache(config.cache_dir, 1ULL << 24ULL, (1 << 23ULL) + (1 << 22ULL));
 
-  std::string out_dir = wcl::join_paths(dir, "outputs");
-  for (size_t i = 0; i < number_of_steps; ++i) {
+  std::string out_dir = wcl::join_paths(config.dir, "outputs");
+  for (size_t i = 0; i < config.number_of_steps; ++i) {
     // First find the job that we care about
-    const TestJob& job = job_pool.step(gen);
+    const TestJob& job = job_pool.step(gen, config);
     auto find_job_request = job.generate_find_request(out_dir);
     auto result = cache.read(find_job_request);
     if (result.match) {
@@ -284,7 +314,7 @@ TEST_FUNC(void, fuzz_loop, size_t number_of_steps, std::string cache_dir, std::s
         ASSERT_EQUAL(buffer.str(), file.content);
       }
     } else {
-      auto add_job_request = job.generate_add_request(dir);
+      auto add_job_request = job.generate_add_request(config.dir);
       cache.add(add_job_request);
     }
   }
@@ -292,5 +322,106 @@ TEST_FUNC(void, fuzz_loop, size_t number_of_steps, std::string cache_dir, std::s
 
 TEST(job_cache_basic_fuzz) {
   wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
-  TEST_FUNC_CALL(fuzz_loop, 10000, ".job_cache_test", "job_cache_test", std::move(gen));
+  FuzzLoopConfig config;
+  config.max_path_size = 16;
+  config.max_out = 5;
+  config.max_vis = 5;
+  config.number_of_steps = 10000;
+  config.cache_dir = ".job_cache_test";
+  config.dir = "job_cache_test";
+  TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
 }
+
+/*
+// This test appears to work but it takes quite a long time and
+// causes a lot of filesystem churn. Just test this on your own
+// occasionally as a debugging/repro tool for those kinds of issues.
+/*
+TEST(job_cache_large_message_fuzz) {
+  wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
+  FuzzLoopConfig config;
+  config.max_path_size = 200;
+  config.max_out = 16000;
+  config.max_vis = 16000;
+  config.number_of_steps = 100;
+  config.cache_dir = ".job_cache_test";
+  config.dir = "job_cache_test";
+  TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+}
+*/
+
+// This test appears to work but it takes *FOREVER* and doesn't represent
+// a very likely case. Still it might be worth running this on your own
+// sometimes to make sure everything is working well
+/*
+TEST(job_cache_huge_message_fuzz) {
+  wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
+  FuzzLoopConfig config;
+  config.max_path_size = 3500;
+  config.max_out = 100000;
+  config.max_vis = 100000;
+  config.number_of_steps = 20;
+  config.cache_dir = ".job_cache_test";
+  config.dir = "job_cache_test";
+  TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+}
+*/
+
+TEST(job_cache_basic_par_fuzz) {
+  FuzzLoopConfig config;
+  config.max_path_size = 16;
+  config.max_out = 5;
+  config.max_vis = 5;
+  config.number_of_steps = 500;
+  config.cache_dir = ".job_cache_test2";
+  config.dir = "job_cache_test2";
+  std::vector<std::future<void>> futs;
+  for (int i = 0; i < 20; ++i) {
+    // Each thread will exit on ASSERT fail logging the error
+    // and will correctly log failed EXPECTS. Because we wait
+    // on all futures in this test there is no way for this to
+    // leave a thread running after the return of this call.
+    // However it is unfortunate that if one thread fails,
+    // these others will keep running to completion. Additionally
+    // if the program dies/crashes all threads die in the current
+    // position without failures from other threads being logged.
+    futs.emplace_back(std::async([&]() {
+      wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
+      TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+    }));
+  }
+  for (auto& fut : futs) {
+    if (fut.valid()) fut.wait();
+  }
+}
+
+// This test should work but it takes quite a long time.
+/*
+TEST(job_cache_large_par_fuzz) {
+  FuzzLoopConfig config;
+  config.max_path_size = 16;
+  config.max_out = 5;
+  config.max_vis = 5;
+  config.number_of_steps = 1000;
+  config.cache_dir = ".job_cache_test";
+  config.dir = "job_cache_test";
+  std::vector<std::future<void>> futs;
+  for (int i = 0; i < 500; ++i) {
+    // Each thread will exit on ASSERT fail logging the error
+    // and will correctly log failed EXPECTS. Because we wait
+    // on all futures in this test there is no way for this to
+    // leave a thread running after the return of this call.
+    // However it is unfortunate that if one thread fails,
+    // these others will keep running to completion. Additionally
+    // if the program dies/crashes all threads die in the current
+    // position without failures from other threads being logged.
+    futs.emplace_back(std::async([&]() {
+      wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
+      TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+    }));
+  }
+  for (auto& fut : futs) {
+    if (fut.valid()) fut.wait();
+  }
+}
+*/
