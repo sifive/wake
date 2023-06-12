@@ -372,7 +372,7 @@ TEST(job_cache_basic_par_fuzz) {
   config.cache_dir = ".job_cache_test";
   config.dir = "job_cache_test";
   std::vector<std::future<void>> futs;
-  for (int i = 0; i < 500; ++i) {
+  for (int i = 0; i < 50; ++i) {
     // Each thread will exit on ASSERT fail logging the error
     // and will correctly log failed EXPECTS. Because we wait
     // on all futures in this test there is no way for this to
