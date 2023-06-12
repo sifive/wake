@@ -28,6 +28,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <wcl/optional.h>
+#include <wcl/result.h>
 #include <wcl/unique_fd.h>
 
 #include <string>
@@ -36,9 +37,29 @@
 
 namespace job_cache {
 
+enum class ConnectError {
+  TooManyAttempts,
+};
+
+enum class FindJobError {
+  FailedMessageReceive,
+  NoResponse,
+  TooManyResponses,
+  FailedParseResponse,
+};
+
 class Cache {
  private:
   wcl::unique_fd socket_fd;
+
+  // Daemon parameters
+  std::string cache_dir;
+  uint64_t max_size;
+  uint64_t low_threshold;
+
+  void launch_daemon();
+  wcl::optional<ConnectError> backoff_try_connect(int attempts);
+  wcl::result<FindJobResponse, FindJobError> read_impl(const FindJobRequest &find_request);
 
  public:
   Cache() = delete;
