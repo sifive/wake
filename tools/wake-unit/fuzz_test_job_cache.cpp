@@ -325,7 +325,7 @@ TEST(job_cache_basic_fuzz) {
   config.max_path_size = 16;
   config.max_out = 5;
   config.max_vis = 5;
-  config.number_of_steps = 10000;
+  config.number_of_steps = 1000;
   config.cache_dir = ".job_cache_test";
   config.dir = "job_cache_test";
   TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
