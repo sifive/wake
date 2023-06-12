@@ -283,19 +283,24 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
   return wcl::result_value<FindJobError>(FindJobResponse(json));
 }
 
-// TODO: track total number of times we've failed in order to
-// fail fast after some threshold when the users requests a
-// cache miss on fail
 FindJobResponse Cache::read(const FindJobRequest &find_request) {
+  static int lifetime_retries = 0;
+
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
 
   bool failed_on_launch = false;
   bool failed_on_connect = false;
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 3; i++) {
     auto response = read_impl(find_request);
     if (response) {
       return *response;
+    }
+
+    // TODO: Add config var to determine if fail is a cache miss
+    if (lifetime_retries > 100 && false) {
+      wcl::log::warning("Cache::read(): reached maximum lifetime retries. Triggering cache miss");
+      return FindJobResponse(wcl::optional<MatchingJob>{});
     }
 
     std::uniform_int_distribution<useconds_t> variance(0, backoff);
@@ -303,6 +308,7 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
     backoff *= 2;
 
     // Retry
+    lifetime_retries++;
     wcl::optional<ConnectError> error;
 
     wcl::log::info("Relaunching the daemon.");
