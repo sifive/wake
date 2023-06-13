@@ -2,6 +2,12 @@ wake (@VERSION@-1) unstable; urgency=medium
 
   * Auto-generated release package.
 
+ -- Matthew Conolly <matthew.conolly@sifive.com>  Tue, 13 Jun 2023 14:00:00 -0800
+
+wake (35.0.0-1) unstable; urgency=medium
+
+  * Auto-generated release package.
+
  -- Ashley Coleman <ashley.coleman@sifive.com>  Fri, 09 Jun 2023 13:00:00 -0800
 
 wake (34.0.1-1) unstable; urgency=medium
