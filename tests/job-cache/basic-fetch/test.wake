@@ -6,6 +6,6 @@ export def test (_: List String): Result (List String) Error =
     require Pass source = source "some-input.txt"
     require Pass outputs =
         makePlan "basic_test" (source,) "cat some-input.txt > test.txt && cat some-input.txt >> test.txt"
-        | runJob
+        | runJobWith defaultRunner
         | getJobOutputs
     Pass (map (_.getPathName) outputs)

@@ -230,6 +230,9 @@ Jobs provide wake's central useful functionality. Wake can be viewed as a functi
 programming language for running jobs.
 
 ```
+from wake import _
+from plan_scorer import _
+
 global def planit =
   "touch foo"
   | makePlan "create file" Nil
@@ -243,7 +246,7 @@ global def runit _ =
 ```
 #### Runners
 
-Note: all definitions and functions referenced in this section can be found in [job.wake](https://github.com/sifive/wake/blob/master/share/wake/lib/system/job.wake).
+Note: all definitions and functions referenced in this section can be found in [this directory](https://github.com/sifive/wake/blob/master/share/wake/lib/system).
 
 Runners are responsible for executing a Plan to run an external program. There are two built-in base runners: `localRunner` and `defaultRunner`. `defaultRunner` creates a sandbox for jobs to run in while `localRunner` runs jobs in the actual workspace. An additional distinction is `localRunner` does not detect inputs/outputs by itself. 
 

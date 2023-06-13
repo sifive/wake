@@ -6,6 +6,6 @@ export def test (lst: List String): Result (List String) Error =
 
     require Pass outputs =
         makePlan "basic_test" Nil "echo {x}: deadbeefdeadbeef > {x}.txt"
-        | runJob
+        | runJobWith defaultRunner
         | getJobOutputs
     Pass (map (_.getPathName) outputs)

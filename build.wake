@@ -72,7 +72,7 @@ def bootstrapTarget targetFn variant =
         def installed =
             makeExecPlan ("cp", path.getPathName, location, Nil) (path,)
             | setPlanLabel "Bootstrap {location}"
-            | runJob
+            | runJobWith defaultRunner
             | getJobOutputs
 
         match installed
@@ -134,7 +134,7 @@ def setVersion release file =
 
     makeShellPlan script (in, Nil)
     | setPlanLabel "release: replace placeholder with version number"
-    | runJob
+    | runJobWith defaultRunner
     | getJobOutput
 
 # Create a release tarball
@@ -222,7 +222,7 @@ def tarball Unit =
         | setPlanLabel "release: package wake source tarball"
         # Since this includes the current time, it's not going to benefit from caching.
         | setPlanKeep False
-        | runJob
+        | runJobWith defaultRunner
         | getJobOutput
 
     Pass (tarball, changelog, Nil)
@@ -251,7 +251,7 @@ export def static _: Result Path Error =
     | setPlanLabel "release: package wake-static tarball"
     # Since this includes the current time, it's not going to benefit from caching.
     | setPlanKeep False
-    | runJob
+    | runJobWith defaultRunner
     | getJobOutput
 
 from test_wake import topic wakeTestBinary
