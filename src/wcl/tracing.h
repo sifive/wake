@@ -65,13 +65,10 @@ struct Event {
   Event urgent() && __attribute__((warn_unused_result));
   Event time() && __attribute__((warn_unused_result));
   Event pid() && __attribute__((warn_unused_result));
-
-  Event info() && __attribute__((warn_unused_result));
-  Event warning() && __attribute__((warn_unused_result));
-  Event error() && __attribute__((warn_unused_result));
+  Event level(const char* level) && __attribute__((warn_unused_result));
 
   void operator()() &&;
-  // TODO: initializer list operator()
+  void operator()(std::initializer_list<std::pair<const std::string, std::string>> list) &&;
 };
 
 // Abstract

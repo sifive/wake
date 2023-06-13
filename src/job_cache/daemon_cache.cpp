@@ -73,6 +73,7 @@ static void lock_file(const char *lock_path) {
   if (errno == EAGAIN || errno == EACCES) {
     wcl::log::info("fcntl(F_SETLK, %s): %s -- assuming another daemon exists, closing", lock_path,
                    strerror(errno))();
+    exit(0);
   }
 
   // Something went wrong trying to grab the lock

@@ -47,14 +47,10 @@ Event Event::message(const char* fmt, va_list args) && {
   va_copy(copy, args);
 
   size_t size = vsnprintf(NULL, 0, fmt, copy);
+  std::string buffer(size, '\0');
+  vsnprintf(&buffer[0], buffer.size() + 1, fmt, args);
 
-  std::vector<char> buffer(size + 1);
-  vsnprintf(buffer.data(), buffer.size(), fmt, args);
-
-  std::string out = buffer.data();
-  out += '\n';
-
-  items[LOG_MESSAGE] = std::move(out);
+  items[LOG_MESSAGE] = std::move(buffer);
   return std::move(*this);
 }
 
@@ -85,18 +81,8 @@ Event Event::pid() && {
   return std::move(*this);
 }
 
-Event Event::info() && {
-  items[LOG_LEVEL] = LOG_LEVEL_INFO;
-  return std::move(*this);
-}
-
-Event Event::warning() && {
-  items[LOG_LEVEL] = LOG_LEVEL_WARNING;
-  return std::move(*this);
-}
-
-Event Event::error() && {
-  items[LOG_LEVEL] = LOG_LEVEL_ERROR;
+Event Event::level(const char* level) && {
+  items[LOG_LEVEL] = level;
   return std::move(*this);
 }
 
@@ -106,12 +92,17 @@ void Event::operator()() && {
   }
 }
 
+void Event::operator()(std::initializer_list<std::pair<const std::string, std::string>> list) && {
+  items.insert(list);
+  std::move (*this)();
+}
+
 Event info(const char* fmt, ...) {
   va_list args;
   va_start(args, fmt);
   auto defer = make_defer([&]() { va_end(args); });
 
-  return event().info().pid().time().message(fmt, args);
+  return event().level(LOG_LEVEL_INFO).pid().time().message(fmt, args);
 }
 
 Event warning(const char* fmt, ...) {
@@ -119,7 +110,7 @@ Event warning(const char* fmt, ...) {
   va_start(args, fmt);
   auto defer = make_defer([&]() { va_end(args); });
 
-  return event().warning().pid().time().message(fmt, args);
+  return event().level(LOG_LEVEL_WARNING).pid().time().message(fmt, args);
 }
 
 Event error(const char* fmt, ...) {
@@ -127,7 +118,7 @@ Event error(const char* fmt, ...) {
   va_start(args, fmt);
   auto defer = make_defer([&]() { va_end(args); });
 
-  return event().error().pid().time().message(fmt, args);
+  return event().level(LOG_LEVEL_ERROR).pid().time().message(fmt, args);
 }
 
 void FormatSubscriber::receive(const Event& e) {
