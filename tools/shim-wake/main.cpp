@@ -31,9 +31,9 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "wcl/filepath.h"
 #include "blake2/blake2.h"
 #include "compat/nofollow.h"
+#include "wcl/filepath.h"
 
 // Can increase to 64 if needed
 #define HASH_BYTES 32
@@ -181,7 +181,7 @@ int main(int argc, char **argv) {
     return 127;
   }
   std::vector<int> fds_to_close;
-  for (const auto& entry : *res) {
+  for (const auto &entry : *res) {
     if (!entry) {
       fprintf(stderr, "bad /proc/self/fd/ entry: %s\n", strerror(entry.error()));
       return 127;
