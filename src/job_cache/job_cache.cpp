@@ -215,18 +215,18 @@ wcl::optional<ConnectError> Cache::backoff_try_connect(int attempts) {
   return {};
 }
 
-Cache::Cache(std::string dir, uint64_t max, uint64_t low) {
+Cache::Cache(std::string dir, uint64_t max, uint64_t low, bool miss) {
   cache_dir = dir;
   max_size = max;
   low_threshold = low;
+  miss_on_failure = miss;
 
   mkdir_no_fail(cache_dir.c_str());
 
   launch_daemon();
 
-  // TODO: Add config var to determine if fail is a cache miss
   auto error = backoff_try_connect(14);
-  if (error && true) {
+  if (error && !miss_on_failure) {
     wcl::log::error("could not connect to daemon. dir = %s", cache_dir.c_str()).urgent()();
     exit(1);
   }
@@ -299,8 +299,7 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
       return *response;
     }
 
-    // TODO: Add config var to determine if fail is a cache miss
-    if (lifetime_retries > 100 && false) {
+    if (lifetime_retries > 100 && miss_on_failure) {
       wcl::log::warning("Cache::read(): reached maximum lifetime retries. Triggering cache miss")();
       return FindJobResponse(wcl::optional<MatchingJob>{});
     }
@@ -324,13 +323,12 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
     wcl::log::error("Cache::read(): at least one connect failure occured")();
   }
 
-  // TODO: Add config var to determine if fail is a cache miss
-  if (true) {
-    wcl::log::error("Cache::read(): Failed to read from daemon cache.").urgent()();
-    exit(1);
+  if (miss_on_failure) {
+    return FindJobResponse(wcl::optional<MatchingJob>{});
   }
 
-  return FindJobResponse(wcl::optional<MatchingJob>{});
+  wcl::log::error("Cache::read(): Failed to read from daemon cache.").urgent()();
+  exit(1);
 }
 
 void Cache::add(const AddJobRequest &add_request) {

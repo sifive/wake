@@ -51,6 +51,7 @@ enum class FindJobError {
 class Cache {
  private:
   wcl::unique_fd socket_fd;
+  bool miss_on_failure = false;
 
   // Daemon parameters
   std::string cache_dir;
@@ -65,7 +66,7 @@ class Cache {
   Cache() = delete;
   Cache(const Cache &) = delete;
 
-  Cache(std::string dir, uint64_t max, uint64_t low);
+  Cache(std::string dir, uint64_t max, uint64_t low, bool miss);
 
   FindJobResponse read(const FindJobRequest &find_request);
   void add(const AddJobRequest &add_request);
