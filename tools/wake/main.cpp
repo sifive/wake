@@ -313,10 +313,18 @@ int main(int argc, char **argv) {
   }
 
   // Initialize Wake logging subsystem
+
+  // Log all events to wake.log
   std::ofstream log_file("wake.log", std::ios::app);
   auto log_file_defer = wcl::make_defer([&log_file]() { log_file.close(); });
   wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file.rdbuf()));
-  wcl::log::subscribe(std::make_unique<wcl::log::UrgentSubscriber>());
+
+  // Log urgent events to cerr
+  auto cerr_subscriber = std::make_unique<wcl::log::SimpleFormatSubscriber>(std::cerr.rdbuf());
+  auto filter_subscriber = std::make_unique<wcl::log::FilterSubscriber>(
+      std::move(cerr_subscriber), [](const auto &e) { return e.get(wcl::log::URGENT) != nullptr; });
+  wcl::log::subscribe(std::move(filter_subscriber));
+
   wcl::log::info("Initialized logging")();
 
   // Now check for any flags that override config options

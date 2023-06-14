@@ -26,6 +26,7 @@
 #include <unistd.h>
 
 #include <cstdarg>
+#include <functional>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -88,10 +89,26 @@ class FormatSubscriber : public Subscriber {
   ~FormatSubscriber() override{};
 };
 
-class UrgentSubscriber : public Subscriber {
+class SimpleFormatSubscriber : public Subscriber {
+ private:
+  std::ostream s;
+
  public:
+  SimpleFormatSubscriber(std::streambuf* rdbuf) : s(rdbuf) {}
   void receive(const Event& e) override;
-  ~UrgentSubscriber() override{};
+  ~SimpleFormatSubscriber() override{};
+};
+
+class FilterSubscriber : public Subscriber {
+ private:
+  std::unique_ptr<Subscriber> subscriber;
+  std::function<bool(const Event&)> predicate;
+
+ public:
+  FilterSubscriber(std::unique_ptr<Subscriber> s, std::function<bool(const Event&)> p)
+      : subscriber(std::move(s)), predicate(p) {}
+  void receive(const Event& e) override;
+  ~FilterSubscriber() override{};
 };
 
 void subscribe(std::unique_ptr<Subscriber>);
