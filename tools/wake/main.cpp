@@ -435,7 +435,12 @@ int main(int argc, char **argv) {
     }
 
     // Since the log is append only, we should clean it up from time to time.
-    unlink("wake.log");
+    // TODO: this is just "unlink_no_fail". Those functions should be moved to
+    // a more generic library
+    if (unlink("wake.log") < 0 && errno != ENOENT) {
+      wcl::log::error("unlink(wake.log): %s", strerror(errno)).urgent()();
+      return 1;
+    }
 
     return 0;
   }
