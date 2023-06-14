@@ -18,4 +18,4 @@ package build_wake
 from wake import _
 
 target wcl variant =
-    src @here variant (util, Nil) Nil Nil
+    src @here variant Nil Nil Nil

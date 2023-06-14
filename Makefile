@@ -101,8 +101,8 @@ bin/wakebox:		tools/wakebox/main.cpp src/wakefs/*.cpp vendor/gopt/*.c $(COMMON_O
 lib/wake/fuse-waked:	tools/fuse-waked/main.cpp $(COMMON_OBJS)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(FUSE_CFLAGS) $(CXX_VERSION) $^ -o $@ $(LDFLAGS)  $(CORE_LDFLAGS) $(FUSE_LDFLAGS)
 
-lib/wake/shim-wake:	tools/shim-wake/main.o vendor/blake2/blake2b-ref.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
+lib/wake/shim-wake:	tools/shim-wake/main.o vendor/blake2/blake2b-ref.o src/wcl/filepath.o
+	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
 lib/wake/wake-hash: tools/wake-hash/main.o vendor/blake2/blake2b-ref.o $(COMMON_OBJS)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LOCAL_CFLAGS) $(CXX_VERSION) $(LDFLAGS) $(CORE_LDFLAGS)
