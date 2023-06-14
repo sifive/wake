@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
   }
 
   wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(std::cout.rdbuf()));
-  wcl::log::info("Initialized logging for job cache daemon");
+  wcl::log::info("Initialized logging for job cache daemon")();
 
   std::string cache_dir = std::string(argv[1]);
   uint64_t low_cache_size = std::stoull(argv[2]);

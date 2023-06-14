@@ -37,117 +37,88 @@ void subscribe(std::unique_ptr<Subscriber> subscriber) {
 
 void clear_subscribers() { subscribers.clear(); }
 
-void publish(Event e) {
-  for (const auto& subscriber : subscribers) {
-    subscriber->receive(e);
-  }
+Event event() {
+  Event e({});
+  return e;
 }
 
-static void log_message(const char* level,
-                        std::initializer_list<std::pair<const std::string, std::string>> list,
-                        const char* fmt, va_list args) {
+Event Event::message(const char* fmt, va_list args) && {
   va_list copy;
   va_copy(copy, args);
 
   size_t size = vsnprintf(NULL, 0, fmt, copy);
+  std::string buffer(size, '\0');
+  vsnprintf(&buffer[0], buffer.size() + 1, fmt, args);
 
-  std::vector<char> buffer(size + 1);
-  vsnprintf(buffer.data(), buffer.size(), fmt, args);
+  items[LOG_MESSAGE] = std::move(buffer);
+  return std::move(*this);
+}
 
-  std::string out = buffer.data();
-  out += '\n';
+Event Event::message(const char* fmt, ...) && {
+  va_list args;
+  va_start(args, fmt);
+  auto defer = make_defer([&]() { va_end(args); });
+  return std::move(*this).message(fmt, args);
+}
 
-  time_t t = time(NULL);
+Event Event::urgent() && {
+  items[URGENT] = "1";
+  return std::move(*this);
+}
+
+Event Event::time() && {
+  time_t t = ::time(NULL);
   struct tm tm = *localtime(&t);
   char time_buffer[20 + 1];
   strftime(time_buffer, sizeof(time_buffer), "%F %T", &tm);
+  items[LOG_TIME] = time_buffer;
 
-  Event e(list);
-  e.items[LOG_LEVEL] = level;
-  e.items[LOG_MESSAGE] = std::move(out);
-  e.items[LOG_PID] = std::to_string(getpid());
-  e.items[LOG_TIME] = time_buffer;
-
-  publish(e);
+  return std::move(*this);
 }
 
-void info(const char* fmt, ...) {
+Event Event::pid() && {
+  items[LOG_PID] = std::to_string(getpid());
+  return std::move(*this);
+}
+
+Event Event::level(const char* level) && {
+  items[LOG_LEVEL] = level;
+  return std::move(*this);
+}
+
+void Event::operator()() && {
+  for (const auto& subscriber : subscribers) {
+    subscriber->receive(*this);
+  }
+}
+
+void Event::operator()(std::initializer_list<std::pair<const std::string, std::string>> list) && {
+  items.insert(list);
+  std::move (*this)();
+}
+
+Event info(const char* fmt, ...) {
   va_list args;
   va_start(args, fmt);
   auto defer = make_defer([&]() { va_end(args); });
-  log_message(LOG_LEVEL_INFO, {}, fmt, args);
+
+  return event().level(LOG_LEVEL_INFO).pid().time().message(fmt, args);
 }
 
-void info(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
-          ...) {
+Event warning(const char* fmt, ...) {
   va_list args;
   va_start(args, fmt);
   auto defer = make_defer([&]() { va_end(args); });
-  log_message(LOG_LEVEL_INFO, list, fmt, args);
+
+  return event().level(LOG_LEVEL_WARNING).pid().time().message(fmt, args);
 }
 
-void warning(const char* fmt, ...) {
+Event error(const char* fmt, ...) {
   va_list args;
   va_start(args, fmt);
   auto defer = make_defer([&]() { va_end(args); });
-  log_message(LOG_LEVEL_WARNING, {}, fmt, args);
-}
 
-void warning(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
-             ...) {
-  va_list args;
-  va_start(args, fmt);
-  auto defer = make_defer([&]() { va_end(args); });
-  log_message(LOG_LEVEL_WARNING, list, fmt, args);
-}
-
-void error(const char* fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  auto defer = make_defer([&]() { va_end(args); });
-  log_message(LOG_LEVEL_ERROR, {}, fmt, args);
-}
-
-void error(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
-           ...) {
-  va_list args;
-  va_start(args, fmt);
-  auto defer = make_defer([&]() { va_end(args); });
-  log_message(LOG_LEVEL_ERROR, list, fmt, args);
-}
-
-void fatal(const char* fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  auto defer = make_defer([&]() { va_end(args); });
-  log_message(LOG_LEVEL_FATAL, {}, fmt, args);
-  ::exit(1);
-}
-
-void fatal(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
-           ...) {
-  va_list args;
-  va_start(args, fmt);
-  auto defer = make_defer([&]() { va_end(args); });
-  log_message(LOG_LEVEL_FATAL, list, fmt, args);
-  ::exit(1);
-}
-
-void exit(const char* fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  auto defer = make_defer([&]() { va_end(args); });
-  log_message(LOG_LEVEL_EXIT, {}, fmt, args);
-  ::exit(0);
-}
-
-void exit(std::initializer_list<std::pair<const std::string, std::string>> list, const char* fmt,
-          ...) {
-  va_list args;
-  va_start(args, fmt);
-  auto defer = make_defer([&]() { va_end(args); });
-  log_message(LOG_LEVEL_EXIT, list, fmt, args);
-  ::exit(0);
+  return event().level(LOG_LEVEL_ERROR).pid().time().message(fmt, args);
 }
 
 void FormatSubscriber::receive(const Event& e) {
@@ -172,25 +143,6 @@ void FormatSubscriber::receive(const Event& e) {
   if (auto* value = e.get(LOG_MESSAGE)) {
     s << " " << *value;
   }
-}
-
-void FatalEventSubscriber::receive(const Event& e) {
-  auto level = e.get(LOG_LEVEL);
-  if (level == nullptr) {
-    return;
-  }
-
-  if (*level != LOG_LEVEL_FATAL) {
-    return;
-  }
-
-  auto msg = e.get(LOG_MESSAGE);
-  if (msg == nullptr) {
-    s << "Fatal log was triggered without a message" << std::endl;
-    return;
-  }
-
-  s << *msg;
 }
 
 }  // namespace log

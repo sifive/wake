@@ -42,40 +42,46 @@
 // moves the file or directory, crashes on error
 void rename_no_fail(const char *old_path, const char *new_path) {
   if (rename(old_path, new_path) < 0) {
-    wcl::log::fatal("rename(%s, %s): %s", old_path, new_path, strerror(errno));
+    wcl::log::error("rename(%s, %s): %s", old_path, new_path, strerror(errno)).urgent()();
+    exit(1);
   }
 }
 
 // Ensures the the given directory has been created
 void mkdir_no_fail(const char *dir) {
   if (mkdir(dir, 0777) < 0 && errno != EEXIST) {
-    wcl::log::fatal("mkdir(%s): %s", dir, strerror(errno));
+    wcl::log::error("mkdir(%s): %s", dir, strerror(errno)).urgent()();
+    exit(1);
   }
 }
 
 void chdir_no_fail(const char *dir) {
   if (chdir(dir) < 0) {
-    wcl::log::fatal("chdir(%s): %s", dir, strerror(errno));
+    wcl::log::error("chdir(%s): %s", dir, strerror(errno)).urgent()();
+    exit(1);
   }
 }
 
 void symlink_no_fail(const char *target, const char *symlink_path) {
   if (symlink(target, symlink_path) == -1) {
-    wcl::log::fatal("symlink(%s, %s): %s", target, symlink_path, strerror(errno));
+    wcl::log::error("symlink(%s, %s): %s", target, symlink_path, strerror(errno)).urgent()();
+    exit(1);
   }
 }
 
 // Ensures the given file has been deleted
 void unlink_no_fail(const char *file) {
   if (unlink(file) < 0 && errno != ENOENT) {
-    wcl::log::fatal("unlink(%s): %s", file, strerror(errno));
+    wcl::log::error("unlink(%s): %s", file, strerror(errno)).urgent()();
+    exit(1);
   }
 }
 
 // Ensures the the given directory no longer exists
 void rmdir_no_fail(const char *dir) {
   if (rmdir(dir) < 0 && errno != ENOENT) {
-    wcl::log::fatal("rmdir(%s): %s", dir, strerror(errno));
+    wcl::log::error("rmdir(%s): %s", dir, strerror(errno)).urgent()();
+    exit(1);
   }
 }
 
@@ -93,20 +99,25 @@ static void copy(int src_fd, int dst_fd) {
   struct stat buf = {};
   // There's a race here between the fstat and the copy_file_range
   if (fstat(src_fd, &buf) < 0) {
-    wcl::log::fatal("fstat(src_fd = %d): %s", src_fd, strerror(errno));
+    wcl::log::error("fstat(src_fd = %d): %s", src_fd, strerror(errno)).urgent()();
+    exit(1);
   }
 
   // TODO: This is very slow because FdBuf is very slow
   // TODO: This will read large files into memory which is very bad
   std::vector<char> data_buf(buf.st_size);
   if (!in.read(data_buf.data(), buf.st_size)) {
-    wcl::log::fatal("copy.read(src_fd = %d, NULL, dst_fd = %d, size = %d): %s", src_fd, dst_fd,
-                    buf.st_size, strerror(errno));
+    wcl::log::error("copy.read(src_fd = %d, NULL, dst_fd = %d, size = %d): %s", src_fd, dst_fd,
+                    buf.st_size, strerror(errno))
+        .urgent()();
+    exit(1);
   }
 
   if (!out.write(data_buf.data(), buf.st_size)) {
-    wcl::log::fatal("copy.write(src_fd = %d, NULL, dst_fd = %d, size = %d): %s", src_fd, dst_fd,
-                    buf.st_size, strerror(errno));
+    wcl::log::error("copy.write(src_fd = %d, NULL, dst_fd = %d, size = %d): %s", src_fd, dst_fd,
+                    buf.st_size, strerror(errno))
+        .urgent()();
+    exit(1);
   }
 }
 
@@ -128,11 +139,14 @@ static void copy(int src_fd, int dst_fd) {
   struct stat buf = {};
   // There's a race here between the fstat and the copy_file_range
   if (fstat(src_fd, &buf) < 0) {
-    wcl::log::fatal("fstat(src_fd = %d): %s", src_fd, strerror(errno));
+    wcl::log::error("fstat(src_fd = %d): %s", src_fd, strerror(errno)).urgent()();
+    exit(1);
   }
   if (copy_file_range(src_fd, nullptr, dst_fd, nullptr, buf.st_size, 0) < 0) {
-    wcl::log::fatal("copy_file_range(src_fd = %d, NULL, dst_fd = %d, size = %ld, 0): %s", src_fd,
-                    dst_fd, buf.st_size, strerror(errno));
+    wcl::log::error("copy_file_range(src_fd = %d, NULL, dst_fd = %d, size = %ld, 0): %s", src_fd,
+                    dst_fd, buf.st_size, strerror(errno))
+        .urgent()();
+    exit(1);
   }
 }
 
@@ -154,15 +168,18 @@ static void copy(int src_fd, int dst_fd) {
   struct stat buf = {};
   // There's a race here between the fstat and the copy_file_range
   if (fstat(src_fd, &buf) < 0) {
-    wcl::log::fatal("fstat(src_fd = %d): %s", src_fd, strerror(errno));
+    wcl::log::error("fstat(src_fd = %d): %s", src_fd, strerror(errno)).urgent()();
+    exit(1);
   }
   off_t idx = 0;
   size_t size = buf.st_size;
   do {
     intptr_t written = sendfile(dst_fd, src_fd, &idx, size);
     if (written < 0) {
-      wcl::log::fatal("sendfile(src_fd = %d, NULL, dst_fd = %d, size = %d, 0): %s", src_fd, dst_fd,
-                      buf.st_size, strerror(errno));
+      wcl::log::error("sendfile(src_fd = %d, NULL, dst_fd = %d, size = %d, 0): %s", src_fd, dst_fd,
+                      buf.st_size, strerror(errno))
+          .urgent()();
+      exit(1);
     }
     idx = written;
     size -= written;
@@ -175,16 +192,19 @@ static void copy(int src_fd, int dst_fd) {
 void copy_or_reflink(const char *src, const char *dst, mode_t mode, int extra_flags) {
   auto src_fd = wcl::unique_fd::open(src, O_RDONLY);
   if (!src_fd) {
-    wcl::log::fatal("open(%s): %s", src, strerror(src_fd.error()));
+    wcl::log::error("open(%s): %s", src, strerror(src_fd.error())).urgent()();
+    exit(1);
   }
   auto dst_fd = wcl::unique_fd::open(dst, O_WRONLY | O_CREAT | extra_flags, mode);
   if (!dst_fd) {
-    wcl::log::fatal("open(%s): %s", dst, strerror(dst_fd.error()));
+    wcl::log::error("open(%s): %s", dst, strerror(dst_fd.error())).urgent()();
+    exit(1);
   }
 
   if (ioctl(dst_fd->get(), FICLONE, src_fd->get()) < 0) {
     if (errno != EINVAL && errno != EOPNOTSUPP && errno != EXDEV) {
-      wcl::log::fatal("ioctl(%s, FICLONE, %s): %s", dst, src, strerror(errno));
+      wcl::log::error("ioctl(%s, FICLONE, %s): %s", dst, src, strerror(errno)).urgent()();
+      exit(1);
     }
     copy(src_fd->get(), dst_fd->get());
   }
@@ -195,11 +215,13 @@ void copy_or_reflink(const char *src, const char *dst, mode_t mode, int extra_fl
 void copy_or_reflink(const char *src, const char *dst, mode_t mode, int extra_flags) {
   auto src_fd = wcl::unique_fd::open(src, O_RDONLY);
   if (!src_fd) {
-    wcl::log::fatal("open(%s): %s", src, strerror(src_fd.error()));
+    wcl::log::error("open(%s): %s", src, strerror(src_fd.error())).urgent()();
+    exit(1);
   }
   auto dst_fd = wcl::unique_fd::open(dst, O_WRONLY | O_CREAT | extra_flags, mode);
   if (!dst_fd) {
-    wcl::log::fatal("open(%s): %s", dst, strerror(dst_fd.error()));
+    wcl::log::error("open(%s): %s", dst, strerror(dst_fd.error())).urgent()();
+    exit(1);
   }
 
   copy(src_fd->get(), dst_fd->get());
@@ -212,18 +234,22 @@ void remove_backing_files(const std::string &dir, int64_t job_id) {
   std::string job_dir = wcl::join_paths(dir, wcl::to_hex(&group_id), std::to_string(job_id));
   auto dir_range = wcl::directory_range::open(job_dir);
   if (!dir_range) {
-    wcl::log::fatal("opendir(%s): %s", job_dir.c_str(), strerror(dir_range.error()));
+    wcl::log::error("opendir(%s): %s", job_dir.c_str(), strerror(dir_range.error())).urgent()();
+    exit(1);
   }
 
   // loop over the directory now and delete any files as we go.
   for (const auto &entry : *dir_range) {
     if (!entry) {
-      wcl::log::fatal("readdir(%s): %s", job_dir.c_str(), strerror(entry.error()));
+      wcl::log::error("readdir(%s): %s", job_dir.c_str(), strerror(entry.error())).urgent()();
+      exit(1);
     }
     if (entry->name == "." || entry->name == "..") continue;
     if (entry->type != wcl::file_type::regular) {
-      wcl::log::fatal("remove_backing_files(%s): found non-regular entry: %s", job_dir.c_str(),
-                      entry->name.c_str());
+      wcl::log::error("remove_backing_files(%s): found non-regular entry: %s", job_dir.c_str(),
+                      entry->name.c_str())
+          .urgent()();
+      exit(1);
     }
     unlink_no_fail(entry->name.c_str());
   }
@@ -276,7 +302,8 @@ void send_json_message(int fd, const JAST &json) {
       if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
         continue;
       }
-      wcl::log::fatal("write(%d): %s", fd, strerror(errno));
+      wcl::log::error("write(%d): %s", fd, strerror(errno)).urgent()();
+      exit(1);
     }
 
     start += res;
