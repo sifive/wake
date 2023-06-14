@@ -42,6 +42,7 @@
 #include "util/term.h"
 #include "util/unlink.h"
 #include "value.h"
+#include "wcl/tracing.h"
 #include "wcl/xoshiro_256.h"
 
 static PRIMFN(prim_vcat) {
@@ -175,6 +176,20 @@ static PRIMTYPE(type_read) {
   result[0].unify(Data::typeString);
   result[1].unify(Data::typeString);
   return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(result);
+}
+
+static PRIMTYPE(type_breadcrumb) {
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeUnit);
+}
+
+static PRIMFN(prim_breadcrumb) {
+  EXPECT(1);
+  STRING(request_str, 0);
+
+  wcl::log::info(request_str->c_str())({{"source", "wake"}});
+
+  runtime.heap.reserve(reserve_unit());
+  RETURN(claim_unit(runtime.heap));
 }
 
 static PRIMFN(prim_read) {
@@ -673,4 +688,5 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "unlink", prim_unlink, type_unlink, PRIM_IMPURE);
   prim_register(pmap, "write", prim_write, type_write, PRIM_IMPURE);
   prim_register(pmap, "read", prim_read, type_read, PRIM_ORDERED);
+  prim_register(pmap, "breadcrumb", prim_breadcrumb, type_breadcrumb, PRIM_IMPURE);
 }

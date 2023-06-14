@@ -313,9 +313,18 @@ int main(int argc, char **argv) {
   }
 
   // Initialize Wake logging subsystem
+
+  // Log all events to wake.log
   std::ofstream log_file("wake.log", std::ios::app);
   auto log_file_defer = wcl::make_defer([&log_file]() { log_file.close(); });
   wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file.rdbuf()));
+
+  // Log urgent events to cerr
+  auto cerr_subscriber = std::make_unique<wcl::log::SimpleFormatSubscriber>(std::cerr.rdbuf());
+  auto filter_subscriber = std::make_unique<wcl::log::FilterSubscriber>(
+      std::move(cerr_subscriber), [](const auto &e) { return e.get(wcl::log::URGENT) != nullptr; });
+  wcl::log::subscribe(std::move(filter_subscriber));
+
   wcl::log::info("Initialized logging")();
 
   // Now check for any flags that override config options
@@ -423,6 +432,14 @@ int main(int argc, char **argv) {
         std::cerr << "error: unlink(" << path << "): " << strerror(errno) << std::endl;
         return 1;
       }
+    }
+
+    // Since the log is append only, we should clean it up from time to time.
+    // TODO: this is just "unlink_no_fail". Those functions should be moved to
+    // a more generic library
+    if (unlink("wake.log") < 0 && errno != ENOENT) {
+      wcl::log::error("unlink(wake.log): %s", strerror(errno)).urgent()();
+      return 1;
     }
 
     return 0;

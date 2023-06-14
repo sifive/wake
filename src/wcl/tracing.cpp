@@ -138,10 +138,34 @@ void FormatSubscriber::receive(const Event& e) {
     s << item.first << "=" << item.second;
   }
 
-  s << "]";
+  s << "] ";
 
   if (auto* value = e.get(LOG_MESSAGE)) {
-    s << " " << *value;
+    s << *value;
+  } else {
+    s << "<empty message>";
+  }
+
+  s << std::endl;
+}
+
+void SimpleFormatSubscriber::receive(const Event& e) {
+  if (auto* level = e.get(LOG_LEVEL)) {
+    s << "[" << *level << "]: ";
+  }
+
+  if (auto* value = e.get(LOG_MESSAGE)) {
+    s << *value;
+  } else {
+    s << "<empty message>";
+  }
+
+  s << std::endl;
+}
+
+void FilterSubscriber::receive(const Event& e) {
+  if (predicate(e)) {
+    subscriber->receive(e);
   }
 }
 
