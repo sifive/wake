@@ -31,6 +31,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include "wcl/filepath.h"
 #include "blake2/blake2.h"
 #include "compat/nofollow.h"
 
@@ -46,25 +47,23 @@ static int do_hash_dir() {
 static int do_hash_link(const char *link) {
   blake2b_state S;
   uint8_t hash[HASH_BYTES];
-  size_t len = 8192;
-  char *buffer = malloc(len);
+  constexpr ssize_t len = 8192;
+  char buffer[len];
 
   ssize_t out;
   while (len == (out = readlink(link, buffer, len))) {
-    len += len;
-    buffer = realloc(buffer, len);
+    fprintf(stderr, "shim hash readlink(%s): symlink with more than 8192 bytes\n", link);
+    return 1;
   }
 
   if (out == -1) {
     fprintf(stderr, "shim hash readlink(%s): %s\n", link, strerror(errno));
-    free(buffer);
     return 1;
   }
 
   blake2b_init(&S, sizeof(hash));
   blake2b_update(&S, (uint8_t *)buffer, out);
   blake2b_final(&S, &hash[0], sizeof(hash));
-  free(buffer);
 
   for (int i = 0; i < (int)sizeof(hash); ++i) printf("%02x", hash[i]);
   printf("\n");
@@ -173,6 +172,28 @@ int main(int argc, char **argv) {
   if (stderr_fd != 2) {
     dup2(stderr_fd, 2);
     close(stderr_fd);
+  }
+
+  // close all open file handles so we leak less into the child process
+  auto res = wcl::directory_range::open("/proc/self/fd/");
+  if (!res) {
+    fprintf(stderr, "wcl::directory_range::open(/proc/self/fd/): %s\n", strerror(res.error()));
+    return 127;
+  }
+  std::vector<int> fds_to_close;
+  for (const auto& entry : *res) {
+    if (!entry) {
+      fprintf(stderr, "bad /proc/self/fd/ entry: %s\n", strerror(entry.error()));
+      return 127;
+    }
+    if (entry->name == "." || entry->name == "..") continue;
+    int fd = std::stoi(entry->name);
+    if (fd <= 2) continue;
+    // Otherwise close the fd
+    fds_to_close.push_back(fd);
+  }
+  for (int fd : fds_to_close) {
+    close(fd);
   }
 
   if (strcmp(argv[5], "<hash>")) {
