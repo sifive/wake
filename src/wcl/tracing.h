@@ -88,6 +88,12 @@ class FormatSubscriber : public Subscriber {
   ~FormatSubscriber() override{};
 };
 
+class UrgentSubscriber : public Subscriber {
+ public:
+  void receive(const Event& e) override;
+  ~UrgentSubscriber() override{};
+};
+
 void subscribe(std::unique_ptr<Subscriber>);
 void clear_subscribers();
 

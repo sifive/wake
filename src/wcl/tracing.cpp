@@ -138,11 +138,41 @@ void FormatSubscriber::receive(const Event& e) {
     s << item.first << "=" << item.second;
   }
 
-  s << "]";
+  s << "] ";
 
   if (auto* value = e.get(LOG_MESSAGE)) {
-    s << " " << *value;
+    s << *value;
+  } else {
+    s << "<empty message>";
   }
+
+  s << std::endl;
+}
+
+void UrgentSubscriber::receive(const Event& e) {
+  auto urgent = e.get(URGENT);
+  if (urgent == nullptr) {
+    return;
+  }
+
+  std::ostream* s = &std::cout;
+
+  auto level = e.get(LOG_LEVEL);
+  if (level != nullptr && *level == LOG_LEVEL_ERROR) {
+    s = &std::cerr;
+  }
+
+  if (level != nullptr) {
+    *s << "[" << *level << "]: ";
+  }
+
+  if (auto* value = e.get(LOG_MESSAGE)) {
+    *s << *value;
+  } else {
+    *s << "<empty message>";
+  }
+
+  *s << std::endl;
 }
 
 }  // namespace log

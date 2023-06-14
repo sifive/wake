@@ -186,7 +186,7 @@ static PRIMFN(prim_breadcrumb) {
   EXPECT(1);
   STRING(request_str, 0);
 
-  wcl::log::info({{"source", "wake"}}, request_str->c_str());
+  wcl::log::info(request_str->c_str())({{"source", "wake"}});
 
   runtime.heap.reserve(reserve_unit());
   RETURN(claim_unit(runtime.heap));
