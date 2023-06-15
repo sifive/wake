@@ -246,7 +246,7 @@ static void garbage_collect_job(std::string job_dir) {
   }
 }
 
-static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int group_id) {
+static void garbage_collect_group(const std::unordered_set<int64_t> jobs,int64_t max_job, int group_id) {
   auto group_dir = std::to_string(group_id);
   auto dir_res = wcl::directory_range::open(group_dir);
   if (!dir_res) {
@@ -262,9 +262,15 @@ static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int gr
       // It isn't critical that we remove this so just log the error and move on
       wcl::log::error("cleaning corrupt job: bad entry in %s: %s", group_dir.c_str(),
                       strerror(entry.error()))();
-      return;
+      continue;
     }
     int64_t job_id = std::stoll(entry->name);
+    // Jobs might be added that aren't in the jobs list. They will
+    // all have a job_id greater than the largest we found at startup so
+    // we ignore them.
+    if (job_id > max_job) continue;
+
+    // Otherwise if we don't know about this job, it has been orphaned.
     if (jobs.count(job_id)) {
       garbage_collect_job(wcl::join_paths(group_dir, entry->name));
     }
@@ -276,21 +282,23 @@ static void garbage_collect_orphan_folders(std::shared_ptr<job_cache::Database> 
   PreparedStatement all_jobs(db, all_jobs_q);
   Transaction transact(db);
   std::unordered_set<int64_t> jobs;
+  int64_t max_job = -1;
   // uint8_t group_id = job_id & 0xFF;
   // std::string job_dir = wcl::join_paths(wcl::to_hex(&group_id), std::to_string(job_id));
 
   // First we run a very large query to find all job ids
-  transact.run([&all_jobs, &jobs]() {
+  transact.run([&all_jobs, &max_job, &jobs]() {
     // Loop over every single job
     while (all_jobs.step() == SQLITE_ROW) {
       int64_t job_id = all_jobs.read_integer(0);
+      max_job = std::max(max_job, job_id);
       jobs.insert(job_id);
     }
   });
 
   // Next we slowly loop over job cache looking for orphaned folders
   for (int group_id = 0; group_id <= 0xFF; ++group_id) {
-    garbage_collect_group(jobs, group_id);
+    garbage_collect_group(jobs, max_job, group_id);
   }
 }
 
