@@ -328,6 +328,7 @@ int main(int argc, char **argv) {
   }
   config_override.log_header_source_width = clo.log_header_source_width;
   config_override.log_header_align = clo.log_header_align;
+  config_override.cache_miss_on_failure = clo.cache_miss_on_failure;
 
   if (!WakeConfig::init(".wakeroot", config_override)) {
     return 1;

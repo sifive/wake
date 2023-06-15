@@ -43,7 +43,12 @@ struct WakeConfigOverrides {
   // Determines the size of the cache that collection
   // tries to get us back to.
   wcl::optional<uint64_t> low_cache_size;
+
+  // Determines if log headers should be aligned
   wcl::optional<bool> log_header_align;
+
+  // Determines if job cache should terminate on error or return a cache miss
+  wcl::optional<bool> cache_miss_on_failure;
 };
 
 template <class T>
@@ -181,7 +186,8 @@ struct SharedCacheMissOnFailure {
   type cache_miss_on_failure = false;
   static constexpr type SharedCacheMissOnFailure::*value =
       &SharedCacheMissOnFailure::cache_miss_on_failure;
-  static constexpr Override<input_type> override_value = nullptr;
+  static constexpr Override<input_type> override_value =
+      &WakeConfigOverrides::cache_miss_on_failure;
 
   static void set(SharedCacheMissOnFailure& p, const JAST& json);
   static void set_input(SharedCacheMissOnFailure& p, const input_type& v) { p.*value = v; }

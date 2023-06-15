@@ -226,10 +226,16 @@ Cache::Cache(std::string dir, uint64_t max, uint64_t low, bool miss) {
   launch_daemon();
 
   auto error = backoff_try_connect(14);
-  if (error && !miss_on_failure) {
-    wcl::log::error("could not connect to daemon. dir = %s", cache_dir.c_str()).urgent()();
-    exit(1);
+  if (!error) {
+    return;
   }
+
+  wcl::log::error("could not connect to daemon. dir = %s", cache_dir.c_str()).urgent()();
+  if (miss_on_failure) {
+    return;
+  }
+
+  exit(1);
 }
 
 wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest &find_request) {
@@ -287,7 +293,7 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
 }
 
 FindJobResponse Cache::read(const FindJobRequest &find_request) {
-  static int lifetime_retries = 0;
+  static int misses_from_failure = 0;
 
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
@@ -299,8 +305,10 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
       return *response;
     }
 
-    if (lifetime_retries > 100 && miss_on_failure) {
-      wcl::log::warning("Cache::read(): reached maximum lifetime retries. Triggering cache miss")();
+    if (miss_on_failure && misses_from_failure > 30) {
+      wcl::log::warning(
+          "Cache::read(): reached maximum cache misses for this invocation. Triggering early "
+          "miss.")();
       return FindJobResponse(wcl::optional<MatchingJob>{});
     }
 
@@ -309,8 +317,6 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
     backoff *= 2;
 
     // Retry
-    lifetime_retries++;
-
     wcl::log::info("Relaunching the daemon.")();
     launch_daemon();
 
@@ -323,11 +329,13 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
     wcl::log::error("Cache::read(): at least one connect failure occured")();
   }
 
+  wcl::log::error("Cache::read(): Failed to read from daemon cache.").urgent()();
+
   if (miss_on_failure) {
+    misses_from_failure++;
     return FindJobResponse(wcl::optional<MatchingJob>{});
   }
 
-  wcl::log::error("Cache::read(): Failed to read from daemon cache.").urgent()();
   exit(1);
 }
 
