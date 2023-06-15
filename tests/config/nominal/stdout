@@ -6,4 +6,5 @@ Wake config:
   label_filter = '.*' (Default)
   max_cache_size = '1024' (WakeRoot)
   low_cache_size = '512' (WakeRoot)
+  cache_miss_on_failure = 'true' (WakeRoot)
   log_header_align = 'true' (WakeRoot)

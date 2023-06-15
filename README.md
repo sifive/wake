@@ -156,7 +156,7 @@ contain JSON5 source where the root object may contain the following keys.
 | log_header_align | A boolean that specifies whether or not to align log header output | No | Boolean | Yes | Yes | False
 | max_cache_size | The number of bytes after which the shared cache will start a collection | No | Integer | Yes | Yes | 25GB
 | low_cache_size | The number of bytes that the cache tries to reach during a collection | No | Integer | Yes | Yes | 15 GB
-| cache_miss_on_failure | if `true` shared cache will report a cache miss instead of dying when something goes wrong | No | Boolean | Yes | Yes | False
+| cache_miss_on_failure | if `true` shared cache will report a cache miss instead of terminating when something goes wrong | No | Boolean | Yes | Yes | False
 
 Below is a full example
 
