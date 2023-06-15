@@ -623,7 +623,7 @@ void DaemonCache::remove_corrupt_job(int64_t job_id) {
   if (!dir_res) {
     // We can keep going even with this failure but we need to at least log it
     wcl::log::error("cleaning corrupt job: wcl::directory_range::open(%s): %s", job_dir.c_str(),
-                    strerror(dir_res.error()));
+                    strerror(dir_res.error()))();
     return;
   }
 
@@ -632,7 +632,7 @@ void DaemonCache::remove_corrupt_job(int64_t job_id) {
     if (!entry) {
       // It isn't critical that we remove this so just log the error and move on
       wcl::log::error("cleaning corrupt job: bad entry in %s: %s", job_dir.c_str(),
-                      strerror(entry.error()));
+                      strerror(entry.error()))();
       return;
     }
     to_delete.emplace_back(wcl::join_paths(job_dir, entry->name));

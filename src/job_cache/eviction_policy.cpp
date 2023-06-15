@@ -221,11 +221,12 @@ struct LRUEvictionPolicyImpl {
 };
 
 static void garbage_collect_job(std::string job_dir) {
+  wcl::log::info("found orphaned job folder: %s", job_dir.c_str())();
   auto dir_res = wcl::directory_range::open(job_dir);
   if (!dir_res) {
     // We can keep going even with this failure but we need to at least log it
     wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
-                    job_dir.c_str(), strerror(dir_res.error()));
+                    job_dir.c_str(), strerror(dir_res.error()))();
     return;
   }
 
@@ -234,7 +235,7 @@ static void garbage_collect_job(std::string job_dir) {
     if (!entry) {
       // If one entry has a failure we can just keep going to try and remove more entries
       wcl::log::error("cleaning corrupt job: bad entry in %s: %s", job_dir.c_str(),
-                      strerror(entry.error()));
+                      strerror(entry.error()))();
       continue;
     }
     std::string file = wcl::join_paths(job_dir, entry->name);
@@ -251,7 +252,7 @@ static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int gr
   if (!dir_res) {
     // We can keep going even with this failure but we need to at least log it
     wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
-                    group_dir.c_str(), strerror(dir_res.error()));
+                    group_dir.c_str(), strerror(dir_res.error()))();
     return;
   }
 
@@ -260,7 +261,7 @@ static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int gr
     if (!entry) {
       // It isn't critical that we remove this so just log the error and move on
       wcl::log::error("cleaning corrupt job: bad entry in %s: %s", group_dir.c_str(),
-                      strerror(entry.error()));
+                      strerror(entry.error()))();
       return;
     }
     int64_t job_id = std::stoll(entry->name);
