@@ -246,7 +246,8 @@ static void garbage_collect_job(std::string job_dir) {
   }
 }
 
-static void garbage_collect_group(const std::unordered_set<int64_t> jobs,int64_t max_job, int group_id) {
+static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int64_t max_job,
+                                  int group_id) {
   auto group_dir = std::to_string(group_id);
   auto dir_res = wcl::directory_range::open(group_dir);
   if (!dir_res) {
