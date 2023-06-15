@@ -31,6 +31,7 @@
 #include <iostream>
 #include <memory>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 
 #include "db_helpers.h"
@@ -219,9 +220,83 @@ struct LRUEvictionPolicyImpl {
   }
 };
 
+static void garbage_collect_job(std::string job_dir) {
+  auto dir_res = wcl::directory_range::open(job_dir);
+  if (!dir_res) {
+    // We can keep going even with this failure but we need to at least log it
+    wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
+                    job_dir.c_str(), strerror(dir_res.error()));
+    return;
+  }
+
+  // Find all the entries to remove
+  for (const auto& entry : *dir_res) {
+    if (!entry) {
+      // If one entry has a failure we can just keep going to try and remove more entries
+      wcl::log::error("cleaning corrupt job: bad entry in %s: %s", job_dir.c_str(),
+                      strerror(entry.error()));
+      continue;
+    }
+    std::string file = wcl::join_paths(job_dir, entry->name);
+    unlink_no_fail(file.c_str());
+
+    // This isn't a super important task so we want to wait a bit between iterations
+    usleep(200);
+  }
+}
+
+static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int group_id) {
+  auto group_dir = std::to_string(group_id);
+  auto dir_res = wcl::directory_range::open(group_dir);
+  if (!dir_res) {
+    // We can keep going even with this failure but we need to at least log it
+    wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
+                    group_dir.c_str(), strerror(dir_res.error()));
+    return;
+  }
+
+  // Find all the entries to remove
+  for (const auto& entry : *dir_res) {
+    if (!entry) {
+      // It isn't critical that we remove this so just log the error and move on
+      wcl::log::error("cleaning corrupt job: bad entry in %s: %s", group_dir.c_str(),
+                      strerror(entry.error()));
+      return;
+    }
+    int64_t job_id = std::stoll(entry->name);
+    if (jobs.count(job_id)) {
+      garbage_collect_job(wcl::join_paths(group_dir, entry->name));
+    }
+  }
+}
+
+static void garbage_collect_orphan_folders(std::shared_ptr<job_cache::Database> db) {
+  constexpr const char* all_jobs_q = "select job_id from jobs";
+  PreparedStatement all_jobs(db, all_jobs_q);
+  Transaction transact(db);
+  std::unordered_set<int64_t> jobs;
+  // uint8_t group_id = job_id & 0xFF;
+  // std::string job_dir = wcl::join_paths(wcl::to_hex(&group_id), std::to_string(job_id));
+
+  // First we run a very large query to find all job ids
+  transact.run([&all_jobs, &jobs]() {
+    // Loop over every single job
+    while (all_jobs.step() == SQLITE_ROW) {
+      int64_t job_id = all_jobs.read_integer(0);
+      jobs.insert(job_id);
+    }
+  });
+
+  // Next we slowly loop over job cache looking for orphaned folders
+  for (int group_id = 0; group_id <= 0xFF; ++group_id) {
+    garbage_collect_group(jobs, group_id);
+  }
+}
+
 void LRUEvictionPolicy::init(const std::string& cache_dir) {
-  auto db = std::make_unique<job_cache::Database>(cache_dir);
-  impl = std::make_unique<LRUEvictionPolicyImpl>(cache_dir, std::move(db));
+  std::shared_ptr<job_cache::Database> db = std::make_unique<job_cache::Database>(cache_dir);
+  impl = std::make_unique<LRUEvictionPolicyImpl>(cache_dir, db);
+  std::async([db]() { garbage_collect_orphan_folders(db); });
 }
 
 void LRUEvictionPolicy::read(int job_id) { impl->mark_new_use(job_id); }

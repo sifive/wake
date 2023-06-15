@@ -54,6 +54,7 @@ class DaemonCache {
 
   FindJobResponse read(const FindJobRequest &find_request);
   void add(const AddJobRequest &add_request);
+  void remove_corrupt_job(int64_t job_id);
 
   void handle_new_client();
   void handle_msg(int fd);
