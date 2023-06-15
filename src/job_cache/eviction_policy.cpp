@@ -317,8 +317,10 @@ static void garbage_collect_orphan_folders(std::shared_ptr<job_cache::Database> 
 void LRUEvictionPolicy::init(const std::string& cache_dir) {
   std::shared_ptr<job_cache::Database> db = std::make_unique<job_cache::Database>(cache_dir);
   impl = std::make_unique<LRUEvictionPolicyImpl>(cache_dir, db);
-  static thread_local std::future<void> fut =
-      std::async([db]() { garbage_collect_orphan_folders(db); });
+
+  // To keep this thread alive, we assign it to a static thread object.
+  // This starts the collection but if the programs ends so too will this thread.
+  gc_thread = std::thread(garbage_collect_orphan_folders, db);
 }
 
 void LRUEvictionPolicy::read(int job_id) { impl->mark_new_use(job_id); }

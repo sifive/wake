@@ -24,6 +24,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 
 namespace job_cache {
 
@@ -55,6 +56,7 @@ class LRUEvictionPolicy : public EvictionPolicy {
   std::unique_ptr<LRUEvictionPolicyImpl> impl;
   uint64_t max_cache_size;
   uint64_t low_cache_size;
+  std::thread gc_thread;
 
  public:
   explicit LRUEvictionPolicy(uint64_t max_cache_size, uint64_t low_cache_size);
