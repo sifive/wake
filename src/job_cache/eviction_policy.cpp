@@ -239,11 +239,16 @@ static void garbage_collect_job(std::string job_dir) {
       continue;
     }
     std::string file = wcl::join_paths(job_dir, entry->name);
-    unlink_no_fail(file.c_str());
+
+    // unlink, if we fail we just ignore the error so that we don't fail
+    unlink(file.c_str());
 
     // This isn't a super important task so we want to wait a bit between iterations
     usleep(200);
   }
+
+  // Finally clean up the file so we don't try to clean it up again later
+  rmdir(job_dir.c_str());
 }
 
 static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int64_t max_job,
@@ -258,6 +263,7 @@ static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int64_
   }
 
   // Find all the entries to remove
+  std::vector<int64_t> jobs_to_check;
   for (const auto& entry : *dir_res) {
     if (!entry) {
       // It isn't critical that we remove this so just log the error and move on
@@ -271,10 +277,17 @@ static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int64_
     // we ignore them.
     if (job_id > max_job) continue;
 
-    // Otherwise if we don't know about this job, it has been orphaned.
+    // Otherwise add to the list to check later
+    jobs_to_check.push_back(job_id);
+  }
+
+  // Collect the jobs in a second loop so that we don't mutate the list
+  // while we're traversing it.
+  for (auto job_id : jobs_to_check) {
     if (jobs.count(job_id)) {
-      garbage_collect_job(wcl::join_paths(group_dir, entry->name));
+      continue;
     }
+    garbage_collect_job(wcl::join_paths(group_dir, std::to_string(job_id)));
   }
 }
 
@@ -284,8 +297,6 @@ static void garbage_collect_orphan_folders(std::shared_ptr<job_cache::Database> 
   Transaction transact(db);
   std::unordered_set<int64_t> jobs;
   int64_t max_job = -1;
-  // uint8_t group_id = job_id & 0xFF;
-  // std::string job_dir = wcl::join_paths(wcl::to_hex(&group_id), std::to_string(job_id));
 
   // First we run a very large query to find all job ids
   transact.run([&all_jobs, &max_job, &jobs]() {
@@ -306,7 +317,8 @@ static void garbage_collect_orphan_folders(std::shared_ptr<job_cache::Database> 
 void LRUEvictionPolicy::init(const std::string& cache_dir) {
   std::shared_ptr<job_cache::Database> db = std::make_unique<job_cache::Database>(cache_dir);
   impl = std::make_unique<LRUEvictionPolicyImpl>(cache_dir, db);
-  std::async([db]() { garbage_collect_orphan_folders(db); });
+  static thread_local std::future<void> fut =
+      std::async([db]() { garbage_collect_orphan_folders(db); });
 }
 
 void LRUEvictionPolicy::read(int job_id) { impl->mark_new_use(job_id); }

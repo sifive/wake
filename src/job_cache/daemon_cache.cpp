@@ -613,7 +613,7 @@ void DaemonCache::remove_corrupt_job(int64_t job_id) {
   // First remove this job from the database so that we don't get hung up on it anymore
   impl->jobs.remove(job_id);
 
-  // Find this job directory so we can remove all the file
+  // Find this job directory so we can remove all the files
   uint8_t group_id = job_id & 0xFF;
   std::string job_dir = wcl::join_paths(wcl::to_hex(&group_id), std::to_string(job_id));
 
@@ -640,11 +640,13 @@ void DaemonCache::remove_corrupt_job(int64_t job_id) {
 
   // Unlink them all
   for (const auto &file : to_delete) {
-    unlink_no_fail(file.c_str());
+    // We don't want to fail if this fails for some reason, so just
+    // ignore the error.
+    unlink(file.c_str());
   }
 
-  // Remove the files
-  rmdir_no_fail(job_dir.c_str());
+  // Remove the files, but don't fail if the rmdir fails
+  rmdir(job_dir.c_str());
 }
 
 FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
