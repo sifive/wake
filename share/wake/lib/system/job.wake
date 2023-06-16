@@ -508,8 +508,10 @@ export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Ru
                     def _ = write ".cache-misses/write.{prefix}.json" "//{label}\n{jobCacheAddJson}"
 
                     True
+
                 # Caching a failed job is a waste of space, never do that
-                require True = status != 0
+                require True = status == 0
+
                 job_cache_add jobCacheAddJson
 
             Pass (RunnerOutput (map getPathName vis) outputs useage)
