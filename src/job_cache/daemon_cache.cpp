@@ -914,6 +914,11 @@ void DaemonCache::launch_evict_loop() {
     close(stdoutPipe[read_side]);
     close(stdoutPipe[write_side]);
 
+    // We use stdout as a comunication line so we re-map logging of eviction to stderr
+    wcl::log::clear_subscribers();
+    wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(std::cerr.rdbuf()));
+    wcl::log::info("Reinitialized logging for eviction loop")();
+
     // Finally enter the eviction loop, if it exits cleanly
     // go ahead and exit with its result.
     int result =

@@ -35,7 +35,8 @@ void remove_backing_files(const std::string &dir, int64_t job_id);
 // in parallel.
 // NOTE: This should not be used from the wake process itself
 //       because it can spawn threads.
-void remove_backing_files(std::string dir, const std::vector<int64_t> &job_ids,
+void remove_backing_files(std::string dir,
+                          const std::vector<std::pair<int64_t, std::string>> &job_ids,
                           size_t min_removals_per_thread, size_t max_number_of_threads);
 
 // Tries to reflink src to dst but copies if that fails.

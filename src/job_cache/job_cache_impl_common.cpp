@@ -238,7 +238,11 @@ void remove_backing_files(const std::string &dir, int64_t job_id) {
     exit(1);
   }
 
+  wcl::log::info("Removing backing files of job with job_id = %ld at %s", job_id,
+                 job_dir.c_str())();
+
   // loop over the directory now and delete any files as we go.
+  std::vector<std::string> files_to_remove;
   for (const auto &entry : *dir_range) {
     if (!entry) {
       wcl::log::error("readdir(%s): %s", job_dir.c_str(), strerror(entry.error())).urgent()();
@@ -251,11 +255,17 @@ void remove_backing_files(const std::string &dir, int64_t job_id) {
           .urgent()();
       exit(1);
     }
-    unlink_no_fail(entry->name.c_str());
+    files_to_remove.push_back(wcl::join_paths(job_dir, entry->name));
   }
+  for (const auto &file : files_to_remove) {
+    unlink_no_fail(file.c_str());
+  }
+
+  rmdir_no_fail(job_dir.c_str());
 }
 
-void remove_backing_files(std::string dir, const std::vector<int64_t> &job_ids,
+void remove_backing_files(std::string dir,
+                          const std::vector<std::pair<int64_t, std::string>> &job_ids,
                           size_t min_removals_per_thread, size_t max_number_of_threads) {
   // Calculate a good number of threads to use.
   size_t actual_num_threads =
@@ -274,7 +284,8 @@ void remove_backing_files(std::string dir, const std::vector<int64_t> &job_ids,
     tasks.emplace_back(std::async(std::launch::async, [&dir, iter, task_end, end]() {
       auto i = iter;
       for (; i < task_end && i < end; ++i) {
-        remove_backing_files(dir, *i);
+        wcl::log::info("evicted job with cmd = %s", i->second.c_str())();
+        remove_backing_files(dir, i->first);
       }
     }));
     iter = task_end;

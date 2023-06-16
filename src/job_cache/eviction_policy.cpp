@@ -80,7 +80,7 @@ struct LRUEvictionPolicyImpl {
   // This is meant to be used as part of a transaction with remove_least_recently_used.
   // It simply returns the job_ids in last use order.
   static constexpr const char* find_least_recently_used_query =
-      "select l.last_use, o.obytes, j.job_id "
+      "select l.last_use, o.obytes, j.job_id, j.commandline "
       "from lru_stats l, jobs j, job_output_info o "
       "where l.job_id = j.job_id and o.job = j.job_id "
       "order by l.last_use";
@@ -160,7 +160,7 @@ struct LRUEvictionPolicyImpl {
   }
 
   void cleanup(uint64_t current_size, uint64_t bytes_to_remove) {
-    std::vector<int64_t> jobs_to_remove;
+    std::vector<std::pair<int64_t, std::string>> jobs_to_remove;
     transact.run([this, &jobs_to_remove, current_size, bytes_to_remove]() {
       uint64_t last_use = 0;
       uint64_t to_remove = bytes_to_remove;
@@ -176,7 +176,16 @@ struct LRUEvictionPolicyImpl {
 
           last_use = find_least_recently_used.read_integer(0);
 
-          jobs_to_remove.push_back(find_least_recently_used.read_integer(2));
+          int64_t job_id = find_least_recently_used.read_integer(2);
+          std::string cmd = find_least_recently_used.read_string(3);
+
+          // The cmd uses null bytes to seperate parts of a command so, we
+          // replace them with spaces to make it readable.
+          for (auto& ch : cmd) {
+            if (ch == '\0') ch = ' ';
+          }
+
+          jobs_to_remove.emplace_back(job_id, std::move(cmd));
 
           removed_so_far += obytes;
 
@@ -213,9 +222,10 @@ struct LRUEvictionPolicyImpl {
     // Now we remove the threads in the background.
     // TODO: Figure out how many cores we actully have and use a multiple of that
     // NOTE: We don't wait for this to finish
-    std::async(std::launch::async, [dir = cache_dir, jobs_to_remove = std::move(jobs_to_remove)]() {
-      remove_backing_files(dir, jobs_to_remove, 8, 128);
-    });
+    // std::async(std::launch::async, [dir = cache_dir, jobs_to_remove =
+    // std::move(jobs_to_remove)]() {
+    remove_backing_files(cache_dir, jobs_to_remove, 8, 128);
+    //});
   }
 };
 
