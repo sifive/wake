@@ -57,6 +57,7 @@ struct CommandLineOptions {
   bool clean;
   bool list_outputs;
   wcl::optional<bool> log_header_align;
+  wcl::optional<bool> cache_miss_on_failure;
 
   const char *percent_str;
   const char *jobs_str;
@@ -152,6 +153,8 @@ struct CommandLineOptions {
       {0, "log-header-source-width", GOPT_ARGUMENT_REQUIRED},
       {0, "log-header-align", GOPT_ARGUMENT_FORBIDDEN},
       {0, "no-log-header-align", GOPT_ARGUMENT_FORBIDDEN},
+      {0, "cache-miss-on-failure", GOPT_ARGUMENT_FORBIDDEN},
+      {0, "no-cache-miss-on-failure", GOPT_ARGUMENT_FORBIDDEN},
       {':', "shebang", GOPT_ARGUMENT_REQUIRED},
       {0, 0, GOPT_LAST}
     };
@@ -219,6 +222,14 @@ struct CommandLineOptions {
 
     if (arg(options, "no-log-header-align")->count) {
       log_header_align = wcl::some(false);
+    }
+
+    if (arg(options, "cache-miss-on-failure")->count) {
+      cache_miss_on_failure = wcl::some(true);
+    }
+
+    if (arg(options, "no-cache-miss-on-failure")->count) {
+      cache_miss_on_failure = wcl::some(false);
     }
 
     auto lhsw_str = arg(options, "log-header-source-width")->argument;

@@ -337,6 +337,7 @@ int main(int argc, char **argv) {
   }
   config_override.log_header_source_width = clo.log_header_source_width;
   config_override.log_header_align = clo.log_header_align;
+  config_override.cache_miss_on_failure = clo.cache_miss_on_failure;
 
   if (!WakeConfig::init(".wakeroot", config_override)) {
     return 1;
@@ -369,7 +370,8 @@ int main(int argc, char **argv) {
   const char *job_cache_dir = getenv("WAKE_EXPERIMENTAL_JOB_CACHE");
   if (job_cache_dir != nullptr) {
     cache = std::make_unique<job_cache::Cache>(job_cache_dir, WakeConfig::get()->max_cache_size,
-                                               WakeConfig::get()->low_cache_size);
+                                               WakeConfig::get()->low_cache_size,
+                                               WakeConfig::get()->cache_miss_on_failure);
     set_job_cache(cache.get());
   }
 

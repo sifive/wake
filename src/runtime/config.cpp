@@ -214,6 +214,7 @@ POLICY_STATIC_DEFINES(LogHeaderSourceWidthPolicy)
 POLICY_STATIC_DEFINES(LabelFilterPolicy)
 POLICY_STATIC_DEFINES(SharedCacheMaxSize)
 POLICY_STATIC_DEFINES(SharedCacheLowSize)
+POLICY_STATIC_DEFINES(SharedCacheMissOnFailure)
 POLICY_STATIC_DEFINES(LogHeaderAlignPolicy)
 
 /********************************************************************
@@ -268,10 +269,17 @@ void SharedCacheLowSize::set(SharedCacheLowSize& p, const JAST& json) {
   }
 }
 
+void SharedCacheMissOnFailure::set(SharedCacheMissOnFailure& p, const JAST& json) {
+  auto json_shared_cache_miss_on_failure = json.expect_boolean();
+  if (json_shared_cache_miss_on_failure) {
+    p.cache_miss_on_failure = *json_shared_cache_miss_on_failure;
+  }
+}
+
 void LogHeaderAlignPolicy::set(LogHeaderAlignPolicy& p, const JAST& json) {
-  auto json_log_header_algih = json.expect_boolean();
-  if (json_log_header_algih) {
-    p.log_header_align = *json_log_header_algih;
+  auto json_log_header_align = json.expect_boolean();
+  if (json_log_header_align) {
+    p.log_header_align = *json_log_header_align;
   }
 }
 

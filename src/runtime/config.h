@@ -43,14 +43,19 @@ struct WakeConfigOverrides {
   // Determines the size of the cache that collection
   // tries to get us back to.
   wcl::optional<uint64_t> low_cache_size;
+
+  // Determines if log headers should be aligned
   wcl::optional<bool> log_header_align;
+
+  // Determines if job cache should terminate on error or return a cache miss
+  wcl::optional<bool> cache_miss_on_failure;
 };
 
 template <class T>
 using Override = wcl::optional<T> WakeConfigOverrides::*;
 
 /********************************************************************
- * Polcies
+ * Policies
  ********************************************************************/
 
 struct VersionPolicy {
@@ -172,6 +177,29 @@ struct SharedCacheLowSize {
   static void emit(const SharedCacheLowSize& p, std::ostream& os) { os << p.*value; }
 };
 
+struct SharedCacheMissOnFailure {
+  using type = bool;
+  using input_type = type;
+  static constexpr const char* key = "cache_miss_on_failure";
+  static constexpr bool allowed_in_wakeroot = true;
+  static constexpr bool allowed_in_userconfig = true;
+  type cache_miss_on_failure = false;
+  static constexpr type SharedCacheMissOnFailure::*value =
+      &SharedCacheMissOnFailure::cache_miss_on_failure;
+  static constexpr Override<input_type> override_value =
+      &WakeConfigOverrides::cache_miss_on_failure;
+
+  static void set(SharedCacheMissOnFailure& p, const JAST& json);
+  static void set_input(SharedCacheMissOnFailure& p, const input_type& v) { p.*value = v; }
+  static void emit(const SharedCacheMissOnFailure& p, std::ostream& os) {
+    if (p.cache_miss_on_failure) {
+      os << "true";
+    } else {
+      os << "false";
+    }
+  }
+};
+
 struct LogHeaderAlignPolicy {
   using type = bool;
   using input_type = type;
@@ -214,8 +242,8 @@ static inline const char* to_string(WakeConfigProvenance p) {
   return "Unknown (this is an error, please report this to Wake devs)";
 }
 
-template <class... Polcies>
-struct WakeConfigImpl : public Polcies... {
+template <class... Policies>
+struct WakeConfigImpl : public Policies... {
   WakeConfigImpl(const WakeConfigImpl&) = delete;
   WakeConfigImpl(WakeConfigImpl&&) = delete;
   WakeConfigImpl() = default;
@@ -295,35 +323,36 @@ struct WakeConfigImpl : public Polcies... {
  protected:
   static std::set<std::string> wakeroot_allowed_keys() {
     std::set<std::string> out;
-    call_all(add_wakeroot_key<Polcies>(out)...);
+    call_all(add_wakeroot_key<Policies>(out)...);
     return out;
   }
 
   static std::set<std::string> userconfig_allowed_keys() {
     std::set<std::string> out;
-    call_all(add_userconfig_key<Polcies>(out)...);
+    call_all(add_userconfig_key<Policies>(out)...);
     return out;
   }
 
   template <WakeConfigProvenance p>
   void set_all(const JAST& json) {
-    call_all(set_policy<p, Polcies>(json)...);
+    call_all(set_policy<p, Policies>(json)...);
   }
 
   void override_all(const WakeConfigOverrides& overrides) {
-    call_all(override_policy<Polcies>(overrides)...);
+    call_all(override_policy<Policies>(overrides)...);
   }
 
  public:
   void emit(std::ostream& os) const {
     os << "Wake config:" << std::endl;
-    call_all(emit_each<Polcies>(os)...);
+    call_all(emit_each<Policies>(os)...);
   }
 };
 
 using WakeConfigImplFull =
     WakeConfigImpl<UserConfigPolicy, VersionPolicy, LogHeaderPolicy, LogHeaderSourceWidthPolicy,
-                   LabelFilterPolicy, SharedCacheMaxSize, SharedCacheLowSize, LogHeaderAlignPolicy>;
+                   LabelFilterPolicy, SharedCacheMaxSize, SharedCacheLowSize,
+                   SharedCacheMissOnFailure, LogHeaderAlignPolicy>;
 
 struct WakeConfig final : public WakeConfigImplFull {
   static bool init(const std::string& wakeroot_path, const WakeConfigOverrides& overrides);
