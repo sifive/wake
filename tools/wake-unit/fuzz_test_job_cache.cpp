@@ -332,7 +332,6 @@ TEST(job_cache_basic_fuzz) {
   TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
 }
 
-/*
 // This test appears to work but it takes quite a long time and
 // causes a lot of filesystem churn. Just test this on your own
 // occasionally as a debugging/repro tool for those kinds of issues.
@@ -347,8 +346,7 @@ TEST(job_cache_large_message_fuzz) {
   config.cache_dir = ".job_cache_test";
   config.dir = "job_cache_test";
   TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
-}
-*/
+}*/
 
 // This test appears to work but it takes *FOREVER* and doesn't represent
 // a very likely case. Still it might be worth running this on your own

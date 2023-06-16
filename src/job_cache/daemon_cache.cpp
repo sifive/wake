@@ -282,6 +282,7 @@ class JobTable {
   std::shared_ptr<job_cache::Database> db;
   PreparedStatement add_job;
   PreparedStatement add_output_info;
+  PreparedStatement remove_job;
 
  public:
   static constexpr const char *insert_query =
@@ -293,10 +294,16 @@ class JobTable {
       "(job, stdout, stderr, ret, runtime, cputime, mem, ibytes, obytes)"
       "values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
+  static constexpr const char *remove_job_query = "delete from jobs where job_id = ?";
+
   JobTable(std::shared_ptr<job_cache::Database> db)
-      : db(db), add_job(db, insert_query), add_output_info(db, add_output_info_query) {
+      : db(db),
+        add_job(db, insert_query),
+        add_output_info(db, add_output_info_query),
+        remove_job(db, remove_job_query) {
     add_job.set_why("Could not insert job");
     add_output_info.set_why("Could not add output info");
+    remove_job.set_why("Could not remove job");
   }
 
   int64_t insert(const std::string &cwd, const std::string &cmd, const std::string &env,
@@ -327,6 +334,12 @@ class JobTable {
     add_output_info.bind_integer(9, obytes);
     add_output_info.step();
     add_output_info.reset();
+  }
+
+  void remove(int64_t job_id) {
+    remove_job.bind_integer(1, job_id);
+    remove_job.step();
+    remove_job.reset();
   }
 };
 
@@ -596,6 +609,46 @@ int DaemonCache::run() {
   return 0;
 }
 
+void DaemonCache::remove_corrupt_job(int64_t job_id) {
+  // First remove this job from the database so that we don't get hung up on it anymore
+  impl->jobs.remove(job_id);
+
+  // Find this job directory so we can remove all the files
+  uint8_t group_id = job_id & 0xFF;
+  std::string job_dir = wcl::join_paths(wcl::to_hex(&group_id), std::to_string(job_id));
+
+  // Iterate over these files collecting the paths to delete
+  std::vector<std::string> to_delete;
+  auto dir_res = wcl::directory_range::open(job_dir);
+  if (!dir_res) {
+    // We can keep going even with this failure but we need to at least log it
+    wcl::log::error("cleaning corrupt job: wcl::directory_range::open(%s): %s", job_dir.c_str(),
+                    strerror(dir_res.error()))();
+    return;
+  }
+
+  // Find all the entries to remove
+  for (const auto &entry : *dir_res) {
+    if (!entry) {
+      // It isn't critical that we remove this so just log the error and move on
+      wcl::log::error("cleaning corrupt job: bad entry in %s: %s", job_dir.c_str(),
+                      strerror(entry.error()))();
+      return;
+    }
+    to_delete.emplace_back(wcl::join_paths(job_dir, entry->name));
+  }
+
+  // Unlink them all
+  for (const auto &file : to_delete) {
+    // We don't want to fail if this fails for some reason, so just
+    // ignore the error.
+    unlink(file.c_str());
+  }
+
+  // Remove the files, but don't fail if the rmdir fails
+  rmdir(job_dir.c_str());
+}
+
 FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
   wcl::optional<std::pair<int, MatchingJob>> matching_job;
 
@@ -634,6 +687,7 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
     int ret = link(cur_file.c_str(), tmp_file.c_str());
     if (ret < 0 && errno != EEXIST) {
       success = false;
+      remove_corrupt_job(job_id);
       break;
     }
     to_copy.emplace_back(std::make_tuple(std::move(tmp_file), output_file.path, output_file.mode));
