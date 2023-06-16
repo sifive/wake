@@ -270,9 +270,11 @@ int main(int argc, char **argv) {
         continue;
       }
 
-      auto diff = wcl::diff<std::string>(src.begin(), src.end(), fmt.begin(), fmt.end());
-      display_diff(std::cerr, diff);
       dry_run_failed = true;
+
+      auto diff = wcl::diff<std::string>(src.begin(), src.end(), fmt.begin(), fmt.end());
+      std::cerr << std::endl << name << std::endl;
+      display_diff(std::cerr, diff);
     }
 
     if (in_place) {
