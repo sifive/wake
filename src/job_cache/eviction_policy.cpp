@@ -52,6 +52,7 @@ struct LRUEvictionPolicyImpl {
   job_cache::PreparedStatement find_least_recently_used;
   job_cache::PreparedStatement remove_least_recently_used;
   job_cache::Transaction transact;
+  std::thread cleaning_thread;
 
   // TODO: Right now we're using `obytes` as a proxy for the size of a job
   //       but this is an over aproximation of the storage cost really.
@@ -220,12 +221,13 @@ struct LRUEvictionPolicyImpl {
     });
 
     // Now we remove the threads in the background.
-    // TODO: Figure out how many cores we actully have and use a multiple of that
     // NOTE: We don't wait for this to finish
-    // std::async(std::launch::async, [dir = cache_dir, jobs_to_remove =
-    // std::move(jobs_to_remove)]() {
-    remove_backing_files(cache_dir, jobs_to_remove, 8, 128);
-    //});
+    // There might be an already running thread finishing up some cleaning.
+    // Instead of killing it we should join it before starting a new one.
+    if (cleaning_thread.joinable()) cleaning_thread.join();
+    // Launch the cleaning thread
+    cleaning_thread = std::thread(remove_backing_files, cache_dir, jobs_to_remove,
+                                  4 * std::thread::hardware_concurrency());
   }
 };
 

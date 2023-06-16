@@ -229,7 +229,7 @@ void copy_or_reflink(const char *src, const char *dst, mode_t mode, int extra_fl
 
 #endif
 
-void remove_backing_files(const std::string &dir, int64_t job_id) {
+void remove_job_backing_files(const std::string &dir, int64_t job_id) {
   uint8_t group_id = job_id & 0xFF;
   std::string job_dir = wcl::join_paths(dir, wcl::to_hex(&group_id), std::to_string(job_id));
   auto dir_range = wcl::directory_range::open(job_dir);
@@ -266,10 +266,9 @@ void remove_backing_files(const std::string &dir, int64_t job_id) {
 
 void remove_backing_files(std::string dir,
                           const std::vector<std::pair<int64_t, std::string>> &job_ids,
-                          size_t min_removals_per_thread, size_t max_number_of_threads) {
+                          size_t max_number_of_threads) {
   // Calculate a good number of threads to use.
-  size_t actual_num_threads =
-      std::min(max_number_of_threads, std::max(1UL, job_ids.size() / min_removals_per_thread));
+  size_t actual_num_threads = std::min(max_number_of_threads, std::max(1UL, job_ids.size()));
 
   // Calculate how many removals will be done by each task
   size_t actual_removals_per_thread =
@@ -285,7 +284,7 @@ void remove_backing_files(std::string dir,
       auto i = iter;
       for (; i < task_end && i < end; ++i) {
         wcl::log::info("evicted job with cmd = %s", i->second.c_str())();
-        remove_backing_files(dir, i->first);
+        remove_job_backing_files(dir, i->first);
       }
     }));
     iter = task_end;
