@@ -511,6 +511,7 @@ export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Ru
 
                 # Caching a failed job is a waste of space, never do that
                 require True = status == 0
+                else Pass ""
 
                 job_cache_add jobCacheAddJson
 
