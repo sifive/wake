@@ -29,14 +29,15 @@
 // This function removes all the baking files of a specific job.
 // While not technically unsafe to use on a job still in the databse
 // this should be avoided.
-void remove_backing_files(const std::string &dir, int64_t job_id);
+void remove_job_backing_files(const std::string &dir, int64_t job_id);
 
 // Like remove_backing_files(int64_t job_id) but removes many
 // in parallel.
 // NOTE: This should not be used from the wake process itself
 //       because it can spawn threads.
-void remove_backing_files(std::string dir, const std::vector<int64_t> &job_ids,
-                          size_t min_removals_per_thread, size_t max_number_of_threads);
+void remove_backing_files(std::string dir,
+                          const std::vector<std::pair<int64_t, std::string>> &job_ids,
+                          size_t max_number_of_threads);
 
 // Tries to reflink src to dst but copies if that fails.
 void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644, int extra_flags = 0);
