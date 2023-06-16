@@ -76,6 +76,7 @@ void print_help(const char *argv0) {
     << "Usage: " << argv0 << " [OPTIONS] [<file> ...]" << std::endl
     << "  --debug    -d     Print debug info while formatting"                   << std::endl
     << "  --dry-run  -n     Check if formatting needed, but don't apply it"      << std::endl
+    << "  --quiet    -q     requires -n, don't emit the diff on failure."        << std::endl
     << "  --help     -h     Print this help message and exit"                    << std::endl
     << "  --in-place -i     Edit files in place. Default emits file to stdout"   << std::endl
     << "  --version  -v     Print the version and exit"                          << std::endl
@@ -146,6 +147,7 @@ int main(int argc, char **argv) {
   struct option options[] {
     { 'd',    "debug", GOPT_ARGUMENT_FORBIDDEN},
     { 'n',  "dry-run", GOPT_ARGUMENT_FORBIDDEN},
+    { 'q',    "quiet", GOPT_ARGUMENT_FORBIDDEN},
     { 'h',     "help", GOPT_ARGUMENT_FORBIDDEN},
     { 'i', "in-place", GOPT_ARGUMENT_FORBIDDEN},
     { 'v',  "version", GOPT_ARGUMENT_FORBIDDEN},
@@ -160,6 +162,7 @@ int main(int argc, char **argv) {
   gopt_errors(argv[0], options);
 
   bool dry_run = arg(options, "dry-run")->count;
+  bool quiet = arg(options, "quiet")->count;
   bool help = arg(options, "help")->count;
   bool in_place = arg(options, "in-place")->count;
   bool version = arg(options, "version")->count;
@@ -185,7 +188,7 @@ int main(int argc, char **argv) {
                        : wcl::xoshiro_256::get_rng_seed();
   wcl::xoshiro_256 rng(seed);
 
-  bool dry_run_failed = false;
+  std::vector<std::pair<std::string, std::string>> dry_run_failures = {};
 
   for (int i = 1; i < argc; i++) {
     std::string name(argv[i]);
@@ -270,11 +273,10 @@ int main(int argc, char **argv) {
         continue;
       }
 
-      dry_run_failed = true;
-
+      std::stringstream s;
       auto diff = wcl::diff<std::string>(src.begin(), src.end(), fmt.begin(), fmt.end());
-      std::cerr << std::endl << name << std::endl;
-      display_diff(std::cerr, diff);
+      display_diff(s, diff);
+      dry_run_failures.push_back({name, s.str()});
     }
 
     if (in_place) {
@@ -288,7 +290,28 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (dry_run && dry_run_failed) {
+  if (dry_run) {
+    if (dry_run_failures.empty()) {
+      exit(EXIT_SUCCESS);
+    }
+
+    std::cerr << "At least one source file failed formatting." << std::endl << std::endl;
+
+    std::cerr << dry_run_failures[0].first << std::endl;
+    if (!quiet) {
+      std::cerr << dry_run_failures[0].second;
+    }
+
+    for (size_t i = 1; i < dry_run_failures.size(); i++) {
+      if (!quiet) {
+        std::cerr << std::endl;
+      }
+      std::cerr << dry_run_failures[i].first << std::endl;
+      if (!quiet) {
+        std::cerr << dry_run_failures[i].second;
+      }
+    }
+
     exit(EXIT_FAILURE);
   }
 
