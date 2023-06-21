@@ -45,3 +45,4 @@ compile_commands.json
 *.swp
 *.swo
 *.swn
+/cargo/target/*
