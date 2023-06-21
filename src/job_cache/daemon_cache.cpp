@@ -482,7 +482,7 @@ class SelectMatchingJobs {
     find_jobs.bind_string(2, find_job_request.command_line);
     find_jobs.bind_string(3, find_job_request.envrionment);
     find_jobs.bind_string(4, find_job_request.stdin_str);
-    find_jobs.bind_string(6, find_job_request.hash);
+    find_jobs.bind_string(6, find_job_request.runner_hash);
 
     // The bloom filter of a matching job has to be a subset of this one
     uint64_t bloom_integer = *reinterpret_cast<const uint64_t *>(find_job_request.bloom.data());
@@ -867,7 +867,7 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   {
     impl->transact.run([this, &add_request, &job_id]() {
       job_id = impl->jobs.insert(add_request.cwd, add_request.command_line, add_request.envrionment,
-                                 add_request.stdin_str, add_request.bloom, add_request.hash);
+                                 add_request.stdin_str, add_request.bloom, add_request.runner_hash);
 
       // Add additional info
       impl->jobs.insert_output_info(job_id, add_request.stdout_str, add_request.stderr_str,

@@ -366,7 +366,7 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
                     "stdin" :-> JString stdin,
                     "input_files" :-> jobCacheVisible,
                     "client_cwd" :-> JString workspace,
-                    "hash" :-> JString hashKey,
+                    "runner_hash" :-> JString hashKey,
                     "dir_redirects" :-> JObject (wakeroot :-> JString "./",),
                 )
 
@@ -486,7 +486,7 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
                     "command_line" :-> JString cmd.implode,
                     "envrionment" :-> JString env.implode,
                     "stdin" :-> JString stdin,
-                    "hash" :-> JString hashKey,
+                    "runner_hash" :-> JString hashKey,
                     "input_files" :-> jobCacheReadFiles,
                     "input_dirs" :-> JArray Nil, # TODO: This will need some fuse work to make good on
                     "output_files" :-> jobCacheOutputFiles,
