@@ -337,7 +337,7 @@ def getPath input =
 
 # wakeroot is the absolute sandbox-path from which input and output files will
 # be interpreted as being relative to if they're in fact relative.
-export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Runner): Runner =
+export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String Error) (wakeroot: String) ((Runner name score baseDoIt): Runner): Runner =
     def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
     def badlaunch job error = prim "job_fail_launch"
     def job_cache_read str = prim "job_cache_read"
@@ -354,6 +354,8 @@ export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Ru
 
             def jobCacheVisible = JArray (map mkVisJson vis)
 
+            require Pass hashKey = hashFn runnerInput
+
             def jobCacheJsonIn =
                 prettyJSON
                 $ JObject (
@@ -364,6 +366,7 @@ export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Ru
                     "stdin" :-> JString stdin,
                     "input_files" :-> jobCacheVisible,
                     "client_cwd" :-> JString workspace,
+                    "runner_hash" :-> JString hashKey,
                     "dir_redirects" :-> JObject (wakeroot :-> JString "./",),
                 )
 
@@ -483,6 +486,7 @@ export def mkJobCacheRunner (wakeroot: String) ((Runner name score baseDoIt): Ru
                     "command_line" :-> JString cmd.implode,
                     "envrionment" :-> JString env.implode,
                     "stdin" :-> JString stdin,
+                    "runner_hash" :-> JString hashKey,
                     "input_files" :-> jobCacheReadFiles,
                     "input_dirs" :-> JArray Nil, # TODO: This will need some fuse work to make good on
                     "output_files" :-> jobCacheOutputFiles,
@@ -843,7 +847,7 @@ export def defaultRunner: Runner =
     # works in relative paths to make different runs consistent. Ideally
     # you'd have a more complex sandbox that kept the wakeroot at a
     # consistent place across runs.
-    mkJobCacheRunner "/workspace" fuseRunner
+    mkJobCacheRunner (\_ Pass "") "/workspace" fuseRunner
 
 # A plan describing how to construct a JSONRunner
 # RawScript: the path to the script to run jobs with

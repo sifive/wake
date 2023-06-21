@@ -301,6 +301,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
   req.command_line = json.get("command_line").value;
   req.envrionment = json.get("envrionment").value;
   req.stdin_str = json.get("stdin").value;
+  req.runner_hash = json.get("runner_hash").value;
   req.stdout_str = json.get("stdout").value;
   req.stderr_str = json.get("stderr").value;
   req.status = std::stoi(json.get("status").value);
@@ -572,6 +573,7 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
   envrionment = find_job_json.get("envrionment").value;
   stdin_str = find_job_json.get("stdin").value;
   client_cwd = find_job_json.get("client_cwd").value;
+  runner_hash = find_job_json.get("runner_hash").value;
   if (wcl::is_relative(client_cwd)) {
     wcl::log::error("FindJobRequest::FindJobRequest: client_cwd cannot be relative. found: '%s'",
                     client_cwd.c_str())
