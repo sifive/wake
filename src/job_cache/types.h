@@ -96,6 +96,7 @@ struct FindJobRequest {
   std::string stdin_str;
   wcl::trie<std::string, std::string> dir_redirects;
   BloomFilter bloom;
+  std::string hash;
   // Using an ordered map is a neat trick here. It
   // gives us repeatable hashes on directories
   // later.

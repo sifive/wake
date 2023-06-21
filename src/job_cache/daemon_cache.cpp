@@ -286,8 +286,8 @@ class JobTable {
 
  public:
   static constexpr const char *insert_query =
-      "insert into jobs (directory, commandline, environment, stdin, bloom_filter)"
-      "values (?, ?, ?, ?, ?)";
+      "insert into jobs (directory, commandline, environment, stdin, bloom_filter, runner_hash)"
+      "values (?, ?, ?, ?, ?, ?)";
 
   static constexpr const char *add_output_info_query =
       "insert into job_output_info"
@@ -307,13 +307,14 @@ class JobTable {
   }
 
   int64_t insert(const std::string &cwd, const std::string &cmd, const std::string &env,
-                 const std::string &stdin_str, BloomFilter bloom) {
+                 const std::string &stdin_str, BloomFilter bloom, const std::string &hash) {
     int64_t bloom_integer = *reinterpret_cast<const int64_t *>(bloom.data());
     add_job.bind_string(1, cwd);
     add_job.bind_string(2, cmd);
     add_job.bind_string(3, env);
     add_job.bind_string(4, stdin_str);
     add_job.bind_integer(5, bloom_integer);
+    add_job.bind_string(6, hash);
     add_job.step();
     int64_t job_id = sqlite3_last_insert_rowid(db->get());
     add_job.reset();
@@ -864,7 +865,7 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   {
     impl->transact.run([this, &add_request, &job_id]() {
       job_id = impl->jobs.insert(add_request.cwd, add_request.command_line, add_request.envrionment,
-                                 add_request.stdin_str, add_request.bloom);
+                                 add_request.stdin_str, add_request.bloom, add_request.hash);
 
       // Add additional info
       impl->jobs.insert_output_info(job_id, add_request.stdout_str, add_request.stderr_str,

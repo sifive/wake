@@ -572,6 +572,7 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
   envrionment = find_job_json.get("envrionment").value;
   stdin_str = find_job_json.get("stdin").value;
   client_cwd = find_job_json.get("client_cwd").value;
+  hash = find_job_json.get("runner_hash").value;
   if (wcl::is_relative(client_cwd)) {
     wcl::log::error("FindJobRequest::FindJobRequest: client_cwd cannot be relative. found: '%s'",
                     client_cwd.c_str())
