@@ -301,6 +301,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
   req.command_line = json.get("command_line").value;
   req.envrionment = json.get("envrionment").value;
   req.stdin_str = json.get("stdin").value;
+  req.hash = json.get("hash").value;
   req.stdout_str = json.get("stdout").value;
   req.stderr_str = json.get("stderr").value;
   req.status = std::stoi(json.get("status").value);

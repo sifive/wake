@@ -187,6 +187,7 @@ struct AddJobRequest {
   std::string envrionment;
   std::string stdin_str;
   BloomFilter bloom;
+  std::string hash;
   std::vector<InputFile> inputs;
   std::vector<InputDir> directories;
   std::vector<OutputFile> outputs;
