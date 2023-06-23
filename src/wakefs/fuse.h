@@ -43,7 +43,7 @@ struct daemon_client {
 
   daemon_client(const std::string &base_dir);
 
-  bool connect(std::vector<std::string> &visible);
+  bool connect(std::vector<std::string> &visible, bool close_live_file);
   bool disconnect(std::string &result);
 
  protected:
@@ -61,13 +61,14 @@ struct json_args {
   std::string hostname;
   std::string domainname;
   bool isolate_network;
+  bool isolate_pids;
 
   int userid;
   int groupid;
 
   std::vector<mount_op> mount_ops;
 
-  json_args() : isolate_network(false), userid(0), groupid(0) {}
+  json_args() : isolate_network(false), isolate_pids(false), userid(0), groupid(0) {}
 };
 
 struct fuse_args : public json_args {

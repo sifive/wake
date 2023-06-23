@@ -65,6 +65,7 @@ bool json_as_struct(const std::string &json, json_args &result) {
   result.stdin_file = jast.get("stdin").value;
 
   result.isolate_network = jast.get("isolate-network").kind == JSON_TRUE;
+  result.isolate_pids = jast.get("isolate-pids").kind == JSON_TRUE;
 
   result.hostname = jast.get("hostname").value;
   result.domainname = jast.get("domainname").value;
@@ -137,7 +138,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     return false;
   }
 
-  if (!args.daemon.connect(args.visible)) return false;
+  if (!args.daemon.connect(args.visible, args.isolate_pids)) return false;
 
   struct timeval start;
   gettimeofday(&start, 0);
@@ -192,11 +193,15 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     }
 
 #ifdef __linux__
-    pidns_args nsargs = {command, args.environment};
-    exec_in_pidns(&nsargs);
-#else
-    int err = execve_wrapper(command, args.environment);
-    std::cerr << "execve " << command[0] << ": " << strerror(err) << std::endl;
+    if (args.isolate_pids) {
+      pidns_args nsargs = {command, args.environment};
+      exec_in_pidns(&nsargs);
+    } else {
+#endif
+      int err = execve_wrapper(command, args.environment);
+      std::cerr << "execve " << command[0] << ": " << strerror(err) << std::endl;
+#ifdef __linux__
+    }
 #endif
     exit(1);
   }
