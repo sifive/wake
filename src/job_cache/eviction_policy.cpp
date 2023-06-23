@@ -25,6 +25,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <wcl/defer.h>
+#include <wcl/xoshiro_256.h>
 
 #include <algorithm>
 #include <future>
@@ -265,7 +266,7 @@ static void garbage_collect_job(std::string job_dir) {
 
 static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int64_t max_job,
                                   int group_id) {
-  auto group_dir = std::to_string(group_id);
+  auto group_dir = wcl::to_hex(&group_id);
   auto dir_res = wcl::directory_range::open(group_dir);
   if (!dir_res) {
     // We can keep going even with this failure but we need to at least log it
@@ -281,6 +282,9 @@ static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int64_
       // It isn't critical that we remove this so just log the error and move on
       wcl::log::error("cleaning corrupt job: bad entry in %s: %s", group_dir.c_str(),
                       strerror(entry.error()))();
+      continue;
+    }
+    if (entry->name == "." || entry->name == "..") {
       continue;
     }
     int64_t job_id = std::stoll(entry->name);
