@@ -80,14 +80,11 @@ class StatusBuf : public std::streambuf {
 extern StatusState status_state;
 
 #define STREAM_LOG "debug"
-#define STREAM_BSP "bsp"
 #define STREAM_INFO "info"
-#define STREAM_INTERACTIVE "interactive"
 #define STREAM_REPORT "report"
 #define STREAM_ECHO "echo"
 #define STREAM_WARNING "warning"
 #define STREAM_ERROR "error"
-#define STREAM_NULL "null"
 
 void status_init();
 void status_refresh(bool idle);

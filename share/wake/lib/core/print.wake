@@ -48,10 +48,6 @@ export def logError: LogLevel =
 export def logWarning: LogLevel =
     LogLevel "warning" # (Some Yellow)
 
-# logInteractive: logged to stdout when wake invoked with a tty (Color)
-export def logInteractive: LogLevel =
-    LogLevel "interactive" # (Some Cyan)
-
 # logReport: logged to stdout unless run with -q (Magenta)
 export def logReport: LogLevel =
     LogLevel "report" # (Some Magenta)

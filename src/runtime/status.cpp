@@ -469,32 +469,26 @@ int status_get_fd(const char *name) {
 }
 
 static int stream_color(std::string name) {
-  if (name == STREAM_ERROR) {
+  if (name == "error") {
     return 1;
   }
-  if (name == STREAM_WARNING) {
+  if (name == "warning") {
     return 3;
   }
-  if (name == STREAM_ECHO) {
+  if (name == "echo") {
     return 0;
   }
-  if (name == STREAM_INFO) {
+  if (name == "info") {
     return 16;
   }
-  if (name == STREAM_LOG) {
+  if (name == "debug") {
     return 4;
   }
-  if (name == STREAM_BSP) {
+  if (name == "bsp") {
     return 2;
   }
-  if (name == STREAM_NULL) {
+  if (name == "null") {
     return 0;
-  }
-  if (name == STREAM_INTERACTIVE) {
-    return 6;
-  }
-  if (name == STREAM_REPORT) {
-    return 5;
   }
 
   return 0;
