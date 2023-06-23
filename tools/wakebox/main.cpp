@@ -60,35 +60,24 @@ void print_help() {
       "                             Use 'eval $WAKEBOX_CMD' to run the command from params file. \n"
       "    -i --allow-interactive   Use default stdin, ignoring the params json file's stdin     \n"
       "                             value.                                                       \n"
-#ifdef __linux__
       "    -b --bind DIR1:DIR2      Place the directory (or file) at DIR1 within the command's   \n"
       "                             view of the filesystem at location DIR2.                     \n"
       "                             May be specified multiple times.                             \n"
       "                             These are applied after the params file mount ops.           \n"
-#endif
       "    -I --isolate-retcode     Don't allow COMMAND's return code to impact wakebox's return \n"
       "                             code.                                                        \n"
       "                                                                                          \n"
       "Other options                                                                             \n"
+      "    -u --use-pid-namespace   Create a Linux PID Namespace for COMMAND to run within.      \n"
       "    -h --help                Print usage                                                  \n"
       "";
 
-#ifdef __linux__
   std::cout << "Usage: wakebox [OPTIONS] [COMMAND...]\n\n" << interactive << "\n" << batch_and_help;
-#else
-  std::cout
-      << "Usage: wakebox [OPTIONS]\n\n"
-      << "NOTE: Reduced command line options due to operating system support.\n"
-      << "      Mount options, uid/gid control and network isolation in the input parameters file\n"
-      << "      will be ignored.\n\n"
-      << batch_and_help;
-#endif
 }
 
 // Decide the default working directory for the new process.
 // Wakebox does not provide direct control of the command running dir at this time.
 const std::string pick_running_dir(const struct fuse_args &fa) {
-#ifdef __linux__
   // If we have a workspace mount, we want to default to that location.
   for (auto &x : fa.mount_ops) {
     if (x.type == "workspace") {
@@ -109,19 +98,14 @@ const std::string pick_running_dir(const struct fuse_args &fa) {
 
   // Try the current directory, which should exist if we have no replacement rootfs.
   return fa.working_dir + "/" + fa.directory;
-#else
-  // On non-linux platforms like MacOS, run_in_fuse is unable to re-map the fuse
-  // mountpoint over the top of the original workspace.
-  // It may expose the temporary fuse mountpoint as a component of absolute paths.
-  return fa.daemon.mount_subdir + "/" + fa.directory;
-#endif
 }
 
 // Interactive mode does not provide userid control at this time.
 // Allows networking by default, no user control yet.
 int run_interactive(const std::string &rootfs, const std::vector<std::string> &toolchains,
-                    const std::vector<mount_op> &binds, const std::vector<std::string> &command) {
-  struct fuse_args fa(get_cwd(), false);
+                    const std::vector<mount_op> &binds, const std::vector<std::string> &command,
+                    bool use_pid_namespace) {
+  struct fuse_args fa(get_cwd(), false, use_pid_namespace);
   fa.command = command;
 
   if (!rootfs.empty()) fa.mount_ops.push_back({"squashfs", rootfs, "/", false});
@@ -147,7 +131,8 @@ int run_interactive(const std::string &rootfs, const std::vector<std::string> &t
 }
 
 int run_batch(const char *params_path, bool has_output, bool use_stdin_file, bool use_shell,
-              bool isolate_retcode, const char *result_path, const std::vector<mount_op> &binds) {
+              bool isolate_retcode, const char *result_path, const std::vector<mount_op> &binds,
+              bool use_pid_namespace) {
   // Read the params file
   std::ifstream ifs(params_path);
   const std::string json((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
@@ -157,7 +142,7 @@ int run_batch(const char *params_path, bool has_output, bool use_stdin_file, boo
   }
   ifs.close();
 
-  fuse_args args(get_cwd(), use_stdin_file);
+  fuse_args args(get_cwd(), use_stdin_file, use_pid_namespace);
   if (!json_as_struct(json, args)) return 1;
   args.command_running_dir = pick_running_dir(args);
 
@@ -217,22 +202,22 @@ int main(int argc, char *argv[]) {
   std::vector<char *> tools(max_pairs, nullptr);
   std::vector<char *> binds(max_pairs, nullptr);
 
+  // clang-format off
   struct option options[] {
-#ifdef __linux__
     {'r', "rootfs", GOPT_ARGUMENT_REQUIRED},
-        {'t', "toolchain", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, tools.data(), max_pairs},
-        {'b', "bind", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, binds.data(), max_pairs},
-        {'x', "bind-cwd", GOPT_ARGUMENT_FORBIDDEN},
-#endif
-        {'p', "params", GOPT_ARGUMENT_REQUIRED}, {'o', "output-stats", GOPT_ARGUMENT_REQUIRED},
-        {'s', "force-shell", GOPT_ARGUMENT_FORBIDDEN},
-        {'i', "interactive", GOPT_ARGUMENT_FORBIDDEN},
-        {'I', "isolate-retcode", GOPT_ARGUMENT_FORBIDDEN},
-
-        {'h', "help", GOPT_ARGUMENT_FORBIDDEN}, {
-      0, 0, GOPT_LAST
-    }
+    {'t', "toolchain", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, tools.data(), max_pairs},
+    {'b', "bind", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, binds.data(), max_pairs},
+    {'x', "bind-cwd", GOPT_ARGUMENT_FORBIDDEN},
+    {'p', "params", GOPT_ARGUMENT_REQUIRED},
+    {'o', "output-stats", GOPT_ARGUMENT_REQUIRED},
+    {'s', "force-shell", GOPT_ARGUMENT_FORBIDDEN},
+    {'i', "interactive", GOPT_ARGUMENT_FORBIDDEN},
+    {'I', "isolate-retcode", GOPT_ARGUMENT_FORBIDDEN},
+    {'u', "use-pid-namespace", GOPT_ARGUMENT_FORBIDDEN},
+    {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
+    {0, 0, GOPT_LAST}
   };
+  // clang-format on
 
   argc = gopt(argv, options);
   gopt_errors("wakebox", options);
@@ -255,7 +240,6 @@ int main(int argc, char *argv[]) {
   }
 
   std::vector<mount_op> bind_ops;
-#ifdef __linux__
   for (unsigned int i = 0; i < arg(options, "bind")->count; i++) {
     const std::string s = binds[i];
     std::string source = s.substr(0, s.find(":"));
@@ -266,7 +250,8 @@ int main(int argc, char *argv[]) {
     }
     bind_ops.push_back({"bind", source, destination});
   }
-#endif
+
+  bool use_pid_namespace = arg(options, "use-pid-namespace")->count > 0;
 
   if (has_positional_cmd) {
     std::string rootfs;
@@ -287,7 +272,7 @@ int main(int argc, char *argv[]) {
       std::cerr << "Must provide a command." << std::endl;
       return 1;
     }
-    return run_interactive(rootfs, toolchains, bind_ops, positional_params);
+    return run_interactive(rootfs, toolchains, bind_ops, positional_params, use_pid_namespace);
 
   } else if (has_params_file) {
     const char *params = arg(options, "params")->argument;
@@ -296,7 +281,7 @@ int main(int argc, char *argv[]) {
     bool use_shell = arg(options, "force-shell")->count > 0;
     const char *result_path = arg(options, "output-stats")->argument;
     return run_batch(params, has_output, use_stdin_file, use_shell, isolate_retcode, result_path,
-                     bind_ops);
+                     bind_ops, use_pid_namespace);
   }
   print_help();
   return 1;

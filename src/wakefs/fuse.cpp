@@ -27,6 +27,7 @@
 #include <limits.h>
 #include <signal.h>
 #include <string.h>
+#include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -36,10 +37,6 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-
-#ifdef __linux__
-#include <sys/prctl.h>
-#endif
 
 #include "compat/rusage.h"
 #include "json/json5.h"
@@ -137,7 +134,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     return false;
   }
 
-  if (!args.daemon.connect(args.visible)) return false;
+  if (!args.daemon.connect(args.visible, args.use_pid_namespace)) return false;
 
   struct timeval start;
   gettimeofday(&start, 0);
@@ -146,7 +143,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   if (pid == 0) {
     std::vector<std::string> command = args.command;
     std::vector<std::string> envs_from_mounts;
-#ifdef __linux__
+
     if (!setup_user_namespaces(args.userid, args.groupid, args.isolate_network, args.hostname,
                                args.domainname))
       exit(1);
@@ -154,7 +151,6 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     if (!do_mounts(args.mount_ops, args.daemon.mount_subdir, envs_from_mounts)) exit(1);
 
     prctl(PR_SET_NAME, "wb-mount-ns", 0, 0, 0);
-#endif
 
     if (chdir(args.command_running_dir.c_str()) != 0) {
       std::cerr << "chdir " << args.command_running_dir << ": " << strerror(errno) << std::endl;
@@ -191,13 +187,13 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
       }
     }
 
-#ifdef __linux__
-    pidns_args nsargs = {command, args.environment};
-    exec_in_pidns(&nsargs);
-#else
-    int err = execve_wrapper(command, args.environment);
-    std::cerr << "execve " << command[0] << ": " << strerror(err) << std::endl;
-#endif
+    if (args.use_pid_namespace) {
+      pidns_args nsargs = {command, args.environment};
+      exec_in_pidns(&nsargs);
+    } else {
+      int err = execve_wrapper(command, args.environment);
+      std::cerr << "execve " << command[0] << ": " << strerror(err) << std::endl;
+    }
     exit(1);
   }
 

@@ -43,7 +43,7 @@ struct daemon_client {
 
   daemon_client(const std::string &base_dir);
 
-  bool connect(std::vector<std::string> &visible);
+  bool connect(std::vector<std::string> &visible, bool use_pid_namespace);
   bool disconnect(std::string &result);
 
  protected:
@@ -74,10 +74,11 @@ struct fuse_args : public json_args {
   const std::string working_dir;    // the original directory that this process was invoked from
   std::string command_running_dir;  // current working dir of the command when it executes
   bool use_stdin_file;
+  bool use_pid_namespace;
   daemon_client daemon;
 
-  fuse_args(const std::string &cwd, bool use_stdin_file)
-      : working_dir(cwd), use_stdin_file(use_stdin_file), daemon(cwd) {}
+  fuse_args(const std::string &cwd, bool use_stdin_file, bool pidns)
+      : working_dir(cwd), use_stdin_file(use_stdin_file), use_pid_namespace(pidns), daemon(cwd) {}
 };
 
 bool json_as_struct(const std::string &json, json_args &result);

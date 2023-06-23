@@ -433,11 +433,13 @@ bool get_workspace_dir(const std::vector<mount_op> &mount_ops,
 
 bool setup_user_namespaces(int id_user, int id_group, bool isolate_network,
                            const std::string &hostname, const std::string &domainname) {
-  // Later we will create a PID namespace.
-  // TODO explain this, if it works in CI.
+  // If we have permissions in the current mount namespace, create a fresh /proc mount.
+  // This can avoid issues where the mount propagation setting for /proc in the
+  // current namespace is set to MS_UNBINDABLE.
   int err = mount("proc", "/proc", "proc", 0, nullptr);
-  if (errno != EPERM && err == -1) {
-    std::cerr << "mount('proc', '/proc', 'proc', 0, nullptr): " << strerror(errno) << std::endl;
+  if (err == -1 && errno != EPERM && errno != EBUSY) {
+    std::cerr << "pre namespace setup: mount('proc', '/proc', 'proc', 0, nullptr): "
+              << strerror(errno) << std::endl;
     exit(1);
   }
 
@@ -484,7 +486,8 @@ bool setup_user_namespaces(int id_user, int id_group, bool isolate_network,
   // than leaking process ids from the exterior namespace.
   int err = mount("proc", "/proc", "proc", 0, nullptr);
   if (err == -1) {
-    std::cerr << "mount('proc', '/proc', 'proc', 0, nullptr): " << strerror(errno) << std::endl;
+    std::cerr << "new pid namespace: mount('proc', '/proc', 'proc', 0, nullptr): "
+              << strerror(errno) << std::endl;
     exit(1);
   }
 
