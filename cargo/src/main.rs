@@ -1,39 +1,19 @@
+// TODO: Setup a postgres hello world
+// TODO: Setup a hyper hello world
+// TODO: Commit that basic repo to wake
+use entity::job;
+use migration::{Migrator, MigratorTrait};
+use sea_orm::{ActiveModelTrait, ActiveValue};
 
-fn hello_world() {
-    println!("Hello, world!");
-}
-
-enum MyType {
-  A, B  
-};
-
-impl MyType {
-  fn flip(&self) -> MyType {
-    match self {
-        MyType::A => todo!(),
-        MyType::B => todo!(),
-    }
-  }
-  fn new() -> MyType {
-    MyType::A; 
-  }
-}
-
-impl Default for MyType {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-fn main() {
-  fun_name();
-  let x: File = File::from_raw_fd(0);
-  hello_world();
-}
-
-fn fun_name(x: MyType) {
-    match x.flip() {
-        MyType::A => todo!(),
-        MyType::B => todo!(),
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let connection = sea_orm::Database::connect("postgres://127.0.0.1/test").await?;
+    Migrator::up(&connection, None).await?;
+    let job = job::ActiveModel {
+        cmd: ActiveValue::Set("cowsay".into()),
+        env: ActiveValue::Set("PATH=/usr/bin:/bin".into()),
+        id: ActiveValue::NotSet,
     };
+    job.insert(&connection).await?;
+    Ok(())
 }

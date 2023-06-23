@@ -46,3 +46,5 @@ compile_commands.json
 *.swo
 *.swn
 /cargo/target/*
+/cargo/migration/target/*
+/cargo/entity/target/*
