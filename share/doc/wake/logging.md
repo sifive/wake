@@ -11,8 +11,6 @@ Wake has a concept of loggers,
 to which text can be written during wake execution by various sources.
 A logger combines a string log level (e.g. "error", "info", "my_custom_level")
 and a display format (color and intensity).
-There can be multiple loggers with the same log level,
-though colors may not display as expected.
 
 |Term Used In this Document | What wake code/libraries call it |
 ----------------------------|----------------------------------|
@@ -23,21 +21,21 @@ though colors may not display as expected.
 
 `wake` has a number of built in loggers in which all start with `log...`.
 You can also make your own logger using `mkLogLevel`.
-You can use this to customize the color you want it to be shown as (if at all)
-and give more fine-grained control over which wake output stream it should go to.
+You can use this to redirect wake output to a dedicated stream which can
+later be filtered on.
 
-
-| wake `def`        | Color/Intensity | log level |
-|-------------------|-----------------|-----------|
-| logDebug          |     Blue        | "debug"   |
-| logInfo           |     Dim         | "info"    |
-| logEcho           |      N/A        | "echo"    |
-| logReport         |    Magenta      | "report"  |
-| logWarning        |    Yellow       | "warning" |
-| logError          |     Red         | "error"   |
-| logNever          |     N/A         | "null"    |
-| mkLogLevel "foo" (Some Green) |  Green     | "foo"     |
-| mkLogLevel2 "bar" (Some Green) (Some Bright) | Bright Green   | "bar"      |
+| wake `def`        | Color/Intensity | log level     |
+|-------------------|-----------------|---------------|
+| logDebug          |     Blue        | "debug"       |
+| logInfo           |     Gray        | "info"        |
+| logEcho           |     Default     | "echo"        |
+| logInteractive    |     Cyan        | "interactive" |
+| logReport         |     Magenta     | "report"      |
+| logWarning        |     Yellow      | "warning"     |
+| logError          |     Red         | "error"       |
+| logNever          |     Default     | "null"        |
+| LogLevel "foo"    |     Default     | "foo"         |
+| LogLevel "bar"    |     Default     | "bar"         |
 
 ## Directing Logger Output
 
@@ -53,30 +51,27 @@ If you match a line in the table, stop!
 This is what will appear on the console as you watch wake execute,
 i.e. what is sent to ``wake`'s stdout:
 
-| log level           | "debug"  | "info"  | "echo"  | "report"  | "warning"  | "error"  | "null"  |  "foo" |
-|---------------------|----------|---------|---------|-----------|------------|----------|---------|--------|
-|--stdout="foo"       |          |         |         |           |            |          |         |    x   |
-|--stdout="foo,info"  |          |    x    |         |           |            |          |         |    x   |
-|--debug              |      x   |    x    |    x    |     x     |      x     |    x     |         |        |
-|--verbose            |          |    x    |    x    |     x     |      x     |    x     |         |        |
-|--quiet              |          |         |         |           |            |    x     |         |        |
-|--no-tty<sup>*</sup> |          |         |    x    |     x     |      x     |    x     |         |        |
-|(default)            |          |         |         |     x     |      x     |    x     |         |        |
-
-<sup>*</sup> `--no-tty` also prevents any coloring from being applied.
+| log level           | "debug"  | "info"  | "echo"  | "interactive" | "report"  | "warning"  | "error"  | "null"  |  "foo" |
+|---------------------|----------|---------|---------|---------------|-----------|------------|----------|---------|--------|
+|--stdout="foo"       |          |         |         |               |           |            |          |         |    x   |
+|--stdout="foo,info"  |          |    x    |         |               |           |            |          |         |    x   |
+|--debug              |    x     |    x    |    x    |    is_atty    |     x     |      x     |    x     |         |        |
+|--verbose            |          |    x    |    x    |    is_atty    |     x     |      x     |    x     |         |        |
+|--quiet              |          |         |         |               |           |            |    x     |         |        |
+|(default)            |          |         |         |    is_atty    |     x     |      x     |    x     |         |        |
 
 Unless overridden with `--stderr=...`,
 the only logger output that ever appears on wake's stderr is from those with log level "error"
 (e.g. `logError`).
 
 The additional command line arguments `--fd:3`, `--fd:4`, `--fd:5` can be used to output to file descriptors 3, 4, 5.
-One example shell command would be, for some wake code that had `mkLogLevel "foo"`:
+One example shell command would be, for some wake code that had `LogLevel "foo"`:
 
 ```
 wake --fd:3="foo" mywakecode 3>foo.txt
 ```
 
-These can be concatenated with commas and include the normal log levels, so to capture both `mkLogLevel "foo"` and `logInfo` to a file:
+These can be concatenated with commas and include the normal log levels, so to capture both `LogLevel "foo"` and `logInfo` to a file:
 
 ```
 wake --fd:3="foo,info" mywakecode 3>foo_and_info.txt
