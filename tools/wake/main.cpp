@@ -746,13 +746,22 @@ int main(int argc, char **argv) {
   if (notype) return (ok && !terminalReporter.errors) ? 0 : 1;
 
   /* Setup logging streams */
-  if (noexecute && !clo.fd1) clo.fd1 = "error";
-  if (clo.debug && !clo.fd1) clo.fd1 = "debug,info,echo,report,warning,error";
-  if (clo.verbose && !clo.fd1) clo.fd1 = "info,echo,report,warning,error";
-  if (clo.quiet && !clo.fd1) clo.fd1 = "error";
-  if (!clo.tty && !clo.fd1) clo.fd1 = "echo,report,warning,error";
-  if (!clo.fd1) clo.fd1 = "report,warning,error";
-  if (!clo.fd2) clo.fd2 = "error";
+
+  if (clo.tty) {
+    if (noexecute && !clo.fd1) clo.fd1 = "error";
+    if (clo.debug && !clo.fd1) clo.fd1 = "debug,info,echo,interactive,report,warning,error";
+    if (clo.verbose && !clo.fd1) clo.fd1 = "info,echo,interactive,report,warning,error";
+    if (clo.quiet && !clo.fd1) clo.fd1 = "error";
+    if (!clo.fd1) clo.fd1 = "interactive,report,warning,error";
+    if (!clo.fd2) clo.fd2 = "error";
+  } else {
+    if (noexecute && !clo.fd1) clo.fd1 = "error";
+    if (clo.debug && !clo.fd1) clo.fd1 = "debug,info,echo,report,warning,error";
+    if (clo.verbose && !clo.fd1) clo.fd1 = "info,echo,report,warning,error";
+    if (clo.quiet && !clo.fd1) clo.fd1 = "error";
+    if (!clo.fd1) clo.fd1 = "report,warning,error";
+    if (!clo.fd2) clo.fd2 = "error";
+  }
 
   status_set_bulk_fd(1, clo.fd1);
   status_set_bulk_fd(2, clo.fd2);
