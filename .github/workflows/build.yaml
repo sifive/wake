@@ -49,7 +49,7 @@ jobs:
           uses: actions/upload-artifact@v3
           with:
             name: dockerfiles
-            path: .circleci/dockerfiles/
+            path: .github/workflows/dockerfiles/
             retention-days: 1
 
         - name: Upload debian files
@@ -83,7 +83,7 @@ jobs:
     docker_builds:
       runs-on: ubuntu-latest
       needs: tarball
-      name: Docker Build (${{ matrix.target }})
+      name: Build ${{ matrix.target }}
       strategy:
         matrix:
           include:
