@@ -119,6 +119,14 @@ jobs:
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
+            - target: rocky_9
+              dockerfile: rocky-9
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
+              build_cmd: rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
+              install_src_glob: build/x86_64/*.rpm
+
             - target: ubuntu_22_04
               dockerfile: ubuntu-22.04
               extra_docker_build_args: ''
@@ -309,6 +317,12 @@ jobs:
             name: release_rocky_8
             path: rocky_8
 
+        - name: Download Rocky 9
+          uses: actions/download-artifact@v3
+          with:
+            name: release_rocky_9
+            path: rocky_9
+
         - name: Download Ubuntu 22.04
           uses: actions/download-artifact@v3
           with:
@@ -321,6 +335,7 @@ jobs:
             VERSION="${TAG:1}"
             cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-${VERSION}-1.x86_64.rpm
             cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-${VERSION}-1.x86_64.rpm
+            cp rocky_9/wake-*-1.x86_64.rpm rocky_9-wake-${VERSION}-1.x86_64.rpm
             cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_${VERSION}-1_amd64.deb
             cp ubuntu_22_04/wake_*-1_amd64.deb ubuntu-22-04-wake_${VERSION}-1_amd64.deb
 
@@ -335,6 +350,7 @@ jobs:
               vscode/wake-*.vsix
               centos-7-6-wake-*-1.x86_64.rpm
               rocky_8-wake-*-1.x86_64.rpm
+              rocky_9-wake-*-1.x86_64.rpm
               debian-bullseye-wake_*-1_amd64.deb
               ubuntu-22-04-wake_*-1_amd64.deb
 
