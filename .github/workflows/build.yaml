@@ -119,14 +119,6 @@ jobs:
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
-            - target: ubuntu_18_04
-              dockerfile: ubuntu-18.04
-              extra_docker_build_args: ''
-              extra_docker_run_args: -w /$(ls -d build/wake-*)
-              build_cmd: debuild -us -uc
-              test_cmd: dpkg -i *.deb && cd tests && wake runTests
-              install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
-
             - target: ubuntu_22_04
               dockerfile: ubuntu-22.04
               extra_docker_build_args: ''
@@ -317,12 +309,6 @@ jobs:
             name: release_rocky_8
             path: rocky_8
 
-        - name: Download Ubuntu 18.04
-          uses: actions/download-artifact@v3
-          with:
-            name: release_ubuntu_18_04
-            path: ubuntu_18_04
-
         - name: Download Ubuntu 22.04
           uses: actions/download-artifact@v3
           with:
@@ -336,7 +322,6 @@ jobs:
             cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-${VERSION}-1.x86_64.rpm
             cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-${VERSION}-1.x86_64.rpm
             cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_${VERSION}-1_amd64.deb
-            cp ubuntu_18_04/wake_*-1_amd64.deb ubuntu-18-04-wake_${VERSION}-1_amd64.deb
             cp ubuntu_22_04/wake_*-1_amd64.deb ubuntu-22-04-wake_${VERSION}-1_amd64.deb
 
         - name: Create Release
@@ -351,6 +336,5 @@ jobs:
               centos-7-6-wake-*-1.x86_64.rpm
               rocky_8-wake-*-1.x86_64.rpm
               debian-bullseye-wake_*-1_amd64.deb
-              ubuntu-18-04-wake_*-1_amd64.deb
               ubuntu-22-04-wake_*-1_amd64.deb
 
