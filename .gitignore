@@ -47,7 +47,7 @@ compile_commands.json
 *.swn
 .cargo
 Cargo.lock
-/cargo/target/*
-/cargo/migration/target/*
-/cargo/entity/target/*
-/cargo/gsc/target/*
+/rust/target/*
+/rust/migration/target/*
+/rust/entity/target/*
+/rust/gsc/target/*
