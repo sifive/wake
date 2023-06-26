@@ -637,7 +637,6 @@ int main(int argc, const char **argv) {
   std::ofstream log_file;
   auto log_file_defer = wcl::make_defer([&log_file]() { log_file.close(); });
   if (wake_lsp_log_path != nullptr) {
-    std::cerr << wake_lsp_log_path << std::endl;
     log_file = std::ofstream(wake_lsp_log_path, std::ios::app);
     wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file.rdbuf()));
   }
