@@ -50,3 +50,4 @@ Cargo.lock
 /cargo/target/*
 /cargo/migration/target/*
 /cargo/entity/target/*
+/cargo/gsc/target/*
