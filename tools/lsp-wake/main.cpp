@@ -23,7 +23,9 @@
 #include <poll.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <wcl/defer.h>
 #include <wcl/filepath.h>
+#include <wcl/tracing.h>
 
 #include <algorithm>
 #include <fstream>
@@ -91,6 +93,8 @@ class LSPServer {
   };
 
   MethodResult processRequest(const std::string &requestString) {
+    wcl::log::info(requestString.c_str())({{"rpc", "rx"}});
+
     // Parse that requestString as JSON
     JAST request;
     std::stringstream parseErrors;
@@ -198,7 +202,7 @@ class LSPServer {
         "Please change the path in the extension settings and reload the window by: " +
         "  1. Opening the command palette (Ctrl + Shift + P); " +
         "  2. Typing \"> Reload Window\" and executing (Enter);";
-    showMessageParams.add("message", messageText.c_str());
+    showMessageParams.add("rpc", messageText.c_str());
     methodResult.notification = message;
   }
 
@@ -233,7 +237,7 @@ class LSPServer {
 
       int ret = poll(&pfds, 1, 2000);
       if (ret == -1) {
-        perror("poll(stdin)");
+        wcl::log::error("poll(stdin): %s", strerror(errno))();
         exit(1);
       }
 
@@ -246,15 +250,13 @@ class LSPServer {
       char buf[4096];
       int got = read(STDIN_FILENO, &buf[0], sizeof(buf));
       if (got == -1) {
-        perror("read(stdin)");
+        wcl::log::error("read(stdin): %s", strerror(errno))();
         exit(1);
       }
 
       // End-of-file reached?
       if (got == 0) {
-#ifdef CERR_DEBUG
-        std::cerr << "Client did not shutdown cleanly" << std::endl;
-#endif
+        wcl::log::error("Client did not shutdown cleanly")();
         exit(1);
       }
 
@@ -265,17 +267,12 @@ class LSPServer {
   void refresh(const std::string &why, MethodResult &methodResult) {
     ignoredCount = 0;
     if (needsUpdate) {
-#ifdef CERR_DEBUG
       struct timeval start, stop;
       gettimeofday(&start, 0);
-#endif
       diagnoseProject(methodResult);
-#ifdef CERR_DEBUG
       gettimeofday(&stop, 0);
       double delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
-      std::cerr << "Refreshed project in " << delay << " seconds (due to " << why << ")"
-                << std::endl;
-#endif
+      wcl::log::info("Refreshed project in %f seconds (due to %s)", delay, why.c_str())();
     }
   }
 
@@ -313,10 +310,10 @@ class LSPServer {
 
     std::string msg = str.str();
 
+    wcl::log::info(msg.c_str())({{"rpc", "tx"}});
+
     if (msg == "{}") {
-#ifdef CERR_DEBUG
-      std::cerr << "Throwing away empty response message" << std::endl;
-#endif
+      wcl::log::warning("Throwing away empty response message")();
       return;
     }
 
@@ -337,6 +334,8 @@ class LSPServer {
     std::string workspaceUri =
         receivedMessage.get("params").get("workspaceFolders").children[0].second.get("uri").value;
     astree.absWorkDir = JSONConverter::decodePath(workspaceUri);
+
+    wcl::log::info("Initialized LSP with workspace = %s", astree.absWorkDir.c_str())();
 
     return methodResult;
   }
@@ -394,9 +393,7 @@ class LSPServer {
       if (++ignoredCount > 2) {
         refresh("highlight", methodResult);
       } else {
-#ifdef CERR_DEBUG
-        std::cerr << "Opting not to refresh code for highlight request" << std::endl;
-#endif
+        wcl::log::info("Opting not to refresh code for highlight request")();
       }
     }
     Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
@@ -412,9 +409,7 @@ class LSPServer {
       if (++ignoredCount > 2) {
         refresh("hover", methodResult);
       } else {
-#ifdef CERR_DEBUG
-        std::cerr << "Opting not to refresh code for hover request" << std::endl;
-#endif
+        wcl::log::info("Opting not to refresh code for hover request")();
       }
     }
     Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
@@ -430,9 +425,7 @@ class LSPServer {
       if (++ignoredCount > 2) {
         refresh("document-symbol", methodResult);
       } else {
-#ifdef CERR_DEBUG
-        std::cerr << "Opting not to refresh code for document-symbol request" << std::endl;
-#endif
+        wcl::log::info("Opting not to refresh code for document-symbol request")();
       }
     }
     JAST message = JSONConverter::createResponseMessage(receivedMessage);
@@ -632,11 +625,23 @@ char *processRequest(const char *request) {
 #else
 
 void instantiateServer(const std::string &stdLib) {
+  wcl::log::info("Initializing lsp server with stdlib = %s", stdLib.c_str())();
+
   bool isReadable = is_readable((stdLib + "/core/boolean.wake").c_str());
   lspServer = new LSPServer(isReadable, stdLib);
 }
 
 int main(int argc, const char **argv) {
+  const char *wake_lsp_log_path = getenv("WAKE_LSP_LOG_PATH");
+
+  std::ofstream log_file;
+  auto log_file_defer = wcl::make_defer([&log_file]() { log_file.close(); });
+  if (wake_lsp_log_path != nullptr) {
+    std::cerr << wake_lsp_log_path << std::endl;
+    log_file = std::ofstream(wake_lsp_log_path, std::ios::app);
+    wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file.rdbuf()));
+  }
+
   if (argc >= 2) {
     instantiateServer(argv[1]);
   } else {
