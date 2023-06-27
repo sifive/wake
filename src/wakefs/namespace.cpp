@@ -518,7 +518,7 @@ bool setup_user_namespaces(int id_user, int id_group, bool isolate_network,
   exit(-WTERMSIG(status));
 }
 
-[[noreturn]] void exec_in_pidns(pidns_args& nsargs) {
+[[noreturn]] void exec_in_pidns(pidns_args &nsargs) {
   alignas(16) uint8_t stack_buf[4096];
   void *child_stack = reinterpret_cast<void *>(stack_buf + sizeof(child_stack));
 
