@@ -518,21 +518,21 @@ bool setup_user_namespaces(int id_user, int id_group, bool isolate_network,
   exit(-WTERMSIG(status));
 }
 
-[[noreturn]] void exec_in_pidns(pidns_args *nsargs) {
+[[noreturn]] void exec_in_pidns(pidns_args& nsargs) {
   alignas(16) uint8_t stack_buf[4096];
   void *child_stack = reinterpret_cast<void *>(stack_buf + sizeof(child_stack));
 
   // Create a new thread in a PID namespace, calling pidns_init.
-  pid_t child_pid = clone(pidns_init, child_stack, CLONE_NEWPID | SIGCHLD, nsargs);
+  pid_t child_pid = clone(pidns_init, child_stack, CLONE_NEWPID | SIGCHLD, &nsargs);
   if (child_pid == -1) {
-    std::cerr << "clone " << nsargs->command[0] << ": " << strerror(errno) << std::endl;
+    std::cerr << "clone " << nsargs.command[0] << ": " << strerror(errno) << std::endl;
     exit(1);
   }
 
   // While we wait, the subdir_live_file for the fuse daemon will be held open.
   int status = 1;
   if (waitpid(child_pid, &status, 0) == -1) {
-    std::cerr << "waitpid (clone) " << nsargs->command[0] << std::endl;
+    std::cerr << "waitpid (clone) " << nsargs.command[0] << std::endl;
     exit(1);
   }
 

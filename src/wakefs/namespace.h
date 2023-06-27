@@ -45,7 +45,7 @@ struct pidns_args {
 
 [[noreturn]] int pidns_init(void *arg);
 
-[[noreturn]] void exec_in_pidns(pidns_args *nsargs);
+[[noreturn]] void exec_in_pidns(pidns_args& nsargs);
 
 #endif
 

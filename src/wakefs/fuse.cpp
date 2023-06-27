@@ -195,7 +195,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
 #ifdef __linux__
     if (args.isolate_pids) {
       pidns_args nsargs = {command, args.environment};
-      exec_in_pidns(&nsargs);
+      exec_in_pidns(nsargs);
     } else {
 #endif
       int err = execve_wrapper(command, args.environment);
