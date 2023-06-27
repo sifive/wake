@@ -241,13 +241,13 @@ JAST createInitializeResultDefault(const JAST &receivedMessage) {
 
   JAST &capabilities = result.add("capabilities", JSON_OBJECT);
   capabilities.add("textDocumentSync", 1);
-  capabilities.add("definitionProvider", true);
-  capabilities.add("referencesProvider", true);
-  capabilities.add("documentHighlightProvider", true);
-  capabilities.add("hoverProvider", true);
-  capabilities.add("documentSymbolProvider", true);
-  capabilities.add("workspaceSymbolProvider", true);
-  capabilities.add("renameProvider", true);
+  capabilities.add_bool("definitionProvider", true);
+  capabilities.add_bool("referencesProvider", true);
+  capabilities.add_bool("documentHighlightProvider", true);
+  capabilities.add_bool("hoverProvider", true);
+  capabilities.add_bool("documentSymbolProvider", true);
+  capabilities.add_bool("workspaceSymbolProvider", true);
+  capabilities.add_bool("renameProvider", true);
 
   JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
   serverInfo.add("name", "lsp wake server");
