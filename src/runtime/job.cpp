@@ -318,10 +318,27 @@ struct JobTable::detail {
   bool batch;
   struct timespec wall;
   RUsage childrenUsage;
+
   std::unordered_map<int, std::unique_ptr<std::streambuf>> fd_bufs;
   std::unordered_map<int, std::unique_ptr<TermInfoBuf>> term_bufs;
 
   detail() {}
+
+  ~detail() {
+    // We need a very specific release order on these so we do it manually
+    for (auto &entry : pidmap) {
+      entry.second.reset();
+    }
+    for (auto &entry : pipes) {
+      entry.second.reset();
+    }
+    for (auto &entry : fd_bufs) {
+      entry.second.release();
+    }
+    for (auto &entry : term_bufs) {
+      entry.second.release();
+    }
+  }
 
   CriticalJob critJob(double nexttime) const;
 };

@@ -74,6 +74,14 @@ static void write_all(int fd, const char *data, size_t len) {
   }
 }
 
+static void status_clear_state() {
+  if (!term_tty()) {
+    return;
+  }
+  std::string nrm = term_normal();
+  write_all(1, nrm.c_str(), nrm.size());
+}
+
 static void status_clear() {
   if (term_tty() && used) {
     std::stringstream os;
@@ -232,6 +240,7 @@ int StatusBuf::overflow(int c) {
     status_clear();
     emit_header();
     buf.sputn(line_buf.data(), line_buf.size());
+    status_clear_state();
     line_buf = "";
   }
 
@@ -252,6 +261,7 @@ StatusBuf::~StatusBuf() {
     line_buf += '\n';
     emit_header();
     buf.sputn(line_buf.data(), line_buf.size());
+    status_clear_state();
   }
   sync();
 }
@@ -552,6 +562,7 @@ void status_refresh(bool idle) {
 void status_finish() {
   status_clear();
   if (term_tty()) {
+    status_clear_state();
     struct itimerval timer;
     memset(&timer, 0, sizeof(timer));
     setitimer(ITIMER_REAL, &timer, 0);
