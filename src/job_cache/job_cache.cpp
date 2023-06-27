@@ -215,13 +215,22 @@ wcl::optional<ConnectError> Cache::backoff_try_connect(int attempts) {
   return {};
 }
 
+template <class Iter>
+static void mkdir_all(std::string acc, Iter begin, Iter end) {
+  for (; begin != end; ++begin) {
+    acc += *begin + "/";
+    mkdir_no_fail(acc.c_str());
+  }
+}
+
 Cache::Cache(std::string dir, uint64_t max, uint64_t low, bool miss) {
   cache_dir = dir;
   max_size = max;
   low_threshold = low;
   miss_on_failure = miss;
 
-  mkdir_no_fail(cache_dir.c_str());
+  auto fp_range = wcl::make_filepath_range_ref(cache_dir);
+  mkdir_all(wcl::is_relative(cache_dir) ? "" : "/", fp_range.begin(), fp_range.end());
 
   launch_daemon();
 
