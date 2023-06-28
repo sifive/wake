@@ -19,8 +19,6 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "eviction_policy.h"
-
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
@@ -37,6 +35,7 @@
 
 #include "db_helpers.h"
 #include "eviction_command.h"
+#include "eviction_policy.h"
 #include "job_cache_impl_common.h"
 #include "message_parser.h"
 
@@ -265,7 +264,7 @@ static void garbage_collect_job(std::string job_dir) {
 }
 
 static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int64_t max_job,
-                                  int group_id) {
+                                  uint8_t group_id) {
   auto group_dir = wcl::to_hex(&group_id);
   auto dir_res = wcl::directory_range::open(group_dir);
   if (!dir_res) {
@@ -326,7 +325,7 @@ static void garbage_collect_orphan_folders(std::shared_ptr<job_cache::Database> 
 
   // Next we slowly loop over job cache looking for orphaned folders
   for (int group_id = 0; group_id <= 0xFF; ++group_id) {
-    garbage_collect_group(jobs, max_job, group_id);
+    garbage_collect_group(jobs, max_job, uint8_t(group_id));
   }
 }
 
