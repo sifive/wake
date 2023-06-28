@@ -178,6 +178,7 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
 
 // Launch the job cache daemon
 void Cache::launch_daemon() {
+  wcl::log::info("Relaunching the daemon.")();
   // We are the daemon, launch the cache
   if (daemonize(cache_dir.c_str())) {
     std::string job_cache = wcl::make_canonical(find_execpath() + "/../bin/job-cache");
@@ -196,6 +197,13 @@ wcl::optional<ConnectError> Cache::backoff_try_connect(int attempts) {
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
   for (int i = 0; i < attempts; i++) {
+    // We normally connect in about 3 tries on fresh connect so
+    // if we haven't connected at this point its a good spot to start
+    // start trying.
+    if (attempts > 3) {
+      launch_daemon();
+    }
+
     auto fd_opt = try_connect(cache_dir);
     if (!fd_opt) {
       std::uniform_int_distribution<useconds_t> variance(0, backoff);
@@ -317,7 +325,6 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
     backoff *= 2;
 
     // Retry
-    wcl::log::info("Relaunching the daemon.")();
     launch_daemon();
 
     wcl::log::info("Reconnecting to daemon.")();
