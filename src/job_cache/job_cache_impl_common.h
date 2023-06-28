@@ -26,6 +26,8 @@
 #include <string>
 #include <vector>
 
+using group_id_t = uint8_t;
+
 // This function removes all the baking files of a specific job.
 // While not technically unsafe to use on a job still in the databse
 // this should be avoided.
