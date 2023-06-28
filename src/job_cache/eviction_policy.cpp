@@ -19,6 +19,8 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include "eviction_policy.h"
+
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
@@ -35,7 +37,6 @@
 
 #include "db_helpers.h"
 #include "eviction_command.h"
-#include "eviction_policy.h"
 #include "job_cache_impl_common.h"
 #include "message_parser.h"
 
