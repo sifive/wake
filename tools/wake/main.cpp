@@ -198,7 +198,7 @@ int main(int argc, char **argv) {
   core_lim.rlim_cur = core_lim.rlim_max;
   setrlimit(RLIMIT_CORE, &core_lim);
 
-  // Geth the start time for wake
+  // Get the start time for wake
   auto start = std::chrono::steady_clock::now();
 
   TerminalReporter terminalReporter;
