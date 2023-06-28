@@ -331,8 +331,14 @@ class LSPServer {
     }
 
     isInitialized = true;
-    std::string workspaceUri =
-        receivedMessage.get("params").get("workspaceFolders").children[0].second.get("uri").value;
+    auto uri = receivedMessage.get("params").get_opt("workspaceFolders");
+    auto rootUri = receivedMessage.get("params").get_opt("rootUri");
+    if (!(bool(uri) | bool(rootUri))) std::cerr << "initialize workspace error, no workspace found!" << std::endl;
+    std::string workspaceUri;
+    if (uri)
+      workspaceUri = (**uri).children[0].second.get("uri").value;
+    else
+      workspaceUri = (**rootUri).value;
     astree.absWorkDir = JSONConverter::decodePath(workspaceUri);
 
     wcl::log::info("Initialized LSP with workspace = %s", astree.absWorkDir.c_str())();
