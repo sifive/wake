@@ -200,7 +200,7 @@ wcl::optional<ConnectError> Cache::backoff_try_connect(int attempts) {
     // We normally connect in about 3 tries on fresh connect so
     // if we haven't connected at this point its a good spot to start
     // start trying.
-    if (attempts > 3) {
+    if (i > 3) {
       launch_daemon();
     }
 
