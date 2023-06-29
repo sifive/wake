@@ -124,7 +124,6 @@ where
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut child = Command::new("../../lib/wake/lsp-wake")
-        .env("WAKE_LSP_LOG_PATH", "wake.lsp.log")
         .stdout(Stdio::piped())
         .stdin(Stdio::piped())
         .spawn()?;
