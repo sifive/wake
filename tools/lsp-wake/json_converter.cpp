@@ -307,7 +307,6 @@ JAST highlightsToJSON(JAST receivedMessage, const std::vector<Location> &occurre
 
 JAST hoverInfoToJSON(JAST receivedMessage, const std::vector<SymbolDefinition> &hoverInfoPieces) {
   JAST message = createResponseMessage(std::move(receivedMessage));
-  JAST &result = message.add("result", JSON_OBJECT);
 
   std::string value;
   for (const SymbolDefinition &def : hoverInfoPieces) {
@@ -321,11 +320,16 @@ JAST hoverInfoToJSON(JAST receivedMessage, const std::vector<SymbolDefinition> &
     }
     value += def.outerDocumentation + "\n\n";
   }
-  if (!value.empty()) {
-    JAST &contents = result.add("contents", JSON_OBJECT);
-    contents.add("kind", "markdown");
-    contents.add("value", value.c_str());
+
+  if (value.empty()) {
+    message.add("result", JSON_NULLVAL);
+    return message;
   }
+
+  JAST &result = message.add("result", JSON_OBJECT);
+  JAST &contents = result.add("contents", JSON_OBJECT);
+  contents.add("kind", "markdown");
+  contents.add("value", value.c_str());
   return message;
 }
 
