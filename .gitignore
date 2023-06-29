@@ -51,3 +51,4 @@ Cargo.lock
 /rust/migration/target/*
 /rust/entity/target/*
 /rust/gsc/target/*
+/rust/test-lsp-wake/target/*
