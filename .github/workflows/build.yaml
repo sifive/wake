@@ -134,7 +134,7 @@ jobs:
               build_cmd: debuild -us -uc
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
               install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
-              
+
               - target: fedora_38
               dockerfile: fedora-38
               extra_docker_build_args: ''
