@@ -478,6 +478,11 @@ bool setup_user_namespaces(int id_user, int id_group, bool isolate_network,
 [[noreturn]] int pidns_init(void *arg) {
   // We should be in a new PID namespace now, label the process in 'ps'.
   prctl(PR_SET_NAME, "wb-pid-ns", 0, 0, 0);
+  // This process should terminate if the parent process exits.
+  if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
+    std::cerr << "pidns_init prctl: " << strerror(errno) << std::endl;
+    exit(1);
+  }
 
   // A fresh mount of procfs over the previous namespace's /proc.
   // which we can only do as we're already in a mount namespace.
