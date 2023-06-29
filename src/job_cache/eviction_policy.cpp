@@ -265,7 +265,7 @@ static void garbage_collect_job(std::string job_dir) {
 }
 
 static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int64_t max_job,
-                                  int group_id) {
+                                  group_id_t group_id) {
   auto group_dir = wcl::to_hex(&group_id);
   auto dir_res = wcl::directory_range::open(group_dir);
   if (!dir_res) {
@@ -325,8 +325,10 @@ static void garbage_collect_orphan_folders(std::shared_ptr<job_cache::Database> 
   });
 
   // Next we slowly loop over job cache looking for orphaned folders
+  // Note we have to use a larger type than group_id_t to know when
+  // to exit this loop correctly.
   for (int group_id = 0; group_id <= 0xFF; ++group_id) {
-    garbage_collect_group(jobs, max_job, group_id);
+    garbage_collect_group(jobs, max_job, uint8_t(group_id));
   }
 }
 

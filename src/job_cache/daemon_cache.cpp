@@ -617,7 +617,7 @@ void DaemonCache::remove_corrupt_job(int64_t job_id) {
   impl->jobs.remove(job_id);
 
   // Find this job directory so we can remove all the files
-  uint8_t group_id = job_id & 0xFF;
+  group_id_t group_id = job_id & 0xFF;
   std::string job_dir = wcl::join_paths(wcl::to_hex(&group_id), std::to_string(job_id));
 
   // Iterate over these files collecting the paths to delete
@@ -671,7 +671,7 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
   mkdir_no_fail(tmp_job_dir.c_str());
 
   // We also need to know what directory we're reading out of
-  uint8_t group_id = job_id & 0xFF;
+  group_id_t group_id = job_id & 0xFF;
   std::string job_dir = wcl::join_paths(wcl::to_hex(&group_id), std::to_string(job_id));
 
   // We then hard link each file to a new location atomically.
