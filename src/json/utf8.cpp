@@ -21,6 +21,7 @@
 
 #include "utf8.h"
 
+#include <cstdint>
 #include <string>
 
 enum {
