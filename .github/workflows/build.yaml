@@ -134,6 +134,14 @@ jobs:
               build_cmd: debuild -us -uc
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
               install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
+              
+              - target: fedora_38
+              dockerfile: fedora-38
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
+              build_cmd: rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
+              install_src_glob: build/x86_64/*.rpm
 
             - target: vscode
               dockerfile: wasm
@@ -328,6 +336,12 @@ jobs:
           with:
             name: release_ubuntu_22_04
             path: ubuntu_22_04
+      
+        - name: Download Fedora 38
+          uses: actions/download-artifact@v3
+          with:
+            name: release_fedora_38
+            path: fedora_38
 
         - name: Rename artifacts
           run: |
@@ -338,6 +352,7 @@ jobs:
             cp rocky_9/wake-*-1.x86_64.rpm rocky_9-wake-${VERSION}-1.x86_64.rpm
             cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_${VERSION}-1_amd64.deb
             cp ubuntu_22_04/wake_*-1_amd64.deb ubuntu-22-04-wake_${VERSION}-1_amd64.deb
+            cp fedora_38/wake-*-1.x86_64.rpm fedora_38-wake-${VERSION}-1.x86_64.rpm
 
         - name: Create Release
           # v1.2.1 -> 919008cf3f741b179569b7a6fb4d8860689ab7f0
@@ -353,4 +368,5 @@ jobs:
               rocky_9-wake-*-1.x86_64.rpm
               debian-bullseye-wake_*-1_amd64.deb
               ubuntu-22-04-wake_*-1_amd64.deb
+              fedora_38-wake-*-1.x86_64.rpm
 
