@@ -810,17 +810,11 @@ export def getJobStatus (job: Job): Status = match (getJobReport job)
         else
             Signaled (-status)
 
-# Implement FUSE-based Runner
-# The FUSE runner on linux supports a few isolation options via resources:
-# - "isolate/user": the Job will appear to run as root
-# - "isolate/host": make the hostname appear to be "build.local"
-# - "isolate/net": disables network access
-# - "isolate/workspace": makes the build appear run in /var/cache/wake
-#    ... if /var/cache/wake does not exist, a directory 'build/wake' is
-#        used relative to where wake has been installed
+# Location of the wake executable
 export def wakePath: String =
-    prim "execpath" # location of the wake executable
+    prim "execpath"
 
+# Implement FUSE-based Runner
 export def fuseRunner: Runner =
     def fuse = "{wakePath}/wakebox"
     def score _ = Pass 2.0
@@ -900,6 +894,8 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
                     "stdin" :-> JString stdin,
                     "resources" :-> res | map JString | JArray,
                     "version" :-> JString version,
+                    "isolate-network" :-> JBoolean False,
+                    "isolate-pids" :-> JBoolean False,
                     "mount-ops" :-> JArray (JObject ("type" :-> JString "workspace", "destination" :-> JString ".", Nil), Nil),
                     "usage" :-> JObject (
                         "status" :-> JInteger status,

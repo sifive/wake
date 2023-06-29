@@ -37,6 +37,10 @@
 #include <iostream>
 #include <sstream>
 
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
+
 #include "compat/rusage.h"
 #include "json/json5.h"
 #include "namespace.h"
@@ -61,6 +65,7 @@ bool json_as_struct(const std::string &json, json_args &result) {
   result.stdin_file = jast.get("stdin").value;
 
   result.isolate_network = jast.get("isolate-network").kind == JSON_TRUE;
+  result.isolate_pids = jast.get("isolate-pids").kind == JSON_TRUE;
 
   result.hostname = jast.get("hostname").value;
   result.domainname = jast.get("domainname").value;
@@ -79,8 +84,8 @@ bool json_as_struct(const std::string &json, json_args &result) {
   return true;
 }
 
-static int execve_wrapper(const std::vector<std::string> &command,
-                          const std::vector<std::string> &environment) {
+int execve_wrapper(const std::vector<std::string> &command,
+                   const std::vector<std::string> &environment) {
   std::vector<const char *> cmd_args;
   for (auto &s : command) cmd_args.push_back(s.c_str());
   cmd_args.push_back(0);
@@ -133,7 +138,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     return false;
   }
 
-  if (!args.daemon.connect(args.visible)) return false;
+  if (!args.daemon.connect(args.visible, args.isolate_pids)) return false;
 
   struct timeval start;
   gettimeofday(&start, 0);
@@ -148,6 +153,8 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
       exit(1);
 
     if (!do_mounts(args.mount_ops, args.daemon.mount_subdir, envs_from_mounts)) exit(1);
+
+    prctl(PR_SET_NAME, "wb-mount-ns", 0, 0, 0);
 #endif
 
     if (chdir(args.command_running_dir.c_str()) != 0) {
@@ -185,8 +192,17 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
       }
     }
 
-    int err = execve_wrapper(command, args.environment);
-    std::cerr << "execve " << command[0] << ": " << strerror(err) << std::endl;
+#ifdef __linux__
+    if (args.isolate_pids) {
+      pidns_args nsargs = {command, args.environment};
+      exec_in_pidns(nsargs);
+    } else {
+#endif
+      int err = execve_wrapper(command, args.environment);
+      std::cerr << "execve " << command[0] << ": " << strerror(err) << std::endl;
+#ifdef __linux__
+    }
+#endif
     exit(1);
   }
 

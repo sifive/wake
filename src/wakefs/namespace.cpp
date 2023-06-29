@@ -433,6 +433,16 @@ bool get_workspace_dir(const std::vector<mount_op> &mount_ops,
 
 bool setup_user_namespaces(int id_user, int id_group, bool isolate_network,
                            const std::string &hostname, const std::string &domainname) {
+  // If we have permissions in the current mount namespace, create a fresh /proc mount.
+  // This can avoid issues where the mount propagation setting for /proc in the
+  // current namespace is set to MS_UNBINDABLE.
+  int err = mount("proc", "/proc", "proc", 0, nullptr);
+  if (err == -1 && errno != EPERM && errno != EBUSY) {
+    std::cerr << "pre namespace setup: mount('proc', '/proc', 'proc', 0, nullptr): "
+              << strerror(errno) << std::endl;
+    exit(1);
+  }
+
   uid_t real_euid = geteuid();
   gid_t real_egid = getegid();
 
@@ -465,4 +475,71 @@ bool setup_user_namespaces(int id_user, int id_group, bool isolate_network,
   return true;
 }
 
+[[noreturn]] int pidns_init(void *arg) {
+  // We should be in a new PID namespace now, label the process in 'ps'.
+  prctl(PR_SET_NAME, "wb-pid-ns", 0, 0, 0);
+
+  // A fresh mount of procfs over the previous namespace's /proc.
+  // which we can only do as we're already in a mount namespace.
+  // Note that this is not a bind mount of an existing /proc.
+  // The new procfs will have the correct data for the new PID namespace, rather
+  // than leaking process ids from the exterior namespace.
+  int err = mount("proc", "/proc", "proc", 0, nullptr);
+  if (err == -1) {
+    std::cerr << "new pid namespace: mount('proc', '/proc', 'proc', 0, nullptr): "
+              << strerror(errno) << std::endl;
+    exit(1);
+  }
+
+  pid_t pid = fork();
+  if (pid == 0) {
+    // Execute the user-specified command.
+    const auto *args = reinterpret_cast<const pidns_args *>(arg);
+    err = execve_wrapper(args->command, args->environment);
+    std::cerr << "execve " << args->command[0] << ": " << strerror(err) << std::endl;
+    exit(1);
+  }
+
+  // Wait for child processes, we are init(1) in this PID namespace.
+  int status;
+  while ((pid = waitpid(-1, &status, 0)) != 0) {
+    if (pid == -1) {
+      if (errno == ECHILD) {
+        break;  // all children have terminated
+      }
+      std::cerr << "waitpid: " << strerror(errno) << std::endl;
+      exit(1);
+    }
+  }
+
+  if (WIFEXITED(status)) {
+    exit(WEXITSTATUS(status));
+  }
+  exit(-WTERMSIG(status));
+}
+
+[[noreturn]] void exec_in_pidns(pidns_args &nsargs) {
+  alignas(16) uint8_t stack_buf[4096];
+  void *child_stack = reinterpret_cast<void *>(stack_buf + sizeof(child_stack));
+
+  // Create a new thread in a PID namespace, calling pidns_init.
+  pid_t child_pid = clone(pidns_init, child_stack, CLONE_NEWPID | SIGCHLD, &nsargs);
+  if (child_pid == -1) {
+    std::cerr << "clone " << nsargs.command[0] << ": " << strerror(errno) << std::endl;
+    exit(1);
+  }
+
+  // While we wait, the subdir_live_file for the fuse daemon will be held open.
+  int status = 1;
+  if (waitpid(child_pid, &status, 0) == -1) {
+    std::cerr << "waitpid (clone) " << nsargs.command[0] << std::endl;
+    exit(1);
+  }
+
+  if (WIFEXITED(status)) {
+    exit(WEXITSTATUS(status));
+  } else {
+    exit(-WTERMSIG(status));
+  }
+}
 #endif

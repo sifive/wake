@@ -52,7 +52,7 @@ daemon_client::daemon_client(const std::string &base_dir)
       visibles_path(mount_path + "/.i." + std::to_string(getpid())) {}
 
 // The arg 'visible' is destroyed/moved in the interest of performance with large visible lists.
-bool daemon_client::connect(std::vector<std::string> &visible) {
+bool daemon_client::connect(std::vector<std::string> &visible, bool close_live_file) {
   int err = mkdir_with_parents(mount_path, 0775);
   if (0 != err) {
     std::cerr << "mkdir_with_parents ('" << mount_path << "'):" << strerror(err) << std::endl;
@@ -98,9 +98,15 @@ bool daemon_client::connect(std::vector<std::string> &visible) {
     return false;
   }
 
-  // This stays open (keeping subdir_live_file live) until we terminate
-  // Note: O_CLOEXEC is NOT set; thus, children keep subdir_live_file live as well
-  live_fd = open(subdir_live_file.c_str(), O_CREAT | O_RDWR | O_EXCL, 0644);
+  // subdir_live_file remains open until we terminate.
+  // Without a PID namespace the live file will be leaked into every child process.
+  int flags = O_CREAT | O_RDWR | O_EXCL;
+  if (close_live_file) {
+    // Only allow wakebox itself to hold the live file.
+    // A PID namespace should be created to re-parent and reap all child processes.
+    flags |= O_CLOEXEC;
+  }
+  live_fd = open(subdir_live_file.c_str(), flags, 0644);
   if (live_fd == -1) {
     std::cerr << "open " << subdir_live_file << ": " << strerror(errno) << std::endl;
     return false;
