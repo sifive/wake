@@ -60,13 +60,11 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
         | runJobWith defaultRunner
         | getJobOutputs
 
-    require Some (Pair cfile _) = find (matches `.*\.c` _.getPathName) result
+    require Some (Pair cppfile _) = find (matches `.*\.cpp` _.getPathName) result
     else failWithError "lemon produced no C file"
 
     require Some (Pair hfile _) = find (matches `.*\.h` _.getPathName) result
     else failWithError "lemon produced no H file"
-
-    require Pass cppfile = installAs (replace `\.c$` ".cpp" cfile.getPathName) cfile
 
     require Some "1" = getenv "UPGRADE_GENERATED"
     else Pass (Pair cppfile hfile)
