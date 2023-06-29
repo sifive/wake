@@ -497,12 +497,12 @@ int main(int argc, char **argv) {
     policy = DescribePolicy::metadata();
   }
 
-  if (clo.debug) {
-    policy = DescribePolicy::debug();
-  }
-
   if (clo.verbose) {
     policy = DescribePolicy::verbose();
+  }
+
+  if (clo.debug) {
+    policy = DescribePolicy::debug();
   }
 
   std::unordered_map<long, JobReflection> captured_jobs = {};
