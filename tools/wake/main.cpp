@@ -21,6 +21,7 @@
 
 #include <inttypes.h>
 #include <stdlib.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <wcl/defer.h>
@@ -190,6 +191,14 @@ class TerminalReporter : public DiagnosticReporter {
 };
 
 int main(int argc, char **argv) {
+  // Make sure we always get core dumps but don't fail
+  // if that fails for some reason.
+  struct rlimit core_lim;
+  getrlimit(RLIMIT_CORE, &core_lim);
+  core_lim.rlim_cur = core_lim.rlim_max;
+  setrlimit(RLIMIT_CORE, &core_lim);
+
+  // Get the start time for wake
   auto start = std::chrono::steady_clock::now();
 
   TerminalReporter terminalReporter;
