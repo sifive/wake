@@ -517,6 +517,11 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
                 require True = status == 0
                 else Pass ""
 
+                # Sometimes we want a read-only cache. For instance read-only pre-merge
+                # with read-write post-merge.
+                require None = getenv "WAKE_EXPERIMENTAL_JOB_CACHE_READ_ONLY"
+                else Pass ""
+
                 job_cache_add jobCacheAddJson
 
             Pass (RunnerOutput (map getPathName vis) outputs useage)
