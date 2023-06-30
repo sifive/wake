@@ -2,16 +2,69 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "job")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
+    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))", unique)]
+    pub hash: Vec<u8>,
     pub cmd: String,
-    pub env: String,
+    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
+    pub env: Vec<u8>,
+    pub cwd: String,
+    pub stdin: String,
+    pub is_atty: bool,
+    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
+    pub hidden_info: Vec<u8>,
+    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
+    pub stdout: Vec<u8>,
+    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
+    pub stderr: Vec<u8>,
+    pub status: i64,
+    #[sea_orm(column_type = "Double")]
+    pub runtime: f64,
+    #[sea_orm(column_type = "Double")]
+    pub cputime: f64,
+    pub memory: i64,
+    pub i_bytes: i64,
+    pub o_bytes: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::output_dir::Entity")]
+    OutputDir,
+    #[sea_orm(has_many = "super::output_file::Entity")]
+    OutputFile,
+    #[sea_orm(has_many = "super::output_symlink::Entity")]
+    OutputSymlink,
+    #[sea_orm(has_many = "super::visible_file::Entity")]
+    VisibleFile,
+}
+
+impl Related<super::output_dir::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::OutputDir.def()
+    }
+}
+
+impl Related<super::output_file::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::OutputFile.def()
+    }
+}
+
+impl Related<super::output_symlink::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::OutputSymlink.def()
+    }
+}
+
+impl Related<super::visible_file::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::VisibleFile.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}

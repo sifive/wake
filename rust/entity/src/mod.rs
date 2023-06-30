@@ -3,3 +3,7 @@
 pub mod prelude;
 
 pub mod job;
+pub mod output_dir;
+pub mod output_file;
+pub mod output_symlink;
+pub mod visible_file;
