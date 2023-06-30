@@ -21,7 +21,7 @@ pub struct Model {
     pub stdout: Vec<u8>,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
     pub stderr: Vec<u8>,
-    pub status: i64,
+    pub status: i32,
     #[sea_orm(column_type = "Double")]
     pub runtime: f64,
     #[sea_orm(column_type = "Double")]

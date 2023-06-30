@@ -38,7 +38,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Job::HiddenInfo).ezblob())
                     .col(ColumnDef::new(Job::Stdout).ezblob())
                     .col(ColumnDef::new(Job::Stderr).ezblob())
-                    .col(ColumnDef::new(Job::Status).big_unsigned().not_null())
+                    .col(ColumnDef::new(Job::Status).integer().not_null())
                     .col(ColumnDef::new(Job::Runtime).double().not_null())
                     .col(ColumnDef::new(Job::Cputime).double().not_null())
                     .col(ColumnDef::new(Job::Memory).big_unsigned().not_null())
