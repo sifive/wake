@@ -38,6 +38,9 @@ int mkdir_with_parents(const std::string &path, mode_t mode) {
     slash_pos = path.find("/", slash_pos + 1);
     std::string dir = path.substr(0, slash_pos);
 
+    struct stat s;
+    if ((stat(dir.c_str(), &s) != -1) && (S_ISDIR(s.st_mode) != 0)) continue;
+
     if (0 != mkdir(dir.c_str(), mode) && errno != EEXIST) return errno;
   }
   return 0;
