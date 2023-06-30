@@ -18,6 +18,7 @@
 #ifndef UTF8_H
 #define UTF8_H
 
+#include <cstdint>
 #include <string>
 
 bool push_utf8(std::string &result, uint32_t c);
