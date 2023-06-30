@@ -148,6 +148,12 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     std::vector<std::string> command = args.command;
     std::vector<std::string> envs_from_mounts;
 #ifdef __linux__
+    // This process should terminate if the parent process exits.
+    if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
+      std::cerr << "run_in_fuse prctl: " << strerror(errno) << std::endl;
+      exit(1);
+    }
+
     if (!setup_user_namespaces(args.userid, args.groupid, args.isolate_network, args.hostname,
                                args.domainname))
       exit(1);
