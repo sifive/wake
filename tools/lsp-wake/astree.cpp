@@ -18,6 +18,8 @@
 
 #include "astree.h"
 
+#include <sys/time.h>
+
 #include <algorithm>
 #include <functional>
 #include <iostream>
@@ -28,6 +30,7 @@
 #include "dst/bind.h"
 #include "dst/expr.h"
 #include "dst/todst.h"
+#include "json_converter.h"
 #include "parser/cst.h"
 #include "parser/lexer.h"
 #include "parser/parser.h"
@@ -37,12 +40,9 @@
 #include "util/diagnostic.h"
 #include "util/file.h"
 #include "util/fragment.h"
+#include "wcl/tracing.h"
 
 static CPPFile cppFile(__FILE__);
-
-ASTree::ASTree() {}
-
-ASTree::ASTree(std::string _absLibDir) : absLibDir(std::move(_absLibDir)) {}
 
 void ASTree::recordComments(CSTElement def, int level) {
   if (def.id() == TOKEN_COMMENT || def.id() == TOKEN_NL) {
@@ -54,44 +54,69 @@ void ASTree::recordComments(CSTElement def, int level) {
   }
 }
 
-void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &processFileDiagnostics) {
+void ASTree::scanProject() {
+  diskFiles.clear();
+
+  wcl::log::info("Scanning disk for wake files. libDir = %s, workDir = %s", absLibDir.c_str(), absWorkDir.c_str())();
+  bool enumok = true;
+  auto files = find_all_wakefiles(enumok, true, false, absLibDir, absWorkDir, stdout);
+  lspReporter.scan(files);
+  reporter = &lspReporter;
+
+  for (std::string filename : files) {
+    std::unique_ptr<FileContent> efile = std::make_unique<ExternalFile>(lspReporter, filename.c_str());
+    CST cst(*efile, lspReporter);
+    diskFiles.insert({filename, std::pair<std::unique_ptr<FileContent>, CST>({std::move(efile), std::move(cst)})});
+  }
+}
+
+std::vector<JAST> ASTree::diagnoseProject() {
+  struct timeval start, stop;
+
+  gettimeofday(&start, 0);
+
   usages.clear();
   definitions.clear();
   types.clear();
   packages.clear();
   comments.clear();
 
-  bool enumok = true;
-  auto allFiles = find_all_wakefiles(enumok, true, false, absLibDir, absWorkDir, stdout);
-
-  std::map<std::string, std::vector<Diagnostic>> diagnostics;
-  LSPReporter lspReporter(diagnostics, allFiles);
-  reporter = &lspReporter;
-
   std::unique_ptr<Top> top(new Top);
   top->def_package = "nothing";
   top->body = std::unique_ptr<Expr>(new VarRef(FRAGMENT_CPP_LINE, "Nil@wake"));
 
-  std::vector<ExternalFile> externalFiles;
-  externalFiles.reserve(allFiles.size());
+  gettimeofday(&stop, 0);
+  double delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("front: %f seconds", delay)();
+  gettimeofday(&start, 0);
 
-  for (auto &filename : allFiles) {
-    auto it = changedFiles.find(filename);
-    FileContent *fcontent;
+  for (auto &filename : diskFiles) {
+    auto it = changedFiles.find(filename.first);
     if (it == changedFiles.end()) {
-      // Re-read files that are not modified in the editor, because who knows what someone did in a
-      // terminal
-      externalFiles.emplace_back(lspReporter, filename.c_str());
-      fcontent = &externalFiles.back();
+      wcl::log::info("Processing '%s' from disk", filename.first.c_str())();
+      dst_top(filename.second.second.root(), *top);
+      recordComments(filename.second.second.root(), 0);
     } else {
-      fcontent = it->second.get();
+      wcl::log::info("Processing '%s' from changed", filename.first.c_str())();
+      dst_top(it->second.second.root(), *top);
+      // TODO: this can be cached
+      recordComments(it->second.second.root(), 0);
     }
-
-    CST cst(*fcontent, lspReporter);
-    dst_top(cst.root(), *top);
-    recordComments(cst.root(), 0);
   }
+
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("dst loop: %f seconds", delay)();
+  gettimeofday(&start, 0);
+
+  // TODO: process files in changed but not in disk.
+
   flatten_exports(*top);
+
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("flatten exports: %f seconds", delay)();
+  gettimeofday(&start, 0);
 
   for (auto &p : top->packages) {
     for (auto &f : p.second->files) {
@@ -100,18 +125,51 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
     }
   }
 
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("packages loop: %f seconds", delay)();
+  gettimeofday(&start, 0);
+
   PrimMap pmap = prim_register_internal();
   bool isTreeBuilt = true;
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
 
-  for (auto &diagnosticEntry : diagnostics) {
-    processFileDiagnostics(diagnosticEntry);
+  std::vector<JAST> out = {};
+  for (const auto& diagnostic : lspReporter.diagnostics) {
+    out.push_back(JSONConverter::fileDiagnosticsToJSON(diagnostic.first, diagnostic.second));
   }
+
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("callback loop: %f seconds", delay)();
+  gettimeofday(&start, 0);
 
   if (root != nullptr) explore(root.get(), true);
 
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("explore: %f seconds", delay)();
+  gettimeofday(&start, 0);
+
   std::sort(definitions.begin(), definitions.end());
+
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("sort: %f seconds", delay)();
+  gettimeofday(&start, 0);
+
   fillDefinitionDocumentationFields();
+
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("fillDocumentation: %f seconds", delay)();
+
+  return out;
+}
+
+void ASTree::fileChanged(std::string filename, std::unique_ptr<StringFile> content) {
+  CST cst(*content, lspReporter);
+  changedFiles.insert({filename, std::pair<std::unique_ptr<FileContent>, CST>({std::move(content), std::move(cst)})});
 }
 
 Location ASTree::findDefinitionLocation(const Location &locationToDefine) {
@@ -515,11 +573,12 @@ void ASTree::LSPReporter::report(Diagnostic diagnostic) {
   diagnostics[diagnostic.getFilename()].push_back(diagnostic);
 }
 
-ASTree::LSPReporter::LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics,
-                                 const std::vector<std::string> &allFiles)
-    : diagnostics(_diagnostics) {
+void ASTree::LSPReporter::scan(const std::vector<std::string> &allFiles) {
+  diagnostics.clear();
+
   // create an empty diagnostics vector for each file
   for (const std::string &fileName : allFiles) {
     diagnostics[fileName];
   }
 }
+

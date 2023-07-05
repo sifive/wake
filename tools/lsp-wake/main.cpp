@@ -222,7 +222,9 @@ class LSPServer {
   }
 
   std::string getBlob(std::string &buffer, size_t length) {
-    while (buffer.size() < length) buffer.append(getStdin());
+    while (buffer.size() < length) {
+      buffer.append(getStdin());
+    }
 
     std::string out(buffer, 0, length);
     buffer.erase(0, length);
@@ -334,6 +336,7 @@ class LSPServer {
     std::string workspaceUri =
         receivedMessage.get("params").get("workspaceFolders").children[0].second.get("uri").value;
     astree.absWorkDir = JSONConverter::decodePath(workspaceUri);
+    astree.scanProject();
 
     wcl::log::info("Initialized LSP with workspace = %s", astree.absWorkDir.c_str())();
 
@@ -350,11 +353,10 @@ class LSPServer {
   }
 
   void diagnoseProject(MethodResult &methodResult) {
-    astree.diagnoseProject([&methodResult](ASTree::FileDiagnostics &fileDiagnostics) {
-      JAST fileDiagnosticsJSON =
-          JSONConverter::fileDiagnosticsToJSON(fileDiagnostics.first, fileDiagnostics.second);
-      methodResult.diagnostics.children.emplace_back("", fileDiagnosticsJSON);
-    });
+    auto diagnostics = astree.diagnoseProject();
+    for (JAST diagnostic : diagnostics) {
+        methodResult.diagnostics.children.emplace_back("", diagnostic);
+    }
     needsUpdate = false;
   }
 
@@ -494,8 +496,7 @@ class LSPServer {
                                   .second.get("text")
                                   .value;
     std::string fileName = JSONConverter::decodePath(fileUri);
-    astree.changedFiles[fileName] =
-        std::make_unique<StringFile>(fileName.c_str(), std::move(fileContent));
+    astree.fileChanged(fileName, std::make_unique<StringFile>(fileName.c_str(), std::move(fileContent)));
     needsUpdate = true;
     ignoredCount = 0;
     return {};
@@ -503,7 +504,16 @@ class LSPServer {
 
   MethodResult didSave(const JAST &receivedMessage) {
     std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-    astree.changedFiles.erase(JSONConverter::decodePath(fileUri));
+    // astree.changedFiles.erase(JSONConverter::decodePath(fileUri));
+    // std::string fileContent = receivedMessage.get("params")
+    //                               .get("contentChanges")
+    //                               .children.back()
+    //                               .second.get("text")
+    //                               .value;
+    // std::string fileName = JSONConverter::decodePath(fileUri);
+    // astree.fileChanged(fileName, std::make_unique<StringFile>(fileName.c_str(), std::move(fileContent)));
+    // TODO: add capability for "send file content on save"
+    // TODO: profile what's taking so long in diagnose
 
     // Might have replaced a file modified on disk
     needsUpdate = true;
@@ -514,7 +524,7 @@ class LSPServer {
 
   MethodResult didClose(const JAST &receivedMessage) {
     std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-    if (astree.changedFiles.erase(JSONConverter::decodePath(fileUri)) > 0) {
+    if (false /*astree.changedFiles.erase(JSONConverter::decodePath(fileUri)) > 0*/) {
       needsUpdate = true;
       // If a user hits 'undo' on a symbol rename, you can get hundreds of sequential didClose
       // invocations Calling refresh here would cause the extension to 'hang' for a very long time.
@@ -529,7 +539,7 @@ class LSPServer {
     for (auto child : jfiles.children) {
       std::string filePath = JSONConverter::decodePath(child.second.get("uri").value);
       // Newly created, modified on disk, or deleted? => File should be re-read from disk.
-      astree.changedFiles.erase(filePath);
+      // astree.changedFiles.erase(filePath);
 
       if (stoi(child.second.get("type").value) == 3) {
         // The file was deleted => clear any stale diagnostics

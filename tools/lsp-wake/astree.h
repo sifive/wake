@@ -27,21 +27,29 @@
 #include <set>
 #include <vector>
 
+#include "json/json5.h"
 #include "dst/expr.h"
 #include "symbol_definition.h"
 #include "util/diagnostic.h"
 
 class ASTree {
  public:
-  std::map<std::string, std::unique_ptr<StringFile>> changedFiles;
+  ASTree() {};
 
-  ASTree();
+  explicit ASTree(std::string _absLibDir): absLibDir(std::move(_absLibDir)) { }
 
-  explicit ASTree(std::string _absLibDir);
 
   typedef std::pair<const std::string, std::vector<Diagnostic>> FileDiagnostics;
 
-  void diagnoseProject(const std::function<void(FileDiagnostics &)> &processFileDiagnostics);
+  // Finds and parses all wakefiles on disk
+  void scanProject();
+
+  // Merges editor changed wakefiles and on disk wakefiles into single dst then diagnoses
+  // any problems
+  std::vector<JAST> diagnoseProject();
+
+  // Begins tracking a file as changed in the editor
+  void fileChanged(std::string filename, std::unique_ptr<StringFile> content);
 
   Location findDefinitionLocation(const Location &locationToDefine);
 
@@ -80,16 +88,21 @@ class ASTree {
   std::vector<SymbolDefinition> packages;
   std::vector<Comment> comments;
 
+  std::map<std::string, std::pair<std::unique_ptr<FileContent>, CST>> changedFiles;
+  std::map<std::string, std::pair<std::unique_ptr<FileContent>, CST>> diskFiles;
+
   class LSPReporter : public DiagnosticReporter {
    private:
-    std::map<std::string, std::vector<Diagnostic>> &diagnostics;
-
     void report(Diagnostic diagnostic) override;
 
    public:
-    explicit LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics,
-                         const std::vector<std::string> &allFiles);
+    LSPReporter() = default;
+    void scan(const std::vector<std::string> &allFiles);
+
+    std::map<std::string, std::vector<Diagnostic>> diagnostics;
   };
+
+  LSPReporter lspReporter;
 
   void explore(Expr *expr, bool isGlobal);
   void explore_type(const AST &ast);
