@@ -318,7 +318,6 @@ JAST hoverInfoToJSON(JAST receivedMessage, const std::vector<SymbolDefinition> &
         value += "**" + introduced.first + ": " + introduced.second + "**\n\n";
       }
     }
-    value += def.outerDocumentation + "\n\n";
   }
 
   if (value.empty()) {

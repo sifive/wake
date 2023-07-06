@@ -44,7 +44,6 @@ struct SymbolDefinition {
   SymbolKind symbolKind;
   bool isGlobal;
   std::string documentation;
-  std::string outerDocumentation;
   std::vector<std::pair<std::string, std::string>> introduces;
 
   SymbolDefinition(std::string _name, Location _location, std::string _type, SymbolKind _symbolKind,

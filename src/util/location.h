@@ -18,6 +18,8 @@
 #ifndef LOCATION_H
 #define LOCATION_H
 
+#include <wcl/hash.h>
+
 #include <ostream>
 
 struct Coordinates {
@@ -41,6 +43,13 @@ struct Coordinates {
   Coordinates operator-(int x) const { return Coordinates(row, column - x); }
 };
 
+template <>
+struct std::hash<Coordinates> {
+  size_t operator()(Coordinates const &coord) const noexcept {
+    return wcl::hash_combine(std::hash<int>{}(coord.row), std::hash<int>{}(coord.column));
+  }
+};
+
 struct Location {
   std::string filename;
   Coordinates start, end;
@@ -62,6 +71,15 @@ struct Location {
   bool operator==(const Location &l) const { return this->contains(l) && l.contains(*this); }
 
   bool operator!=(const Location &l) const { return !(*this == l); }
+};
+
+template <>
+struct std::hash<Location> {
+  size_t operator()(Location const &loc) const noexcept {
+    auto hash = wcl::hash_combine(std::hash<std::string>{}(loc.filename),
+                                  std::hash<Coordinates>{}(loc.start));
+    return wcl::hash_combine(hash, std::hash<Coordinates>{}(loc.end));
+  }
 };
 
 #define LOCATION Location(__FILE__, Coordinates(__LINE__), Coordinates(__LINE__))
