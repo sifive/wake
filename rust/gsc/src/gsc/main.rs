@@ -15,7 +15,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // connect to our db
     let connection = sea_orm::Database::connect("postgres://127.0.0.1/test").await?;
-    Migrator::up(&connection, None).await?;
+    let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
+    if pending_migrations.len() != 0 {
+        let err = Error::new(
+            ErrorKind::Other,
+            format!(
+                "This gsc version expects {:?} additional migrations to be applied",
+                pending_migrations.len()
+            ),
+        );
+        tracing::error! {%err, "unperformed migrations, please apply these migrations before starting gsc"};
+        Err(err)?;
+    }
+    //Migrator::up(&connection, None).await?;
     let state = Arc::new(connection);
 
     // build our application with a single route
