@@ -18,10 +18,14 @@
 
 #include "astree.h"
 
+#include <sys/time.h>
+
+#include <cassert>
 #include <algorithm>
 #include <functional>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -37,6 +41,7 @@
 #include "util/diagnostic.h"
 #include "util/file.h"
 #include "util/fragment.h"
+#include "wcl/tracing.h"
 
 static CPPFile cppFile(__FILE__);
 
@@ -55,6 +60,9 @@ void ASTree::recordComments(CSTElement def, int level) {
 }
 
 void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &processFileDiagnostics) {
+  struct timeval start, stop;
+  gettimeofday(&start, 0);
+
   usages.clear();
   definitions.clear();
   types.clear();
@@ -63,6 +71,11 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
 
   bool enumok = true;
   auto allFiles = find_all_wakefiles(enumok, true, false, absLibDir, absWorkDir, stdout);
+
+  gettimeofday(&stop, 0);
+  double delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("find files: %f seconds", delay)();
+  gettimeofday(&start, 0);
 
   std::map<std::string, std::vector<Diagnostic>> diagnostics;
   LSPReporter lspReporter(diagnostics, allFiles);
@@ -74,6 +87,11 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
 
   std::vector<ExternalFile> externalFiles;
   externalFiles.reserve(allFiles.size());
+
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("front: %f seconds", delay)();
+  gettimeofday(&start, 0);
 
   for (auto &filename : allFiles) {
     auto it = changedFiles.find(filename);
@@ -91,7 +109,18 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
     dst_top(cst.root(), *top);
     recordComments(cst.root(), 0);
   }
+
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("cst/dst loop: %f seconds", delay)();
+  gettimeofday(&start, 0);
+
   flatten_exports(*top);
+
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("flatten exports: %f seconds", delay)();
+  gettimeofday(&start, 0);
 
   for (auto &p : top->packages) {
     for (auto &f : p.second->files) {
@@ -100,18 +129,49 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
     }
   }
 
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("packages loop: %f seconds", delay)();
+  gettimeofday(&start, 0);
+
   PrimMap pmap = prim_register_internal();
   bool isTreeBuilt = true;
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
+
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("bind refs: %f seconds", delay)();
+  gettimeofday(&start, 0);
 
   for (auto &diagnosticEntry : diagnostics) {
     processFileDiagnostics(diagnosticEntry);
   }
 
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("callback: %f seconds", delay)();
+  gettimeofday(&start, 0);
+
   if (root != nullptr) explore(root.get(), true);
 
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("explore: %f seconds", delay)();
+  gettimeofday(&start, 0);
+
   std::sort(definitions.begin(), definitions.end());
+
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("sort: %f seconds", delay)();
+  gettimeofday(&start, 0);
+
   fillDefinitionDocumentationFields();
+
+  gettimeofday(&stop, 0);
+  delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+  wcl::log::info("fillDocumentation: %f seconds", delay)();
+  gettimeofday(&start, 0);
 }
 
 Location ASTree::findDefinitionLocation(const Location &locationToDefine) {
@@ -467,6 +527,15 @@ void ASTree::fillDefinitionDocumentationFields() {
       ++definitions_iterator;
     }
   }
+
+  for (const auto& def : definitions) {
+    std::stringstream s;
+    s << std::endl;
+    s << def.location << std::endl;
+    s << "  documentation = " << def.documentation << std::endl;
+    s << std::endl;
+    wcl::log::info("%s", s.str().c_str())({{"filter", "fex"}});
+  }
 }
 
 std::string ASTree::sanitizeComment(std::string comment) {
@@ -504,12 +573,6 @@ void ASTree::emplaceComment(std::vector<std::pair<std::string, int>> &comment,
   }
   comment.back().first += text;
 }
-
-ASTree::SymbolUsage::SymbolUsage(Location _usage, Location _definition)
-    : usage(std::move(_usage)), definition(std::move(_definition)) {}
-
-ASTree::Comment::Comment(std::string _comment_text, Location _location, int _level)
-    : comment_text(std::move(_comment_text)), location(std::move(_location)), level(_level) {}
 
 void ASTree::LSPReporter::report(Diagnostic diagnostic) {
   diagnostics[diagnostic.getFilename()].push_back(diagnostic);
