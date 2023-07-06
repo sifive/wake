@@ -118,7 +118,6 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(OutputSymlink::Path).string().not_null())
                     .col(ColumnDef::new(OutputSymlink::Content).ezblob())
-                    .col(ColumnDef::new(OutputSymlink::Mode).integer().not_null())
                     .col(ColumnDef::new(OutputSymlink::JobId).integer().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
@@ -206,7 +205,6 @@ enum OutputSymlink {
     Id,
     Path,
     Content,
-    Mode,
     JobId,
 }
 

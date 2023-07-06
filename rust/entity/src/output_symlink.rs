@@ -10,7 +10,6 @@ pub struct Model {
     pub path: String,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
     pub content: Vec<u8>,
-    pub mode: i32,
     pub job_id: i32,
 }
 
