@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::error! {%err, "unperformed migrations, please apply these migrations before starting gsc"};
         Err(err)?;
     }
-    //Migrator::up(&connection, None).await?;
+
     let state = Arc::new(connection);
 
     // build our application with a single route

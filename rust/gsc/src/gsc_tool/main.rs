@@ -62,7 +62,6 @@ async fn list_api_keys(_: ListKeysOpts, conn: &DatabaseConnection) -> Result<(),
 
     let headers = vec!["Id".into(), "Key".into(), "Desc".into()];
     keys.insert(0, headers.clone());
-    keys.push(headers);
 
     table::print_table(keys);
 
