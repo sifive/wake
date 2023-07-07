@@ -188,12 +188,7 @@ export function prepareConnection(connection: Connection, isWeb: Boolean) {
     });
 
     connection.onHover(async (params: HoverParams): Promise<Hover | null | ResponseError<void>> => {
-        let result: Hover | ResponseError<void> = await getResponse(createLspJson('textDocument/hover', params));
-        if (result.hasOwnProperty("contents")) {
-            return result;
-        } else {
-            return null;
-        }
+        return await getResponse(createLspJson('textDocument/hover', params));
     });
 
     connection.onDocumentSymbol(async (params: DocumentSymbolParams): Promise<SymbolInformation[] | ResponseError<void>> => {
