@@ -28,3 +28,6 @@ data-encoding = "2.4.0"
 cli-table = "0.4.7"
 rand = "0.8.5"
 rand_core = "0.6.4"
+inquire = { version = "0.6.2", features = [] }
+atty = "0.2.14"
+papergrid = "0.9.1"

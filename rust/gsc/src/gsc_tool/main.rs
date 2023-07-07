@@ -1,6 +1,8 @@
+use atty::Stream;
 use data_encoding::BASE64;
 use entity::api_key;
 use gumdrop::Options;
+use inquire::Confirm;
 use migration::{DbErr, Migrator, MigratorTrait};
 use rand_core::{OsRng, RngCore};
 use sea_orm::{
@@ -8,6 +10,8 @@ use sea_orm::{
 };
 use std::io::{self, BufRead, Error, ErrorKind, Write};
 use tracing;
+
+mod table;
 
 #[tracing::instrument]
 async fn add_api_key(
@@ -43,15 +47,22 @@ async fn add_api_key(
 
 #[tracing::instrument]
 async fn list_api_keys(_: ListKeysOpts, conn: &DatabaseConnection) -> Result<(), DbErr> {
-    let keys = api_key::Entity::find().all(conn).await?;
-    // TODO: It would be really nice if this was formatted into a table
-    for key in keys {
-        println!("{} {}", key.key, key.desc);
-    }
+    let mut keys: Vec<_> = api_key::Entity::find()
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(|x| vec![format!("{}", x.id), x.key, x.desc])
+        .collect();
+
+    let headers = vec!["Id".into(), "Key".into(), "Desc".into()];
+    keys.insert(0, headers.clone());
+    keys.push(headers);
+
+    table::print_table(keys);
+
     Ok(())
 }
 
-// TODO: We should add a yes/no question utility
 #[tracing::instrument]
 async fn remove_api_key(
     key: String,
@@ -72,16 +83,17 @@ async fn remove_api_key(
         std::process::exit(2);
     }
 
-    // TODO: Only do this if stdin fails the isatty check
-    println!("key = {}, desc = {}", key, results[0].desc);
-    print!("Are you sure you want to delete this key [y/N]: ");
-    io::stdout().flush()?;
-    let mut line = String::new();
-    let stdin = io::stdin();
-    stdin.lock().read_line(&mut line).unwrap();
-    if !line.starts_with("y") && !line.starts_with("Y") {
-        println!("Aborting key removal");
-        return Ok(());
+    // We only want to prompt the user if the user can type into the terminal
+    if atty::is(Stream::Stdin) {
+        let should_delete = Confirm::new("Are you sure you want to delete this key?")
+            .with_default(false)
+            .with_help_message(format!("key = {}, desc = {:?}", key, results[0].desc).as_str())
+            .prompt()?;
+
+        if !should_delete {
+            println!("Aborting key removal");
+            return Ok(());
+        }
     }
 
     // Ok now that we're really sure we want to delete this key
