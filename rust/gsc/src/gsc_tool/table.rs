@@ -28,6 +28,19 @@ pub fn print_table(data: Vec<Vec<String>>) {
         right: Some('│'),
         intersection: Some('┼'),
     });
+    cfg.set_padding(
+        Entity::Global,
+        Sides::new(
+            Indent::spaced(1),
+            Indent::spaced(1),
+            Indent::spaced(1),
+            Indent::spaced(1),
+        ),
+    );
+
+    cfg.set_alignment_horizontal(Entity::Global, AlignmentHorizontal::Left);
+    cfg.set_alignment_horizontal(Entity::Row(0), AlignmentHorizontal::Center);
+    cfg.set_alignment_vertical(Entity::Global, AlignmentVertical::Center);
     let data = data
         .iter()
         .map(|row| row.iter().map(CellInfo::new).collect())

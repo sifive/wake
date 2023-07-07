@@ -31,3 +31,4 @@ rand_core = "0.6.4"
 inquire = { version = "0.6.2", features = [] }
 atty = "0.2.14"
 papergrid = "0.9.1"
+textwrap = "0.16.0"

@@ -8,7 +8,7 @@ use rand_core::{OsRng, RngCore};
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
 };
-use std::io::{self, BufRead, Error, ErrorKind, Write};
+use std::io::{Error, ErrorKind};
 use tracing;
 
 mod table;
@@ -51,7 +51,13 @@ async fn list_api_keys(_: ListKeysOpts, conn: &DatabaseConnection) -> Result<(),
         .all(conn)
         .await?
         .into_iter()
-        .map(|x| vec![format!("{}", x.id), x.key, x.desc])
+        .map(|x| {
+            vec![
+                format!("{}", x.id),
+                x.key,
+                textwrap::wrap(&x.desc, 60).join("\n"),
+            ]
+        })
         .collect();
 
     let headers = vec!["Id".into(), "Key".into(), "Desc".into()];
