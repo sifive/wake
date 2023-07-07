@@ -234,7 +234,7 @@ enum VisibleFile {
 // visible files. This greatly simplifies lookup and allows
 // for a fast lookup by hash alone.
 #[derive(Iden)]
-enum Job {
+pub enum Job {
     Table,
     Id,
     Hash,
