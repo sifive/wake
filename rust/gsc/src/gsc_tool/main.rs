@@ -13,6 +13,9 @@ use tracing;
 
 mod table;
 
+#[path = "../common/config.rs"]
+mod config;
+
 #[tracing::instrument]
 async fn add_api_key(
     opts: AddKeyOpts,
@@ -121,6 +124,19 @@ struct TopLevel {
     #[options(help_flag, help = "print help message")]
     help: bool,
 
+    #[options(help = "Specify a config override file", meta = "CONFIG", no_short)]
+    config_override: Option<String>,
+
+    #[options(
+        help = "Specify and override for the database url",
+        meta = "DATABASE_URL",
+        no_short
+    )]
+    database_url: Option<String>,
+
+    #[options(help = "Show's the config and then exits", no_short)]
+    show_config: bool,
+
     // The `command` option will delegate option parsing to the command type,
     // starting at the first free argument.
     #[options(command)]
@@ -178,8 +194,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse our arguments
     let args = TopLevel::parse_args_default_or_exit();
 
+    // Gather our config
+    let config = config::GSCConfig::new(config::GSCConfigOverride {
+        config_override: args.config_override,
+        database_url: args.database_url,
+        ..Default::default()
+    })?;
+
+    if args.show_config {
+        println!("{}", serde_json::to_string(&config).unwrap());
+        return Ok(());
+    }
+
     // connect to our db
-    let connection = sea_orm::Database::connect("postgres://127.0.0.1/test").await?;
+    let connection = sea_orm::Database::connect(config.database_url).await?;
     let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
     if pending_migrations.len() != 0 {
         let err = Error::new(
