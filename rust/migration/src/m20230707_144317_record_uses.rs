@@ -12,7 +12,6 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(JobUses::Table)
-                    .if_not_exists()
                     .col(
                         ColumnDef::new(JobUses::Id)
                             .integer()
