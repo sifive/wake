@@ -134,6 +134,9 @@ struct TopLevel {
     )]
     database_url: Option<String>,
 
+    #[options(help = "Show's the config and then exits", no_short)]
+    show_config: bool,
+
     // The `command` option will delegate option parsing to the command type,
     // starting at the first free argument.
     #[options(command)]
@@ -197,6 +200,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         database_url: args.database_url,
         ..Default::default()
     })?;
+
+    if args.show_config {
+        println!("{}", serde_json::to_string(&config).unwrap());
+        return Ok(());
+    }
 
     // connect to our db
     let connection = sea_orm::Database::connect(config.database_url).await?;

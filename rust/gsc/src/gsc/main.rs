@@ -20,6 +20,9 @@ struct ServerOptions {
     #[options(help = "Specify a config override file", meta = "CONFIG", no_short)]
     config_override: Option<String>,
 
+    #[options(help = "Show's the config and then exits", no_short)]
+    show_config: bool,
+
     #[options(
         help = "Specify an override for the bind address",
         meta = "SERVER_IP[:SERVER_PORT]",
@@ -50,6 +53,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         server_addr: args.server_addr,
         database_url: args.database_url,
     })?;
+
+    if args.show_config {
+        println!("{}", serde_json::to_string(&config).unwrap());
+        return Ok(());
+    }
 
     // connect to our db
     let connection = sea_orm::Database::connect(&config.database_url).await?;

@@ -1,5 +1,5 @@
 use config::{Config, ConfigError, Environment, File};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Default)]
 pub struct GSCConfigOverride {
@@ -8,7 +8,7 @@ pub struct GSCConfigOverride {
     pub server_addr: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct GSCConfig {
     pub database_url: String,
     // TODO: We should allow setting a domain as well
