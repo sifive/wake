@@ -93,7 +93,7 @@ class LSPServer {
   };
 
   MethodResult processRequest(const std::string &requestString) {
-    wcl::log::info(requestString.c_str())({{"rpc", "rx"}});
+    wcl::log::info("%s", requestString.c_str())({{"rpc", "rx"}});
 
     // Parse that requestString as JSON
     JAST request;
@@ -202,7 +202,7 @@ class LSPServer {
         "Please change the path in the extension settings and reload the window by: " +
         "  1. Opening the command palette (Ctrl + Shift + P); " +
         "  2. Typing \"> Reload Window\" and executing (Enter);";
-    showMessageParams.add("rpc", messageText.c_str());
+    showMessageParams.add("message", messageText.c_str());
     methodResult.notification = message;
   }
 
@@ -310,7 +310,7 @@ class LSPServer {
 
     std::string msg = str.str();
 
-    wcl::log::info(msg.c_str())({{"rpc", "tx"}});
+    wcl::log::info("%s", msg.c_str())({{"rpc", "tx"}});
 
     if (msg == "{}") {
       wcl::log::warning("Throwing away empty response message")();
