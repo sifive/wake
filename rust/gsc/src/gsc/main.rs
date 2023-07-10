@@ -1,4 +1,5 @@
 use axum::{routing::post, Router};
+use gumdrop::Options;
 use migration::{Migrator, MigratorTrait};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
@@ -8,14 +9,50 @@ mod add_job;
 mod read_job;
 mod types;
 
+#[path = "../common/config.rs"]
+mod config;
+
+#[derive(Debug, Options)]
+struct ServerOptions {
+    #[options(help_flag, help = "print help message")]
+    help: bool,
+
+    #[options(help = "Specify a config override file", meta = "CONFIG", no_short)]
+    config_override: Option<String>,
+
+    #[options(
+        help = "Specify an override for the bind address",
+        meta = "SERVER_IP[:SERVER_PORT]",
+        no_short
+    )]
+    server_addr: Option<String>,
+
+    #[options(
+        help = "Specify an override for the database url",
+        meta = "DATABASE_URL",
+        no_short
+    )]
+    database_url: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // setup a subscriber so that we always have logging
     let subscriber = tracing_subscriber::FmtSubscriber::new();
     tracing::subscriber::set_global_default(subscriber)?;
 
+    // Parse our arguments
+    let args = ServerOptions::parse_args_default_or_exit();
+
+    // Get our configuration
+    let config = config::GSCConfig::new(config::GSCConfigOverride {
+        config_override: args.config_override,
+        server_addr: args.server_addr,
+        database_url: args.database_url,
+    })?;
+
     // connect to our db
-    let connection = sea_orm::Database::connect("postgres://127.0.0.1/test").await?;
+    let connection = sea_orm::Database::connect(&config.database_url).await?;
     let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
     if pending_migrations.len() != 0 {
         let err = Error::new(
@@ -49,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
 
     // run it with hyper on localhost:3000
-    axum::Server::bind(&"127.0.0.1:3000".parse()?)
+    axum::Server::bind(&config.server_addr.parse()?)
         .serve(app.into_make_service())
         .await?;
     Ok(())
