@@ -29,9 +29,14 @@ export function activate(context: vscode.ExtensionContext): void {
 		clientOptions
 	);
 	client.clientOptions.errorHandler = client.createDefaultErrorHandler(Number.MAX_SAFE_INTEGER);
+	client.clientOptions.initializationOptions = {
+		'stdLibPath': stdLibPath
+	};
 
 	// Start the client. This will also launch the server
 	client.start();
+
+	// TODO: Shouldn't these happen before starting the server?
 	registerFsMethods(client, stdLibPath, context);
 	registerTimelineCommands(context);
 }

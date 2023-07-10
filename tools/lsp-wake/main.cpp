@@ -598,7 +598,8 @@ void instantiateServerCustomStdLib(const char *stdLib) {
   }
 }
 
-char *processRequest(const char *request) {
+char *processRequest(const char *req) {
+  std::string request(req);
   LSPServer::MethodResult methodResult = lspServer->processRequest(request);
 
   JAST jsonResult(JSON_OBJECT);
