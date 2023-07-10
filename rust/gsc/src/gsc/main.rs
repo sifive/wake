@@ -6,6 +6,7 @@ use std::sync::Arc;
 use tracing;
 
 mod add_job;
+mod api_key_check;
 mod read_job;
 mod types;
 
@@ -83,7 +84,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             post({
                 let shared_state = state.clone();
                 move |body| add_job::add_job(body, shared_state)
-            }),
+            })
+            .layer(axum::middleware::from_fn({
+                let shared_state = state.clone();
+                move |req, next| {
+                    api_key_check::api_key_check_middleware(req, next, shared_state.clone())
+                }
+            })),
         )
         .route(
             "/job/matching",
