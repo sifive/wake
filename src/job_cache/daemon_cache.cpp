@@ -1031,9 +1031,8 @@ void DaemonCache::handle_msg(int client_fd) {
 
   state = it->second.read_messages(msgs);
 
+  wcl::log::info("DaemonCache::handle_msg(): received %zu messages", msgs.size())();
   for (const auto &msg : msgs) {
-    wcl::log::info("msg: %s", msg.c_str())();
-
     JAST json;
     std::stringstream parseErrors;
     if (!JAST::parse(msg, parseErrors, json)) {
