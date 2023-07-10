@@ -78,21 +78,20 @@ async fn remove_api_key(
     // It means that you can never be quite sure you acomplished what you thought
     // you did and have to use list-keys to check. This also lets us output
     // the description before commiting.
-    let results = api_key::Entity::find()
+    let Some(result) = api_key::Entity::find()
         .filter(api_key::Column::Key.eq(&key))
-        .all(conn)
-        .await?;
-
-    if results.len() == 0 {
+        .one(conn)
+        .await?
+    else {
         println!("{} is not a valid key", key);
         std::process::exit(2);
-    }
+    };
 
     // We only want to prompt the user if the user can type into the terminal
     if atty::is(Stream::Stdin) {
         let should_delete = Confirm::new("Are you sure you want to delete this key?")
             .with_default(false)
-            .with_help_message(format!("key = {}, desc = {:?}", key, results[0].desc).as_str())
+            .with_help_message(format!("key = {}, desc = {:?}", key, result.desc).as_str())
             .prompt()?;
 
         if !should_delete {
