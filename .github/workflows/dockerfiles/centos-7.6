@@ -8,6 +8,7 @@ RUN yum --setopt=skip_missing_names_on_install=False install -y centos-release-s
 RUN yum --setopt=skip_missing_names_on_install=False install -y devtoolset-9-gcc*
 RUN rpmdev-setuptree
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y
+
 
 WORKDIR /build

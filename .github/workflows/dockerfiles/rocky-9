@@ -8,6 +8,7 @@ RUN dnf install -y rpm-build rpm-devel rpmlint make python3 bash diffutils patch
 
 RUN rpmdev-setuptree
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y
+
 
 WORKDIR /build
