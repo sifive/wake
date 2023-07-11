@@ -43,9 +43,6 @@ const webClientConfig = {
 		path: path.join(__dirname, 'lsp-client', 'out'),
 		libraryTarget: 'commonjs',
 	},
-	optimization: {
-		minimize: false
-	},
 	resolve: {
 		mainFields: ['module', 'main'],
 		extensions: ['.ts', '.js'], // support ts-files and js-files
@@ -89,9 +86,6 @@ const webServerConfig = {
 		path: path.join(__dirname, 'lsp-server', 'out'),
 		libraryTarget: 'var',
 		library: 'serverExportVar',
-	},
-	optimization: {
-		minimize: false
 	},
 	resolve: {
 		mainFields: ['module', 'main'],
@@ -146,9 +140,6 @@ const nodeClientConfig = {
 		libraryTarget: 'commonjs',
 		devtoolModuleFilenameTemplate: '../../[resource-path]'
 	},
-	optimization: {
-		minimize: false
-	},
 	resolve: {
 		mainFields: ['module', 'main'],
 		extensions: ['.ts', '.js'],
@@ -187,9 +178,6 @@ const nodeServerConfig = {
 		path: path.join(__dirname, 'lsp-server', 'out'),
 		libraryTarget: 'var',
 		library: 'serverExportVar',
-	},
-	optimization: {
-		minimize: false
 	},
 	resolve: {
 		mainFields: ['module', 'main'],

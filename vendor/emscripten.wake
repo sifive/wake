@@ -30,9 +30,7 @@ def emmake =
     whichInEnvPath "emmake"
 
 def emscriptenCFlags =
-    "-Wall", "-O3",
-    "-s", "ASSERTIONS",
-    Nil
+    "-Wall", "-O3", Nil
 
 # wake-format off
 def emscriptenLFlags =
@@ -44,7 +42,6 @@ def emscriptenLFlags =
     "-s", "MODULARIZE=1",
     "-s", "EXPORT_ES6=1",
     "-s", "SINGLE_FILE",
-    "-s", "NO_DISABLE_EXCEPTION_CATCHING",
     Nil
 
 publish compileC =

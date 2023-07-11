@@ -42,10 +42,6 @@
 
 static CPPFile cppFile(__FILE__);
 
-ASTree::ASTree() {}
-
-ASTree::ASTree(std::string _absLibDir) : absLibDir(std::move(_absLibDir)) {}
-
 void ASTree::recordComments(CSTElement def, int level) {
   if (def.id() == TOKEN_COMMENT) {
     Location loc = def.location();

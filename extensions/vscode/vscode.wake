@@ -63,7 +63,6 @@ export def vscode _: Result Path Error =
         makeExecPlan (npm, "ci", Nil) (packageJSON, packageLockJSON, Nil)
         | setPlanLabel "npm ci: Install npm dependencies"
         | editPlanEnvironment (addEnvironmentPath emsdkBinDir)
-        | editPlanEnvironment ("EMCC_DEBUG=1", _)
         | setPlanDirectory @here
         # NPM installs its dependencies from the web, and so can't be fully sandboxed.
         | setPlanShare False

@@ -66,7 +66,6 @@ const InternalError  = -32603;
 
 export function prepareConnection(connection: Connection, isWeb: Boolean) {
     const getResponse = async <T, E>(request: string): Promise<T | ResponseError<E>> => {
-        console.log("-> " + request);
         let c_str = await lock.use(async () => { // synchronise requests to wasm
             return await lspModule?.processRequest(request) ?? null;
         });
@@ -81,8 +80,6 @@ export function prepareConnection(connection: Connection, isWeb: Boolean) {
 
         let response = lspModule.toString(c_str);
         lspModule._free(c_str); // free the string mallocced by c++
-
-        console.log("<- " + response);
 
         let result = JSON.parse(response);
 
@@ -104,22 +101,10 @@ export function prepareConnection(connection: Connection, isWeb: Boolean) {
     // Create lsp handlers
     connection.onInitialize(async (params: InitializeParams): Promise<InitializeResult | ResponseError<InitializeError>> => {
         lspModule = await wakeLspModule(connection);
-
-        // instantiate the server with a stdLib falling back to the default
-        // when none is provided
-        let path = params.initializationOptions?.stdLibPath;
-        if (path === null) {
-            lspModule?._instantiateServer();
-        } else {
-            // TODO: We should move the handling of the stdlib location
-            // directly into the LSP, but that is a significant refactor
-            lspModule?.instantiateServerCustomStdLib(path);
-        }
+        lspModule?._instantiateServer();
 
         let response: InitializeResult | ResponseError<InitializeError> = await getResponse(createLspJson('initialize', params));
         // TODO: impl & test invalid stdlib
-        //
-
         return response;
     });
 
