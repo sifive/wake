@@ -20,7 +20,6 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <job_cache/daemon_cache.h>
-#include <wcl/defer.h>
 #include <wcl/tracing.h>
 
 // argv[0] = program name
