@@ -22,6 +22,7 @@
 #include "json5.h"
 
 #include "wcl/optional.h"
+#include "wcl/tracing.h"
 
 const char *jsymbolTable[] = {
     // appear in JAST and JSymbol
@@ -141,4 +142,13 @@ std::ostream &operator<<(std::ostream &os, const JAST &jast) {
     default:
       return os << "corrupt";
   }
+}
+
+void JsonSubscriber::receive(const wcl::log::Event &e) {
+  JAST out(JSON_OBJECT);
+  for (const auto &item : e.items) {
+    out.add(item.first, item.second);
+  }
+
+  s << out << std::endl;
 }

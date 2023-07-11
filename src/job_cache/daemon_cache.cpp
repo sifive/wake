@@ -21,6 +21,7 @@
 
 #include "daemon_cache.h"
 
+#include <json/json5.h>
 #include <sqlite3.h>
 #include <sys/socket.h>
 #include <sys/un.h>

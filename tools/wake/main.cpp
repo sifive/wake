@@ -42,6 +42,7 @@
 #include "dst/expr.h"
 #include "dst/todst.h"
 #include "job_cache/job_cache.h"
+#include "json/json5.h"
 #include "markup.h"
 #include "optimizer/ssa.h"
 #include "parser/cst.h"
@@ -326,7 +327,7 @@ int main(int argc, char **argv) {
   // Log all events to wake.log
   std::ofstream log_file("wake.log", std::ios::app);
   auto log_file_defer = wcl::make_defer([&log_file]() { log_file.close(); });
-  wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file.rdbuf()));
+  wcl::log::subscribe(std::make_unique<JsonSubscriber>(log_file.rdbuf()));
 
   // Log urgent events to cerr
   auto cerr_subscriber = std::make_unique<wcl::log::SimpleFormatSubscriber>(std::cerr.rdbuf());

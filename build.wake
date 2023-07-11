@@ -103,10 +103,25 @@ def all variant =
 
     Pass (flatten x)
 
+def buildWakeLogViewer Unit =
+    require Some path = getenv "PATH"
+    else failWithError "Could not find cargo on path"
+    require Pass log_viewer =
+        makeExecPlan (whichIn path "cargo", "build", "--release",) Nil
+        | setPlanDirectory "rust/log_viewer"
+        | setPlanFnOutputs (\_ "rust/log_viewer/target/release/log_viewer",)
+        | runJobWith localRunner
+        | getJobOutput
+
+    Pass log_viewer
+
 # Install wake into a target location
 def doInstall dest kind =
     require Pass variant = toVariant kind
     require Pass datfiles = sources "{@here}/share" `.*`
+
+    require Pass log_viewer = buildWakeLogViewer Unit
+    require Pass log_viewer = installAs "{dest}/bin/wake-log-viewer" log_viewer
 
     def binfilesResult = all variant
     def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
@@ -117,7 +132,7 @@ def doInstall dest kind =
     require Pass binfiles = binfilesResult
     require Pass bininstall = findFailFn releaseBin binfiles
 
-    def outputs = readme, bininstall ++ datinstall
+    def outputs = readme, log_viewer, bininstall ++ datinstall
 
     Pass outputs
 
