@@ -579,9 +579,7 @@ void instantiateServerImpl() {
 
 extern "C" {
 
-void instantiateServer() {
-  instantiateServerImpl();
-}
+void instantiateServer() { instantiateServerImpl(); }
 
 char *processRequest(const char *request) {
   LSPServer::MethodResult methodResult = lspServer->processRequest(request);
