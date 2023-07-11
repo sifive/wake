@@ -20,6 +20,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <job_cache/daemon_cache.h>
+#include <wcl/defer.h>
 #include <wcl/tracing.h>
 
 // argv[0] = program name
@@ -31,9 +32,6 @@ int main(int argc, char **argv) {
     std::cerr << "Usage: job-cache cache/directory 100 5000" << std::endl;
     return 1;
   }
-
-  wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(std::cout.rdbuf()));
-  wcl::log::info("Initialized logging for job cache daemon")();
 
   std::string cache_dir = std::string(argv[1]);
   uint64_t low_cache_size = std::stoull(argv[2]);
