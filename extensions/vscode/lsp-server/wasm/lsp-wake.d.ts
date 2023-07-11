@@ -20,7 +20,6 @@
 // Declare wasm functions so that we can use them in typescript
 export interface WakeLspModule extends EmscriptenModule {
     _instantiateServer(): void;
-    instantiateServerCustomStdLib(stdLib: string): void;
     processRequest(request: string): Promise<number>;
 
     toString(pointer: number): string;

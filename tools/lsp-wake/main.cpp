@@ -570,7 +570,7 @@ class LSPServer {
 
 LSPServer *lspServer = nullptr;
 
-void instantiateServer() {
+void instantiateServerImpl() {
   wcl::log::info("Instantiating lsp server")();
   lspServer = new LSPServer();
 }
@@ -578,6 +578,11 @@ void instantiateServer() {
 #ifdef __EMSCRIPTEN__
 
 extern "C" {
+
+void instantiateServer() {
+  instantiateServerImpl();
+}
+
 char *processRequest(const char *request) {
   LSPServer::MethodResult methodResult = lspServer->processRequest(request);
 
@@ -614,7 +619,7 @@ int main(int argc, const char **argv) {
     wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file.rdbuf()));
   }
 
-  instantiateServer();
+  instantiateServerImpl();
 
   // Process requests until something goes wrong
   lspServer->processRequests();

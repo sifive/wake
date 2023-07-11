@@ -18,6 +18,5 @@
 
 Module['onRuntimeInitialized'] = function() {
     Module['processRequest'] = cwrap('processRequest', 'number', ['string'], { async: true });
-    Module['instantiateServerCustomStdLib'] = cwrap('instantiateServerCustomStdLib', 'void', ['string']);
     Module['toString'] = UTF8ToString;
 }
