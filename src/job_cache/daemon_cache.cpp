@@ -1083,6 +1083,17 @@ void DaemonCache::handle_new_client() {
   wcl::log::info("new client connected: %d", accept_fd)();
 }
 
+void DaemonCache::close_client(int clinet_fd) {
+    wcl::log::info("closing client fd = %d", client_fd)();
+    poll.remove(client_fd);
+    close(client_fd);
+    message_parsers.erase(client_fd);
+    if (message_parsers.empty()) {
+      exit_now = true;
+      wcl::log::info("All clients disconnected, exiting.")();
+    }
+}
+
 void DaemonCache::handle_msg(int client_fd) {
   // In case multiple read events have been enqueued since the
   // last epoll_wait, we have to perform all the reads that
@@ -1111,7 +1122,9 @@ void DaemonCache::handle_msg(int client_fd) {
     if (json.get("method").value == "cache/read") {
       FindJobRequest req(json.get("params"));
       FindJobResponse res = read(req);
-      send_json_message(client_fd, res.to_json());
+      wcl::errno_t write_error = send_json_message(client_fd, res.to_json());
+      wcl::log::error("DaemonCache::handle_msg(): failed to send client a response, closing cleint").urgent()();
+      close_client(client_fd);
     }
 
     if (json.get("method").value == "cache/add") {
@@ -1122,14 +1135,7 @@ void DaemonCache::handle_msg(int client_fd) {
 
   // If the file was closed, remove from epoll and close it.
   if (state == MessageParserState::StopSuccess) {
-    wcl::log::info("closing client fd = %d", client_fd)();
-    poll.remove(client_fd);
-    close(client_fd);
-    message_parsers.erase(client_fd);
-    if (message_parsers.empty()) {
-      exit_now = true;
-      wcl::log::info("All clients disconnected, exiting.")();
-    }
+    close_client(client_fd);
     return;
   }
 

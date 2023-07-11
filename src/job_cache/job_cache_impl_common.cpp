@@ -296,7 +296,7 @@ void remove_backing_files(std::string dir,
   }
 }
 
-void send_json_message(int fd, const JAST &json) {
+wcl::errno_t send_json_message(int fd, const JAST &json) {
   std::stringstream s;
   s << json;
   std::string json_str = s.str();
@@ -312,8 +312,8 @@ void send_json_message(int fd, const JAST &json) {
       if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
         continue;
       }
-      wcl::log::error("write(%d): %s", fd, strerror(errno)).urgent()();
-      exit(1);
+      wcl::log::error("send_json_message: write(%d): %s", fd, strerror(errno)).urgent()();
+      return errno;
     }
 
     start += res;

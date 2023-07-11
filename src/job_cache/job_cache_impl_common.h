@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "wcl/result.h"
 
 using group_id_t = uint8_t;
 
@@ -54,4 +55,4 @@ void unlink_no_fail(const char *file);
 void rmdir_no_fail(const char *dir);
 
 // Write the serialized JAST to fd with proper retries on failure
-void send_json_message(int fd, const JAST &json);
+wcl::errno_t send_json_message(int fd, const JAST &json);
