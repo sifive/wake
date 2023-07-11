@@ -106,6 +106,7 @@ def all variant =
 def buildWakeLogViewer Unit =
     require Some path = getenv "PATH"
     else failWithError "Could not find cargo on path"
+
     require Pass log_viewer =
         makeExecPlan (whichIn path "cargo", "build", "--release",) Nil
         | setPlanDirectory "rust/log_viewer"
@@ -119,7 +120,6 @@ def buildWakeLogViewer Unit =
 def doInstall dest kind =
     require Pass variant = toVariant kind
     require Pass datfiles = sources "{@here}/share" `.*`
-
     require Pass log_viewer = buildWakeLogViewer Unit
     require Pass log_viewer = installAs "{dest}/bin/wake-log-viewer" log_viewer
 
