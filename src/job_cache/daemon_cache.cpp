@@ -32,6 +32,9 @@
 #include <wcl/unique_fd.h>
 #include <wcl/xoshiro_256.h>
 
+#include <ctime>
+#include <fstream>
+
 #include "db_helpers.h"
 #include "eviction_command.h"
 #include "eviction_policy.h"
@@ -42,6 +45,21 @@
 namespace {
 
 using namespace job_cache;
+
+static std::unique_ptr<std::ofstream> initialize_logging() {
+  time_t today = time(NULL);
+  struct tm tm = *localtime(&today);
+  char time_buffer[10 + 1];
+  strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d", &tm);
+  std::string log_path = ".cache." + std::string(time_buffer) + ".log";
+
+  std::unique_ptr<std::ofstream> log_file =
+      std::make_unique<std::ofstream>(log_path, std::ios::app);
+  wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file->rdbuf()));
+
+  wcl::log::info("Initialized logging for job cache daemon")();
+  return log_file;
+}
 
 // Helper that only returns successful file opens.
 static int open_fd(const char *str, int flags, mode_t mode) {
@@ -566,10 +584,13 @@ struct CacheDbImpl {
 
 DaemonCache::DaemonCache(std::string dir, uint64_t max, uint64_t low)
     : rng(wcl::xoshiro_256::get_rng_seed()), max_cache_size(max), low_cache_size(low) {
-  wcl::log::info("Launching DaemonCache. dir = %s, max = %lu, low = %lu", dir.c_str(),
-                 max_cache_size, low_cache_size)();
   mkdir_no_fail(dir.c_str());
   chdir_no_fail(dir.c_str());
+
+  log_file = initialize_logging();
+
+  wcl::log::info("Launching DaemonCache. dir = %s, max = %lu, low = %lu", dir.c_str(),
+                 max_cache_size, low_cache_size)();
 
   impl = std::make_unique<CacheDbImpl>(".");
 
@@ -971,10 +992,7 @@ void DaemonCache::launch_evict_loop() {
     close(stdoutPipe[read_side]);
     close(stdoutPipe[write_side]);
 
-    // We use stdout as a comunication line so we re-map logging of eviction to stderr
-    wcl::log::clear_subscribers();
-    wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(std::cerr.rdbuf()));
-    wcl::log::info("Reinitialized logging for eviction loop")();
+    wcl::log::info("Launching eviction loop")();
 
     // Finally enter the eviction loop, if it exits cleanly
     // go ahead and exit with its result.
