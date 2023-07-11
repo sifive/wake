@@ -6,6 +6,6 @@ RUN dnf install -y epel-release
 RUN dnf install -y rpm-build rpm-devel rpmlint make python36 bash diffutils patch rpmdevtools m4 tar xz dash git which make gcc gcc-c++ fuse fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel squashfuse
 RUN rpmdev-setuptree
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 WORKDIR /build

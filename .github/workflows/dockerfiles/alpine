@@ -1,7 +1,7 @@
 FROM alpine:3.14.0
 
 RUN apk add m4 g++ make pkgconf git tar xz gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev dash sqlite-static ncurses-static linux-headers curl
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 WORKDIR /build
 

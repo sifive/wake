@@ -6,6 +6,6 @@ RUN apt-get update && apt-get install -y build-essential devscripts git fuse lib
 
 RUN useradd -m -d /build build
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 WORKDIR /build
