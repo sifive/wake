@@ -73,7 +73,7 @@ static std::unique_ptr<std::ofstream> initialize_logging() {
   std::vector<std::string> to_delete;
   for (const auto &entry : *res) {
     if (!entry) {
-      wcl::log::warning("bad /proc/self/fd/ entry: %s\n", strerror(entry.error()))();
+      wcl::log::warning("bad file entry: error = %s\n", strerror(entry.error()))();
       continue;
     }
 
