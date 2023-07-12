@@ -8,5 +8,9 @@ RUN useradd -m -d /build build
 
 WORKDIR /build
 RUN HOME=/build curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-RUN bash -c 'echo $HOME'
-
+RUN HOME=/build bash -c 'echo $HOME'
+RUN ls -a /build
+RUN ls -a /root
+RUN ls /build/.cargo
+RUN ls /root/.cargo
+RUN find / -type d -name ".cargo"
