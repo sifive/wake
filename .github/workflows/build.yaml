@@ -170,7 +170,7 @@ jobs:
               dockerfile: wasm
               extra_docker_build_args: ''
               extra_docker_run_args: -u build
-              build_cmd: . ~/.cargo/env && make -C wake-* wasm
+              build_cmd: . /root/.cargo/env && make -C wake-* wasm
               test_cmd: ls # no-op
               # TODO: This doesn't fully capture all the wake contents
               # but that is okay since wake-wasm in still in its infancy
