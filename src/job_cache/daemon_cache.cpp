@@ -48,7 +48,9 @@ using namespace job_cache;
 
 static std::unique_ptr<std::ofstream> initialize_logging() {
   const char *str_fmt = "%Y-%m-%d";
-  const size_t str_fmt_len = 10;
+  const size_t str_fmt_len = 10;         // count("XXXX-XX-XX")
+  const size_t filename_prefix_len = 7;  // count (".cache.")
+  const size_t filename_suffix_len = 4;  // count (".log")
 
   time_t today = time(NULL);
   struct tm tm = *localtime(&today);
@@ -79,15 +81,15 @@ static std::unique_ptr<std::ofstream> initialize_logging() {
     if (entry->type != wcl::file_type::regular) continue;
     // Don't consider file names that aren't the correct size
     // count(".cache.XXXX-XX-XX.log") == 21
-    if (entry->name.size() != 21) continue;
+    if (entry->name.size() != filename_prefix_len + str_fmt_len + filename_suffix_len) continue;
     // Only consider files that start with ".cache."
     if (entry->name.find(".cache.") != 0) continue;
     // and end in ".log"
-    if (entry->name.find(".log") != 17) continue;
+    if (entry->name.find(".log") != filename_prefix_len + str_fmt_len) continue;
     // Don't consider the current log file
     if (entry->name == log_path) continue;
 
-    std::string day = entry->name.substr(7, str_fmt_len);
+    std::string day = entry->name.substr(filename_prefix_len, str_fmt_len);
     struct tm prev_tm = {0};
     strptime(day.c_str(), str_fmt, &prev_tm);
 
