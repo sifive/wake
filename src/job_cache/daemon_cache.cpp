@@ -47,10 +47,15 @@ namespace {
 using namespace job_cache;
 
 static std::unique_ptr<std::ofstream> initialize_logging() {
+  const char *str_fmt = "%Y-%m-%d";
+  const size_t str_fmt_len = 10;         // count("XXXX-XX-XX")
+  const size_t filename_prefix_len = 7;  // count (".cache.")
+  const size_t filename_suffix_len = 4;  // count (".log")
+
   time_t today = time(NULL);
   struct tm tm = *localtime(&today);
-  char time_buffer[10 + 1];
-  strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d", &tm);
+  char time_buffer[str_fmt_len + 1];
+  strftime(time_buffer, sizeof(time_buffer), str_fmt, &tm);
   std::string log_path = ".cache." + std::string(time_buffer) + ".log";
 
   std::unique_ptr<std::ofstream> log_file =
@@ -58,6 +63,50 @@ static std::unique_ptr<std::ofstream> initialize_logging() {
   wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file->rdbuf()));
 
   wcl::log::info("Initialized logging for job cache daemon")();
+
+  auto res = wcl::directory_range::open(".");
+  if (!res) {
+    wcl::log::warning("Failed to open cwd to cleanup log files")();
+    return log_file;
+  }
+
+  std::vector<std::string> to_delete;
+  for (const auto &entry : *res) {
+    if (!entry) {
+      wcl::log::warning("bad file entry: error = %s\n", strerror(entry.error()))();
+      continue;
+    }
+
+    // Only consider files
+    if (entry->type != wcl::file_type::regular) continue;
+    // Don't consider file names that aren't the correct size
+    // count(".cache.XXXX-XX-XX.log") == 21
+    if (entry->name.size() != filename_prefix_len + str_fmt_len + filename_suffix_len) continue;
+    // Only consider files that start with ".cache."
+    if (entry->name.find(".cache.") != 0) continue;
+    // and end in ".log"
+    if (entry->name.find(".log") != filename_prefix_len + str_fmt_len) continue;
+    // Don't consider the current log file
+    if (entry->name == log_path) continue;
+
+    std::string day = entry->name.substr(filename_prefix_len, str_fmt_len);
+    struct tm prev_tm = {0};
+    strptime(day.c_str(), str_fmt, &prev_tm);
+
+    double diff_secs = difftime(today, mktime(&prev_tm));
+
+    int four_days = 60 /*secs*/ * 60 /*mins*/ * 24 /*hours*/ * 4 /*days*/;
+    if (diff_secs > four_days) {
+      to_delete.push_back(entry->name);
+    }
+  }
+
+  wcl::log::info("Cleaning up %lu previous daemon log files", to_delete.size())();
+  for (const std::string &file : to_delete) {
+    wcl::log::info("  -> %s", file.c_str())();
+    unlink(file.c_str());
+  }
+
   return log_file;
 }
 
