@@ -103,18 +103,40 @@ def all variant =
 
     Pass (flatten x)
 
+target findCargoPath Unit =
+    require Some cargo_home = getenv "CARGO_HOME"
+    else
+        require Some path = getenv "PATH"
+        else "cargo"
+
+        whichIn path "cargo"
+
+    "{cargo_home}/bin/cargo"
+
+# Builds a cargo project, the Cargo.toml file must be listed as well as the outputs of intrest.
+# All source files must be listed as well. Cargo will not reuse work because the sandbox
+# will not contain its extra info, inside of target.
+# TODO: Add an environment variable to opt-in to localRunner cargo builds if we detect
+#       existing outputs in {pathToCrate}/target/release
+def buildWithCargo (sources: List Path) (pathToCrate: String) (outputs: List String) =
+    require Pass outputs =
+        makeExecPlan (findCargoPath Unit, "build", "--release",) sources
+        | setPlanLabel "cargo: {pathToCrate}"
+        | setPlanDirectory pathToCrate
+        | setPlanFnOutputs (\_ map ("{pathToCrate}/target/release/{_}") outputs)
+        | runJobWith defaultRunner
+        | getJobOutputs
+
+    Pass outputs
+
 def buildWakeLogViewer Unit =
-    require Some path = getenv "PATH"
-    else failWithError "Could not find cargo on path"
+    require Pass cargoToml = source "rust/log_viewer/Cargo.toml"
+    require Pass main = source "rust/log_viewer/src/main.rs"
+    require Pass outputs = buildWithCargo (cargoToml, main,) "rust/log_viewer" ("log_viewer",)
+    require (logViewer, Nil) = outputs
+    else failWithError "More than one output returned when building log_viewer"
 
-    require Pass log_viewer =
-        makeExecPlan (whichIn path "cargo", "build", "--release",) Nil
-        | setPlanDirectory "rust/log_viewer"
-        | setPlanFnOutputs (\_ "rust/log_viewer/target/release/log_viewer",)
-        | runJobWith localRunner
-        | getJobOutput
-
-    Pass log_viewer
+    Pass logViewer
 
 # Install wake into a target location
 def doInstall dest kind =

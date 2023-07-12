@@ -14,4 +14,3 @@ palette = "0.7.2"
 serde = { version = "1.0.171", features = ["std", "derive"] }
 serde-aux = "4.2.0"
 serde_json = "1.0.100"
-sobol = "1.0.2"

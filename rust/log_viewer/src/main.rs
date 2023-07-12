@@ -10,7 +10,6 @@ use std::fs::File;
 use std::io::BufRead;
 use std::{collections::HashMap, io::BufReader};
 
-// TODO: Shorten messages to fit the screen
 // TODO: elide repeated messages (but say how many are skipped)
 
 // Here we implement an additive recurrence sequence
@@ -41,7 +40,7 @@ impl Iterator for AdditiveRec {
 // that behaves a bit better when sampling from it. If you sample two points
 // a certain distance apart in CIELAB, the perceived distance is roughly proportional
 // to the distance between those points. So if we can sample a lot of points that stay
-// relativelly distinct from each other we can consequently get nice distinct colors.
+// relatively distinct from each other we can consequently get nice distinct colors.
 // Additionally CIELAB has a sort of "brightness" field so that we can keep a relativelly
 // consistent brightness.
 //
@@ -49,12 +48,10 @@ impl Iterator for AdditiveRec {
 // low-discrepancy sequences. These give us consistently spaced out values in any dimensions
 // and the minimum area/volume between anytime sampled points is inversely related to the
 // number of points sampled. So if we only sample a few points, our colors will be very
-// distinct, as we sample more and more points they will get closer and closer togethor but
+// distinct, as we sample more and more points they will get closer and closer together but
 // they should do a quite good job of staying as far apart as possible. We're using an additive
 // recurence which does quite a good job for this use case and is very simple.
 fn generate_distinct_colors() -> impl Iterator<Item = Color> {
-    //let params = JoeKuoD6::minimal();
-    //let seq = Sobol::<f32>::new(2, &params);
     AdditiveRec {
         x: 0.0f32,
         y: 0.0f32,
@@ -64,12 +61,9 @@ fn generate_distinct_colors() -> impl Iterator<Item = Color> {
         // Vary luminosity from 60 to 90. I just played around with it
         // and found this to be a good range
         let l = point.0 * 30.0f32 + 60.0f32;
-        //let l = 75.0f32;
-        // The "chroma" of a CIELAB color is sort of like the magnitude
-        // of the A and B components. As chroma gets high the colors start
-        // to look a bit samey. More formally the perceptual rate of change
-        // is low. So instead of using the full -128 to 127 range we use
-        // a -100 to 100 range which I found to work a bit better in practice.
+        // TODO: Consider setting Chroma at max, and just adjusting hue
+        //       or varying chroma just a little bit like we do luminosity.
+        // A and B both range from -128 to 127
         let a = 255.0f32 * point.1 - 128.0f32;
         let b = 255.0f32 * point.2 - 128.0f32;
         // Add a new color that should be highly distinct from
@@ -91,6 +85,8 @@ fn generate_distinct_colors() -> impl Iterator<Item = Color> {
     })
 }
 
+// Defaults in serde require a function name. This provides
+// -1 as a default
 fn neg_one() -> i32 {
     -1
 }

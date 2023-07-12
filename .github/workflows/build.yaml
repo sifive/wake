@@ -91,7 +91,7 @@ jobs:
               dockerfile: alpine
               extra_docker_build_args: ''
               extra_docker_run_args: ''
-              build_cmd: make -C wake-* static
+              build_cmd: source ~/.cargo/env && make -C wake-* static
               test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
               install_src_glob: build/wake-*/wake-static_*
 
@@ -99,7 +99,7 @@ jobs:
               dockerfile: centos-7.6
               extra_docker_build_args: ''
               extra_docker_run_args: ''
-              build_cmd: source scl_source enable devtoolset-9 && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              build_cmd: source scl_source enable devtoolset-9 ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
@@ -107,7 +107,7 @@ jobs:
               dockerfile: debian-bullseye
               extra_docker_build_args: ''
               extra_docker_run_args: -w /$(ls -d build/wake-*)
-              build_cmd: debuild -us -uc
+              build_cmd: source ~/.cargo/env && debuild -us -uc
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
               install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
 
@@ -115,7 +115,7 @@ jobs:
               dockerfile: rocky-8
               extra_docker_build_args: ''
               extra_docker_run_args: ''
-              build_cmd: rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              build_cmd: source ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
@@ -123,7 +123,7 @@ jobs:
               dockerfile: rocky-9
               extra_docker_build_args: ''
               extra_docker_run_args: ''
-              build_cmd: rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              build_cmd: source ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
@@ -131,7 +131,7 @@ jobs:
               dockerfile: ubuntu-22.04
               extra_docker_build_args: ''
               extra_docker_run_args: -w /$(ls -d build/wake-*)
-              build_cmd: debuild -us -uc
+              build_cmd: source ~/.cargo/env && debuild -us -uc
               test_cmd: dpkg -i *.deb && cd tests && wake runTests
               install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
 
@@ -139,7 +139,7 @@ jobs:
               dockerfile: fedora-38
               extra_docker_build_args: ''
               extra_docker_run_args: ''
-              build_cmd: rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              build_cmd: source ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
@@ -170,7 +170,7 @@ jobs:
               dockerfile: wasm
               extra_docker_build_args: ''
               extra_docker_run_args: -u build
-              build_cmd: make -C wake-* wasm
+              build_cmd: source ~/.cargo/env && make -C wake-* wasm
               test_cmd: ls # no-op
               # TODO: This doesn't fully capture all the wake contents
               # but that is okay since wake-wasm in still in its infancy
