@@ -91,7 +91,7 @@ jobs:
               dockerfile: alpine
               extra_docker_build_args: ''
               extra_docker_run_args: ''
-              build_cmd: . ~/.cargo/env && make -C wake-* static
+              build_cmd: make -C wake-* static
               test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
               install_src_glob: build/wake-*/wake-static_*
 
