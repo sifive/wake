@@ -177,7 +177,7 @@ jobs:
             #   # and is not deployed/depended on
             #   install_src_glob: build/wake-*/bin/*.wasm*
 
-       steps:
+      steps:
         - name: Create target directories
           run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
 
