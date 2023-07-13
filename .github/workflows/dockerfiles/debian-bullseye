@@ -5,5 +5,6 @@ RUN apt-get update && apt-get install -y build-essential m4 devscripts git fuse 
 
 WORKDIR /build
 ENV HOME=/build
+RUN usermod --home /build root
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
