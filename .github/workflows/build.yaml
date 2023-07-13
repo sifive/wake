@@ -95,87 +95,87 @@ jobs:
               test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
               install_src_glob: build/wake-*/wake-static_*
 
-      #       - target: centos_7_6
-      #         dockerfile: centos-7.6
-      #         extra_docker_build_args: ''
-      #         extra_docker_run_args: ''
-      #         build_cmd: source scl_source enable devtoolset-9 ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-      #         test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
-      #         install_src_glob: build/x86_64/*.rpm
+            - target: centos_7_6
+              dockerfile: centos-7.6
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
+              build_cmd: source scl_source enable devtoolset-9 ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
+              install_src_glob: build/x86_64/*.rpm
 
-      #       - target: debian_bullseye
-      #         dockerfile: debian-bullseye
-      #         extra_docker_build_args: ''
-      #         extra_docker_run_args: -w /$(ls -d build/wake-*)
-      #         build_cmd: . ~/.cargo/env && debuild -us -uc
-      #         test_cmd: dpkg -i *.deb && cd tests && wake runTests
-      #         install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
+            - target: debian_bullseye
+              dockerfile: debian-bullseye
+              extra_docker_build_args: ''
+              extra_docker_run_args: -w /$(ls -d build/wake-*)
+              build_cmd: . ~/.cargo/env && debuild -us -uc
+              test_cmd: dpkg -i *.deb && cd tests && wake runTests
+              install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
 
-      #       - target: rocky_8
-      #         dockerfile: rocky-8
-      #         extra_docker_build_args: ''
-      #         extra_docker_run_args: ''
-      #         build_cmd: . ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-      #         test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
-      #         install_src_glob: build/x86_64/*.rpm
+            - target: rocky_8
+              dockerfile: rocky-8
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
+              build_cmd: . ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
+              install_src_glob: build/x86_64/*.rpm
 
-      #       - target: rocky_9
-      #         dockerfile: rocky-9
-      #         extra_docker_build_args: ''
-      #         extra_docker_run_args: ''
-      #         build_cmd: . ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-      #         test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
-      #         install_src_glob: build/x86_64/*.rpm
+            - target: rocky_9
+              dockerfile: rocky-9
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
+              build_cmd: . ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
+              install_src_glob: build/x86_64/*.rpm
 
-      #       - target: ubuntu_22_04
-      #         dockerfile: ubuntu-22.04
-      #         extra_docker_build_args: ''
-      #         extra_docker_run_args: -w /$(ls -d build/wake-*)
-      #         build_cmd: . ~/.cargo/env && debuild -us -uc
-      #         test_cmd: dpkg -i *.deb && cd tests && wake runTests
-      #         install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
+            - target: ubuntu_22_04
+              dockerfile: ubuntu-22.04
+              extra_docker_build_args: ''
+              extra_docker_run_args: -w /$(ls -d build/wake-*)
+              build_cmd: . ~/.cargo/env && debuild -us -uc
+              test_cmd: dpkg -i *.deb && cd tests && wake runTests
+              install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
 
-      #       - target: fedora_38
-      #         dockerfile: fedora-38
-      #         extra_docker_build_args: ''
-      #         extra_docker_run_args: ''
-      #         build_cmd: . ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-      #         test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
-      #         install_src_glob: build/x86_64/*.rpm
+            - target: fedora_38
+              dockerfile: fedora-38
+              extra_docker_build_args: ''
+              extra_docker_run_args: ''
+              build_cmd: . ~/.cargo/env && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
+              install_src_glob: build/x86_64/*.rpm
 
-      #       - target: vscode
-      #         dockerfile: wasm
-      #         extra_docker_build_args: ''
-      #         extra_docker_run_args: -u build
-      #         build_cmd: make -C wake-* vscode
-      #         test_cmd: ls # no-op
-      #         install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
+            - target: vscode
+              dockerfile: wasm
+              extra_docker_build_args: ''
+              extra_docker_run_args: -u build
+              build_cmd: make -C wake-* vscode
+              test_cmd: ls # no-op
+              install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
 
-      #       # Two confounding bugs are breaking the latest emsdk build. We can't really work around them
-      #       # so for now, disable the latest target and track them closely.
-      #       #
-      #       # Bugs:
-      #       #   webpack tries to resolve new URL into a module which is incorrect (https://github.com/webpack/webpack/issues/16878)
-      #       #   emscripten may emit ES6 style imports which makes webpack grumpy (https://github.com/emscripten-core/emscripten/issues/19066#issuecomment-1486853354)
-      #       #
-      #       # - target: vscode_latest
-      #       #   dockerfile: wasm
-      #       #   extra_docker_build_args: --build-arg EMSDK_VERSION=latest
-      #       #   extra_docker_run_args: -u build
-      #       #   build_cmd: make -C wake-* vscode
-      #       #   test_cmd: ls # no-op
-      #       #   install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
+            # Two confounding bugs are breaking the latest emsdk build. We can't really work around them
+            # so for now, disable the latest target and track them closely.
+            #
+            # Bugs:
+            #   webpack tries to resolve new URL into a module which is incorrect (https://github.com/webpack/webpack/issues/16878)
+            #   emscripten may emit ES6 style imports which makes webpack grumpy (https://github.com/emscripten-core/emscripten/issues/19066#issuecomment-1486853354)
+            #
+            # - target: vscode_latest
+            #   dockerfile: wasm
+            #   extra_docker_build_args: --build-arg EMSDK_VERSION=latest
+            #   extra_docker_run_args: -u build
+            #   build_cmd: make -C wake-* vscode
+            #   test_cmd: ls # no-op
+            #   install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
 
-      #       - target: wasm
-      #         dockerfile: wasm
-      #         extra_docker_build_args: ''
-      #         extra_docker_run_args: -u build
-      #         build_cmd: . ~/.cargo/env && make -C wake-* wasm
-      #         test_cmd: ls # no-op
-      #         # TODO: This doesn't fully capture all the wake contents
-      #         # but that is okay since wake-wasm in still in its infancy
-      #         # and is not deployed/depended on
-      #         install_src_glob: build/wake-*/bin/*.wasm*
+            - target: wasm
+              dockerfile: wasm
+              extra_docker_build_args: ''
+              extra_docker_run_args: -u build
+              build_cmd: . ~/.cargo/env && make -C wake-* wasm
+              test_cmd: ls # no-op
+              # TODO: This doesn't fully capture all the wake contents
+              # but that is okay since wake-wasm in still in its infancy
+              # and is not deployed/depended on
+              install_src_glob: build/wake-*/bin/*.wasm*
 
       # steps:
         - name: Create target directories
