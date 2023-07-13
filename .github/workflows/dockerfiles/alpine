@@ -7,8 +7,8 @@ WORKDIR /build
 ENV RUST_FOLDER="rust-$VERSION-x86_64-unknown-linux-gnu"
 ENV RUST_TAR="$RUST_FOLDER.tar.gz"
 RUN wget "https://static.rust-lang.org/dist/$RUST_TAR"
-tar -xf $RUST_TAR
-./$RUST_FOLDER/install.sh --verbose
+RUN tar -xf $RUST_TAR
+RUN ./$RUST_FOLDER/install.sh --verbose
 
 RUN wget https://github.com/libfuse/libfuse/releases/download/fuse-2.9.9/fuse-2.9.9.tar.gz
 RUN tar xvzf fuse-2.9.9.tar.gz
