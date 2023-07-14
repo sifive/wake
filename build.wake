@@ -119,11 +119,15 @@ target findCargoPath Unit =
 # TODO: Add an environment variable to opt-in to localRunner cargo builds if we detect
 #       existing outputs in {pathToCrate}/target/release
 def buildWithCargo (sources: List Path) (pathToCrate: String) (outputs: List String) =
+    require Some path = getenv "PATH"
+    else failWithError "PATH was not set; cargo will not be able to find rustc"
+
     require Pass outputs =
         makeExecPlan (findCargoPath Unit, "build", "--release",) sources
         | setPlanLabel "cargo: {pathToCrate}"
         | setPlanDirectory pathToCrate
         | setPlanFnOutputs (\_ map ("{pathToCrate}/target/release/{_}") outputs)
+        | setPlanEnvironment ("PATH={path}",)
         | runJobWith defaultRunner
         | getJobOutputs
 
