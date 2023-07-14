@@ -8,7 +8,9 @@ RUN rpmdev-setuptree
 
 
 WORKDIR /build
-ENV HOME=/build
-RUN usermod --home /build root
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-
+ENV VERSION=1.70.0
+ENV RUST_FOLDER="rust-$VERSION-x86_64-unknown-linux-musl"
+ENV RUST_TAR="$RUST_FOLDER.tar.gz"
+RUN wget "https://static.rust-lang.org/dist/$RUST_TAR"
+RUN tar -xf $RUST_TAR
+RUN sh ./$RUST_FOLDER/install.sh --verbose
