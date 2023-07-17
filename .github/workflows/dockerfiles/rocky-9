@@ -15,4 +15,3 @@ ENV RUST_TAR="$RUST_FOLDER.tar.gz"
 RUN wget "https://static.rust-lang.org/dist/$RUST_TAR"
 RUN tar -xf $RUST_TAR
 RUN sh ./$RUST_FOLDER/install.sh --verbose
-
