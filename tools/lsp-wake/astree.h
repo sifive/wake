@@ -20,6 +20,7 @@
 #define ASTREE_H
 
 #include <parser/cst.h>
+#include <wcl/hash.h>
 
 #include <functional>
 #include <iostream>
@@ -77,11 +78,32 @@ class ASTree {
     int level;  // level of nestedness in the tree
   };
 
+  struct LineLocation {
+    std::string filename;
+    int row;
+
+    explicit LineLocation(const Location &location)
+        : filename(location.filename), row(location.start.row) {}
+    LineLocation(std::string _filename, int _row) : filename(std::move(_filename)), row(_row) {}
+  };
+
+  struct HashLineLocation {
+    std::size_t operator()(const LineLocation &loc) const {
+      return wcl::hash_combine(std::hash<std::string>{}(loc.filename), std::hash<int>{}(loc.row));
+    }
+  };
+
+  struct EqualLineLocation {
+    bool operator()(const LineLocation &lhs, const LineLocation &rhs) const {
+      return lhs.row == rhs.row && lhs.filename == rhs.filename;
+    }
+  };
+
   std::set<Location> types;
   std::vector<SymbolDefinition> definitions;
   std::vector<SymbolUsage> usages;
   std::vector<SymbolDefinition> packages;
-  std::unordered_map<std::string, Comment> comments;
+  std::unordered_map<LineLocation, Comment, HashLineLocation, EqualLineLocation> comments;
 
   class LSPReporter : public DiagnosticReporter {
    private:
@@ -105,11 +127,13 @@ class ASTree {
 
   static std::string sanitizeComment(std::string comment);
 
-  std::string sanitizeMultilineComment(const std::vector<Comment> &comment);
+  std::vector<Comment> collectDocumentationComments(const SymbolDefinition &def);
+  std::string sanitizeComments(const std::vector<Comment> &comment);
 
   static void emplaceComment(std::vector<std::pair<std::string, int>> &comment,
                              const std::string &text, int level);
 
-  void mergeSameLineDefinitions(const SymbolDefinition &merge_from, SymbolDefinition *into);
+  void mergeSameLineDefinitions(const SymbolDefinition &merge_from, SymbolDefinition &into);
 };
+
 #endif
