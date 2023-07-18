@@ -1083,15 +1083,15 @@ void DaemonCache::handle_new_client() {
   wcl::log::info("new client connected: %d", accept_fd)();
 }
 
-void DaemonCache::close_client(int clinet_fd) {
-    wcl::log::info("closing client fd = %d", client_fd)();
-    poll.remove(client_fd);
-    close(client_fd);
-    message_parsers.erase(client_fd);
-    if (message_parsers.empty()) {
-      exit_now = true;
-      wcl::log::info("All clients disconnected, exiting.")();
-    }
+void DaemonCache::close_client(int client_fd) {
+  wcl::log::info("closing client fd = %d", client_fd)();
+  poll.remove(client_fd);
+  close(client_fd);
+  message_parsers.erase(client_fd);
+  if (message_parsers.empty()) {
+    exit_now = true;
+    wcl::log::info("All clients disconnected, exiting.")();
+  }
 }
 
 void DaemonCache::handle_msg(int client_fd) {
@@ -1122,9 +1122,16 @@ void DaemonCache::handle_msg(int client_fd) {
     if (json.get("method").value == "cache/read") {
       FindJobRequest req(json.get("params"));
       FindJobResponse res = read(req);
-      wcl::errno_t write_error = send_json_message(client_fd, res.to_json());
-      wcl::log::error("DaemonCache::handle_msg(): failed to send client a response, closing cleint").urgent()();
-      close_client(client_fd);
+      auto write_error = send_json_message(client_fd, res.to_json());
+      if (write_error) {
+        wcl::log::error("DaemonCache::handle_msg(): send_json_message(%d): %s", client_fd,
+                        strerror(*write_error))
+            .urgent()();
+        wcl::log::error(
+            "DaemonCache::handle_msg(): failed to send client a response, closing cleint")
+            .urgent()();
+        close_client(client_fd);
+      }
     }
 
     if (json.get("method").value == "cache/add") {

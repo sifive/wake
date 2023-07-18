@@ -296,7 +296,7 @@ void remove_backing_files(std::string dir,
   }
 }
 
-wcl::errno_t send_json_message(int fd, const JAST &json) {
+wcl::optional<wcl::posix_error_t> send_json_message(int fd, const JAST &json) {
   std::stringstream s;
   s << json;
   std::string json_str = s.str();
@@ -313,9 +313,11 @@ wcl::errno_t send_json_message(int fd, const JAST &json) {
         continue;
       }
       wcl::log::error("send_json_message: write(%d): %s", fd, strerror(errno)).urgent()();
-      return errno;
+      return wcl::make_some<wcl::posix_error_t>(errno);
     }
 
     start += res;
   }
+
+  return {};
 }

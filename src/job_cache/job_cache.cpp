@@ -20,8 +20,6 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "job_cache.h"
-
 #include <json/json5.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -39,6 +37,7 @@
 #include <vector>
 
 #include "daemon_cache.h"
+#include "job_cache.h"
 #include "job_cache_impl_common.h"
 #include "message_parser.h"
 
@@ -261,10 +260,10 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
   request.add("params", find_request.to_json());
 
   // serialize the request, send it, deserialize the response, return it
-  wcl::errno_t write_error = send_json_message(socket_fd.get(), request);
+  auto write_error = send_json_message(socket_fd.get(), request);
 
-  if (write_error != 0) {
-    return wcl::result_error<FindJobResponse>(FindJobError::FailedRequest);    
+  if (write_error) {
+    return wcl::result_error<FindJobResponse>(FindJobError::FailedRequest);
   }
   MessageParser parser(socket_fd.get());
   std::vector<std::string> messages;
