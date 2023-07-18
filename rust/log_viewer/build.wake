@@ -21,7 +21,7 @@ from rust import _
 def buildWakeLogViewer Unit =
     require Pass cargoToml = source "rust/log_viewer/Cargo.toml"
     require Pass main = source "rust/log_viewer/src/main.rs"
-    require Pass outputs = buildWithCargo (cargoToml, main,) "rust/log_viewer" ("log_viewer",)
+    require Pass outputs = cargoBuild (cargoToml, main,) "rust/log_viewer" ("log_viewer",)
 
     require (logViewer, Nil) = outputs
     else failWithError "More than one output returned when building log_viewer"

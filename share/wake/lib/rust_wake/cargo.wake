@@ -25,12 +25,12 @@ target findCargoPath Unit =
 
     Pass "{cargo_home}/bin/cargo"
 
-# Builds a cargo project, the Cargo.toml file must be listed as well as the outputs of intrest.
+# Builds a cargo project, the Cargo.toml file must be listed as well as the outputs of interest.
 # All source files must be listed as well. Cargo will not reuse work because the sandbox
 # will not contain its extra info, inside of target.
 # TODO: Add an environment variable to opt-in to localRunner cargo builds if we detect
 #       existing outputs in {pathToCrate}/target/release
-export def buildWithCargo (sources: List Path) (pathToCrate: String) (outputs: List String) =
+export def cargoBuild (sources: List Path) (pathToCrate: String) (outputs: List String) =
     require Pass cargoPath = findCargoPath Unit
 
     require Pass outputs =

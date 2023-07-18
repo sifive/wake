@@ -41,7 +41,7 @@ impl Iterator for AdditiveRec {
 // a certain distance apart in CIELAB, the perceived distance is roughly proportional
 // to the distance between those points. So if we can sample a lot of points that stay
 // relatively distinct from each other we can consequently get nice distinct colors.
-// Additionally CIELAB has a sort of "brightness" field so that we can keep a relativelly
+// Additionally CIELAB has a sort of "brightness" field so that we can keep a relatively
 // consistent brightness.
 //
 // In order to sample distinct points we use quasi-monte color methods, specifically
@@ -111,10 +111,10 @@ fn get_log_level_color(level: &Option<String>) -> Color {
       return Color::White;
     };
 
-    match level {
-        x if x == "info" => Color::Grey,
-        x if x == "warning" => Color::Yellow,
-        x if x == "error" => Color::Red,
+    match level.as_str() {
+        "info" => Color::Grey,
+        "warning" => Color::Yellow,
+        "error" => Color::Red,
         _ => Color::White,
     }
 }
@@ -195,7 +195,7 @@ fn render_line(config: &RenderConfig, event: &Event) -> Result<(), Report> {
     for renderable in to_render {
         print!("{}", renderable);
     }
-    println!("");
+    println!();
     Ok(())
 }
 
