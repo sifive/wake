@@ -388,12 +388,6 @@ TEST(job_cache_basic_par_fuzz) {
       TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
     }));
   }
-  for (int i = 0; i < 100; ++i) {
-    // 1) randomly select one of these options: suspend, or kill
-    // 2) randomly select a thread to apply this to
-    // 3) on kill we just kill and then move on to the next thread
-    // 4) on suspend we sleep for a bit, and then wake the thread.
-  }
   for (auto& fut : futs) {
     if (fut.valid()) fut.wait();
   }
