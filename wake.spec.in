@@ -32,6 +32,7 @@ mkdir -p %{buildroot}/var/cache/wake
 %files
 /usr/bin/wake
 /usr/bin/wakebox
+/usr/bin/wake-log-viewer
 /usr/bin/wake-format
 /usr/bin/job-cache
 /usr/lib/wake

@@ -1,0 +1,45 @@
+# Copyright 2023 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package rust
+
+target findCargoPath Unit =
+    require Some cargo_home = getenv "CARGO_HOME"
+    else
+        require Some path = getenv "PATH"
+        else failWithError "neither $PATH nor $CARGO_HOME is set; cannot find cargo"
+
+        Pass (whichIn path "cargo")
+
+    Pass "{cargo_home}/bin/cargo"
+
+# Builds a cargo project, the Cargo.toml file must be listed as well as the outputs of interest.
+# All source files must be listed as well. Cargo will not reuse work because the sandbox
+# will not contain its extra info, inside of target.
+# TODO: Add an environment variable to opt-in to localRunner cargo builds if we detect
+#       existing outputs in {pathToCrate}/target/release
+export def cargoBuild (sources: List Path) (pathToCrate: String) (outputs: List String) =
+    require Pass cargoPath = findCargoPath Unit
+
+    require Pass outputs =
+        makeExecPlan (cargoPath, "build", "--release",) sources
+        | setPlanLabel "cargo: {pathToCrate}"
+        | setPlanDirectory pathToCrate
+        | setPlanFnOutputs (\_ map ("{pathToCrate}/target/release/{_}") outputs)
+        | prependPlanPath (dirname cargoPath)
+        | runJobWith defaultRunner
+        | getJobOutputs
+
+    Pass outputs

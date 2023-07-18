@@ -21,6 +21,7 @@
 
 #include "tracing.h"
 
+#include <chrono>
 #include <ctime>
 #include <vector>
 
@@ -67,11 +68,14 @@ Event Event::urgent() && {
 }
 
 Event Event::time() && {
-  time_t t = ::time(NULL);
-  struct tm tm = *localtime(&t);
+  timespec tp;
+  clock_gettime(CLOCK_REALTIME, &tp);
+  std::string nano = std::to_string(tp.tv_nsec);
+  struct tm tm = *localtime(&tp.tv_sec);
   char time_buffer[20 + 1];
-  strftime(time_buffer, sizeof(time_buffer), "%F %T", &tm);
-  items[LOG_TIME] = time_buffer;
+  strftime(time_buffer, sizeof(time_buffer), "%FT%T", &tm);
+  nano.resize(9, '0');
+  items[LOG_TIME] = std::string(time_buffer) + "." + nano;
 
   return std::move(*this);
 }

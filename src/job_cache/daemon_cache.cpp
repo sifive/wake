@@ -21,6 +21,7 @@
 
 #include "daemon_cache.h"
 
+#include <json/json5.h>
 #include <sqlite3.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -60,7 +61,7 @@ static std::unique_ptr<std::ofstream> initialize_logging() {
 
   std::unique_ptr<std::ofstream> log_file =
       std::make_unique<std::ofstream>(log_path, std::ios::app);
-  wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file->rdbuf()));
+  wcl::log::subscribe(std::make_unique<JsonSubscriber>(log_file->rdbuf()));
 
   wcl::log::info("Initialized logging for job cache daemon")();
 

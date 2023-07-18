@@ -21,6 +21,7 @@
 
 #include "job_cache.h"
 
+#include <json/json5.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <util/execpath.h>

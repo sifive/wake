@@ -107,6 +107,8 @@ def all variant =
 def doInstall dest kind =
     require Pass variant = toVariant kind
     require Pass datfiles = sources "{@here}/share" `.*`
+    require Pass log_viewer = buildWakeLogViewer Unit
+    require Pass log_viewer = installAs "{dest}/bin/wake-log-viewer" log_viewer
 
     def binfilesResult = all variant
     def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
@@ -117,7 +119,7 @@ def doInstall dest kind =
     require Pass binfiles = binfilesResult
     require Pass bininstall = findFailFn releaseBin binfiles
 
-    def outputs = readme, bininstall ++ datinstall
+    def outputs = readme, log_viewer, bininstall ++ datinstall
 
     Pass outputs
 

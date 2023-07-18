@@ -25,6 +25,17 @@
 
 #include "util/location.h"
 #include "wcl/optional.h"
+#include "wcl/tracing.h"
+
+class JsonSubscriber : public wcl::log::Subscriber {
+ private:
+  std::ostream s;
+
+ public:
+  JsonSubscriber(std::streambuf *rdbuf) : s(rdbuf) {}
+  void receive(const wcl::log::Event &e) override;
+  ~JsonSubscriber() override{};
+};
 
 enum SymbolJSON {
   // appear in JAST and JSymbol
