@@ -2,6 +2,12 @@ wake (@VERSION@-1) unstable; urgency=medium
 
   * Auto-generated release package.
 
+ -- Ashley Coleman <ashley.coleman@sifive.com>  Wed, 19 Jul 2023 10:30:00 -0800
+
+wake (37.1.1-1) unstable; urgency=medium
+
+  * Auto-generated release package.
+
  -- Ashley Coleman <ashley.coleman@sifive.com>  Mon, 10 Jul 2023 10:30:00 -0800
 
 wake (37.1.0-1) unstable; urgency=medium
