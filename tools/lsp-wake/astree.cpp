@@ -20,12 +20,11 @@
 
 #include <sys/time.h>
 
-#include <cassert>
 #include <algorithm>
+#include <cassert>
 #include <functional>
 #include <iostream>
 #include <map>
-#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -527,15 +526,6 @@ void ASTree::fillDefinitionDocumentationFields() {
       ++definitions_iterator;
     }
   }
-
-  for (const auto& def : definitions) {
-    std::stringstream s;
-    s << std::endl;
-    s << def.location << std::endl;
-    s << "  documentation = " << def.documentation << std::endl;
-    s << std::endl;
-    wcl::log::info("%s", s.str().c_str())({{"filter", "fex"}});
-  }
 }
 
 std::string ASTree::sanitizeComment(std::string comment) {
@@ -573,6 +563,12 @@ void ASTree::emplaceComment(std::vector<std::pair<std::string, int>> &comment,
   }
   comment.back().first += text;
 }
+
+ASTree::SymbolUsage::SymbolUsage(Location _usage, Location _definition)
+    : usage(std::move(_usage)), definition(std::move(_definition)) {}
+
+ASTree::Comment::Comment(std::string _comment_text, Location _location, int _level)
+    : comment_text(std::move(_comment_text)), location(std::move(_location)), level(_level) {}
 
 void ASTree::LSPReporter::report(Diagnostic diagnostic) {
   diagnostics[diagnostic.getFilename()].push_back(diagnostic);

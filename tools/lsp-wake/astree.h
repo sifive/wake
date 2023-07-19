@@ -63,13 +63,11 @@ class ASTree {
   struct SymbolUsage {
     Location usage;
     Location definition;
-    SymbolUsage(Location _usage, Location _definition): usage(std::move(_usage)), definition(std::move(_definition)) {}
-
+    SymbolUsage(Location _usage, Location _definition);
   };
 
   struct Comment {
-    Comment(): location("") {}
-    Comment(std::string _comment_text, Location _location, int _level): comment_text(std::move(_comment_text)), location(std::move(_location)), level(_level) {}
+    Comment(std::string _comment_text, Location _location, int level);
 
     std::string comment_text;
     Location location;
