@@ -16,9 +16,10 @@
  */
 
 // Open Group Base Specifications Issue 7
-#include "types.h"
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
+
+#include "job_cache.h"
 
 #include <json/json5.h>
 #include <sys/socket.h>
@@ -37,9 +38,9 @@
 #include <vector>
 
 #include "daemon_cache.h"
-#include "job_cache.h"
 #include "job_cache_impl_common.h"
 #include "message_parser.h"
+#include "types.h"
 
 namespace job_cache {
 

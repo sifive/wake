@@ -216,7 +216,7 @@ int create_cache_socket(const std::string &dir, const std::string &key) {
   // While this successfully stops multiple daemons from running,
   // it has another issue in that just because the lock is aquired,
   // doesn't mean that the service has started. I don't see a strong
-  // way around this however so I think the clients will just have
+  // way around this however so I think the client will just have
   // keep retrying the connection. Worse yet the old key may
   // still exist so users will have to keep re-*reading* the key
   // while retrying with expoential backoff.
