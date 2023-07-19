@@ -216,7 +216,7 @@ int create_cache_socket(const std::string &dir, const std::string &key) {
   // While this successfully stops multiple daemons from running,
   // it has another issue in that just because the lock is aquired,
   // doesn't mean that the service has started. I don't see a strong
-  // way around this however so I think the clients will just have
+  // way around this however so I think the client will just have
   // keep retrying the connection. Worse yet the old key may
   // still exist so users will have to keep re-*reading* the key
   // while retrying with expoential backoff.
@@ -1083,6 +1083,17 @@ void DaemonCache::handle_new_client() {
   wcl::log::info("new client connected: %d", accept_fd)();
 }
 
+void DaemonCache::close_client(int client_fd) {
+  wcl::log::info("closing client fd = %d", client_fd)();
+  poll.remove(client_fd);
+  close(client_fd);
+  message_parsers.erase(client_fd);
+  if (message_parsers.empty()) {
+    exit_now = true;
+    wcl::log::info("All clients disconnected, exiting.")();
+  }
+}
+
 void DaemonCache::handle_msg(int client_fd) {
   // In case multiple read events have been enqueued since the
   // last epoll_wait, we have to perform all the reads that
@@ -1111,7 +1122,16 @@ void DaemonCache::handle_msg(int client_fd) {
     if (json.get("method").value == "cache/read") {
       FindJobRequest req(json.get("params"));
       FindJobResponse res = read(req);
-      send_json_message(client_fd, res.to_json());
+      auto write_error = send_json_message(client_fd, res.to_json());
+      if (write_error) {
+        wcl::log::error("DaemonCache::handle_msg(): send_json_message(%d): %s", client_fd,
+                        strerror(*write_error))
+            .urgent()();
+        wcl::log::error(
+            "DaemonCache::handle_msg(): failed to send client a response, closing cleint")
+            .urgent()();
+        close_client(client_fd);
+      }
     }
 
     if (json.get("method").value == "cache/add") {
@@ -1122,14 +1142,7 @@ void DaemonCache::handle_msg(int client_fd) {
 
   // If the file was closed, remove from epoll and close it.
   if (state == MessageParserState::StopSuccess) {
-    wcl::log::info("closing client fd = %d", client_fd)();
-    poll.remove(client_fd);
-    close(client_fd);
-    message_parsers.erase(client_fd);
-    if (message_parsers.empty()) {
-      exit_now = true;
-      wcl::log::info("All clients disconnected, exiting.")();
-    }
+    close_client(client_fd);
     return;
   }
 

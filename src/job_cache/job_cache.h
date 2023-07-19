@@ -42,6 +42,7 @@ enum class ConnectError {
 };
 
 enum class FindJobError {
+  FailedRequest,
   FailedMessageReceive,
   NoResponse,
   TooManyResponses,

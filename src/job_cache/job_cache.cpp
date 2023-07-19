@@ -40,6 +40,7 @@
 #include "daemon_cache.h"
 #include "job_cache_impl_common.h"
 #include "message_parser.h"
+#include "types.h"
 
 namespace job_cache {
 
@@ -260,7 +261,11 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
   request.add("params", find_request.to_json());
 
   // serialize the request, send it, deserialize the response, return it
-  send_json_message(socket_fd.get(), request);
+  auto write_error = send_json_message(socket_fd.get(), request);
+
+  if (write_error) {
+    return wcl::result_error<FindJobResponse>(FindJobError::FailedRequest);
+  }
   MessageParser parser(socket_fd.get());
   std::vector<std::string> messages;
 
@@ -360,7 +365,8 @@ void Cache::add(const AddJobRequest &add_request) {
   request.add("method", "cache/add");
   request.add("params", add_request.to_json());
 
-  // serialize the request and send it
+  // serialize the request and send it, we ignore an error
+  // if it occurs here and we keep moving.
   send_json_message(socket_fd.get(), request);
 }
 

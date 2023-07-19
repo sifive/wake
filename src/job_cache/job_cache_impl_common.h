@@ -26,6 +26,9 @@
 #include <string>
 #include <vector>
 
+#include "wcl/optional.h"
+#include "wcl/result.h"
+
 using group_id_t = uint8_t;
 
 // This function removes all the baking files of a specific job.
@@ -54,4 +57,4 @@ void unlink_no_fail(const char *file);
 void rmdir_no_fail(const char *dir);
 
 // Write the serialized JAST to fd with proper retries on failure
-void send_json_message(int fd, const JAST &json);
+wcl::optional<wcl::posix_error_t> send_json_message(int fd, const JAST &json);
