@@ -33,12 +33,11 @@ export function activate(context: vscode.ExtensionContext): void {
 		'stdLibPath': stdLibPath
 	};
 
-	// Start the client. This will also launch the server
-	client.start();
-
-	// TODO: Shouldn't these happen before starting the server?
 	registerFsMethods(client, stdLibPath, context);
 	registerTimelineCommands(context);
+
+	// Start the client. This will also launch the server
+	client.start();
 }
 
 export function deactivate(): Thenable<void> | undefined {
