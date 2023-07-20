@@ -1592,3 +1592,9 @@ def y =
     def x = !(a + b),
 
     0
+
+def x =
+    def y = "{one | two} three"
+    def z = "{one | two | three} four"
+
+    z

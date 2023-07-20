@@ -66,8 +66,7 @@ export def runJob (p: Plan): Job = match p
                         Accept _ _ = ""
                         Reject why = why
 
-                    makeError "No runner for '{job.getJobDescription}' available, because: {map pretty opts
-                    | catWith ", "}"
+                    makeError "No runner for '{job.getJobDescription}' available, because: {map pretty opts | catWith ", "}"
 
                 # Make sure badlaunch completes before badfinish
                 def _ = wait (\_ badfinish job error) (badlaunch job error)

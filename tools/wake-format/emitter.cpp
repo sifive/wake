@@ -1666,7 +1666,8 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(walk_placeholder(ctx, node));
+  // TODO: rename/rework binop() to represent 'do not split'
+  MEMO_RET(walk_placeholder(ctx.binop(), node));
 }
 
 wcl::doc Emitter::walk_kind(ctx_t ctx, CSTElement node) {
