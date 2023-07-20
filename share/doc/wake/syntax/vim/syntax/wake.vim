@@ -5,6 +5,7 @@
 "   2018 October 23 : Initial Wake Syntax File
 "   2019 January 9  : Add highlighting for Types
 "   2019 January 9  : Add highlighting for raw strings
+"   2023 July 20    : Add highlighting for macros and specify conditionals
 
 if version < 600
     syntax clear
@@ -17,7 +18,9 @@ syn match lineComment "#.*"
 
 " Keywords
 " TODO Should important globals from prim.wake we marked keywords?
-syn keyword wakeKeyword if then else here global type topic subscribe match require data tuple prim
+syn keyword wakeKeyword global type topic subscribe data tuple prim
+syn match wakeMacro "here\|@here\|@line\|@file\|@!"
+syn keyword wakeConditional if then else match require
 
 syn keyword wakeOperatorModifier binary unary
 syn keyword wakeInclude package export import from
@@ -33,7 +36,7 @@ syn match wakeUpperIdentifier "\<[A-Z][A-Za-z0-9_]*"
 
 " Strings
 " string literals with escapes
-syn region wakeString start=/\v"/ skip=/\v\\./ end=/\v"/ contains=wakeStringEscape
+syn region wakeString start=/\v"/ skip=/\v\\./ end=/\v"/ contains=wakeStringEscape,wakeMacro
 syn match wakeStringEscape "\\[nrfvb\\\"]" contained
 syn region wakeRawString start=/\v'/ skip=/\v\\./ end=/\v'/
 syn region wakeRegexString start=/\v`/ skip=/\v\\./ end=/\v`/
@@ -50,6 +53,8 @@ syn match wakeHexFloatNumber /\<0x[0-9a-fA-F_]\+[pP][+-]\?[0-9a-fA-F_]\+\>/
 
 "===== Links =====
 hi link wakeKeyword Keyword
+hi link wakeConditional Conditional
+hi link wakeMacro Macro
 
 hi link lineComment Comment
 
