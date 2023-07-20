@@ -1322,6 +1322,6 @@ def y =
     0
 
 def x =
-  def y = "{one | two} thre"
+  def y = "{one | two} three"
   def z = "{one | two | three} four"
   z
