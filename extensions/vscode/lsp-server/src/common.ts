@@ -65,63 +65,23 @@ function createLspJsonNoParams(method: string): string {
 const InternalError  = -32603;
 
 export function prepareConnection(connection: Connection, isWeb: Boolean) {
-    let initializeRequest = '';
-
     const getResponse = async <T, E>(request: string): Promise<T | ResponseError<E>> => {
         let c_str = await lock.use(async () => { // synchronise requests to wasm
-
-            // A hack: we have to pass stdLib to wasm, but it is only accessible from the client side.
-            // The client only responds to requests after it has received an initialize response from the server.
-            if (lspModule == null) {
-                // So we save the initialize request,
-                initializeRequest = request;
-                lspModule = await wakeLspModule(connection);
-
-                // instantiate the server with a default stdLib
-                lspModule._instantiateServer();
-
-                // and send the initialize response to the client.
-                return await lspModule.processRequest(request);
-            }
-            if (initializeRequest !== '') {
-                // This is needed in web as well, even though stdlib there is not customizable:
-                // stdLib packaged with the extension has a uri scheme different from that of the workspace folder.
-
-                // After the initialize request was processed, we reinstantiate the wakeLspModule:
-                // make lsp functions usable, make connection usable in wasm;
-                lspModule = await wakeLspModule(connection);
-
-                // get stdLib from the client;
-                let stdLib: string = await connection.sendRequest('getStdLib');
-
-                // instantiate a new server with the correct stdLib;
-                lspModule.instantiateServerCustomStdLib(stdLib);
-
-                // and process the saved initialize request to initialize the new server.
-                let initializeResponse = await lspModule.processRequest(initializeRequest);
-
-                let str = lspModule.toString(initializeResponse);
-                lspModule._free(initializeResponse);
-                let result = JSON.parse(str);
-                if (result.notification.hasOwnProperty('method')) {
-                    // Send notification about invalid stdLib.
-                    await connection.sendNotification(result.notification.method, result.notification.params);
-                }
-                // No need to send a response back: the only case in which it would be different from the one with
-                // the default stdLib is if the custom lib is invalid. in that case the user sees the notification and
-                // can act accordingly.
-                initializeRequest = '';
-            }
-            // Process all subsequent requests normally.
-            return await lspModule.processRequest(request);
+            return await lspModule?.processRequest(request) ?? null;
         });
 
-        if (lspModule == null) {
+        if (lspModule === null) {
             return new ResponseError(InternalError, 'Failed to load wake lsp module.');
         }
-        let str = lspModule.toString(c_str);
+
+        if (c_str === null) {
+            return new ResponseError(InternalError, 'Failed to receive response from lsp module.');
+        }
+
+        let response = lspModule.toString(c_str);
         lspModule._free(c_str); // free the string mallocced by c++
-        let result = JSON.parse(str);
+
+        let result = JSON.parse(response);
 
         if (result.response.hasOwnProperty('error')) {
             return new ResponseError(result.response.error.code, result.response.error.message); // request resulted in an error
@@ -140,6 +100,9 @@ export function prepareConnection(connection: Connection, isWeb: Boolean) {
 
     // Create lsp handlers
     connection.onInitialize(async (params: InitializeParams): Promise<InitializeResult | ResponseError<InitializeError>> => {
+        lspModule = await wakeLspModule(connection);
+        lspModule?._instantiateServer();
+
         return await getResponse(createLspJson('initialize', params));
     });
 

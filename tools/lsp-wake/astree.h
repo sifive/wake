@@ -36,9 +36,7 @@ class ASTree {
  public:
   std::map<std::string, std::unique_ptr<StringFile>> changedFiles;
 
-  ASTree();
-
-  explicit ASTree(std::string _absLibDir);
+  ASTree() = default;
 
   typedef std::pair<const std::string, std::vector<Diagnostic>> FileDiagnostics;
 

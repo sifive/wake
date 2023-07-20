@@ -24,7 +24,7 @@ target buildLSP variant: Result (List Path) Error = match variant
 
         # wake-format off
         def extraLFlags =
-            "-s", 'EXPORTED_FUNCTIONS=_instantiateServer,_instantiateServerCustomStdLib,_processRequest',
+            "-s", 'EXPORTED_FUNCTIONS=_instantiateServer,_processRequest',
             "-s", 'DEFAULT_LIBRARY_FUNCS_TO_INCLUDE=[$cwrap]',
             "-s", 'EXPORT_NAME="wakeLspModule"',
             "--post-js", postJS.getPathName,

@@ -73,9 +73,7 @@ static inline bool message_is_notification(JAST request) {
 
 class LSPServer {
  public:
-  LSPServer() : astree() {}
-  explicit LSPServer(bool _isSTDLibValid, std::string _stdLib)
-      : isSTDLibValid(_isSTDLibValid), astree(std::move(_stdLib)) {}
+  LSPServer() = default;
 
   struct MethodResult {
     JAST response;
@@ -166,7 +164,6 @@ class LSPServer {
  private:
   typedef MethodResult (LSPServer::*LspMethod)(const JAST &);
 
-  bool isSTDLibValid = false;
   bool isInitialized = false;
   bool needsUpdate = false;
   int ignoredCount = 0;
@@ -191,13 +188,14 @@ class LSPServer {
       {"workspace/symbol", &LSPServer::workspaceSymbol},
       {"textDocument/rename", &LSPServer::rename}};
 
-  void notifyAboutInvalidSTDLib(MethodResult &methodResult) const {
+  void notifyAboutInvalidSTDLib(MethodResult &methodResult, const std::string &libDir) const {
     JAST message = JSONConverter::createMessage();
     message.add("method", "window/showMessage");
     JAST &showMessageParams = message.add("params", JSON_OBJECT);
     showMessageParams.add("type", 1);  // Error
+    // TODO: make this message dependent on the client
     std::string messageText =
-        "The path to the wake standard library (" + astree.absLibDir + ") is invalid. " +
+        "The path to the wake standard library (" + libDir + ") is invalid. " +
         "Wake language features will not be provided. " +
         "Please change the path in the extension settings and reload the window by: " +
         "  1. Opening the command palette (Ctrl + Shift + P); " +
@@ -323,29 +321,42 @@ class LSPServer {
 
   MethodResult initialize(const JAST &receivedMessage) {
     MethodResult methodResult;
-    if (!isSTDLibValid) {
-      notifyAboutInvalidSTDLib(methodResult);  // set notification
-      methodResult.response = JSONConverter::createInitializeResultInvalidSTDLib(receivedMessage);
-    } else {
-      methodResult.response = JSONConverter::createInitializeResultDefault(receivedMessage);
+
+    std::string stdLibPath = wcl::make_canonical(find_execpath() + "/../../share/wake/lib");
+    auto initializationOptions = receivedMessage.get("params").get("initializationOptions");
+    if (initializationOptions.kind == JSON_OBJECT) {
+      auto stdLibPathEntry = initializationOptions.get("stdLibPath");
+      if (stdLibPathEntry.kind == JSON_STR) {
+        stdLibPath = stdLibPathEntry.value;
+      }
     }
+
+    bool stdLibValid = is_readable((stdLibPath + "/core/boolean.wake").c_str());
+    if (!stdLibValid) {
+      notifyAboutInvalidSTDLib(methodResult, stdLibPath);  // set notification
+      methodResult.response = JSONConverter::createInitializeResultInvalidSTDLib(receivedMessage);
+      return methodResult;
+    }
+
+    methodResult.response = JSONConverter::createInitializeResultDefault(receivedMessage);
 
     isInitialized = true;
     std::string workspaceUri =
         receivedMessage.get("params").get("workspaceFolders").children[0].second.get("uri").value;
+
+    astree.absLibDir = stdLibPath;
     astree.absWorkDir = JSONConverter::decodePath(workspaceUri);
 
-    wcl::log::info("Initialized LSP with workspace = %s", astree.absWorkDir.c_str())();
+    wcl::log::info("Initialized LSP with stdlib = %s, workspace = %s", astree.absLibDir.c_str(),
+                   astree.absWorkDir.c_str())();
 
     return methodResult;
   }
 
   MethodResult initialized(const JAST &_) {
     MethodResult methodResult;
-    if (isSTDLibValid) {
-      needsUpdate = true;
-      refresh("initialized", methodResult);  // set diagnostics
-    }
+    needsUpdate = true;
+    refresh("initialized", methodResult);  // set diagnostics
     return methodResult;
   }
 
@@ -558,45 +569,18 @@ class LSPServer {
   MethodResult serverExit(const JAST &_) { exit(isShutDown ? 0 : 1); }
 };
 
-LSPServer *lspServer = nullptr;
+std::unique_ptr<LSPServer> lspServer;
+
+void instantiateServerImpl() {
+  wcl::log::info("Instantiating lsp server")();
+  lspServer = std::make_unique<LSPServer>();
+}
 
 #ifdef __EMSCRIPTEN__
 
-void instantiateServerInternal(const std::string &stdLib) {
-  // clang-format off
-  int isNode = EM_ASM_INT({
-    return ENVIRONMENT_IS_NODE;
-  });
-  // clang-format on
-  bool isReadable = false;
-  if (isNode) {
-    isReadable = is_readable((stdLib + "/core/boolean.wake").c_str());
-  } else {  // no need to check stdlib validity in web, since it can't be customized there
-    isReadable = true;
-  }
-  lspServer = new LSPServer(isReadable, stdLib);
-}
-
 extern "C" {
-void instantiateServer() {
-  // This path doesn't matter in web since we don't check the validity of this stdlib there.
-  // (We don't check it since we can't send an 'accessFile' request to the client at this stage)
-  auto stdlib = wcl::make_canonical(find_execpath() + "/../../share/wake/lib");
-  instantiateServerInternal(stdlib);
-}
 
-void instantiateServerCustomStdLib(const char *stdLib) {
-  // clang-format off
-  int isNode = EM_ASM_INT({
-    return ENVIRONMENT_IS_NODE;
-  });
-  // clang-format on
-  if (isNode) {
-    instantiateServerInternal(wcl::make_canonical(stdLib));
-  } else {
-    instantiateServerInternal(stdLib);  // We want to preserve the uri scheme of stdlib in web
-  }
-}
+void instantiateServer() { instantiateServerImpl(); }
 
 char *processRequest(const char *request) {
   LSPServer::MethodResult methodResult = lspServer->processRequest(request);
@@ -624,13 +608,6 @@ char *processRequest(const char *request) {
 
 #else
 
-void instantiateServer(const std::string &stdLib) {
-  wcl::log::info("Initializing lsp server with stdlib = %s", stdLib.c_str())();
-
-  bool isReadable = is_readable((stdLib + "/core/boolean.wake").c_str());
-  lspServer = new LSPServer(isReadable, stdLib);
-}
-
 int main(int argc, const char **argv) {
   const char *wake_lsp_log_path = getenv("WAKE_LSP_LOG_PATH");
 
@@ -641,11 +618,8 @@ int main(int argc, const char **argv) {
     wcl::log::subscribe(std::make_unique<wcl::log::FormatSubscriber>(log_file.rdbuf()));
   }
 
-  if (argc >= 2) {
-    instantiateServer(argv[1]);
-  } else {
-    instantiateServer(wcl::make_canonical(find_execpath() + "/../../share/wake/lib"));
-  }
+  instantiateServerImpl();
+
   // Process requests until something goes wrong
   lspServer->processRequests();
 }

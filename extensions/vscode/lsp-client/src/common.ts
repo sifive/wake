@@ -29,10 +29,6 @@ export const clientOptions: LanguageClientOptions = {
 
 export function registerFsMethods(client: CommonLanguageClient, stdLibPath: string, context: ExtensionContext): void {
     client.onReady().then(() => {
-        client.onRequest('getStdLib', async (): Promise<string> => {
-            return stdLibPath;
-        });
-
         client.onRequest('getStdLibFiles', async (): Promise<string[]> => {
             // When running in web, stdlib packaged with the extension is hosted online and not recognized as a folder
             // by vscode fs api. Thus, it cannot be traversed to find out its contents.

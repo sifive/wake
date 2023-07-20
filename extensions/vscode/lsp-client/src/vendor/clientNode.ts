@@ -29,11 +29,15 @@ export function activate(context: vscode.ExtensionContext): void {
 		clientOptions
 	);
 	client.clientOptions.errorHandler = client.createDefaultErrorHandler(Number.MAX_SAFE_INTEGER);
+	client.clientOptions.initializationOptions = {
+		'stdLibPath': stdLibPath
+	};
+
+	registerFsMethods(client, stdLibPath, context);
+	registerTimelineCommands(context);
 
 	// Start the client. This will also launch the server
 	client.start();
-	registerFsMethods(client, stdLibPath, context);
-	registerTimelineCommands(context);
 }
 
 export function deactivate(): Thenable<void> | undefined {
