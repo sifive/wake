@@ -569,11 +569,11 @@ class LSPServer {
   MethodResult serverExit(const JAST &_) { exit(isShutDown ? 0 : 1); }
 };
 
-LSPServer *lspServer = nullptr;
+std::unique_ptr<LSPServer> lspServer;
 
 void instantiateServerImpl() {
   wcl::log::info("Instantiating lsp server")();
-  lspServer = new LSPServer();
+  lspServer = std::make_unique<LSPServer>();
 }
 
 #ifdef __EMSCRIPTEN__
@@ -622,8 +622,6 @@ int main(int argc, const char **argv) {
 
   // Process requests until something goes wrong
   lspServer->processRequests();
-
-  delete lspServer;
 }
 
 #endif
