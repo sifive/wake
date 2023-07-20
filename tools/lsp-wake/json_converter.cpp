@@ -311,14 +311,17 @@ JAST hoverInfoToJSON(JAST receivedMessage, const std::vector<SymbolDefinition> &
   std::string value;
   for (const SymbolDefinition &def : hoverInfoPieces) {
     value += "**" + def.name + ": " + def.type + "**\n\n";
-    value += def.documentation + "\n\n";
+
+    if (!def.documentation.empty()) {
+      value += def.documentation + "\n\n";
+    }
+
     if (!def.introduces.empty()) {
       value += "Introduces:\n\n";
       for (auto introduced : def.introduces) {
         value += "**" + introduced.first + ": " + introduced.second + "**\n\n";
       }
     }
-    value += def.outerDocumentation + "\n\n";
   }
 
   if (value.empty()) {

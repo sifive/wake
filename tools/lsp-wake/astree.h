@@ -20,6 +20,7 @@
 #define ASTREE_H
 
 #include <parser/cst.h>
+#include <wcl/hash.h>
 
 #include <functional>
 #include <iostream>
@@ -63,22 +64,46 @@ class ASTree {
   struct SymbolUsage {
     Location usage;
     Location definition;
-    SymbolUsage(Location _usage, Location _definition);
+    SymbolUsage(Location _usage, Location _definition)
+        : usage(std::move(_usage)), definition(std::move(_definition)) {}
   };
 
   struct Comment {
-    Comment(std::string _comment_text, Location _location, int level);
+    Comment() : location("") {}
+    Comment(std::string _comment_text, Location _location, int _level)
+        : comment_text(std::move(_comment_text)), location(std::move(_location)), level(_level) {}
 
     std::string comment_text;
     Location location;
     int level;  // level of nestedness in the tree
   };
 
+  struct LineLocation {
+    std::string filename;
+    int row;
+
+    explicit LineLocation(const Location &location)
+        : filename(location.filename), row(location.start.row) {}
+    LineLocation(std::string _filename, int _row) : filename(std::move(_filename)), row(_row) {}
+  };
+
+  struct HashLineLocation {
+    std::size_t operator()(const LineLocation &loc) const {
+      return wcl::hash_combine(std::hash<std::string>{}(loc.filename), std::hash<int>{}(loc.row));
+    }
+  };
+
+  struct EqualLineLocation {
+    bool operator()(const LineLocation &lhs, const LineLocation &rhs) const {
+      return lhs.row == rhs.row && lhs.filename == rhs.filename;
+    }
+  };
+
   std::set<Location> types;
   std::vector<SymbolDefinition> definitions;
   std::vector<SymbolUsage> usages;
   std::vector<SymbolDefinition> packages;
-  std::vector<Comment> comments;
+  std::unordered_map<LineLocation, Comment, HashLineLocation, EqualLineLocation> comments;
 
   class LSPReporter : public DiagnosticReporter {
    private:
@@ -102,11 +127,13 @@ class ASTree {
 
   static std::string sanitizeComment(std::string comment);
 
-  static std::string composeOuterComment(std::vector<std::pair<std::string, int>> comment);
+  std::vector<Comment> collectDocumentationComments(const SymbolDefinition &def);
+  std::string sanitizeComments(const std::vector<Comment> &comment);
 
   static void emplaceComment(std::vector<std::pair<std::string, int>> &comment,
                              const std::string &text, int level);
 
-  void recordSameLocationDefinition(std::vector<SymbolDefinition>::iterator &definitions_iterator);
+  void mergeSameLineDefinitions(const SymbolDefinition &merge_from, SymbolDefinition &into);
 };
+
 #endif
