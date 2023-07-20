@@ -103,9 +103,7 @@ export function prepareConnection(connection: Connection, isWeb: Boolean) {
         lspModule = await wakeLspModule(connection);
         lspModule?._instantiateServer();
 
-        let response: InitializeResult | ResponseError<InitializeError> = await getResponse(createLspJson('initialize', params));
-        // TODO: impl & test invalid stdlib
-        return response;
+        return await getResponse(createLspJson('initialize', params));
     });
 
     connection.onInitialized(async (params: InitializedParams): Promise<void> => {

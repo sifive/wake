@@ -193,6 +193,7 @@ class LSPServer {
     message.add("method", "window/showMessage");
     JAST &showMessageParams = message.add("params", JSON_OBJECT);
     showMessageParams.add("type", 1);  // Error
+    // TODO: make this message dependent on the client
     std::string messageText =
         "The path to the wake standard library (" + libDir + ") is invalid. " +
         "Wake language features will not be provided. " +
