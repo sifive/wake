@@ -210,6 +210,8 @@ static PRIMFN(prim_read) {
       runtime.heap.reserve(need_pass);
 
       String *out = String::claim(runtime.heap, size);
+      out->c_str()[size] = 0;
+
       t.seekg(0, t.beg);
       t.read(out->c_str(), out->size());
       if (t) RETURN(claim_result(runtime.heap, true, out));
