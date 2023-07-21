@@ -1666,8 +1666,16 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
+  MultiLineStringIndentationFSM fsm;
+
+  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    if (child.id() == CST_LITERAL) {
+      fsm.accept(child);
+    }
+  }
+
   // TODO: rename/rework binop() to represent 'do not split'
-  MEMO_RET(walk_placeholder(ctx.binop(), node));
+  MEMO_RET(walk_placeholder(ctx.binop().prefix(fsm.prefix.size()), node));
 }
 
 wcl::doc Emitter::walk_kind(ctx_t ctx, CSTElement node) {
@@ -1693,21 +1701,12 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_LITERAL, node, "Expected CST_LITERAL");
 
-  std::string::size_type prefix_size = 0;
-
-  if (node.firstChildElement().id() == TOKEN_MSTR_BEGIN ||
-      node.firstChildElement().id() == TOKEN_MSTR_RESUME ||
-      node.firstChildElement().id() == TOKEN_LSTR_BEGIN ||
-      node.firstChildElement().id() == TOKEN_LSTR_RESUME) {
-    prefix_size = MultiLineStringIndentationFSM::analyze(node);
-  }
-
   // clang-format off
 
   // Insert the proper amount of spaces to correctly indent the line relative to base identation
-  auto inset_line = fmt().escape([prefix_size](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node){
+  auto inset_line = fmt().escape([prefix_length = ctx.prefix_length](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node){
            FMT_ASSERT(node.id() == TOKEN_WS, node, "Expected <TOKEN_WS>, Saw <" + std::string(symbolName(node.id())) + ">");
-           builder.append(node.fragment().segment().str().substr(prefix_size));
+           builder.append(node.fragment().segment().str().substr(prefix_length));
            node.nextSiblingElement();
   });
 

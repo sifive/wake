@@ -47,6 +47,7 @@ enum class ExplodeOption {
 
 struct ctx_t {
   size_t nest_level = 0;
+  size_t prefix_length = 0;
   wcl::doc_state state = wcl::doc_state::identity();
 
   ExplodeOption explode_option = ExplodeOption::Allow;
@@ -82,6 +83,12 @@ struct ctx_t {
     return copy;
   }
 
+  ctx_t prefix(size_t len) {
+    ctx_t copy = *this;
+    copy.prefix_length = len;
+    return copy;
+  }
+
   ctx_t sub(const wcl::doc_builder& builder) const {
     ctx_t copy = *this;
     copy.state = state + *builder;
@@ -93,7 +100,8 @@ struct ctx_t {
 
   bool operator==(const ctx_t& other) const {
     return state == other.state && nest_level == other.nest_level &&
-           explode_option == other.explode_option && nested_binop == other.nested_binop;
+           explode_option == other.explode_option && nested_binop == other.nested_binop
+           && prefix_length == other.prefix_length;
   }
 };
 
