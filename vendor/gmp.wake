@@ -33,12 +33,12 @@ def buildGmpWASM _ =
 
     def job =
         """
-            cd .build
-            wget https://ftp.gnu.org/gnu/gmp/gmp-%{version}.tar.xz
-            tar xmf gmp-%{version}.tar.xz
-            cd gmp-%{version}
-            emconfigure ./configure --disable-assembly --host none --enable-cxx
-            emmake make -j4 MAKEINFO=true
+        cd .build
+        wget https://ftp.gnu.org/gnu/gmp/gmp-%{version}.tar.xz
+        tar xmf gmp-%{version}.tar.xz
+        cd gmp-%{version}
+        emconfigure ./configure --disable-assembly --host none --enable-cxx
+        emmake make -j4 MAKEINFO=true
         """
         | makePlan "compiling gmp" (buildDir, Nil)
         | editPlanEnvironment (addEnvironmentPath emsdk)

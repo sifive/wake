@@ -80,9 +80,9 @@ def gunzip zip =
 
     def script =
         "%
-            set -e
-            gzip -dc "%{zip.getPathName}" > "%{out}.tmp"
-            mv "%{out}.tmp" "%{out}"
+        set -e
+        gzip -dc "%{zip.getPathName}" > "%{out}.tmp"
+        mv "%{out}.tmp" "%{out}"
         %"
 
     makeShellPlan script (zip, Nil)

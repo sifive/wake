@@ -33,11 +33,11 @@ def buildSqlite3WASM _ =
 
     def job =
         """
-            cd .build
-            wget https://sqlite.org/2022/sqlite-amalgamation-3390200.zip
-            unzip sqlite-amalgamation-3390200
-            cd sqlite-amalgamation-3390200
-            emcc -c sqlite3.c
+        cd .build
+        wget https://sqlite.org/2022/sqlite-amalgamation-3390200.zip
+        unzip sqlite-amalgamation-3390200
+        cd sqlite-amalgamation-3390200
+        emcc -c sqlite3.c
         """
         | makePlan "compiling sqlite3" (buildDir, Nil)
         | editPlanEnvironment (addEnvironmentPath emsdk)
