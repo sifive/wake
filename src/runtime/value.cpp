@@ -79,7 +79,7 @@ String *String::claim(Heap &h, size_t length) {
 }
 
 String *String::claim(Heap &h, const std::string &str) {
-  return new (h.claim(reserve(str.length()))) String(str.c_str(), str.length());
+  return new (h.claim(reserve(str.size()))) String(str.c_str(), str.size());
 }
 
 String *String::claim(Heap &h, const char *str, size_t length) {
@@ -91,7 +91,7 @@ String *String::alloc(Heap &h, size_t length) {
 }
 
 String *String::alloc(Heap &h, const std::string &str) {
-  return new (h.alloc(reserve(str.length()))) String(str.c_str(), str.length());
+  return new (h.alloc(reserve(str.size()))) String(str.c_str(), str.size());
 }
 
 String *String::alloc(Heap &h, const char *str, size_t length) {
