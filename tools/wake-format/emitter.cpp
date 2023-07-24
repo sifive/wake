@@ -1701,10 +1701,21 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_LITERAL, node, "Expected CST_LITERAL");
 
+  // walk_interpolate will set prefix_length when multiple
+  // literals are interpolated, but if we aren't interpolated
+  // we may still need to determine the prefix_length
+  std::string::size_type prefix_length = ctx.prefix_length;
+  if (prefix_length == 0 && (node.firstChildElement().id() == TOKEN_MSTR_BEGIN ||
+                             node.firstChildElement().id() == TOKEN_MSTR_RESUME ||
+                             node.firstChildElement().id() == TOKEN_LSTR_BEGIN ||
+                             node.firstChildElement().id() == TOKEN_LSTR_RESUME)) {
+    prefix_length = MultiLineStringIndentationFSM::analyze(node);
+  }
+
   // clang-format off
 
   // Insert the proper amount of spaces to correctly indent the line relative to base identation
-  auto inset_line = fmt().escape([prefix_length = ctx.prefix_length](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node){
+  auto inset_line = fmt().escape([prefix_length](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node){
            FMT_ASSERT(node.id() == TOKEN_WS, node, "Expected <TOKEN_WS>, Saw <" + std::string(symbolName(node.id())) + ">");
            builder.append(node.fragment().segment().str().substr(prefix_length));
            node.nextSiblingElement();

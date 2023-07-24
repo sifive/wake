@@ -100,8 +100,8 @@ struct ctx_t {
 
   bool operator==(const ctx_t& other) const {
     return state == other.state && nest_level == other.nest_level &&
-           explode_option == other.explode_option && nested_binop == other.nested_binop
-           && prefix_length == other.prefix_length;
+           explode_option == other.explode_option && nested_binop == other.nested_binop &&
+           prefix_length == other.prefix_length;
   }
 };
 
