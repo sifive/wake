@@ -136,7 +136,7 @@ struct String final : public GCObject<String, Value> {
   static RootPointer<String> literal(Heap &h, const std::string &value);
 
  private:
-  String(size_t length_);
+  explicit String(size_t length_);
 };
 
 // An exception-safe wrapper for mpz_t
