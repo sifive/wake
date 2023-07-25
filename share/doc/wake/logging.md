@@ -24,18 +24,18 @@ You can also make your own `LogLevel` tuple.
 You can use this to redirect wake output to a dedicated stream which can
 later be filtered on.
 
-| wake `def`        | Color/Intensity | log level     |
-|-------------------|-----------------|---------------|
-| logDebug          |     Blue        | "debug"       |
-| logInfo           |     Gray        | "info"        |
-| logEcho           |     Default     | "echo"        |
-| logInteractive    |     Cyan        | "interactive" |
-| logReport         |     Magenta     | "report"      |
-| logWarning        |     Yellow      | "warning"     |
-| logError          |     Red         | "error"       |
-| logNever          |     Default     | "null"        |
-| LogLevel "foo"    |     Default     | "foo"         |
-| LogLevel "bar"    |     Default     | "bar"         |
+| wake `def`        |  log level    |
+|-------------------|---------------|
+| logDebug          | "debug"       |
+| logInfo           | "info"        |
+| logEcho           | "echo"        |
+| logInteractive    | "interactive" |
+| logReport         | "report"      |
+| logWarning        | "warning"     |
+| logError          |  "error"      |
+| logNever          |  "null"       |
+| LogLevel "foo"    | "foo"         |
+| LogLevel "bar"    | "bar"         |
 
 ## Directing Logger Output
 
@@ -78,11 +78,9 @@ wake --fd:3="foo,info" mywakecode 3>foo_and_info.txt
 ```
 ### Log Headers
 
-Each logging stream will emit with a log header by default.
-This is configured via a wake config setting `log_header`.
-This can be disabled with `"log_header": ""` in your wake
-config file, or with `--log-header` on the command line. The options are
-
+Each logging stream can optionally emit with a log header. See the
+"Configuring Wake" section of the [README](https://github.com/sifive/wake/README.md?plain=1#L140)
+for more info.
 
 ## What Gets Sent To Loggers
 
