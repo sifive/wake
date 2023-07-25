@@ -316,14 +316,14 @@ bool run_as_init_proc(F f) {
       wcl::log::error("run_as_init_proc: waitpid(): %s", strerror(errno))();
       return false;
     }
-  
+
     // Relay errors up to the top
     if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
       return true;
     }
     return false;
   }
-  
+
   // Now that we're in an isolated child, we unshare our namespaces
   if (unshare(CLONE_NEWUSER | CLONE_NEWPID) != 0) {
     wcl::log::error("unshare(CLONE_NEW_USER | CLONE_NEWPID): %s", strerror(errno))();
