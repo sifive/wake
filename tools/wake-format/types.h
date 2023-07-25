@@ -49,7 +49,6 @@ struct ctx_t {
   size_t nest_level = 0;
   size_t prefix_length = 0;
   wcl::doc_state state = wcl::doc_state::identity();
-
   ExplodeOption explode_option = ExplodeOption::Allow;
   bool nested_binop = false;
 
@@ -177,6 +176,8 @@ struct std::hash<ctx_t> {
   size_t operator()(ctx_t const& ctx) const noexcept {
     auto hash = wcl::hash_combine(std::hash<wcl::doc_state>{}(ctx.state),
                                   std::hash<size_t>{}(ctx.nest_level));
-    return wcl::hash_combine(hash, std::hash<ExplodeOption>{}(ctx.explode_option));
+    hash = wcl::hash_combine(hash, std::hash<ExplodeOption>{}(ctx.explode_option));
+    hash = wcl::hash_combine(hash, std::hash<size_t>{}(ctx.prefix_length));
+    return wcl::hash_combine(hash, std::hash<bool>{}(ctx.nested_binop));
   }
 };
