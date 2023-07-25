@@ -188,6 +188,7 @@ class Emitter {
   wcl::doc walk_kind(ctx_t ctx, CSTElement node);
   wcl::doc walk_lambda(ctx_t ctx, CSTElement node);
   wcl::doc walk_literal(ctx_t ctx, CSTElement node);
+  wcl::doc walk_literal(ctx_t ctx, CSTElement node, size_t whitespace_prefix);
   wcl::doc walk_match(ctx_t ctx, CSTElement node);
   wcl::doc walk_op(ctx_t ctx, CSTElement node);
   wcl::doc walk_package(ctx_t ctx, CSTElement node);

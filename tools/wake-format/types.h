@@ -56,16 +56,6 @@ struct ctx_t {
   // TODO: Find a better name and rename this.
   bool nested_binop = false;
 
-  // The length of the whitespace in a multiline string line
-  // which is not part of the actual string. In the example below
-  // where spaces are written as '.', the prefix is 4.
-  // def x =
-  // ...."""
-  // ....asdf
-  // ......asdf
-  //     """
-  size_t multiline_string_whitespace_prefix = 0;
-
   ctx_t nest() const {
     ctx_t copy = *this;
     copy.nest_level++;
@@ -96,12 +86,6 @@ struct ctx_t {
     return copy;
   }
 
-  ctx_t prefix(size_t len) {
-    ctx_t copy = *this;
-    copy.multiline_string_whitespace_prefix = len;
-    return copy;
-  }
-
   ctx_t sub(const wcl::doc_builder& builder) const {
     ctx_t copy = *this;
     copy.state = state + *builder;
@@ -113,8 +97,7 @@ struct ctx_t {
 
   bool operator==(const ctx_t& other) const {
     return state == other.state && nest_level == other.nest_level &&
-           explode_option == other.explode_option && nested_binop == other.nested_binop &&
-           multiline_string_whitespace_prefix == other.multiline_string_whitespace_prefix;
+           explode_option == other.explode_option && nested_binop == other.nested_binop;
   }
 };
 
@@ -191,7 +174,6 @@ struct std::hash<ctx_t> {
     auto hash = wcl::hash_combine(std::hash<wcl::doc_state>{}(ctx.state),
                                   std::hash<size_t>{}(ctx.nest_level));
     hash = wcl::hash_combine(hash, std::hash<ExplodeOption>{}(ctx.explode_option));
-    hash = wcl::hash_combine(hash, std::hash<size_t>{}(ctx.multiline_string_whitespace_prefix));
     return wcl::hash_combine(hash, std::hash<bool>{}(ctx.nested_binop));
   }
 };
