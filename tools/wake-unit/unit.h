@@ -27,6 +27,7 @@
 
 #include "json/json5.h"
 #include "util/term.h"
+#include "wcl/tracing.h"
 
 // Represents an error message to display to the user
 struct ErrorMessage {
@@ -90,6 +91,7 @@ struct TestLogger {
     err->predicate_error << term_normal() << ", but was found to be ";
     err->predicate_error << term_colour(TERM_MAGENTA) << actual_str;
     err->predicate_error << term_normal() << std::endl;
+    wcl::log::info("expected `%s` to be %s but found %s", cond_str, expected_str, actual_str)();
     return fail(*err, assert);
   }
 
@@ -107,6 +109,8 @@ struct TestLogger {
       err->predicate_error << term_normal() << "\nBut actual vector length was:\n\t";
       err->predicate_error << term_colour(TERM_MAGENTA) << actual.size();
       err->predicate_error << term_normal() << std::endl;
+      wcl::log::info("expected vector length of %zu but actual length was %zu", expected.size(),
+                     actual.size())();
       return fail(*err, assert);
     }
 
@@ -127,6 +131,8 @@ struct TestLogger {
         err->predicate_error << term_normal() << "But:\n\t" << term_colour(TERM_MAGENTA) << "("
                              << expected_str << ")[" << i << "] = " << expected[i] << "\n";
         err->predicate_error << term_normal() << std::endl;
+        wcl::log::info("expected %s and %s to be equal: but (%s)[%zu] != (%s)[%zu]", expected_str,
+                       actual_str, actual_str, i, expected_str, i)();
         return fail(*err, assert);
       }
     }
@@ -149,6 +155,8 @@ struct TestLogger {
       err->predicate_error << term_normal() << "\nBut actual vector length was:\n\t";
       err->predicate_error << term_colour(TERM_MAGENTA) << actual;
       err->predicate_error << term_normal() << std::endl;
+      wcl::log::info("expected vector length of %zu but actual length was %zu", expected.size(),
+                     actual.size())();
       return fail(*err, assert);
     }
 
@@ -166,6 +174,8 @@ struct TestLogger {
         err->predicate_error << term_normal() << "\nBut were found to differ at index " << i
                              << "\n";
         err->predicate_error << term_normal() << std::endl;
+        wcl::log::info("expected %s and %s to be equal, but differ at index %zu", expected_str,
+                       actual_str, i)();
         return fail(*err, assert);
       }
     }
@@ -185,6 +195,7 @@ struct TestLogger {
     err->predicate_error << term_normal() << "\nBut got:\n\t";
     err->predicate_error << term_colour(TERM_MAGENTA) << actual;
     err->predicate_error << term_normal() << std::endl;
+    wcl::log::info("expected %d but got %d at %s:%d", expected, actual, file, line)();
     return fail(*err, assert);
   }
 
@@ -200,6 +211,7 @@ struct TestLogger {
     err->predicate_error << term_normal() << "\nBut got:\n\t";
     err->predicate_error << term_colour(TERM_MAGENTA) << actual;
     err->predicate_error << term_normal() << std::endl;
+    wcl::log::info("expected %zu but got %zu at %s:%d", expected, actual, file, line)();
     return fail(*err, assert);
   }
 
@@ -215,6 +227,7 @@ struct TestLogger {
     err->predicate_error << term_normal() << "\nBut got:\n\t";
     err->predicate_error << term_colour(TERM_MAGENTA) << actual;
     err->predicate_error << term_normal() << std::endl;
+    wcl::log::info("expected %ld but got %ld at %s:%d", expected, actual, file, line)();
     return fail(*err, assert);
   }
 
@@ -234,6 +247,8 @@ struct TestLogger {
     err->predicate_error << "(" << actual.size() << ")" << term_colour(TERM_MAGENTA) << '"'
                          << json_escape(actual) << '"';
     err->predicate_error << term_normal() << std::endl;
+    wcl::log::info("expected %s but got %s at %s:%d", json_escape(expected).c_str(),
+                   json_escape(actual).c_str(), file, line)();
     return fail(*err, assert);
   }
 
@@ -254,6 +269,9 @@ struct TestLogger {
     err->predicate_error << "(" << actual.size() << ")" << term_colour(TERM_MAGENTA) << '"'
                          << json_escape(actual) << '"';
     err->predicate_error << term_normal() << std::endl;
+
+    wcl::log::info("expected %s but got %s at %s:%d", json_escape(expected).c_str(),
+                   json_escape(actual).c_str(), file, line)();
     return fail(*err, assert);
   }
 
@@ -270,9 +288,13 @@ struct TestLogger {
     err->predicate_error << term_normal() << " to be equal to `";
     err->predicate_error << term_colour(TERM_MAGENTA) << actual_str;
     err->predicate_error << "`" << term_normal() << ", but was found to differ";
+    wcl::log::info("expected `%s` == `%s` but was false at %s:%d", expected_str, actual_str, file,
+                   line)();
     return fail(*err, assert);
   }
 };
+
+#define NUM_ERRORS() (logger__.errors.size())
 
 // Public:
 #define EXPECT_TRUE(cond) (logger__.expect(false, true, (cond), #cond, __LINE__, __FILE__))
@@ -285,14 +307,14 @@ struct TestLogger {
 using TestFunc = void (*)(TestLogger&);
 
 struct TestRegister {
-  TestRegister(const char* test_name, TestFunc test);
+  TestRegister(const char* test_name, TestFunc test, std::initializer_list<const char*> tags);
 };
 
 #define TEST_FUNC(ret_type, name, ...) static ret_type name(TestLogger& logger__, __VA_ARGS__)
 
 #define TEST_FUNC_CALL(func, ...) func(logger__, __VA_ARGS__)
 
-#define TEST(name)                                                \
-  static void Test__##name(TestLogger&);                          \
-  static TestRegister Test__Unique__##name(#name, &Test__##name); \
+#define TEST(name, ...)                                                          \
+  static void Test__##name(TestLogger&);                                         \
+  static TestRegister Test__Unique__##name(#name, &Test__##name, {__VA_ARGS__}); \
   static void Test__##name(TestLogger& logger__)

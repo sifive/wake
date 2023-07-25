@@ -26,9 +26,11 @@
 DiagnosticReporter* reporter;
 
 struct Test {
-  const char* test_name;
+  std::string test_name;
   TestFunc test;
-  Test(const char* test_name_, TestFunc test_) : test_name(test_name_), test(test_) {}
+  std::set<std::string> tags;
+  Test(const char* test_name_, TestFunc test_, std::set<std::string> tags)
+      : test_name(test_name_), test(test_), tags(tags) {}
 };
 
 // A global list of all the tests to run. Its kept static so that
@@ -41,23 +43,55 @@ static std::vector<Test>* get_tests() {
   return &tests;
 }
 
-TestRegister::TestRegister(const char* test_name, TestFunc test) {
-  get_tests()->emplace_back(test_name, test);
+TestRegister::TestRegister(const char* test_name, TestFunc test,
+                           std::initializer_list<const char*> tags) {
+  std::set<std::string> test_tags;
+  for (const auto* tag : tags) {
+    test_tags.emplace(tag);
+  }
+  get_tests()->emplace_back(test_name, test, std::move(test_tags));
+}
+
+//
+bool matches_prefix(const std::vector<std::string>& prefixes, const Test& test) {
+  // If there are no prefixes, everything matches
+  if (prefixes.empty()) return true;
+
+  // Otherwise at least one of the prefixes should match.
+  for (const auto& prefix : prefixes) {
+    if (test.test_name.find(prefix) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool matches_tags(const std::set<std::string>& tags, const Test& test) {
+  // In order for a test to match the tags, its tags must be a subset of
+  // of the tags the user specified. This prevents tests tagged with "large"
+  // from running unless the user specifies the "large" tag
+  for (const auto& tag : test.tags) {
+    if (tags.count(tag) == 0) {
+      return false;
+    }
+  }
+  return true;
 }
 
 int main(int argc, char** argv) {
   bool no_color = false;
-  if (argc > 2) {
-    std::cerr << "Too many arguments to be valid, --no-color is the only valid argument";
-    return 1;
-  }
-  if (argc == 2) {
-    if (strcmp(argv[1], "--no-color") == 0)
+  std::vector<std::string> prefixes;
+  std::set<std::string> tags;
+  for (int i = 1; i < argc; ++i) {
+    const char* arg = argv[i];
+    if (strcmp(arg, "--no-color") == 0) {
       no_color = true;
-    else {
-      std::cerr << "`" << argv[1]
-                << "` is not a valid argument, --no-color is the only valid option";
-      return 1;
+    }
+    if (strcmp(arg, "--prefix") == 0) {
+      prefixes.emplace_back(argv[++i]);
+    }
+    if (strcmp(arg, "--tag") == 0) {
+      tags.emplace(argv[++i]);
     }
   }
   term_init(true, true);
@@ -67,13 +101,15 @@ int main(int argc, char** argv) {
   for (auto& test : *get_tests()) {
     // Set this logjump in case this test fails
     size_t num_errors = logger.errors.size();
-    logger.test_name = test.test_name;
+    logger.test_name = test.test_name.c_str();
     if (setjmp(logger.return_jmp_buffer)) {
       // Now that we've made it in here we know that a test has assert failed.
       // We still want to keep running all the other tests however so we keep going.
       // The failure will be logged so we can catch it later.
       continue;
     }
+    if (!matches_prefix(prefixes, test)) continue;
+    if (!matches_tags(tags, test)) continue;
     // If this returns then we won't long jump
     test.test(logger);
     if (num_errors == logger.errors.size()) passing_tests.emplace(test.test_name);

@@ -1,11 +1,16 @@
+#include <json/json5.h>
+#include <sched.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <wcl/filepath.h>
+#include <wcl/tracing.h>
 
 #include <fstream>
 #include <future>
 #include <map>
 #include <random>
+#include <set>
 #include <sstream>
 #include <thread>
 #include <vector>
@@ -293,6 +298,75 @@ struct Pool {
   }
 };
 
+template <class F>
+bool run_as_init_proc(F f) {
+  // We're going to unshare some namespaces but this can mess with later
+  // things that spawn threads so we want to fork first to isolate
+  int pid_wrapper = fork();
+
+  if (pid_wrapper == -1) {
+    wcl::log::error("run_as_init_proc: fork failure: %s", strerror(errno))();
+    return false;
+  }
+
+  // We wait for the child to return here
+  if (pid_wrapper != 0) {
+    int status = 0;
+    if (waitpid(pid_wrapper, &status, 0) != pid_wrapper) {
+      wcl::log::error("run_as_init_proc: waitpid(): %s", strerror(errno))();
+      return false;
+    }
+  
+    // Relay errors up to the top
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+      return true;
+    }
+    return false;
+  }
+  
+  // Now that we're in an isolated child, we unshare our namespaces
+  if (unshare(CLONE_NEWUSER | CLONE_NEWPID) != 0) {
+    wcl::log::error("unshare(CLONE_NEW_USER | CLONE_NEWPID): %s", strerror(errno))();
+    exit(1);
+  }
+
+  // Now the next child we create will be the init process for that namespace.
+  int pid = fork();
+
+  if (pid == -1) {
+    wcl::log::error("run_as_init_proc: fork failure: %s", strerror(errno))();
+    exit(1);
+  }
+
+  // In the child process we just want to run the function.
+  // We assure the user that the code executed by f() will be
+  // executed as the init process of its own namespace.
+  if (pid == 0) {
+    int retcode = f();
+    wcl::log::info("exiting process: retcode = %d", retcode)();
+    exit(retcode);
+  }
+
+  // We now need to wait on f() to finish to simulate this interface
+  // as being sync
+  int status = 0;
+  if (waitpid(pid, &status, 0) != pid) {
+    wcl::log::error("run_as_init_proc: waitpid(): %s", strerror(errno))();
+    exit(1);
+  }
+
+  // Relay the errors up to the top
+  if (WIFEXITED(status)) {
+    exit(WEXITSTATUS(status));
+  }
+  exit(2);
+}
+
+void signal_and_wait(pid_t pid, int sig, int us) {
+  kill(pid, sig);
+  usleep(us);
+}
+
 TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, wcl::xoshiro_256 gen) {
   Pool<TestJob> job_pool;
 
@@ -311,13 +385,128 @@ TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, wcl::xoshiro_256 gen) {
         std::ifstream t(wcl::join_paths(out_dir, file.path));
         std::stringstream buffer;
         buffer << t.rdbuf();
-        ASSERT_EQUAL(buffer.str(), file.content);
+        // NOTE: We avoid asserting because it causes wild things to happen
+        // when we use fuzz_many_with_ns because it causes child processes
+        // to long jump back to main and exit.
+        EXPECT_EQUAL(buffer.str(), file.content);
       }
     } else {
       auto add_job_request = job.generate_add_request(config.dir);
       cache.add(add_job_request);
     }
   }
+}
+
+TEST_FUNC(void, fuzz_many_with_ns, int num_procs, const FuzzLoopConfig& config,
+          wcl::xoshiro_256 gen) {
+  // This will look a bit odd because some of the logs will be from outside the pid namespace
+  // and some will be from inside the pid namespace but we'll just have to deal with that.
+  std::ofstream log_file("wake.log", std::ios::app);
+  wcl::log::subscribe(std::make_unique<JsonSubscriber>(log_file.rdbuf()));
+
+  // Note that there will be processes in the o
+  bool result = run_as_init_proc([&]() -> int {
+    // We want to keep a certain number of processes
+    // unkilled, we call these procs "immune"
+    std::set<pid_t> immune_procs;
+    for (int i = 0; i < num_procs; ++i) {
+      pid_t pid = fork();
+      if (pid == -1) {
+        wcl::log::error("fuzz_many_with_ns: fork failure: %s", strerror(errno))();
+        return 1;
+      }
+
+      if (pid == 0) {
+        wcl::log::info("test proc was forked!")();
+        // We need to construct a different generator so the jobs aren't stomping on each other
+        TEST_FUNC_CALL(fuzz_loop, config, wcl::xoshiro_256(wcl::xoshiro_256::get_rng_seed()));
+        wcl::log::info("process exiting naturally: num_errors = %d", (int)NUM_ERRORS())();
+        exit(NUM_ERRORS() != 0);
+      }
+      if (i <= num_procs / 2) {
+        immune_procs.insert(pid);
+      }
+    }
+
+    // Now we need to loop over children and randomly kill the
+    // the non-immune ones. We should exit once we have no children
+    // left.
+    bool child_found = false;
+    while (child_found) {
+      child_found = false;
+      auto proc_dir = wcl::directory_range::open("/proc");
+      if (!proc_dir) {
+        wcl::log::error("unable to open /proc")();
+        return 1;
+      }
+
+      // This loop is the chaos monkey that randomly tampers with processes
+      for (const auto& entry : *proc_dir) {
+        if (!entry) {
+          wcl::log::error("entry error in /proc: %s", strerror(entry.error()))();
+          return 1;
+        }
+        // Only the entries that are numbers are processes
+        if (entry->name.size() == 0) continue;
+        if (!isdigit(entry->name[0])) continue;
+        wcl::log::info("checking on pid = %s", entry->name.c_str())();
+        pid_t pid = std::stoi(entry->name);
+
+        // We should see ourselves in this namespace, and we are process 1
+        // so skip ourselves
+        if (pid == 1) continue;
+
+        switch (gen() & 3) {
+          case 0:
+            break;
+          case 1:
+            if (!immune_procs.count(pid)) signal_and_wait(pid, SIGKILL, 5000);
+            break;
+          case 2:
+            // If there's only one process left running, we don't want to keep pausing it,
+            // otherwise we'll never make progress.
+            if (!child_found) break;
+            signal_and_wait(pid, SIGSTOP, 1000);
+            signal_and_wait(pid, SIGCONT, 0);
+            break;
+          case 3:
+            if (!immune_procs.count(pid)) signal_and_wait(pid, SIGTERM, 5000);
+            break;
+        }
+
+        // Lastly we want to end the loop once we don't have any more processes running
+        child_found = true;
+      }
+    }
+
+    // Now we need to collect the status of all the jobs. We had each job exit 0 if it
+    // found no errors so we'll check that here.
+    while (true) {
+      int status = 0;
+      pid_t pid = waitpid(-1, &status, 0);
+      if (pid == -1 && errno == ECHILD) {
+        wcl::log::error("no more children! return 0")();
+        return 0;
+      }
+      if (pid == -1) {
+        wcl::log::error("fuzz_many_ns: waitpid: %s", strerror(errno))();
+        return 1;
+      }
+      if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+        wcl::log::error("fuzz_many_ns: process with pid = %d, exited with retcode = %d", pid,
+                        WEXITSTATUS(status))();
+        return 1;
+      }
+      if (!WIFEXITED(status)) {
+        wcl::log::info("pid = %d had a non-exit waitpid event", pid)();
+      } else {
+        wcl::log::info("pid = %d exited with return code 0", pid)();
+      }
+    }
+  });
+
+  // This is a very low-information problem unfortunately,
+  ASSERT_TRUE(result) << "choas testing for shared cache failed: check logs for issues";
 }
 
 TEST(job_cache_basic_fuzz) {
@@ -332,40 +521,51 @@ TEST(job_cache_basic_fuzz) {
   TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
 }
 
+TEST(job_cache_par_chaos_fuzz, "pid-namespace") {
+  wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
+  FuzzLoopConfig config;
+  config.max_path_size = 16;
+  config.max_out = 5;
+  config.max_vis = 5;
+  config.number_of_steps = 10000;
+  config.cache_dir = ".job_cache_test_chaos";
+  config.dir = "job_cache_test_chaos";
+  TEST_FUNC_CALL(fuzz_many_with_ns, 20, config, std::move(gen));
+}
+
 // This test appears to work but it takes quite a long time and
 // causes a lot of filesystem churn. Just test this on your own
 // occasionally as a debugging/repro tool for those kinds of issues.
-/*
-TEST(job_cache_large_message_fuzz) {
+
+TEST(job_cache_large_message_fuzz, "large") {
   wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
   FuzzLoopConfig config;
   config.max_path_size = 200;
   config.max_out = 16000;
   config.max_vis = 16000;
   config.number_of_steps = 100;
-  config.cache_dir = ".job_cache_test";
-  config.dir = "job_cache_test";
+  config.cache_dir = ".job_cache_test_large";
+  config.dir = "job_cache_test_large";
   TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
-}*/
+}
 
 // This test appears to work but it takes *FOREVER* and doesn't represent
 // a very likely case. Still it might be worth running this on your own
 // sometimes to make sure everything is working well
-/*
-TEST(job_cache_huge_message_fuzz) {
+
+TEST(job_cache_huge_message_fuzz, "huge") {
   wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
   FuzzLoopConfig config;
   config.max_path_size = 3500;
   config.max_out = 100000;
   config.max_vis = 100000;
   config.number_of_steps = 20;
-  config.cache_dir = ".job_cache_test";
-  config.dir = "job_cache_test";
+  config.cache_dir = ".job_cache_test_huge";
+  config.dir = "job_cache_test_huge";
   TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
 }
-*/
 
-TEST(job_cache_basic_par_fuzz) {
+TEST(job_cache_basic_par_fuzz, "threaded") {
   FuzzLoopConfig config;
   config.max_path_size = 16;
   config.max_out = 5;
@@ -394,8 +594,7 @@ TEST(job_cache_basic_par_fuzz) {
 }
 
 // This test should work but it takes quite a long time.
-/*
-TEST(job_cache_large_par_fuzz) {
+TEST(job_cache_large_par_fuzz, "large") {
   FuzzLoopConfig config;
   config.max_path_size = 16;
   config.max_out = 5;
@@ -422,4 +621,3 @@ TEST(job_cache_large_par_fuzz) {
     if (fut.valid()) fut.wait();
   }
 }
-*/

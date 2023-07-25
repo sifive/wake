@@ -7,7 +7,6 @@ PASSED:
   diff_empty
   diff_fuzz1
   diff_fuzz2
-  diff_fuzz2_large
   diff_fuzz3
   diff_id
   diff_permute

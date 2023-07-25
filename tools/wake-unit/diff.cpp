@@ -213,7 +213,7 @@ TEST(diff_fuzz2) {
 // also increases the probability of finding a snag.
 // This also doubles as a santity check to ensure that
 // we aren't doing too bad on performance.
-TEST(diff_fuzz2_large) {
+TEST(diff_fuzz2_large, "large") {
   // seed the rng for fuzzing
   uint64_t seedV = 0xdeadbeefdeadbeef;
   std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> seed = {seedV, seedV, seedV, seedV};
