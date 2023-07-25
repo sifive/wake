@@ -79,7 +79,7 @@ wake --fd:3="foo,info" mywakecode 3>foo_and_info.txt
 ### Log Headers
 
 Each logging stream can optionally emit with a log header. See the
-"Configuring Wake" section of the [README](https://github.com/sifive/wake/README.md?plain=1#L140)
+"Configuring Wake" section of the [README](https://github.com/sifive/wake/blob/master/README.md#configuring-wake)
 for more info.
 
 ## What Gets Sent To Loggers
