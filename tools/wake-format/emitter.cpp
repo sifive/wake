@@ -1685,7 +1685,9 @@ wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
     }
 
     if (child.id() == CST_LITERAL) {
-      bdr.append(dispatch(ctx, child, [this, p = fsm.prefix.size()](ctx_t c, CSTElement n) { return walk_literal(c, n, p); }));
+      bdr.append(dispatch(ctx, child, [this, p = fsm.prefix.size()](ctx_t c, CSTElement n) {
+        return walk_literal(c, n, p);
+      }));
       continue;
     }
 
