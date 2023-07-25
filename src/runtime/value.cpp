@@ -25,6 +25,7 @@
 #include <re2/re2.h>
 #include <string.h>
 
+#include <algorithm>
 #include <sstream>
 
 #include "optimizer/ssa.h"
@@ -65,23 +66,24 @@ std::string HeapObject::to_str() const {
   return str.str();
 }
 
-String::String(size_t length_) : length(length_) {}
+String::String(size_t length_) : length(length_) {
+  char *str = static_cast<char *>(data());
+  std::fill(str, str + length + 1, 0);
+}
 
 String::String(const String &s) : length(s.length) { memcpy(data(), s.data(), length + 1); }
+String::String(const char *str, size_t length) : length(length) { memcpy(data(), str, length + 1); }
 
 String *String::claim(Heap &h, size_t length) {
   return new (h.claim(reserve(length))) String(length);
 }
 
 String *String::claim(Heap &h, const std::string &str) {
-  String *out = claim(h, str.size());
-  memcpy(out->c_str(), str.c_str(), str.size() + 1);
-  return out;
+  return new (h.claim(reserve(str.size()))) String(str.c_str(), str.size());
 }
 
 String *String::claim(Heap &h, const char *str, size_t length) {
-  auto out = claim(h, length);
-  memcpy(out->c_str(), str, length);
+  String *out = new (h.claim(reserve(length))) String(str, length);
   out->c_str()[length] = 0;
   return out;
 }
@@ -91,24 +93,16 @@ String *String::alloc(Heap &h, size_t length) {
 }
 
 String *String::alloc(Heap &h, const std::string &str) {
-  String *out = alloc(h, str.size());
-  memcpy(out->data(), str.c_str(), str.size() + 1);
-  return out;
+  return new (h.alloc(reserve(str.size()))) String(str.c_str(), str.size());
 }
 
 String *String::alloc(Heap &h, const char *str, size_t length) {
-  String *out = alloc(h, length);
-  memcpy(out->c_str(), str, length);
+  String *out = new (h.alloc(reserve(length))) String(str, length);
   out->c_str()[length] = 0;
   return out;
 }
 
-String *String::alloc(Heap &h, const char *str) {
-  size_t size = strlen(str);
-  String *out = alloc(h, size);
-  memcpy(out->data(), str, size + 1);
-  return out;
-}
+String *String::alloc(Heap &h, const char *str) { return alloc(h, str, strlen(str)); }
 
 RootPointer<String> String::literal(Heap &h, const std::string &value) {
   h.guarantee(reserve(value.size()));

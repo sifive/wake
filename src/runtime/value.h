@@ -76,7 +76,7 @@ struct String final : public GCObject<String, Value> {
 
   size_t length;
 
-  String(size_t length_);
+  String(const char *str, size_t length);
   String(const String &s);
 
   const char *c_str() const { return static_cast<const char *>(data()); }
@@ -134,6 +134,9 @@ struct String final : public GCObject<String, Value> {
 
   // Never call this during runtime! It can invalidate the heap.
   static RootPointer<String> literal(Heap &h, const std::string &value);
+
+ private:
+  explicit String(size_t length_);
 };
 
 // An exception-safe wrapper for mpz_t
