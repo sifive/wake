@@ -1,0 +1,8 @@
+
+def _ =
+    # wake-format off
+    """
+        if %{x}; then
+            %{x}
+        fi
+    """

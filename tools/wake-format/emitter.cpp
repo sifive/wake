@@ -1666,17 +1666,17 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
+
+  ctx = ctx.binop();
+
   MultiLineStringIndentationFSM fsm;
+  wcl::doc_builder bdr;
 
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
     if (child.id() == CST_LITERAL) {
       fsm.accept(child);
     }
   }
-
-  ctx = ctx.binop();
-
-  wcl::doc_builder bdr;
 
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
     if (!child.isNode()) {
@@ -1685,11 +1685,11 @@ wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
     }
 
     if (child.id() == CST_LITERAL) {
-      bdr.append(walk_literal(ctx, child, fsm.prefix.size()));
+      bdr.append(dispatch(ctx, child, [this, p = fsm.prefix.size()](ctx_t c, CSTElement n) { return walk_literal(c, n, p); }));
       continue;
     }
 
-    bdr.append(walk_node(ctx, child));
+    bdr.append(dispatch(ctx, child, [this](ctx_t c, CSTElement n) { return walk_node(c, n); }));
   }
 
   MEMO_RET(std::move(bdr).build());
