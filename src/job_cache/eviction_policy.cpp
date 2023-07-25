@@ -238,6 +238,9 @@ static void garbage_collect_job(std::string job_dir) {
   auto dir_res = wcl::directory_range::open(job_dir);
   if (!dir_res) {
     // We can keep going even with this failure but we need to at least log it
+    if (dir_res.error() == ENOENT) {
+      return;
+    }
     wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
                     job_dir.c_str(), strerror(dir_res.error()))();
     return;

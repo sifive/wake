@@ -26,13 +26,20 @@
 #include "util/location.h"
 #include "wcl/optional.h"
 #include "wcl/tracing.h"
+#include "wcl/unique_fd.h"
 
 class JsonSubscriber : public wcl::log::Subscriber {
  private:
-  std::ostream s;
+  wcl::unique_fd to_append;
+
+  explicit JsonSubscriber(wcl::unique_fd &&f) : to_append(std::move(f)) {}
 
  public:
-  JsonSubscriber(std::streambuf *rdbuf) : s(rdbuf) {}
+  JsonSubscriber(const JsonSubscriber &) = delete;
+  JsonSubscriber(JsonSubscriber &&) = default;
+  JsonSubscriber() = delete;
+  static wcl::result<JsonSubscriber, wcl::posix_error_t> create(const char *log_path);
+
   void receive(const wcl::log::Event &e) override;
   ~JsonSubscriber() override{};
 };

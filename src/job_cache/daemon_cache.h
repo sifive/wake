@@ -50,8 +50,6 @@ class DaemonCache {
   std::unordered_map<int, MessageParser> message_parsers;
   bool exit_now = false;
 
-  std::unique_ptr<std::ofstream> log_file;
-
   void launch_evict_loop();
   void reap_evict_loop();
 
