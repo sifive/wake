@@ -48,8 +48,12 @@ enum class ExplodeOption {
 struct ctx_t {
   size_t nest_level = 0;
   wcl::doc_state state = wcl::doc_state::identity();
-
   ExplodeOption explode_option = ExplodeOption::Allow;
+
+  // A badly named variable used to determine if | and $ are forced to newline
+  // Roughtly correlates to the notion of nested inside of something or not as
+  // a human would judge it.
+  // TODO: Find a better name and rename this.
   bool nested_binop = false;
 
   ctx_t nest() const {
@@ -169,6 +173,7 @@ struct std::hash<ctx_t> {
   size_t operator()(ctx_t const& ctx) const noexcept {
     auto hash = wcl::hash_combine(std::hash<wcl::doc_state>{}(ctx.state),
                                   std::hash<size_t>{}(ctx.nest_level));
-    return wcl::hash_combine(hash, std::hash<ExplodeOption>{}(ctx.explode_option));
+    hash = wcl::hash_combine(hash, std::hash<ExplodeOption>{}(ctx.explode_option));
+    return wcl::hash_combine(hash, std::hash<bool>{}(ctx.nested_binop));
   }
 };
