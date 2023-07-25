@@ -1378,3 +1378,13 @@ def test =
                 asdf
                 test
     """
+
+def x = 
+        if (y == 1) then
+            Pass Unit
+        else
+            failWithError """
+                asdf
+                foo
+                bar
+            """
