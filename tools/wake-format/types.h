@@ -47,10 +47,24 @@ enum class ExplodeOption {
 
 struct ctx_t {
   size_t nest_level = 0;
-  size_t prefix_length = 0;
   wcl::doc_state state = wcl::doc_state::identity();
   ExplodeOption explode_option = ExplodeOption::Allow;
+
+  // A badly named variable used to determine if | and $ are forced to newline
+  // Roughtly correlates to the notion of nested inside of something or not as
+  // a human would judge it.
+  // TODO: Find a better name and rename this.
   bool nested_binop = false;
+
+  // The length of the whitespace in a multiline string line
+  // which is not part of the actual string. In the example below
+  // where spaces are written as '.', the prefix is 4.
+  // def x =
+  // ...."""
+  // ....asdf
+  // ......asdf
+  //     """
+  size_t multiline_string_whitespace_prefix = 0;
 
   ctx_t nest() const {
     ctx_t copy = *this;
@@ -84,7 +98,7 @@ struct ctx_t {
 
   ctx_t prefix(size_t len) {
     ctx_t copy = *this;
-    copy.prefix_length = len;
+    copy.multiline_string_whitespace_prefix = len;
     return copy;
   }
 
@@ -100,7 +114,7 @@ struct ctx_t {
   bool operator==(const ctx_t& other) const {
     return state == other.state && nest_level == other.nest_level &&
            explode_option == other.explode_option && nested_binop == other.nested_binop &&
-           prefix_length == other.prefix_length;
+           multiline_string_whitespace_prefix == other.multiline_string_whitespace_prefix;
   }
 };
 
@@ -177,7 +191,7 @@ struct std::hash<ctx_t> {
     auto hash = wcl::hash_combine(std::hash<wcl::doc_state>{}(ctx.state),
                                   std::hash<size_t>{}(ctx.nest_level));
     hash = wcl::hash_combine(hash, std::hash<ExplodeOption>{}(ctx.explode_option));
-    hash = wcl::hash_combine(hash, std::hash<size_t>{}(ctx.prefix_length));
+    hash = wcl::hash_combine(hash, std::hash<size_t>{}(ctx.multiline_string_whitespace_prefix));
     return wcl::hash_combine(hash, std::hash<bool>{}(ctx.nested_binop));
   }
 };

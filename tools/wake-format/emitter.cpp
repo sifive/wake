@@ -1701,10 +1701,10 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_LITERAL, node, "Expected CST_LITERAL");
 
-  // walk_interpolate will set prefix_length when multiple
+  // walk_interpolate will set the prefix length when multiple
   // literals are interpolated, but if we aren't interpolated
   // we may still need to determine the prefix_length
-  std::string::size_type prefix_length = ctx.prefix_length;
+  std::string::size_type prefix_length = ctx.multiline_string_whitespace_prefix;
   if (prefix_length == 0 && (node.firstChildElement().id() == TOKEN_MSTR_BEGIN ||
                              node.firstChildElement().id() == TOKEN_MSTR_RESUME ||
                              node.firstChildElement().id() == TOKEN_LSTR_BEGIN ||
