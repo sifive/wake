@@ -1,5 +1,6 @@
 #include <json/json5.h>
 #include <sched.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -325,8 +326,8 @@ bool run_as_init_proc(F f) {
   }
 
   // Now that we're in an isolated child, we unshare our namespaces
-  if (unshare(CLONE_NEWUSER | CLONE_NEWPID) != 0) {
-    wcl::log::error("unshare(CLONE_NEW_USER | CLONE_NEWPID): %s", strerror(errno))();
+  if (unshare(CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWPID) != 0) {
+    wcl::log::error("unshare(CLONE_NEW_USER | CLONE_NEWNS | CLONE_NEWPID): %s", strerror(errno))();
     exit(1);
   }
 
@@ -342,6 +343,12 @@ bool run_as_init_proc(F f) {
   // We assure the user that the code executed by f() will be
   // executed as the init process of its own namespace.
   if (pid == 0) {
+    // mount a new proc filesystem in the init process
+    if (mount("proc", "/proc", "proc", 0, nullptr) == -1) {
+      wcl::log::error("mount(proc): %s", strerror(errno))();
+      exit(1);
+    }
+
     int retcode = f();
     wcl::log::info("exiting process: retcode = %d", retcode)();
     exit(retcode);
