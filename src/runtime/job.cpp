@@ -1535,7 +1535,9 @@ static PRIMTYPE(type_job_desc) {
 static PRIMFN(prim_job_desc) {
   EXPECT(1);
   JOB(arg0, 0);
-  RETURN(String::alloc(runtime.heap, pretty_cmd(arg0->cmdline->as_str())));
+  std::string desc =
+      arg0->label->empty() ? pretty_cmd(arg0->cmdline->as_str()) : arg0->label->as_str();
+  RETURN(String::alloc(runtime.heap, desc));
 }
 
 static PRIMTYPE(type_job_finish) {
