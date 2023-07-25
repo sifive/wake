@@ -20,7 +20,8 @@ and a display format (color and intensity).
 ## Using & Creating Loggers
 
 `wake` has a number of built in loggers in which all start with `log...`.
-You can also make your own logger using `mkLogLevel`.
+You can also make your own `LogLevel` tuple, but you cannot set the
+color/intensity for such a logger.
 You can use this to redirect wake output to a dedicated stream which can
 later be filtered on.
 
