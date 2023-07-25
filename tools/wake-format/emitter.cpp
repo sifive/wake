@@ -1716,6 +1716,7 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
    .pred(TOKEN_MSTR_CONTINUE, fmt().token(TOKEN_MSTR_CONTINUE).token(TOKEN_NL))
    .pred(TOKEN_LSTR_PAUSE, fmt().token(TOKEN_LSTR_PAUSE))
    .pred(TOKEN_MSTR_PAUSE, fmt().token(TOKEN_MSTR_PAUSE))
+   .pred(TOKEN_NL, fmt().token(TOKEN_NL))
    // otherwise: fail
   );
 
@@ -1758,7 +1759,7 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
      .pred(TOKEN_MSTR_RESUME, fmt().token(TOKEN_MSTR_RESUME).token(TOKEN_NL))
      // otherwise: fail
     )
-    .nest(multiline_string_loop)
+    .join(multiline_string_loop)
     .fmt_if(TOKEN_LSTR_END, fmt().next().freshline().lit(wcl::doc::lit("%\"")))
     .fmt_if(TOKEN_MSTR_END, fmt().next().freshline().lit(wcl::doc::lit("\"\"\"")));
   // clang-format on
