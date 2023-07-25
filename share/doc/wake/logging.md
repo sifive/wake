@@ -20,8 +20,7 @@ and a display format (color and intensity).
 ## Using & Creating Loggers
 
 `wake` has a number of built in loggers in which all start with `log...`.
-You can also make your own `LogLevel` tuple, but you cannot set the
-color/intensity for such a logger.
+You can also make your own `LogLevel` tuple.
 You can use this to redirect wake output to a dedicated stream which can
 later be filtered on.
 
@@ -77,6 +76,13 @@ These can be concatenated with commas and include the normal log levels, so to c
 ```
 wake --fd:3="foo,info" mywakecode 3>foo_and_info.txt
 ```
+### Log Headers
+
+Each logging stream will emit with a log header by default.
+This is configured via a wake config setting `log_header`.
+This can be disabled with `"log_header": ""` in your wake
+config file, or with `--log-header` on the command line. The options are
+
 
 ## What Gets Sent To Loggers
 
