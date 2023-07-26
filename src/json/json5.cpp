@@ -156,7 +156,7 @@ wcl::result<JsonSubscriber, wcl::posix_error_t> JsonSubscriber::create(const cha
 }
 
 void JsonSubscriber::receive(const wcl::log::Event &e) {
-  std::string warning_msg = "{\"message\": \"warning: The next line may be split\"}\n";
+  std::string warning_msg = "{\"message\": \"warning: The next line may be corrupted\"}\n";
   JAST out(JSON_OBJECT);
   for (const auto &item : e.items) {
     out.add(item.first, item.second);
