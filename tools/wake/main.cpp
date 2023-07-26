@@ -325,9 +325,10 @@ int main(int argc, char **argv) {
   // Initialize Wake logging subsystem
 
   // Log all events to wake.log
-  auto res = JsonSubscriber::create("wake.log");
+  auto res = JsonSubscriber::fd_t::open("wake.log");
   if (!res) {
-    std::cerr << "Unable to init logging: " << strerror(res.error()) << std::endl;
+    std::cerr << "Unable to init logging: wake.log failed to open: " << strerror(res.error())
+              << std::endl;
     return 1;
   }
   wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*res)));

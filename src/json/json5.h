@@ -29,16 +29,17 @@
 #include "wcl/unique_fd.h"
 
 class JsonSubscriber : public wcl::log::Subscriber {
- private:
-  wcl::unique_fd to_append;
+ public:
+  using fd_t = wcl::precise_unique_fd<O_APPEND | O_CREAT | O_WRONLY, 0644>;
 
-  explicit JsonSubscriber(wcl::unique_fd &&f) : to_append(std::move(f)) {}
+ private:
+  fd_t to_append;
 
  public:
+  explicit JsonSubscriber(fd_t f) : to_append(std::move(f)) {}
   JsonSubscriber(const JsonSubscriber &) = delete;
   JsonSubscriber(JsonSubscriber &&) = default;
   JsonSubscriber() = delete;
-  static wcl::result<JsonSubscriber, wcl::posix_error_t> create(const char *log_path);
 
   void receive(const wcl::log::Event &e) override;
   ~JsonSubscriber() override{};

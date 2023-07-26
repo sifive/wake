@@ -86,4 +86,29 @@ class unique_fd {
   }
 };
 
+template <int flags, mode_t mode>
+class precise_unique_fd {
+ private:
+  unique_fd fd;
+
+  precise_unique_fd(unique_fd&& fd) : fd(std::move(fd)) {}
+
+ public:
+  precise_unique_fd(precise_unique_fd&&) = default;
+  precise_unique_fd(const precise_unique_fd&) = delete;
+  precise_unique_fd() = delete;
+
+  static result<precise_unique_fd, posix_error_t> open(const char* str) {
+    auto fd = unique_fd::open(str, flags, mode);
+    if (!fd) {
+      return make_error<precise_unique_fd, posix_error_t>(fd.error());
+    }
+    return make_result<precise_unique_fd, posix_error_t>(precise_unique_fd(std::move(*fd)));
+  }
+
+  int get() const { return fd.get(); }
+
+  bool valid() const { return fd.valid(); }
+};
+
 }  // namespace wcl

@@ -59,14 +59,15 @@ static void initialize_logging() {
   strftime(time_buffer, sizeof(time_buffer), str_fmt, &tm);
   std::string log_path = ".cache." + std::string(time_buffer) + ".log";
 
-  auto sub_res = JsonSubscriber::create(log_path.c_str());
-  if (!sub_res) {
-    std::cerr << "urgent warning: Could not init logging: " << strerror(sub_res.error())
-              << std::endl;
+  auto log_file_res = JsonSubscriber::fd_t::open(log_path.c_str());
+
+  if (!log_file_res) {
+    std::cerr << "urgent warning: Could not init logging: " << log_path
+              << " failed to open: " << strerror(log_file_res.error()) << std::endl;
     std::cerr << "urgent warning: Continuing without logging." << std::endl;
     return;
   }
-  wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*sub_res)));
+  wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*log_file_res)));
 
   wcl::log::info("Initialized logging for job cache daemon")();
 

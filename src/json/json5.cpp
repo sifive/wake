@@ -147,14 +147,6 @@ std::ostream &operator<<(std::ostream &os, const JAST &jast) {
   }
 }
 
-wcl::result<JsonSubscriber, wcl::posix_error_t> JsonSubscriber::create(const char *log_path) {
-  auto res = wcl::unique_fd::open(log_path, O_APPEND | O_CREAT | O_WRONLY, 0644);
-  if (!res) {
-    return wcl::make_error<JsonSubscriber, wcl::posix_error_t>(res.error());
-  }
-  return wcl::make_result<JsonSubscriber, wcl::posix_error_t>(JsonSubscriber(std::move(*res)));
-}
-
 void JsonSubscriber::receive(const wcl::log::Event &e) {
   std::string warning_msg = "{\"message\": \"warning: The next line may be corrupted\"}\n";
   JAST out(JSON_OBJECT);
