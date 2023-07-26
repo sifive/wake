@@ -408,8 +408,9 @@ TEST_FUNC(void, fuzz_many_with_ns, int num_procs, const FuzzLoopConfig& config,
           wcl::xoshiro_256 gen) {
   // This will look a bit odd because some of the logs will be from outside the pid namespace
   // and some will be from inside the pid namespace but we'll just have to deal with that.
-  std::ofstream log_file("wake.log", std::ios::app);
-  wcl::log::subscribe(std::make_unique<JsonSubscriber>(log_file.rdbuf()));
+  auto res = JsonSubscriber::fd_t::open("wake.log");
+  ASSERT_TRUE((bool)res) << "Unable to init logging: wake.log failed to open: " << strerror(res.error());
+  wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*res)));
 
   // Note that there will be processes in the o
   bool result = run_as_init_proc([&]() -> int {
