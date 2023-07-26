@@ -237,6 +237,11 @@ static void garbage_collect_job(std::string job_dir) {
   wcl::log::info("found orphaned job folder: %s", job_dir.c_str())();
   auto dir_res = wcl::directory_range::open(job_dir);
   if (!dir_res) {
+    // It's not an error if this directory doesn't exist
+    if (dir_res.error() == ENOENT) {
+      return;
+    }
+
     // We can keep going even with this failure but we need to at least log it
     wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
                     job_dir.c_str(), strerror(dir_res.error()))();

@@ -47,7 +47,7 @@ namespace {
 
 using namespace job_cache;
 
-static std::unique_ptr<std::ofstream> initialize_logging() {
+static void initialize_logging() {
   const char *str_fmt = "%Y-%m-%d";
   const size_t str_fmt_len = 10;         // count("XXXX-XX-XX")
   const size_t filename_prefix_len = 7;  // count (".cache.")
@@ -59,16 +59,22 @@ static std::unique_ptr<std::ofstream> initialize_logging() {
   strftime(time_buffer, sizeof(time_buffer), str_fmt, &tm);
   std::string log_path = ".cache." + std::string(time_buffer) + ".log";
 
-  std::unique_ptr<std::ofstream> log_file =
-      std::make_unique<std::ofstream>(log_path, std::ios::app);
-  wcl::log::subscribe(std::make_unique<JsonSubscriber>(log_file->rdbuf()));
+  auto log_file_res = JsonSubscriber::fd_t::open(log_path.c_str());
+
+  if (!log_file_res) {
+    std::cerr << "urgent warning: Could not init logging: " << log_path
+              << " failed to open: " << strerror(log_file_res.error()) << std::endl;
+    std::cerr << "urgent warning: Continuing without logging." << std::endl;
+    return;
+  }
+  wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*log_file_res)));
 
   wcl::log::info("Initialized logging for job cache daemon")();
 
   auto res = wcl::directory_range::open(".");
   if (!res) {
     wcl::log::warning("Failed to open cwd to cleanup log files")();
-    return log_file;
+    return;
   }
 
   std::vector<std::string> to_delete;
@@ -108,7 +114,7 @@ static std::unique_ptr<std::ofstream> initialize_logging() {
     unlink(file.c_str());
   }
 
-  return log_file;
+  return;
 }
 
 // Helper that only returns successful file opens.
@@ -637,7 +643,7 @@ DaemonCache::DaemonCache(std::string dir, uint64_t max, uint64_t low)
   mkdir_no_fail(dir.c_str());
   chdir_no_fail(dir.c_str());
 
-  log_file = initialize_logging();
+  initialize_logging();
 
   wcl::log::info("Launching DaemonCache. dir = %s, max = %lu, low = %lu", dir.c_str(),
                  max_cache_size, low_cache_size)();

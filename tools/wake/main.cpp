@@ -325,9 +325,13 @@ int main(int argc, char **argv) {
   // Initialize Wake logging subsystem
 
   // Log all events to wake.log
-  std::ofstream log_file("wake.log", std::ios::app);
-  auto log_file_defer = wcl::make_defer([&log_file]() { log_file.close(); });
-  wcl::log::subscribe(std::make_unique<JsonSubscriber>(log_file.rdbuf()));
+  auto res = JsonSubscriber::fd_t::open("wake.log");
+  if (!res) {
+    std::cerr << "Unable to init logging: wake.log failed to open: " << strerror(res.error())
+              << std::endl;
+    return 1;
+  }
+  wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*res)));
 
   // Log urgent events to cerr
   auto cerr_subscriber = std::make_unique<wcl::log::SimpleFormatSubscriber>(std::cerr.rdbuf());

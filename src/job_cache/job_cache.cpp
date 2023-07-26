@@ -301,7 +301,7 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
     // the case where no error has yet occured but messages is still empty.
   } while (state == MessageParserState::Continue);
 
-  wcl::log::info("Cache::read(): message rx: %s", messages[0].c_str())();
+  wcl::log::info("Cache::read(): message rx")();
 
   JAST json;
   std::stringstream parseErrors;

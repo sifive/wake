@@ -21,6 +21,9 @@
 
 #include "json5.h"
 
+#include <memory>
+#include <sstream>
+
 #include "wcl/optional.h"
 #include "wcl/tracing.h"
 
@@ -145,10 +148,18 @@ std::ostream &operator<<(std::ostream &os, const JAST &jast) {
 }
 
 void JsonSubscriber::receive(const wcl::log::Event &e) {
+  std::string warning_msg = "{\"message\": \"warning: The next line may be corrupted\"}\n";
   JAST out(JSON_OBJECT);
   for (const auto &item : e.items) {
     out.add(item.first, item.second);
   }
 
-  s << out << std::endl;
+  std::stringstream ss;
+  ss << out << std::endl;
+  std::string line = ss.str();
+
+  if (line.size() > 4095) {
+    write(to_append.get(), warning_msg.data(), warning_msg.size());
+  }
+  write(to_append.get(), line.data(), line.size());
 }
