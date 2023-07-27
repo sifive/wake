@@ -30,6 +30,8 @@
 
 #include "job_cache.h"
 #include "message_parser.h"
+#include "message_sender.h"
+#include "job_cache_impl_common.h"
 
 namespace job_cache {
 
@@ -46,8 +48,9 @@ class DaemonCache {
   uint64_t low_cache_size;
   std::string key;
   int listen_socket_fd;
-  Poll poll;
+  EPoll poll;
   std::unordered_map<int, MessageParser> message_parsers;
+  std::unordered_map<int, MessageSender> message_senders;
   bool exit_now = false;
 
   void launch_evict_loop();
@@ -59,7 +62,8 @@ class DaemonCache {
   void close_client(int client_fd);
 
   void handle_new_client();
-  void handle_msg(int fd);
+  void handle_read_msg(int fd);
+  void handle_write(int fd);
 
  public:
   ~DaemonCache();

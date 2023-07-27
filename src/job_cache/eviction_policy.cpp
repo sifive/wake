@@ -243,8 +243,8 @@ static void garbage_collect_job(std::string job_dir) {
     }
 
     // We can keep going even with this failure but we need to at least log it
-    wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
-                    job_dir.c_str(), strerror(dir_res.error()))();
+    //wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
+    //                job_dir.c_str(), strerror(dir_res.error()))();
     return;
   }
 
@@ -275,8 +275,8 @@ static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int64_
   auto dir_res = wcl::directory_range::open(group_dir);
   if (!dir_res) {
     // We can keep going even with this failure but we need to at least log it
-    wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
-                    group_dir.c_str(), strerror(dir_res.error()))();
+    //wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
+    //                group_dir.c_str(), strerror(dir_res.error()))();
     return;
   }
 
@@ -367,7 +367,8 @@ LRUEvictionPolicy::~LRUEvictionPolicy() {}
 int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> policy) {
   policy->init(cache_dir);
 
-  MessageParser msg_parser(STDIN_FILENO);
+  // Famous last words "a timeout of a year is plenty"
+  MessageParser msg_parser(STDIN_FILENO, 60 * 60 * 24 * 30 * 12);
   MessageParserState state;
   do {
     std::vector<std::string> msgs;

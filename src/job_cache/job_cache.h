@@ -47,11 +47,12 @@ enum class FindJobError {
   NoResponse,
   TooManyResponses,
   FailedParseResponse,
+  Timeout,
+  CouldNotConnect,
 };
 
 class Cache {
  private:
-  wcl::unique_fd socket_fd;
   bool miss_on_failure = false;
 
   // Daemon parameters
@@ -60,7 +61,7 @@ class Cache {
   uint64_t low_threshold;
 
   void launch_daemon();
-  wcl::optional<ConnectError> backoff_try_connect(int attempts);
+  wcl::result<wcl::unique_fd, ConnectError> backoff_try_connect(int attempts);
   wcl::result<FindJobResponse, FindJobError> read_impl(const FindJobRequest &find_request);
 
  public:

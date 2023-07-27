@@ -28,18 +28,30 @@
 
 namespace job_cache {
 
-enum class MessageParserState { Continue, StopSuccess, StopFail };
+enum class MessageParserState { Continue, StopSuccess, StopFail, Timeout };
 
+// Message parser acts sort of like a Rust future, it holds the state
+// needed to keep reading from a fd even if it would block. This can be
+// be thought of as dual to MessageSender. MessageParser will read as many
+// messages as it can until it receives EAGAIN/EWOULDBLOCK. This means that
+// you *must* use non-blocking IO with it. It can be used with either edge
+// triggered or level triggered events.
 struct MessageParser {
   std::string message_buff = "";
   int fd;
+  time_t deadline;
 
   MessageParser() = delete;
-  MessageParser(int fd) : fd(fd) {}
+  MessageParser(int fd, uint64_t timeout) : fd(fd), deadline(time(nullptr) + timeout) {}
 
   MessageParserState read_messages(std::vector<std::string>& messages) {
     messages = {};
 
+    time_t now = time(nullptr);
+    if (now > deadline) {
+      return MessageParserState::Timeout;    
+    }
+      
     while (true) {
       uint8_t buffer[4096] = {};
       ssize_t count = read(fd, static_cast<void*>(buffer), 4096);
@@ -55,13 +67,19 @@ struct MessageParser {
         // as equivlient to a close which would normally appear as the count == 0
         // case above.
         if (errno == ECONNRESET) return MessageParserState::StopSuccess;
-        // There are some failures that could occur that just require us to retry.
-        // EINTR could occur on any fd type but EAGAIN and EWOULDBLOCK should
-        // only occur if the user gave us a non-blocking socket.
-        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue;
+        // On EINTR we should just retry until we get EAGAIN/EWOULDBLOCK
+        if (errno == EINTR) {
+          continue;
+        }
+        // If we hit EAGAIN/EWOULDBLOCK then we might have more work to do but
+        // we can't do that work just yet and need to continue.
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return MessageParserState::Continue;
+
         return MessageParserState::StopFail;
       }
 
+      // Here we split this up
       uint8_t* iter = buffer;
       uint8_t* buffer_end = buffer + count;
       while (iter < buffer_end) {
@@ -73,18 +91,10 @@ struct MessageParser {
         }
         iter = end + 1;
       }
-
-      // If we get less than 4096 bytes we want to assume that the messages
-      // are done and exit. If however we still haven't received a full message
-      // yet, we want to keep going until the fd is closed. If we have a message
-      // to return however lets return and process that instead.
-      if (count < 4096 && messages.size() != 0) {
-        return MessageParserState::Continue;
-      }
     }
 
     // not actually reachable
-    return MessageParserState::Continue;
+    return MessageParserState::StopFail;
   }
 };
 

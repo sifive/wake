@@ -32,6 +32,7 @@
 #include <wcl/tracing.h>
 #include <wcl/unique_fd.h>
 #include <wcl/xoshiro_256.h>
+#include <util/poll.h>
 
 #include <ctime>
 #include <fstream>
@@ -41,6 +42,7 @@
 #include "eviction_policy.h"
 #include "job_cache_impl_common.h"
 #include "message_parser.h"
+#include "message_sender.h"
 #include "types.h"
 
 namespace {
@@ -663,26 +665,51 @@ int DaemonCache::run() {
     wcl::log::info("Exiting run loop.")();
   });
 
-  poll.add(listen_socket_fd);
+  poll.add(listen_socket_fd, EPOLLIN);
+  uint32_t no_events_sec_counter = 0;
   while (!exit_now) {
-    // recieve and process messages
+    // While the daemon exits after 10 minutes,
+    // we only have our epoll timeout set at
+    // 5 seconds. This is to ensure that we can
+    // hit all of our timeout deadlines to within
+    // 5 seconds.
     struct timespec wait_until;
-    wait_until.tv_sec = 60 * 10;
+    wait_until.tv_sec = 5;    
     wait_until.tv_nsec = 0;
+    wcl::log::info("daemon: Waiting on an event")();
+    auto events = poll.wait(&wait_until, nullptr);
+    wcl::log::info("received %zu events!", events.size())();
 
-    auto fds = poll.wait(&wait_until, nullptr);
-
-    if (fds.empty() && message_parsers.empty()) {
-      wcl::log::info("No initial connection for 10 mins, exiting.")();
-      return 0;
+    if (events.empty()) {
+      no_events_sec_counter += wait_until.tv_sec;
+      if (wait_until.tv_sec >= 10 * 60) {
+        wcl::log::info("No events for 10 minutes, exiting.")();
+        return 0;
+      }
     }
 
-    for (int fd : fds) {
-      if (fd == listen_socket_fd) {
+    for (auto event : events) {
+      // The only events we check for on the listen socket
+      // are accepting new connections
+      if (event.data.fd == listen_socket_fd) {
+        wcl::log::info("processing listen socket event!")();
         handle_new_client();
-      } else {
-        handle_msg(fd);
+        continue;
       }
+  
+      // Check if this was a read event that we can handle
+      if (event.events & EPOLLIN) {
+        wcl::log::info("processing EPOLLIN event on %d", event.data.fd)();
+        handle_read_msg(event.data.fd);
+      }
+
+      // Check if we can write something again
+      if (event.events & EPOLLOUT) {
+        wcl::log::info("processing EPOLLOUT event on %d", event.data.fd)();
+        handle_write(event.data.fd);    
+      }
+
+      wcl::log::info("In case I missed this, unrecognized event on %d: events = %d", event.data.fd, event.events)();
     }
   }
 
@@ -1077,30 +1104,84 @@ void DaemonCache::reap_evict_loop() {
 DaemonCache::~DaemonCache() { reap_evict_loop(); }
 
 void DaemonCache::handle_new_client() {
-  // Accept the new client socket.
-  int accept_fd = accept4(listen_socket_fd, nullptr, nullptr, SOCK_CLOEXEC);
+  // Accept the new client socket. We accept as non-blocking so that we can
+  // do repeated reads/writes without being concerned we might block.
+  int accept_fd = accept4(listen_socket_fd, nullptr, nullptr, SOCK_CLOEXEC | SOCK_NONBLOCK);
   if (accept_fd == -1) {
     wcl::log::error("accept(%s): %s", key.c_str(), strerror(errno)).urgent()();
     exit(1);
   }
 
-  poll.add(accept_fd);
-  message_parsers.insert({accept_fd, MessageParser(accept_fd)});
+  // We want to be notified of both reads and writes, additionally
+  // we want to be edge triggered. With edge trigger comes the responsibility
+  // that we must do all reads/writes we're capable of
+  poll.add(accept_fd, EPOLLIN | EPOLLOUT | EPOLLET);
+  message_parsers.insert({accept_fd, MessageParser(accept_fd, 10)});
   wcl::log::info("new client connected: %d", accept_fd)();
 }
 
 void DaemonCache::close_client(int client_fd) {
   wcl::log::info("closing client fd = %d", client_fd)();
+  // We use edge-triggered, read+write+close events for each client
   poll.remove(client_fd);
   close(client_fd);
   message_parsers.erase(client_fd);
+  message_senders.erase(client_fd);
   if (message_parsers.empty()) {
-    exit_now = true;
-    wcl::log::info("All clients disconnected, exiting.")();
+    if (getenv("WAKE_SHARED_CACHE_FAST_CLOSE")) {
+      exit_now = true;
+    }
+    wcl::log::info("All clients disconnected.")();
   }
 }
 
-void DaemonCache::handle_msg(int client_fd) {
+void DaemonCache::handle_write(int client_fd) {
+  auto it = message_senders.find(client_fd);
+  if (it == message_senders.end()) {
+    wcl::log::info("handle_write(%d): avliable for write but we have nothing to write for it", client_fd)();
+    // Unlike with reading, the client is likely to be ready for us to write
+    // to them often but with reading we should never see a client that has
+    // a read avliable and not want to see the message.
+    return;  
+  }
+
+  MessageSender& sender = *&it->second;
+  wcl::log::info("handle_write(%d): Sending", client_fd)();
+  wcl::log::info("sender.data.size() == %zu", sender.data.size())();
+  wcl::log::info("sender.fd = %d", sender.fd)();
+  MessageSenderState state = sender.send();
+  wcl::log::info("handle_write(%d): Sent", client_fd)();
+
+  // This client might be deadlocked, do us both
+  // a favor and kill this connection
+  if (state == MessageSenderState::Timeout) {
+    wcl::log::error("client_fd = %d timed out on write", client_fd)();
+    close_client(client_fd);
+    return;
+  }
+
+  // If we have an error on write, close this client.
+  if (state == MessageSenderState::StopFail) {
+    wcl::log::error("write(%d): %s", client_fd, strerror(errno)).urgent()();
+    close_client(client_fd);
+    return;
+  }
+
+  // We need to wait a bit before we try again
+  if (state == MessageSenderState::Continue) {
+    wcl::log::info("handle_write(%d): Continuing write later", client_fd)();
+    return;    
+  }
+
+  // Once we've finished sending the message to the client,
+  // close the connection.
+  if (state == MessageSenderState::StopSuccess) {
+    wcl::log::info("handle_write(%d): All done writing, closing client", client_fd)();
+    close_client(client_fd);
+  }
+}
+
+void DaemonCache::handle_read_msg(int client_fd) {
   // In case multiple read events have been enqueued since the
   // last epoll_wait, we have to perform all the reads that
   // have been enqueued.
@@ -1128,34 +1209,59 @@ void DaemonCache::handle_msg(int client_fd) {
     if (json.get("method").value == "cache/read") {
       FindJobRequest req(json.get("params"));
       FindJobResponse res = read(req);
-      auto write_error = send_json_message(client_fd, res.to_json());
-      if (write_error) {
-        wcl::log::error("DaemonCache::handle_msg(): send_json_message(%d): %s", client_fd,
-                        strerror(*write_error))
-            .urgent()();
-        wcl::log::error(
-            "DaemonCache::handle_msg(): failed to send client a response, closing cleint")
-            .urgent()();
+      auto iter = message_senders.find(client_fd);
+      if (iter != message_senders.end()) {
+        // This means that there was already an incomplete message waiting
+        // to be sent. This is an error and must mean the client sent
+        // us two read messages without waiting on a response back from
+        // the first one. Let's get rid of this faulty client.
+        wcl::log::error("Tried to write a new message before another had completed. closing client_fd = %d", client_fd)();
         close_client(client_fd);
+        return;
       }
+
+      // Convert the json to a string with a null terminator
+      std::stringstream ss;
+      ss << res.to_json();
+      ss << '\0';
+
+      // Enqueue the writer so that it will be handled as needed, if it takes us longer than
+      // 10 seconds to send this message, this client is being annoying and we should close
+      // them.
+      wcl::log::info("Adding %d to message_senders queue", client_fd)();
+      MessageSender sender(ss.str(), client_fd, 10);
+      message_senders.emplace(client_fd, std::move(sender));
+
+      // The client was likely already ready for reading so we won't receive an edge-triggered
+      // notification that we can write to it unless we first fill the kernel buffer up. So
+      // we need to do as much writing as we can right now.
+      wcl::log::info("Kicking off first write for %d", client_fd)();
+      handle_write(client_fd);
     }
 
     if (json.get("method").value == "cache/add") {
       AddJobRequest req(json.get("params"));
       add(req);
+      close_client(client_fd);
     }
   }
 
   // If the file was closed, remove from epoll and close it.
-  if (state == MessageParserState::StopSuccess) {
-    close_client(client_fd);
-    return;
-  }
+  //if (state == MessageParserState::StopSuccess) {
+  //  close_client(client_fd);
+  //  return;
+  //}
 
   // If there's an error just fail.
   if (state == MessageParserState::StopFail) {
-    wcl::log::error("read(%d), key = %s:", client_fd, strerror(errno)).urgent()();
+    wcl::log::error("read(%d): %s", client_fd, strerror(errno)).urgent()();
     exit(1);
+  }
+
+  if (state == MessageParserState::Timeout) {
+    wcl::log::error("read(%d): timed out, closing client", client_fd)();
+    close_client(client_fd);
+    return;    
   }
 }
 

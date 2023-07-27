@@ -41,23 +41,48 @@
 #include <sys/epoll.h>
 #define EVENTS 512
 
+#include <wcl/tracing.h>
+
 struct Poll::detail {
   int pfd;
 };
 
-Poll::Poll() : imp(std::make_unique<Poll::detail>()) {
-  imp->pfd = epoll_create1(EPOLL_CLOEXEC);
-  if (imp->pfd == -1) {
-    perror("epoll_create1");
+EPoll::EPoll() {
+  epfd = epoll_create1(EPOLL_CLOEXEC);
+  if (epfd == -1) {
+    wcl::log::error("epoll_create1: %s", strerror(errno)).urgent()();
     exit(1);
   }
 }
 
+Poll::Poll() : imp(std::make_unique<Poll::detail>()) {
+  imp->pfd = epoll_create1(EPOLL_CLOEXEC);
+  if (imp->pfd == -1) {
+    wcl::log::error("epoll_create1: %s", strerror(errno)).urgent()();
+    exit(1);
+  }
+}
+
+EPoll::~EPoll() {
+  close(epfd);
+}
+
 Poll::~Poll() { close(imp->pfd); }
+
+void EPoll::add(int fd, uint32_t events) {
+  struct epoll_event ev;
+  ev.events = events;
+  ev.data.fd = fd;
+
+  if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == -1) {
+    wcl::log::error("epoll_ctl(EPOLL_CTL_ADD): %s", strerror(errno)).urgent()();
+    exit(1);
+  }
+}
 
 void Poll::add(int fd) {
   struct epoll_event ev;
-  ev.events = POLLIN;
+  ev.events = EPOLLIN;
   ev.data.fd = fd;
 
   if (epoll_ctl(imp->pfd, EPOLL_CTL_ADD, fd, &ev) == -1) {
@@ -66,10 +91,18 @@ void Poll::add(int fd) {
   }
 }
 
-void Poll::remove(int fd) {
+void EPoll::remove(int fd) {
+  // epoll_event is ignored on EPOLL_CTL_DEL
   struct epoll_event ev;
-  ev.events = POLLIN;
-  ev.data.fd = fd;
+  if (epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &ev) == -1) {
+    wcl::log::error("epoll_ctl(EPOLL_CTL_DEL): %s", strerror(errno)).urgent()();
+    exit(1);
+  }
+}
+
+void Poll::remove(int fd) {
+  // epoll_event is ignored on EPOLL_CTL_DEL
+  struct epoll_event ev;
 
   if (epoll_ctl(imp->pfd, EPOLL_CTL_DEL, fd, &ev) == -1) {
     perror("epoll_ctl(EPOLL_CTL_DEL)");
@@ -84,6 +117,31 @@ void Poll::clear() {
     perror("epoll_create1");
     exit(1);
   }
+}
+
+
+std::vector<epoll_event> EPoll::wait(struct timespec *timeout, sigset_t *saved) {
+  struct epoll_event events[EVENTS];
+  int ptimeout;
+
+  if (timeout) {
+    ptimeout = timeout->tv_sec * 1000 + (timeout->tv_nsec + 999999) / 1000000;
+  } else {
+    ptimeout = -1;
+  }
+
+  int nfds = epoll_pwait(epfd, &events[0], EVENTS, ptimeout, saved);
+  if (nfds == -1 && errno != EINTR) {
+    wcl::log::error("epoll_pwait: %s", strerror(errno)).urgent()();
+    exit(1);
+  }
+
+  std::vector<epoll_event> ready;
+  if (nfds > 0) {
+    for (int i = 0; i < nfds; ++i) ready.push_back(events[i]);
+  }
+
+  return ready;
 }
 
 std::vector<int> Poll::wait(struct timespec *timeout, sigset_t *saved) {

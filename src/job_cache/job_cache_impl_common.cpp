@@ -38,6 +38,10 @@
 #include "wcl/tracing.h"
 #include "wcl/unique_fd.h"
 #include "wcl/xoshiro_256.h"
+#include "util/poll.h"
+
+#include "message_parser.h"
+#include "message_sender.h"
 
 // moves the file or directory, crashes on error
 void rename_no_fail(const char *old_path, const char *new_path) {
@@ -234,7 +238,7 @@ void remove_job_backing_files(const std::string &dir, int64_t job_id) {
   std::string job_dir = wcl::join_paths(dir, wcl::to_hex(&group_id), std::to_string(job_id));
   auto dir_range = wcl::directory_range::open(job_dir);
   if (!dir_range) {
-    wcl::log::error("opendir(%s): %s", job_dir.c_str(), strerror(dir_range.error())).urgent()();
+    //wcl::log::error("opendir(%s): %s", job_dir.c_str(), strerror(dir_range.error())).urgent()();
     exit(1);
   }
 
@@ -296,28 +300,86 @@ void remove_backing_files(std::string dir,
   }
 }
 
-wcl::optional<wcl::posix_error_t> send_json_message(int fd, const JAST &json) {
+namespace job_cache {
+
+wcl::result<std::vector<std::string>, SyncMessageReadError> sync_read_message(int fd, uint64_t timeout_seconds) {
+  EPoll epoll;
+  epoll.add(fd, EPOLLIN);
+  MessageParser parser(fd, timeout_seconds);
+
+  std::vector<std::string> out;
+
+  while (true) {
+    // Timeout the epoll after 1 second so that
+    // we can uphold the timeout accuracy to within 1 second
+    struct timespec timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_nsec = 0;
+    wcl::log::info("client: waiting for EPOLLIN event on %d", fd)();
+    epoll.wait(&timeout, nullptr);
+    wcl::log::info("client: EPOLLIN event occured on %d", fd)();
+
+    std::vector<std::string> messages;
+    auto state = parser.read_messages(messages);
+
+    for (auto& message : messages) {
+      out.emplace_back(std::move(message));
+    }
+
+    // Note that we don't stop reading on this connection until its closed so we expect
+    // the other side to close it for us when they're done sending messages.
+    if (state == MessageParserState::StopSuccess) {
+      return wcl::make_result<std::vector<std::string>, SyncMessageReadError>(std::move(out));
+    }
+
+    if (state == MessageParserState::StopFail) {
+      wcl::log::error("client: read(%d): %s", fd, strerror(errno))();
+      return wcl::make_error<std::vector<std::string>, SyncMessageReadError>(SyncMessageReadError::Fail);
+    }
+
+    if (state == MessageParserState::Timeout) {
+      wcl::log::error("client: read(%d): timed out", fd)();
+      return wcl::make_error<std::vector<std::string>, SyncMessageReadError>(SyncMessageReadError::Timeout);
+    }
+  }
+}
+
+wcl::optional<wcl::posix_error_t> sync_send_json_message(int fd, const JAST &json, uint64_t timeout_seconds) {
   std::stringstream s;
   s << json;
   std::string json_str = s.str();
   json_str += '\0';
 
-  size_t start = 0;
-  while (start < json_str.size()) {
-    int res = write(fd, json_str.data() + start, json_str.size() - start);
-    if (res == -1) {
-      // If we get interuppted by a signal, or we get hit by a block, retry.
-      // Today we don't use non-blocking sockets but when we did this was required.
-      // It's strictly more correct for the function to do this so we keep it.
-      if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
-        continue;
-      }
-      wcl::log::error("send_json_message: write(%d): %s", fd, strerror(errno)).urgent()();
+  EPoll epoll;
+  epoll.add(fd, EPOLLOUT);
+  MessageSender sender(std::move(json_str), fd, timeout_seconds);
+
+
+  while (true) {
+    // Timeout the epoll after 1 second so that
+    // we can uphold the timeout accuracy to within 1 second
+    struct timespec timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_nsec = 0;
+    wcl::log::info("client: waiting for EPOLLOUT event on %d", fd)();
+    epoll.wait(&timeout, nullptr);
+    wcl::log::info("client: EPOLLOUT event on %d occured!", fd)();
+    auto state = sender.send();
+    if (state == MessageSenderState::Timeout) {
+      wcl::log::error("client: write(%d): timed out", fd)();
+      return wcl::some(ETIME);
+    }
+    if (state == MessageSenderState::StopFail) {
+      wcl::log::error("client: write(%d): %s", fd, strerror(errno))();
       return wcl::make_some<wcl::posix_error_t>(errno);
     }
-
-    start += res;
+    if (state == MessageSenderState::StopSuccess) {
+      wcl::log::info("Finished writing: %s", s.str().c_str())();
+      return {};
+    }
   }
 
   return {};
+}
+
 }
