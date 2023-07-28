@@ -281,7 +281,7 @@ TEST(filepath_dir_range_basic) {
 
   auto touch_sym = [&](std::string entry) {
     std::string path = "test_dir/" + entry;
-    symlink("touch", path.c_str());
+    (void)symlink("touch", path.c_str());
     expected_type[entry] = wcl::file_type::symlink;
   };
 
