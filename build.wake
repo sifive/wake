@@ -154,11 +154,32 @@ def tarball Unit =
     # Identify those sources files to include in the tarball
     require Pass allSources = sources "." `.*`
 
-    def srcs =
+    def excludeGlobs =
+        "**/.gitignore",
+        ".circleci/**",
+        "debian/**",
+        ".github/**",
+        ".vscode/**",
+        ".clang-format",
+        ".dockerignore",
+        ".git-blame-ignore-revs",
+        ".gitattributes",
+        "wake.spec.in",
+
+    def regexes =
+        excludeGlobs
+        | map globToRegExp
+
+    def Pair rejects srcs =
         allSources
-        | filter (! matches `(debian/|wake.spec).*` _.getPathName) # omit packaging files
-        | filter (! matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
-        | filter (! matches `(.*/)*\.gitignore` _.getPathName) # omit git files
+        | splitBy (\x matchesAny regexes x.getPathName)
+
+    def _ =
+        def files = (rejects | map (\x (("  ", x.getPathName, Nil) | cat)))
+        def msg = "Files below are excluded from tarball", files
+
+        msg
+        | map (printlnLevel logInfo _)
 
     def Pair testPaths wakePaths = splitBy (matches `tests/.*` _.getPathName) srcs
 
