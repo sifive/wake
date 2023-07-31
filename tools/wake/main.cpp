@@ -200,7 +200,7 @@ int main(int argc, char **argv) {
   setrlimit(RLIMIT_CORE, &core_lim);
 
   // Get the start time for wake
-  auto start = std::chrono::steady_clock::now();
+  auto wake_start = std::chrono::steady_clock::now();
 
   TerminalReporter terminalReporter;
   reporter = &terminalReporter;
@@ -596,12 +596,12 @@ int main(int argc, char **argv) {
   std::string libdir = wcl::make_canonical(find_execpath() + "/../share/wake/lib");
   std::vector<std::string> wakefilenames;
   {
-    struct timeval start, stop;
-    gettimeofday(&start, 0);
+    auto start = std::chrono::steady_clock::now();
     wakefilenames = find_all_wakefiles(enumok, clo.workspace, clo.verbose, libdir, ".", user_warn);
-    gettimeofday(&stop, 0);
-    double delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
-    wcl::log::info("Find all wakefiles took %f seconds", delay)();
+    auto stop = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+    wcl::log::info("Find all wakefiles took %f seconds",
+                   static_cast<double>(duration) / 1000000.0)();
   }
 
   if (!enumok) {
@@ -614,12 +614,11 @@ int main(int argc, char **argv) {
   Runtime runtime(clo.profile ? &tree : nullptr, clo.profileh, heap_factor);
   bool sources = false;
   {
-    struct timeval start, stop;
-    gettimeofday(&start, 0);
+    auto start = std::chrono::steady_clock::now();
     sources = find_all_sources(runtime, clo.workspace);
-    gettimeofday(&stop, 0);
-    double delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
-    wcl::log::info("Find all sources took %f seconds", delay)();
+    auto stop = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+    wcl::log::info("Find all sources took %f seconds", static_cast<double>(duration) / 1000000.0)();
   }
 
   if (!sources) {
@@ -647,18 +646,17 @@ int main(int argc, char **argv) {
     bool is_stdout_tty = isatty(1);
     bool alerted_slow_cache = false;
 
-    struct timeval starttv, stop;
-    gettimeofday(&starttv, 0);
+    auto start = std::chrono::steady_clock::now();
 
     for (size_t i = 0; i < wakefilenames.size(); i++) {
       auto &wakefile = wakefilenames[i];
 
       auto now = std::chrono::steady_clock::now();
       if (!clo.quiet && is_stdout_tty &&
-          std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
+          std::chrono::duration_cast<std::chrono::milliseconds>(now - wake_start).count() > 1000) {
         std::cout << "Scanning " << i + 1 << "/" << wakefilenames.size() << " wake files.\r"
                   << std::flush;
-        start = now;
+        wake_start = now;
         alerted_slow_cache = true;
       }
 
@@ -690,9 +688,12 @@ int main(int argc, char **argv) {
         }
       }
     }
-    gettimeofday(&stop, 0);
-    double delay = (stop.tv_sec - starttv.tv_sec) + (stop.tv_usec - starttv.tv_usec) / 1000000.0;
-    wcl::log::info("Scanning wake files took %f seconds", delay)();
+
+    auto stop = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+    wcl::log::info("Scanning wake files took %f seconds",
+                   static_cast<double>(duration) / 1000000.0)();
+
     if (!clo.quiet && alerted_slow_cache && is_stdout_tty) {
       std::cout << "Scanning " << wakefilenames.size() << "/" << wakefilenames.size()
                 << " wake files.\r" << std::endl;
