@@ -594,8 +594,16 @@ int main(int argc, char **argv) {
 
   bool enumok = true;
   std::string libdir = wcl::make_canonical(find_execpath() + "/../share/wake/lib");
-  auto wakefilenames =
-      find_all_wakefiles(enumok, clo.workspace, clo.verbose, libdir, ".", user_warn);
+  std::vector<std::string> wakefilenames;
+  {
+    struct timeval start, stop;
+    gettimeofday(&start, 0);
+    wakefilenames = find_all_wakefiles(enumok, clo.workspace, clo.verbose, libdir, ".", user_warn);
+    gettimeofday(&stop, 0);
+    double delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+    wcl::log::info("Find all wakefiles took %f seconds", delay)();
+  }
+
   if (!enumok) {
     if (clo.verbose) std::cerr << "Workspace wake file enumeration failed" << std::endl;
     // Try to run the build anyway; if wake files are missing, it will fail later
@@ -604,7 +612,16 @@ int main(int argc, char **argv) {
 
   Profile tree;
   Runtime runtime(clo.profile ? &tree : nullptr, clo.profileh, heap_factor);
-  bool sources = find_all_sources(runtime, clo.workspace);
+  bool sources = false;
+  {
+    struct timeval start, stop;
+    gettimeofday(&start, 0);
+    sources = find_all_sources(runtime, clo.workspace);
+    gettimeofday(&stop, 0);
+    double delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+    wcl::log::info("Find all sources took %f seconds", delay)();
+  }
+
   if (!sources) {
     if (clo.verbose) std::cerr << "Source file enumeration failed" << std::endl;
     // Try to run the build anyway; if sources are missing, it will fail later
@@ -622,57 +639,64 @@ int main(int argc, char **argv) {
   std::vector<ExternalFile> wakefiles;
   wakefiles.reserve(wakefilenames.size());
 
-  bool alerted_slow_cache = false;
-  // While the slow cache alert is helpful, its also flakey.
-  // In order to support automated flows better we only emit it when
-  // a terminal is being used, which is a good indicator of a human
-  // using wake rather than an automated flow.
-  bool is_stdout_tty = isatty(1);
+  {
+    // While the slow cache alert is helpful, its also flakey.
+    // In order to support automated flows better we only emit it when
+    // a terminal is being used, which is a good indicator of a human
+    // using wake rather than an automated flow.
+    bool is_stdout_tty = isatty(1);
+    bool alerted_slow_cache = false;
 
-  for (size_t i = 0; i < wakefilenames.size(); i++) {
-    auto &wakefile = wakefilenames[i];
+    struct timeval starttv, stop;
+    gettimeofday(&starttv, 0);
 
-    auto now = std::chrono::steady_clock::now();
-    if (!clo.quiet && is_stdout_tty &&
-        std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
-      std::cout << "Scanning " << i + 1 << "/" << wakefilenames.size() << " wake files.\r"
-                << std::flush;
-      start = now;
-      alerted_slow_cache = true;
-    }
+    for (size_t i = 0; i < wakefilenames.size(); i++) {
+      auto &wakefile = wakefilenames[i];
 
-    if (clo.verbose && clo.debug) std::cerr << "Parsing " << wakefile << std::endl;
+      auto now = std::chrono::steady_clock::now();
+      if (!clo.quiet && is_stdout_tty &&
+          std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() > 1000) {
+        std::cout << "Scanning " << i + 1 << "/" << wakefilenames.size() << " wake files.\r"
+                  << std::flush;
+        start = now;
+        alerted_slow_cache = true;
+      }
 
-    wakefiles.emplace_back(terminalReporter, wakefile.c_str());
-    FileContent &file = wakefiles.back();
-    CST cst(file, terminalReporter);
-    auto package = dst_top(cst.root(), *top);
+      if (clo.verbose && clo.debug) std::cerr << "Parsing " << wakefile << std::endl;
 
-    // Does this file inform our choice of a default package?
-    size_t slash = wakefile.find_last_of('/');
-    std::string dir(wakefile, 0, slash == std::string::npos ? 0 : (slash + 1));  // "" | .+/
-    if (src_dir.compare(0, dir.size(), dir) == 0) {  // dir = prefix or parent of src_dir?
-      int dirlen = dir.size();
-      if (dirlen > longest_src_dir) {
-        longest_src_dir = dirlen;
-        top->def_package = package;
-        warned_conflict = false;
-      } else if (dirlen == longest_src_dir) {
-        if (top->def_package != package && !warned_conflict) {
-          std::cerr << "Directory " << (dir.empty() ? "." : dir.c_str())
-                    << " has wakefiles with both package '" << top->def_package << "' and '"
-                    << package << "'. This prevents default package selection;"
-                    << " defaulting to no package." << std::endl;
-          top->def_package = nullptr;
-          warned_conflict = true;
+      wakefiles.emplace_back(terminalReporter, wakefile.c_str());
+      FileContent &file = wakefiles.back();
+      CST cst(file, terminalReporter);
+      auto package = dst_top(cst.root(), *top);
+
+      // Does this file inform our choice of a default package?
+      size_t slash = wakefile.find_last_of('/');
+      std::string dir(wakefile, 0, slash == std::string::npos ? 0 : (slash + 1));  // "" | .+/
+      if (src_dir.compare(0, dir.size(), dir) == 0) {  // dir = prefix or parent of src_dir?
+        int dirlen = dir.size();
+        if (dirlen > longest_src_dir) {
+          longest_src_dir = dirlen;
+          top->def_package = package;
+          warned_conflict = false;
+        } else if (dirlen == longest_src_dir) {
+          if (top->def_package != package && !warned_conflict) {
+            std::cerr << "Directory " << (dir.empty() ? "." : dir.c_str())
+                      << " has wakefiles with both package '" << top->def_package << "' and '"
+                      << package << "'. This prevents default package selection;"
+                      << " defaulting to no package." << std::endl;
+            top->def_package = nullptr;
+            warned_conflict = true;
+          }
         }
       }
     }
-  }
-
-  if (!clo.quiet && alerted_slow_cache && is_stdout_tty) {
-    std::cout << "Scanning " << wakefilenames.size() << "/" << wakefilenames.size()
-              << " wake files.\r" << std::endl;
+    gettimeofday(&stop, 0);
+    double delay = (stop.tv_sec - starttv.tv_sec) + (stop.tv_usec - starttv.tv_usec) / 1000000.0;
+    wcl::log::info("Scanning wake files took %f seconds", delay)();
+    if (!clo.quiet && alerted_slow_cache && is_stdout_tty) {
+      std::cout << "Scanning " << wakefilenames.size() << "/" << wakefilenames.size()
+                << " wake files.\r" << std::endl;
+    }
   }
 
   if (clo.in) {
