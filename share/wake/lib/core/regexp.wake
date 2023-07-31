@@ -81,28 +81,6 @@ export def regExpToString (regExp: RegExp): String =
 export def matches (testRegExp: RegExp) (str: String): Boolean =
     (\_ \_ prim "match") testRegExp str
 
-# Test if a String matches all provided regular expressions
-# matchesAll (`a*`, `*b`) "ab" = True
-# matchesAll (`a*`, `*b`) "a" = False
-export def matchesAll (testRegExps: List RegExp) (str: String): Boolean = match testRegExps
-    Nil = True
-    head, tail =
-        if (matches head str) then
-            matchesAll tail str
-        else
-            False
-
-# Test if a String matches any provided regular expressions
-# matchesAny (`a*`, `*b`) "ac" = True
-# matchesAny (`a*`, `*b`) "c" = False
-export def matchesAny (testRegExps: List RegExp) (str: String) = match testRegExps
-    Nil = False
-    head, tail =
-        if (matches head str) then
-            True
-        else
-            matchesAny tail str
-
 # Extract fields out of a String using a parenthetical regular expression.
 # extract `(.*)-(.*)` "hello-world-hello" = ("hello", "world-hello", Nil)
 # extract `(.*)-(.*)` "helloworldhello" = Nil

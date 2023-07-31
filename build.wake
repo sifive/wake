@@ -166,13 +166,14 @@ def tarball Unit =
         ".gitattributes",
         "wake.spec.in",
 
-    def regexes =
+    def matchesAnyGlob path =
         excludeGlobs
         | map globToRegExp
+        | exists (matches _ path.getPathName)
 
     def Pair rejects srcs =
         allSources
-        | splitBy (\x matchesAny regexes x.getPathName)
+        | splitBy matchesAnyGlob
 
     def _ =
         def files = (rejects | map (\x (("  ", x.getPathName, Nil) | cat)))
