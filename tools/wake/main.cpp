@@ -599,9 +599,8 @@ int main(int argc, char **argv) {
     auto start = std::chrono::steady_clock::now();
     wakefilenames = find_all_wakefiles(enumok, clo.workspace, clo.verbose, libdir, ".", user_warn);
     auto stop = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-    wcl::log::info("Find all wakefiles took %f seconds",
-                   static_cast<double>(duration) / 1000000.0)();
+    auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(stop - start).count();
+    wcl::log::info("Find all wakefiles took %f seconds", duration)();
   }
 
   if (!enumok) {
@@ -617,8 +616,8 @@ int main(int argc, char **argv) {
     auto start = std::chrono::steady_clock::now();
     sources = find_all_sources(runtime, clo.workspace);
     auto stop = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-    wcl::log::info("Find all sources took %f seconds", static_cast<double>(duration) / 1000000.0)();
+    auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(stop - start).count();
+    wcl::log::info("Find all sources took %f seconds", duration)();
   }
 
   if (!sources) {
@@ -690,9 +689,8 @@ int main(int argc, char **argv) {
     }
 
     auto stop = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-    wcl::log::info("Scanning wake files took %f seconds",
-                   static_cast<double>(duration) / 1000000.0)();
+    auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(stop - start).count();
+    wcl::log::info("Scanning wake files took %f seconds", duration)();
 
     if (!clo.quiet && alerted_slow_cache && is_stdout_tty) {
       std::cout << "Scanning " << wakefilenames.size() << "/" << wakefilenames.size()
@@ -716,7 +714,7 @@ int main(int argc, char **argv) {
 
   if (!flatten_exports(*top)) ok = false;
 
-  std::vector<std::pair<std::string, std::string> > defs;
+  std::vector<std::pair<std::string, std::string>> defs;
   std::set<std::string> types;
 
   if (targets) {
