@@ -32,8 +32,8 @@ later be filtered on.
 | logInteractive    | "interactive" |
 | logReport         | "report"      |
 | logWarning        | "warning"     |
-| logError          |  "error"      |
-| logNever          |  "null"       |
+| logError          | "error"       |
+| logNever          | "null"        |
 | LogLevel "foo"    | "foo"         |
 | LogLevel "bar"    | "bar"         |
 
