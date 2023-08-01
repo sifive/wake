@@ -39,6 +39,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "compat/readable.h"
 #include "parser/wakefiles.h"
 #include "prim.h"
 #include "types/data.h"
@@ -283,8 +284,13 @@ bool find_all_sources(Runtime &runtime, bool workspace) {
   int flags, dirfd = open(".", O_RDONLY);
   if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1) fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
 
-  std::vector<std::string> sources = scan_git(dirfd);
-  std::sort(sources.begin(), sources.end());
+  std::vector<std::string> sources;
+
+  // Source discovery requires git
+  if (is_readable(".git")) {
+    sources = scan_git(dirfd);
+    std::sort(sources.begin(), sources.end());
+  }
 
   size_t need = Record::reserve(sources.size());
   for (auto &x : sources) need += String::reserve(x.size());
