@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -454,6 +455,108 @@ static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wake
   return output;
 }
 
+// TODO: share this with find_all_sources
+static std::string slurp(int dirfd, const char *const *argv, bool &fail) {
+  std::stringstream str;
+  char buf[4096];
+  int got, status, pipefd[2];
+  pid_t pid;
+
+  if (pipe(pipefd) == -1) {
+    fail = true;
+    fprintf(stderr, "Failed to open pipe %s\n", strerror(errno));
+  } else if ((pid = fork()) == 0) {
+    if (fchdir(dirfd) == -1) {
+      fprintf(stderr, "Failed to chdir: %s\n", strerror(errno));
+      exit(1);
+    }
+    close(pipefd[0]);
+    if (pipefd[1] != 1) {
+      dup2(pipefd[1], 1);
+      close(pipefd[1]);
+    }
+    execvp(argv[0], const_cast<char *const *>(argv));
+    fprintf(stderr, "Failed to execlp(git): %s\n", strerror(errno));
+    exit(1);
+  } else {
+    close(pipefd[1]);
+    while ((got = read(pipefd[0], buf, sizeof(buf))) > 0) str.write(buf, got);
+    if (got == -1) {
+      fprintf(stderr, "Failed to read from git: %s\n", strerror(errno));
+      fail = true;
+    }
+    close(pipefd[0]);
+    while (waitpid(pid, &status, 0) != pid) {
+    }
+    if (WIFSIGNALED(status)) {
+      fprintf(stderr, "Failed to reap git: killed by %d\n", WTERMSIG(status));
+      fail = true;
+    } else if (WEXITSTATUS(status)) {
+      fprintf(stderr, "Failed to reap git: exited with %d\n", WEXITSTATUS(status));
+      fail = true;
+    }
+  }
+  return str.str();
+}
+
+std::vector<std::string> find_external_stdlib_files(bool &ok, bool verbose,
+                                                    const std::string &libdir,
+                                                    FILE *user_warning_dest, const RE2 &exp) {
+  std::vector<std::string> libfiles;
+#ifdef __EMSCRIPTEN__
+  // clang-format off
+    int isNode = EM_ASM_INT({
+      return ENVIRONMENT_IS_NODE;
+    });
+  // clang-format on
+  if (isNode) {
+    if (push_files(libfiles, libdir, exp, 0, user_warning_dest)) ok = false;
+  } else {
+    if (push_packaged_stdlib_files(libfiles, exp, 0)) ok = false;
+  }
+#else
+  if (push_files(libfiles, libdir, exp, 0, user_warning_dest)) ok = false;
+#endif
+  std::sort(libfiles.begin(), libfiles.end());
+  return filter_wakefiles(std::move(libfiles), libdir, verbose);
+}
+
+std::vector<std::string> find_workspace_wakefiles_via_search(bool &ok, bool verbose,
+                                                             const std::string &workdir,
+                                                             FILE *user_warning_dest,
+                                                             const RE2 &exp) {
+  std::vector<std::string> workfiles;
+  if (push_files(workfiles, workdir, exp, 0, user_warning_dest)) ok = false;
+  std::sort(workfiles.begin(), workfiles.end());
+  return filter_wakefiles(std::move(workfiles), workdir, verbose);
+}
+
+std::vector<std::string> find_workspace_wakefiles_via_git(bool &ok, bool verbose,
+                                                          const std::string &workdir) {
+  std::vector<std::string> workfiles;
+
+  int dirfd = open(".", O_RDONLY);
+  static const char *fileArgs[] = {"git",    "ls-files", "--recurse-submodules", "-z", "--",
+                                   "*.wake", nullptr};
+  bool fail = false;
+  std::string fileStr(slurp(dirfd, &fileArgs[0], fail));
+  close(dirfd);
+  if (fail) {
+    ok = false;
+    return {};
+  }
+  const char *tok = fileStr.data();
+  const char *end = tok + fileStr.size();
+  for (const char *scan = tok; scan != end; ++scan) {
+    if (*scan == 0 && scan != tok) {
+      workfiles.emplace_back(tok);
+      tok = scan + 1;
+    }
+  }
+  std::sort(workfiles.begin(), workfiles.end());
+  return filter_wakefiles(std::move(workfiles), workdir, verbose);
+}
+
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose,
                                             const std::string &libdir, const std::string &workdir,
                                             FILE *user_warning_dest) {
@@ -464,30 +567,21 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
 
   std::vector<std::string> libfiles, workfiles;
 
-  std::string boolean = workdir + "/share/wake/lib/core/boolean.wake";
-  if (!workspace || !is_readable(boolean.c_str())) {
-#ifdef __EMSCRIPTEN__
-    // clang-format off
-    int isNode = EM_ASM_INT({
-      return ENVIRONMENT_IS_NODE;
-    });
-    // clang-format on
-    if (isNode) {
-      if (push_files(libfiles, libdir, exp, 0, user_warning_dest)) ok = false;
-    } else {
-      if (push_packaged_stdlib_files(libfiles, exp, 0)) ok = false;
-    }
-#else
-    if (push_files(libfiles, libdir, exp, 0, user_warning_dest)) ok = false;
-#endif
-    std::sort(libfiles.begin(), libfiles.end());
-    libfiles = filter_wakefiles(std::move(libfiles), libdir, verbose);
+  std::string boolean_path = workdir + "/share/wake/lib/core/boolean.wake";
+  bool workspace_contains_stdlib = workspace && is_readable(boolean_path.c_str());
+  if (!workspace_contains_stdlib) {
+    libfiles = find_external_stdlib_files(ok, verbose, libdir, user_warning_dest, exp);
   }
 
-  if (workspace) {
-    if (push_files(workfiles, workdir, exp, 0, user_warning_dest)) ok = false;
-    std::sort(workfiles.begin(), workfiles.end());
-    workfiles = filter_wakefiles(std::move(workfiles), workdir, verbose);
+  if (!workspace) {
+    return libfiles;
+  }
+
+  std::string git_path = workdir + "/.git";
+  if (is_readable(git_path.c_str())) {
+    workfiles = find_workspace_wakefiles_via_git(ok, verbose, workdir);
+  } else {
+    workfiles = find_workspace_wakefiles_via_search(ok, verbose, workdir, user_warning_dest, exp);
   }
 
   // Combine the two sorted vectors into one sorted vector
