@@ -29,6 +29,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <wcl/tracing.h>
 
 #include <algorithm>
 #include <chrono>
@@ -454,6 +455,77 @@ static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wake
   return output;
 }
 
+std::vector<std::string> find_external_stdlib_files(bool &ok, bool verbose,
+                                                    const std::string &libdir,
+                                                    FILE *user_warning_dest, const RE2 &exp) {
+  std::vector<std::string> libfiles;
+#ifdef __EMSCRIPTEN__
+  // clang-format off
+    int isNode = EM_ASM_INT({
+      return ENVIRONMENT_IS_NODE;
+    });
+  // clang-format on
+  if (isNode) {
+    if (push_files(libfiles, libdir, exp, 0, user_warning_dest)) ok = false;
+  } else {
+    if (push_packaged_stdlib_files(libfiles, exp, 0)) ok = false;
+  }
+#else
+  if (push_files(libfiles, libdir, exp, 0, user_warning_dest)) ok = false;
+#endif
+  std::sort(libfiles.begin(), libfiles.end());
+  return filter_wakefiles(std::move(libfiles), libdir, verbose);
+}
+
+std::vector<std::string> find_workspace_wakefiles_via_search(bool &ok, bool verbose,
+                                                             const std::string &workdir,
+                                                             FILE *user_warning_dest,
+                                                             const RE2 &exp) {
+  std::vector<std::string> workfiles;
+  if (push_files(workfiles, workdir, exp, 0, user_warning_dest)) ok = false;
+  std::sort(workfiles.begin(), workfiles.end());
+  return filter_wakefiles(std::move(workfiles), workdir, verbose);
+}
+
+std::vector<std::string> find_workspace_wakefiles_via_manifest(const std::string &manifest_path) {
+  std::vector<std::string> workfiles;
+  std::vector<std::string> unreadable_files;
+  DiagnosticIgnorer ignorer;
+  ExternalFile file(ignorer, manifest_path.c_str());
+  StringSegment segment = file.segment();
+  std::stringstream in;
+  in.write(reinterpret_cast<const char *>(segment.start), segment.size());
+
+  std::string line;
+  while (std::getline(in, line)) {
+    // strip trailing whitespace (including windows CR)
+    size_t found = line.find_last_not_of(" \t\f\v\n\r");
+    if (found != std::string::npos) {
+      line.erase(found + 1);
+    } else {
+      line.clear();  // entirely whitespace
+    }
+
+    // allow empty lines and comments
+    if (line == "" || line[0] == '#') continue;
+
+    if (is_readable(line.c_str())) {
+      workfiles.push_back(line);
+    } else {
+      unreadable_files.push_back(line);
+    }
+  }
+
+  for (const auto &file : unreadable_files) {
+    wcl::log::error("manifest file '%s' does not exist", file.c_str()).urgent()();
+  }
+
+  if (!unreadable_files.empty()) {
+    exit(1);
+  }
+
+  return workfiles;
+}
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose,
                                             const std::string &libdir, const std::string &workdir,
                                             FILE *user_warning_dest) {
@@ -464,30 +536,21 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
 
   std::vector<std::string> libfiles, workfiles;
 
-  std::string boolean = workdir + "/share/wake/lib/core/boolean.wake";
-  if (!workspace || !is_readable(boolean.c_str())) {
-#ifdef __EMSCRIPTEN__
-    // clang-format off
-    int isNode = EM_ASM_INT({
-      return ENVIRONMENT_IS_NODE;
-    });
-    // clang-format on
-    if (isNode) {
-      if (push_files(libfiles, libdir, exp, 0, user_warning_dest)) ok = false;
-    } else {
-      if (push_packaged_stdlib_files(libfiles, exp, 0)) ok = false;
-    }
-#else
-    if (push_files(libfiles, libdir, exp, 0, user_warning_dest)) ok = false;
-#endif
-    std::sort(libfiles.begin(), libfiles.end());
-    libfiles = filter_wakefiles(std::move(libfiles), libdir, verbose);
+  std::string boolean_path = workdir + "/share/wake/lib/core/boolean.wake";
+  bool workspace_contains_stdlib = workspace && is_readable(boolean_path.c_str());
+  if (!workspace_contains_stdlib) {
+    libfiles = find_external_stdlib_files(ok, verbose, libdir, user_warning_dest, exp);
   }
 
-  if (workspace) {
-    if (push_files(workfiles, workdir, exp, 0, user_warning_dest)) ok = false;
-    std::sort(workfiles.begin(), workfiles.end());
-    workfiles = filter_wakefiles(std::move(workfiles), workdir, verbose);
+  if (!workspace) {
+    return libfiles;
+  }
+
+  std::string manifest_path = workdir + "/.wakemanifest";
+  if (is_readable(manifest_path.c_str())) {
+    workfiles = find_workspace_wakefiles_via_manifest(manifest_path);
+  } else {
+    workfiles = find_workspace_wakefiles_via_search(ok, verbose, workdir, user_warning_dest, exp);
   }
 
   // Combine the two sorted vectors into one sorted vector
