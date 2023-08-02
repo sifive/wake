@@ -164,6 +164,7 @@ def tarball Unit =
         ".dockerignore",
         ".git-blame-ignore-revs",
         ".gitattributes",
+        ".wakemanifest",
         "wake.spec.in",
 
     def matchesAnyGlob path =
