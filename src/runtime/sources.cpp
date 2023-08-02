@@ -39,7 +39,6 @@
 #include <iostream>
 #include <sstream>
 
-#include "compat/readable.h"
 #include "parser/wakefiles.h"
 #include "prim.h"
 #include "types/data.h"
@@ -287,7 +286,8 @@ bool find_all_sources(Runtime &runtime, bool workspace) {
   std::vector<std::string> sources;
 
   // Source discovery requires git
-  if (is_readable(".git")) {
+  struct stat unused;
+  if (stat(".git", &unused) == 0) {
     sources = scan_git(dirfd);
     std::sort(sources.begin(), sources.end());
   }
