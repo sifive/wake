@@ -56,7 +56,7 @@ install:	all
 # It assumes clang is available on the PATH and will fail otherwise
 formatAll:
 	@clang-format -i --style=file $(shell ./scripts/which_clang_files all)
-	@bin/wake-format.native-cpp14-release -i $(shell ./scripts/which_wake_files all)
+	@bin/wake-format.native-cpp14-release --auto --in-place
 
 
 # Formats all changed or staged .h or .cpp files

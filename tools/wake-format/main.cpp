@@ -33,6 +33,7 @@
 #include "parser/cst.h"
 #include "parser/parser.h"
 #include "parser/syntax.h"
+#include "parser/wakefiles.h"
 #include "util/diagnostic.h"
 #include "util/file.h"
 #include "wcl/diff.h"
@@ -74,11 +75,12 @@ void print_help(const char *argv0) {
   // clang-format off
   std::cout << std::endl
     << "Usage: " << argv0 << " [OPTIONS] [<file> ...]" << std::endl
+    << "  --auto     -a     Auto select files to format, matches wake discovery" << std::endl
     << "  --debug    -d     Print debug info while formatting"                   << std::endl
     << "  --dry-run  -n     Check if formatting needed, but don't apply it"      << std::endl
-    << "  --quiet    -q     requires -n, don't emit the diff on failure."        << std::endl
     << "  --help     -h     Print this help message and exit"                    << std::endl
     << "  --in-place -i     Edit files in place. Default emits file to stdout"   << std::endl
+    << "  --quiet    -q     requires -n, don't emit the diff on failure."        << std::endl
     << "  --version  -v     Print the version and exit"                          << std::endl
     << std::endl;
   // clang-format on
@@ -145,11 +147,12 @@ int main(int argc, char **argv) {
 
   // clang-format off
   struct option options[] {
+    { 'a',     "auto", GOPT_ARGUMENT_FORBIDDEN},
     { 'd',    "debug", GOPT_ARGUMENT_FORBIDDEN},
     { 'n',  "dry-run", GOPT_ARGUMENT_FORBIDDEN},
-    { 'q',    "quiet", GOPT_ARGUMENT_FORBIDDEN},
     { 'h',     "help", GOPT_ARGUMENT_FORBIDDEN},
     { 'i', "in-place", GOPT_ARGUMENT_FORBIDDEN},
+    { 'q',    "quiet", GOPT_ARGUMENT_FORBIDDEN},
     { 'v',  "version", GOPT_ARGUMENT_FORBIDDEN},
     // Undocumented flag for turning off true RNG
     // Used to make messages deterministic for testing
@@ -168,6 +171,7 @@ int main(int argc, char **argv) {
   bool version = arg(options, "version")->count;
   bool debug = arg(options, "debug")->count;
   bool no_rng = arg(options, "no-rng")->count;
+  bool auto_find_files = arg(options, "auto")->count;
 
   if (help) {
     print_help(argv[0]);
@@ -179,7 +183,7 @@ int main(int argc, char **argv) {
     exit(EXIT_SUCCESS);
   }
 
-  if (argc < 2) {
+  if (argc < 2 && !auto_find_files) {
     std::cerr << argv[0] << ": missing files to format" << std::endl;
     exit(EXIT_FAILURE);
   }
@@ -190,8 +194,28 @@ int main(int argc, char **argv) {
 
   std::vector<std::pair<std::string, std::string>> dry_run_failures = {};
 
+  std::vector<std::string> wakefiles = {};
+  FILE *user_warn = stdout;
+  user_warn = fopen("/dev/null", "w");
+  if (auto_find_files) {
+    bool ok;
+    wakefiles = find_all_wakefiles(ok, true, false, ".", ".", user_warn);
+    if (!ok) {
+      std::cerr << "Failed to automatically discover wake files" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+  }
+  fclose(user_warn);
+
   for (int i = 1; i < argc; i++) {
-    std::string name(argv[i]);
+    wakefiles.emplace_back(argv[i]);
+  }
+
+  for (const auto &name : wakefiles) {
+    if (debug) {
+      std::cerr << "Formatting '" << name << "'" << std::endl;
+    }
+
     std::string tmp = name + ".tmp." + rng.unique_name();
 
     ExternalFile external_file = ExternalFile(*reporter, name.c_str());
