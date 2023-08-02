@@ -204,12 +204,12 @@ int main(int argc, char **argv) {
       std::cerr << "Failed to automatically discover wake files" << std::endl;
       exit(EXIT_FAILURE);
     }
-  } else {
-    for (int i = 1; i < argc; i++) {
-      wakefiles.emplace_back(argv[i]);
-    }
   }
   fclose(user_warn);
+
+  for (int i = 1; i < argc; i++) {
+    wakefiles.emplace_back(argv[i]);
+  }
 
   for (const auto &name : wakefiles) {
     if (debug) {
