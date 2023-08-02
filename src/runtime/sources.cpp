@@ -254,134 +254,54 @@ static std::string slurp(int dirfd, const char *const *argv, bool &fail) {
   return str.str();
 }
 
-static bool scan(std::vector<std::string> &files, std::vector<std::string> &submods,
-                 const std::string &path, int dirfd) {
-  auto dir = fdopendir(dirfd);
-  if (!dir) {
-    fprintf(stderr, "Failed to fdopendir %s: %s\n", path.c_str(), strerror(errno));
-    close(dirfd);
-    return true;
+static std::vector<std::string> scan_git(int dirfd) {
+  std::vector<std::string> files;
+
+  bool failed;
+  static const char *fileArgs[] = {"git", "ls-files", "-z", "--recurse-submodules", nullptr};
+  std::string fileStr(slurp(dirfd, &fileArgs[0], failed));
+
+  if (failed) {
+    fprintf(stderr, "Failed to discover source files from git\n");
+    exit(1);
   }
 
-  struct dirent *f;
-  bool failed = false;
-  for (errno = 0; 0 != (f = readdir(dir)); errno = 0) {
-    if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0)))
-      continue;
-    if (!strcmp(f->d_name, ".git")) {
-      static const char *fileArgs[] = {"git", "ls-files", "-z", nullptr};
-      std::string fileStr(slurp(dirfd, &fileArgs[0], failed));
-      std::string submodStr;
-      if (faccessat(dirfd, ".gitmodules", R_OK, 0) == 0) {
-        static const char *submodArgs[] = {
-            "git",  "config", "-f", ".gitmodules", "-z", "--get-regexp", "^submodule[.].*[.]path$",
-            nullptr};
-        submodStr = slurp(dirfd, &submodArgs[0], failed);
-      }
-      std::string prefix(path == "." ? "" : (path + "/"));
-      const char *tok = fileStr.data();
-      const char *end = tok + fileStr.size();
-      for (const char *scan = tok; scan != end; ++scan) {
-        if (*scan == 0 && scan != tok) {
-          files.emplace_back(prefix + tok);
-          tok = scan + 1;
-        }
-      }
-      tok = submodStr.data();
-      end = tok + submodStr.size();
-      const char *value = nullptr;
-      for (const char *scan = tok; scan != end; ++scan) {
-        if (*scan == '\n' && !value) value = scan + 1;
-        if (*scan == 0 && scan != tok && value) {
-          submods.emplace_back(prefix + value);
-          tok = scan + 1;
-          value = nullptr;
-        }
-      }
-    } else {
-      bool recurse;
-#ifdef DT_DIR
-      if (f->d_type == DT_UNKNOWN) {
-#endif
-        struct stat sbuf;
-        if (fstatat(dirfd, f->d_name, &sbuf, AT_SYMLINK_NOFOLLOW) != 0) {
-          fprintf(stderr, "Failed to fstatat %s/%s: %s\n", path.c_str(), f->d_name,
-                  strerror(errno));
-          failed = true;
-          recurse = false;
-        } else {
-          recurse = S_ISDIR(sbuf.st_mode);
-        }
-#ifdef DT_DIR
-      } else {
-        recurse = f->d_type == DT_DIR;
-      }
-#endif
-      if (recurse) {
-        std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
-        if (name == ".build" || name == ".fuse") continue;
-        int fd = openat(dirfd, f->d_name, O_RDONLY);
-        if (fd == -1) {
-          fprintf(stderr, "Failed to openat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
-          failed = true;
-        } else {
-          if (scan(files, submods, name, fd)) failed = true;
-        }
-      }
+  const char *tok = fileStr.data();
+  const char *end = tok + fileStr.size();
+
+  for (const char *scan = tok; scan != end; ++scan) {
+    if (*scan == 0 && scan != tok) {
+      files.emplace_back(tok);
+      tok = scan + 1;
     }
   }
 
-  if (errno != 0 && !failed) {
-    fprintf(stderr, "Failed to readdir %s: %s\n", path.c_str(), strerror(errno));
-    failed = true;
-  }
-
-  if (closedir(dir) != 0) {
-    fprintf(stderr, "Failed to closedir %s: %s\n", path.c_str(), strerror(errno));
-    failed = true;
-  }
-
-  return failed;
-}
-
-static bool scan(std::vector<std::string> &files, std::vector<std::string> &submods) {
-  int flags, dirfd = open(".", O_RDONLY);
-  if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1) fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
-  return dirfd == -1 || scan(files, submods, ".", dirfd);
+  return files;
 }
 
 bool find_all_sources(Runtime &runtime, bool workspace) {
-  bool ok = true;
-  std::vector<std::string> files, submods, difference;
-  if (workspace) ok = !scan(files, submods);
+  int flags, dirfd = open(".", O_RDONLY);
+  if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1) fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
 
-  std::sort(files.begin(), files.end());
-  std::sort(submods.begin(), submods.end());
+  std::vector<std::string> sources;
 
-  // Compute difference = files - submodes
-  difference.reserve(files.size());
-  auto fi = files.begin(), si = submods.begin();
-  while (fi != files.end()) {
-    if (si == submods.end()) {
-      difference.emplace_back(std::move(*fi++));
-    } else if (*fi < *si) {
-      difference.emplace_back(std::move(*fi++));
-    } else {
-      if (*si == *fi) ++fi;
-      ++si;
-    }
+  // Source discovery requires git
+  struct stat unused;
+  if (stat(".git", &unused) == 0) {
+    sources = scan_git(dirfd);
+    std::sort(sources.begin(), sources.end());
   }
 
-  size_t need = Record::reserve(difference.size());
-  for (auto &x : difference) need += String::reserve(x.size());
+  size_t need = Record::reserve(sources.size());
+  for (auto &x : sources) need += String::reserve(x.size());
   runtime.heap.guarantee(need);
 
-  Record *out = Record::claim(runtime.heap, &Constructor::array, difference.size());
+  Record *out = Record::claim(runtime.heap, &Constructor::array, sources.size());
   for (size_t i = 0; i < out->size(); ++i)
-    out->at(i)->instant_fulfill(String::claim(runtime.heap, difference[i]));
+    out->at(i)->instant_fulfill(String::claim(runtime.heap, sources[i]));
 
   runtime.sources = out;
-  return ok;
+  return true;
 }
 
 static PRIMTYPE(type_sources) {
