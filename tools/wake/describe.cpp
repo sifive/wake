@@ -200,7 +200,7 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
     if (!job.tags.empty()) {
       out << "# Tags:" << std::endl;
       for (auto &x : job.tags) {
-        out << "   " << x.uri << ": ";
+        out << "#   " << x.uri << ": ";
         indent(out, "#     ", x.content);
       }
     }
