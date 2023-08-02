@@ -147,13 +147,13 @@ int main(int argc, char **argv) {
 
   // clang-format off
   struct option options[] {
+    { 'a',     "auto", GOPT_ARGUMENT_FORBIDDEN},
     { 'd',    "debug", GOPT_ARGUMENT_FORBIDDEN},
     { 'n',  "dry-run", GOPT_ARGUMENT_FORBIDDEN},
-    { 'q',    "quiet", GOPT_ARGUMENT_FORBIDDEN},
     { 'h',     "help", GOPT_ARGUMENT_FORBIDDEN},
     { 'i', "in-place", GOPT_ARGUMENT_FORBIDDEN},
+    { 'q',    "quiet", GOPT_ARGUMENT_FORBIDDEN},
     { 'v',  "version", GOPT_ARGUMENT_FORBIDDEN},
-    { 'a',     "auto", GOPT_ARGUMENT_FORBIDDEN},
     // Undocumented flag for turning off true RNG
     // Used to make messages deterministic for testing
     {   0,   "no-rng", GOPT_ARGUMENT_FORBIDDEN},
