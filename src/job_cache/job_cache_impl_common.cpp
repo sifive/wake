@@ -237,7 +237,7 @@ void remove_job_backing_files(const std::string &dir, int64_t job_id) {
   std::string job_dir = wcl::join_paths(dir, wcl::to_hex(&group_id), std::to_string(job_id));
   auto dir_range = wcl::directory_range::open(job_dir);
   if (!dir_range) {
-    // wcl::log::error("opendir(%s): %s", job_dir.c_str(), strerror(dir_range.error())).urgent()();
+    wcl::log::error("opendir(%s): %s", job_dir.c_str(), strerror(dir_range.error())).urgent()();
     exit(1);
   }
 

@@ -243,8 +243,8 @@ static void garbage_collect_job(std::string job_dir) {
     }
 
     // We can keep going even with this failure but we need to at least log it
-    // wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
-    //                job_dir.c_str(), strerror(dir_res.error()))();
+    wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
+                    job_dir.c_str(), strerror(dir_res.error()))();
     return;
   }
 
@@ -275,8 +275,8 @@ static void garbage_collect_group(const std::unordered_set<int64_t> jobs, int64_
   auto dir_res = wcl::directory_range::open(group_dir);
   if (!dir_res) {
     // We can keep going even with this failure but we need to at least log it
-    // wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
-    //                group_dir.c_str(), strerror(dir_res.error()))();
+    wcl::log::error("garbage collecting orphaned folders: wcl::directory_range::open(%s): %s",
+                    group_dir.c_str(), strerror(dir_res.error()))();
     return;
   }
 

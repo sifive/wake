@@ -17,11 +17,6 @@ package build_wake
 
 from wake import _
 
-def testJob Unit =
-    makePlan "echo: test" Nil "echo test"
-    | runJobWith defaultRunner
-    | getJobStdout
-
 # Useful build variants (arguments to all)
 def toVariant = match _
     "default" = Pass (Pair "native-cpp14-release" "native-c11-release")

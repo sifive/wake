@@ -683,7 +683,7 @@ int DaemonCache::run() {
 
     if (events.empty()) {
       no_events_sec_counter += wait_until.tv_sec;
-      if (no_events_sec_counter >= 60) {
+      if (no_events_sec_counter >= 10 * 60) {
         wcl::log::info("No events for 10 minutes, exiting.")();
         return 0;
       }
@@ -1252,12 +1252,6 @@ void DaemonCache::handle_read_msg(int client_fd) {
       close_client(client_fd);
     }
   }
-
-  // If the file was closed, remove from epoll and close it.
-  // if (state == MessageParserState::StopSuccess) {
-  //  close_client(client_fd);
-  //  return;
-  //}
 
   // If there's an error just fail.
   if (state == MessageParserState::StopFail) {
