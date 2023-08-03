@@ -26,13 +26,13 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/wait.h>
+#include <util/poll.h>
 #include <wcl/defer.h>
 #include <wcl/filepath.h>
 #include <wcl/optional.h>
 #include <wcl/tracing.h>
 #include <wcl/unique_fd.h>
 #include <wcl/xoshiro_256.h>
-#include <util/poll.h>
 
 #include <ctime>
 #include <fstream>
@@ -674,18 +674,21 @@ int DaemonCache::run() {
     // hit all of our timeout deadlines to within
     // 5 seconds.
     struct timespec wait_until;
-    wait_until.tv_sec = 5;    
+    wait_until.tv_sec = 5;
     wait_until.tv_nsec = 0;
+
     wcl::log::info("daemon: Waiting on an event")();
     auto events = poll.wait(&wait_until, nullptr);
     wcl::log::info("received %zu events!", events.size())();
 
     if (events.empty()) {
       no_events_sec_counter += wait_until.tv_sec;
-      if (wait_until.tv_sec >= 10 * 60) {
+      if (no_events_sec_counter >= 60) {
         wcl::log::info("No events for 10 minutes, exiting.")();
         return 0;
       }
+    } else {
+      no_events_sec_counter = 0;
     }
 
     for (auto event : events) {
@@ -696,7 +699,7 @@ int DaemonCache::run() {
         handle_new_client();
         continue;
       }
-  
+
       // Check if this was a read event that we can handle
       if (event.events & EPOLLIN) {
         wcl::log::info("processing EPOLLIN event on %d", event.data.fd)();
@@ -706,10 +709,11 @@ int DaemonCache::run() {
       // Check if we can write something again
       if (event.events & EPOLLOUT) {
         wcl::log::info("processing EPOLLOUT event on %d", event.data.fd)();
-        handle_write(event.data.fd);    
+        handle_write(event.data.fd);
       }
 
-      wcl::log::info("In case I missed this, unrecognized event on %d: events = %d", event.data.fd, event.events)();
+      wcl::log::info("In case I missed this, unrecognized event on %d: events = %d", event.data.fd,
+                     event.events)();
     }
   }
 
@@ -1138,14 +1142,15 @@ void DaemonCache::close_client(int client_fd) {
 void DaemonCache::handle_write(int client_fd) {
   auto it = message_senders.find(client_fd);
   if (it == message_senders.end()) {
-    wcl::log::info("handle_write(%d): avliable for write but we have nothing to write for it", client_fd)();
+    wcl::log::info("handle_write(%d): avliable for write but we have nothing to write for it",
+                   client_fd)();
     // Unlike with reading, the client is likely to be ready for us to write
     // to them often but with reading we should never see a client that has
     // a read avliable and not want to see the message.
-    return;  
+    return;
   }
 
-  MessageSender& sender = *&it->second;
+  MessageSender &sender = *&it->second;
   wcl::log::info("handle_write(%d): Sending", client_fd)();
   wcl::log::info("sender.data.size() == %zu", sender.data.size())();
   wcl::log::info("sender.fd = %d", sender.fd)();
@@ -1170,7 +1175,7 @@ void DaemonCache::handle_write(int client_fd) {
   // We need to wait a bit before we try again
   if (state == MessageSenderState::Continue) {
     wcl::log::info("handle_write(%d): Continuing write later", client_fd)();
-    return;    
+    return;
   }
 
   // Once we've finished sending the message to the client,
@@ -1215,7 +1220,9 @@ void DaemonCache::handle_read_msg(int client_fd) {
         // to be sent. This is an error and must mean the client sent
         // us two read messages without waiting on a response back from
         // the first one. Let's get rid of this faulty client.
-        wcl::log::error("Tried to write a new message before another had completed. closing client_fd = %d", client_fd)();
+        wcl::log::error(
+            "Tried to write a new message before another had completed. closing client_fd = %d",
+            client_fd)();
         close_client(client_fd);
         return;
       }
@@ -1247,7 +1254,7 @@ void DaemonCache::handle_read_msg(int client_fd) {
   }
 
   // If the file was closed, remove from epoll and close it.
-  //if (state == MessageParserState::StopSuccess) {
+  // if (state == MessageParserState::StopSuccess) {
   //  close_client(client_fd);
   //  return;
   //}
@@ -1261,7 +1268,7 @@ void DaemonCache::handle_read_msg(int client_fd) {
   if (state == MessageParserState::Timeout) {
     wcl::log::error("read(%d): timed out, closing client", client_fd)();
     close_client(client_fd);
-    return;    
+    return;
   }
 }
 

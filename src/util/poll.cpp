@@ -63,9 +63,7 @@ Poll::Poll() : imp(std::make_unique<Poll::detail>()) {
   }
 }
 
-EPoll::~EPoll() {
-  close(epfd);
-}
+EPoll::~EPoll() { close(epfd); }
 
 Poll::~Poll() { close(imp->pfd); }
 
@@ -118,7 +116,6 @@ void Poll::clear() {
     exit(1);
   }
 }
-
 
 std::vector<epoll_event> EPoll::wait(struct timespec *timeout, sigset_t *saved) {
   struct epoll_event events[EVENTS];

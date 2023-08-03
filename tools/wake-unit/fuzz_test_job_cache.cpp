@@ -406,13 +406,6 @@ TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, wcl::xoshiro_256 gen) {
 
 TEST_FUNC(void, fuzz_many_with_ns, int num_procs, const FuzzLoopConfig& config,
           wcl::xoshiro_256 gen) {
-  // This will look a bit odd because some of the logs will be from outside the pid namespace
-  // and some will be from inside the pid namespace but we'll just have to deal with that.
-  auto res = JsonSubscriber::fd_t::open("wake.log");
-  ASSERT_TRUE((bool)res) << "Unable to init logging: wake.log failed to open: "
-                         << strerror(res.error());
-  wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*res)));
-
   // Note that there will be processes in the o
   bool result = run_as_init_proc([&]() -> int {
     // We want to keep a certain number of processes
@@ -530,6 +523,8 @@ TEST(job_cache_basic_fuzz) {
   TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
 }
 
+// This is our most powerful style oftest, it's a chaos
+// monkey style fuzz test but it doesn't test large messages.
 TEST(job_cache_par_chaos_fuzz, "pid-namespace") {
   wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
   FuzzLoopConfig config;
@@ -542,10 +537,25 @@ TEST(job_cache_par_chaos_fuzz, "pid-namespace") {
   TEST_FUNC_CALL(fuzz_many_with_ns, 20, config, std::move(gen));
 }
 
+// This is one of our more powerful tests, its lightly tests the
+// large message case in parallel but also with chaos monkey testing.
+TEST(job_cache_par_chaos_fuzz_large_messages, "pid-namespace") {
+  wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
+  FuzzLoopConfig config;
+  config.max_path_size = 3500;
+  config.max_out = 1000;
+  config.max_vis = 1000;
+  config.number_of_steps = 100;
+  config.cache_dir = ".job_cache_test_chaos";
+  config.dir = "job_cache_test_chaos";
+  TEST_FUNC_CALL(fuzz_many_with_ns, 10, config, std::move(gen));
+}
+
 // This test appears to work but it takes quite a long time and
 // causes a lot of filesystem churn. Just test this on your own
 // occasionally as a debugging/repro tool for those kinds of issues.
-
+// This is a non-parallel test that ensures that kernel buffers filling
+// up doesn't cause major issues.
 TEST(job_cache_large_message_fuzz, "large") {
   wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
   FuzzLoopConfig config;
@@ -558,22 +568,57 @@ TEST(job_cache_large_message_fuzz, "large") {
   TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
 }
 
+// This test works like 10 instances of the above test
+// running in parallel. The goal is to stress concurency testing
+// when we have parallel actions between multiple chunked writes
+// as this is the most complex case we have to handle.
+TEST(job_cache_large_message_par_fuzz, "huge") {
+  FuzzLoopConfig config;
+  config.max_path_size = 200;
+  config.max_out = 16000;
+  config.max_vis = 16000;
+  config.number_of_steps = 100;
+  config.cache_dir = ".job_cache_large_par";
+  config.dir = "job_cache_large_par";
+  std::vector<std::future<void>> futs;
+  for (int i = 0; i < 10; ++i) {
+    // Each thread will exit on ASSERT fail logging the error
+    // and will correctly log failed EXPECTS. Because we wait
+    // on all futures in this test there is no way for this to
+    // leave a thread running after the return of this call.
+    // However it is unfortunate that if one thread fails,
+    // these others will keep running to completion. Additionally
+    // if the program dies/crashes all threads die in the current
+    // position without failures from other threads being logged.
+    futs.emplace_back(std::async([&]() {
+      wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
+      TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+    }));
+  }
+  for (auto& fut : futs) {
+    if (fut.valid()) fut.wait();
+  }
+}
+
 // This test appears to work but it takes *FOREVER* and doesn't represent
 // a very likely case. Still it might be worth running this on your own
 // sometimes to make sure everything is working well
-
 TEST(job_cache_huge_message_fuzz, "huge") {
   wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
   FuzzLoopConfig config;
-  config.max_path_size = 3500;
-  config.max_out = 100000;
-  config.max_vis = 100000;
-  config.number_of_steps = 20;
+  config.max_path_size = 1000;
+  config.max_out = 50000;
+  config.max_vis = 50000;
+  config.number_of_steps = 10;
   config.cache_dir = ".job_cache_test_huge";
   config.dir = "job_cache_test_huge";
   TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
 }
 
+// This test is the back bone of our testing strategy,
+// it tests 95% of our primary functionality. The main draw back
+// is that it doesn't ever send a message large enough to fill
+// a kernel buffer.
 TEST(job_cache_basic_par_fuzz, "threaded") {
   FuzzLoopConfig config;
   config.max_path_size = 16;
@@ -602,7 +647,8 @@ TEST(job_cache_basic_par_fuzz, "threaded") {
   }
 }
 
-// This test should work but it takes quite a long time.
+// This test should work but it takes quite a long time. It's
+// just a more extreme version of the basic par fuzz.
 TEST(job_cache_large_par_fuzz, "large") {
   FuzzLoopConfig config;
   config.max_path_size = 16;

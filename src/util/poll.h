@@ -18,8 +18,8 @@
 #ifndef POLL_H
 #define POLL_H
 
-#include <sys/select.h>
 #include <sys/epoll.h>
+#include <sys/select.h>
 
 #include <memory>
 #include <vector>

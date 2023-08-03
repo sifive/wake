@@ -29,9 +29,9 @@
 #include <unordered_map>
 
 #include "job_cache.h"
+#include "job_cache_impl_common.h"
 #include "message_parser.h"
 #include "message_sender.h"
-#include "job_cache_impl_common.h"
 
 namespace job_cache {
 

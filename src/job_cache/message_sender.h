@@ -65,7 +65,8 @@ class MessageSender {
     sender.state = MessageSenderState::StopFail;
   }
 
-  MessageSender(std::string data_, int fd, uint64_t timeout_seconds) : data(std::move(data_)), fd(fd) {
+  MessageSender(std::string data_, int fd, uint64_t timeout_seconds)
+      : data(std::move(data_)), fd(fd) {
     start = data.begin();
     deadline = time(nullptr) + timeout_seconds;
     state = MessageSenderState::Continue;
@@ -89,7 +90,7 @@ class MessageSender {
       wcl::log::info("MessageSender::send(): Inside the loop")();
       int res = write(fd, &*start, data.end() - start);
       if (res == -1) {
-        //signal interuptions will be rare and should just be re-tried until
+        // signal interuptions will be rare and should just be re-tried until
         // we get EAGAIN/EWOULDBLOCK
         if (errno == EINTR) {
           continue;
@@ -107,7 +108,8 @@ class MessageSender {
       }
 
       wcl::log::info("MessageSender::send(): Wrote %d bytes", res)();
-      wcl::log::info("MessageSender::send(): Chunk wrote: %s", std::string(start, start + res).c_str())();
+      wcl::log::info("MessageSender::send(): Chunk wrote: %s",
+                     std::string(start, start + res).c_str())();
       start += res;
     }
 
@@ -117,6 +119,5 @@ class MessageSender {
     return state;
   }
 };
-
 
 }  // namespace job_cache

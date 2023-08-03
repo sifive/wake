@@ -281,18 +281,17 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
   std::vector<std::string> messages = std::move(*messages_res);
 
   if (messages.size() == 0) {
-            wcl::log::error("Cache::read(): daemon exited without responding")();
-      return wcl::result_error<FindJobResponse>(FindJobError::NoResponse);
+    wcl::log::error("Cache::read(): daemon exited without responding")();
+    return wcl::result_error<FindJobResponse>(FindJobError::NoResponse);
   }
 
   if (messages.size() > 1) {
-      
-wcl::log::info("message.size() == %lu", messages.size())();
-      for (const auto &message : messages) {
-        wcl::log::info("message.size() = %lu, message = '%s'", message.size(), message.c_str())();
-      }
-      wcl::log::error("Cache::read(): daemon responded with too many results")();
-      return wcl::result_error<FindJobResponse>(FindJobError::TooManyResponses);
+    wcl::log::info("message.size() == %lu", messages.size())();
+    for (const auto &message : messages) {
+      wcl::log::info("message.size() = %lu, message = '%s'", message.size(), message.c_str())();
+    }
+    wcl::log::error("Cache::read(): daemon responded with too many results")();
+    return wcl::result_error<FindJobResponse>(FindJobError::TooManyResponses);
   }
 
   wcl::log::info("Cache::read(): message rx")();
@@ -365,7 +364,7 @@ void Cache::add(const AddJobRequest &add_request) {
   auto socket_fd = backoff_try_connect(10);
   if (!socket_fd) {
     wcl::log::error("Cache::add(): Failed to connect")();
-    return;    
+    return;
   }
   sync_send_json_message(socket_fd->get(), request, 10);
 }

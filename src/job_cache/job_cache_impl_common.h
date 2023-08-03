@@ -65,10 +65,12 @@ enum class SyncMessageReadError {
 
 // Continues reading until fd is closed by the other side, an error occurs, or a timeout occurs.
 // Returns every message read withint that time frame.
-wcl::result<std::vector<std::string>, SyncMessageReadError> sync_read_message(int fd, uint64_t timeout_seconds);
+wcl::result<std::vector<std::string>, SyncMessageReadError> sync_read_message(
+    int fd, uint64_t timeout_seconds);
 
 // Write the serialized JAST to fd synchronously, returning an error from write
 // ETIME is returned if a timeout occurs.
-wcl::optional<wcl::posix_error_t> sync_send_json_message(int fd, const JAST &json, uint64_t timeout_seconds);
+wcl::optional<wcl::posix_error_t> sync_send_json_message(int fd, const JAST &json,
+                                                         uint64_t timeout_seconds);
 
-}
+}  // namespace job_cache
