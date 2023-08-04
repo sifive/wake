@@ -22,6 +22,7 @@ def toVariant = match _
     "default" = Pass (Pair "native-cpp14-release" "native-c11-release")
     "static" = Pass (Pair "native-cpp14-static" "native-c11-static")
     "debug" = Pass (Pair "native-cpp14-debug" "native-c11-debug")
+    "wasm" = Pass (Pair "wasm-cpp14-release" "wasm-c11-release")
     s = Fail "Unknown build target ({s})".makeError
 
 export def build: List String => Result String Error = match _
