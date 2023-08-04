@@ -63,6 +63,6 @@ struct EPoll {
   std::vector<epoll_event> wait(struct timespec *timeout, sigset_t *saved);
 };
 
-#ifdef
+#endif
 
 #endif

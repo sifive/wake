@@ -712,7 +712,7 @@ int DaemonCache::run() {
         handle_write(event.data.fd);
       }
 
-      if (event.events & (EPOLLIN | EPOLLOUT) == 0) {
+      if ((event.events & (EPOLLIN | EPOLLOUT)) == 0) {
         wcl::log::info("Unrecognized event on %d: events = %d", event.data.fd, event.events)();
       }
     }

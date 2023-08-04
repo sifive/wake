@@ -107,8 +107,7 @@ class MessageSender {
       }
 
       wcl::log::info("MessageSender::send(): Wrote %d bytes", res)();
-                     std::string(start, start + res).c_str())();
-                     start += res;
+      start += res;
     }
 
     state = MessageSenderState::StopSuccess;
