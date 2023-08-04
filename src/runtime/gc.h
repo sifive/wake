@@ -321,12 +321,7 @@ struct alignas(PadObject) GCObject : public B {
   template <typename... ARGS>
   GCObject(ARGS &&...args) : B(std::forward<ARGS>(args)...) {
     static_assert(sizeof(MovedObject) <= sizeof(T), "HeapObject is too small");
-// TODO: on wasm pointer types are 4 bytes while doubles are 8 and that is
-// causing this assert to fail. Doubles won't be properly aligned in wasm
-// which may prove troublesome.
-#ifndef __EMSCRIPTEN__
     static_assert(sizeof(PadObject) == alignof(T), "HeapObject alignment wrong");
-#endif
   }
 
   T *self() { return static_cast<T *>(this); }
