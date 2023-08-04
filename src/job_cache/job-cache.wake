@@ -17,7 +17,9 @@ package build_wake
 
 from wake import _
 
-target jobCacheLib variant =
-    require Pass schemaSql = source "src/job_cache/schema.sql"
+target jobCacheLib variant = match variant
+    Pair "wasm-cpp14-release" -> Pass Nil
+    _ ->
+        require Pass schemaSql = source "src/job_cache/schema.sql"
 
-    src @here variant (json, gopt, blake2, wcl, util,) (sqlite3,) (schemaSql,)
+        src @here variant (json, gopt, blake2, wcl, util,) (sqlite3,) (schemaSql,)
