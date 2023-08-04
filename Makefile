@@ -86,9 +86,6 @@ tarball:	wake.db
 vscode:		wake.db
 	$(WAKE_ENV) ./bin/wake vscode
 
-wasm:		wake.db
-	$(WAKE_ENV) ./bin/wake build wasm
-
 static:	wake.db
 	$(WAKE_ENV) ./bin/wake static
 

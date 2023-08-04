@@ -166,17 +166,6 @@ jobs:
             #   test_cmd: ls # no-op
             #   install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
 
-            - target: wasm
-              dockerfile: wasm
-              extra_docker_build_args: ''
-              extra_docker_run_args: -u build
-              build_cmd: make -C wake-* wasm
-              test_cmd: ls # no-op
-              # TODO: This doesn't fully capture all the wake contents
-              # but that is okay since wake-wasm in still in its infancy
-              # and is not deployed/depended on
-              install_src_glob: build/wake-*/bin/*.wasm*
-
       steps:
         - name: Create target directories
           run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
