@@ -42,7 +42,7 @@ def createStdlibJSON (stdlibSources: List Path): Result Path Error =
     write "{@here}/stdlib.json" (prettyJSON content)
 
 export def vscode _: Result Path Error =
-    require Pass variant = toVariant "wasm"
+    require Pass variant = Pass (Pair "wasm-cpp14-release" "wasm-c11-release")
     require Pass files = buildLSP variant
 
     require js, Nil = filter (matches `.*\.wasm-.*` _.getPathName) files
