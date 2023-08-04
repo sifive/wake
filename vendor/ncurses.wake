@@ -18,8 +18,10 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def ncurses _ =
-    pkgConfig "ncurses tinfo"
-    | getOrElseFn (\Unit pkg "ncurses")
-    | editSysLibCFlags (filter (matches `-I.*` _)) # remove feature test manipulation
-    | Pass
+def ncurses = match _
+    Pair "wasm-cpp14-release" _ = Pass (makeSysLib "ncurses")
+    _ =
+        pkgConfig "ncurses tinfo"
+        | getOrElseFn (\Unit pkg "ncurses")
+        | editSysLibCFlags (filter (matches `-I.*` _)) # remove feature test manipulation
+        | Pass
