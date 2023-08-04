@@ -712,8 +712,9 @@ int DaemonCache::run() {
         handle_write(event.data.fd);
       }
 
-      wcl::log::info("In case I missed this, unrecognized event on %d: events = %d", event.data.fd,
-                     event.events)();
+      if (event.events & (EPOLLIN | EPOLLOUT) == 0) {
+        wcl::log::info("Unrecognized event on %d: events = %d", event.data.fd, event.events)();
+      }
     }
   }
 
@@ -1151,11 +1152,7 @@ void DaemonCache::handle_write(int client_fd) {
   }
 
   MessageSender &sender = *&it->second;
-  wcl::log::info("handle_write(%d): Sending", client_fd)();
-  wcl::log::info("sender.data.size() == %zu", sender.data.size())();
-  wcl::log::info("sender.fd = %d", sender.fd)();
   MessageSenderState state = sender.send();
-  wcl::log::info("handle_write(%d): Sent", client_fd)();
 
   // This client might be deadlocked, do us both
   // a favor and kill this connection

@@ -18,7 +18,6 @@
 #ifndef POLL_H
 #define POLL_H
 
-#include <sys/epoll.h>
 #include <sys/select.h>
 
 #include <memory>
@@ -45,6 +44,9 @@ struct Poll {
   int max_fds() const;
 };
 
+#ifdef __linux__
+
+#include <sys/epoll.h>
 // EPoll is a more advanced wrapper around the epoll interface.
 // It explicitly uses types from the linux epoll interface.
 // It allows for read and write polling as well as level
@@ -60,5 +62,7 @@ struct EPoll {
   void remove(int fd);
   std::vector<epoll_event> wait(struct timespec *timeout, sigset_t *saved);
 };
+
+#ifdef
 
 #endif

@@ -87,7 +87,6 @@ class MessageSender {
     }
 
     while (start < data.end()) {
-      wcl::log::info("MessageSender::send(): Inside the loop")();
       int res = write(fd, &*start, data.end() - start);
       if (res == -1) {
         // signal interuptions will be rare and should just be re-tried until
@@ -108,12 +107,9 @@ class MessageSender {
       }
 
       wcl::log::info("MessageSender::send(): Wrote %d bytes", res)();
-      wcl::log::info("MessageSender::send(): Chunk wrote: %s",
                      std::string(start, start + res).c_str())();
-      start += res;
+                     start += res;
     }
-
-    wcl::log::info("MessageSender::send(): Finished writing")();
 
     state = MessageSenderState::StopSuccess;
     return state;

@@ -198,9 +198,9 @@ wcl::result<wcl::unique_fd, ConnectError> Cache::backoff_try_connect(int attempt
   useconds_t backoff = 1000;
   wcl::unique_fd socket_fd;
   for (int i = 0; i < attempts; i++) {
-    // We normally connect in about 3 tries on fresh connect so
-    // if we haven't connected at this point its a good spot to start
-    // start trying.
+    // We normally connect in about 3 tries, sometimes 4 on fresh
+    // connect so if we haven't connected at this point its a good
+    // spot to start start trying.
     if (i > 4) {
       launch_daemon();
     }
@@ -319,9 +319,7 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
       return *response;
     }
 
-    if (response.error() == FindJobError::CouldNotConnect) {
-      failed_on_connect |= true;
-    }
+    failed_on_connect |= response.error() == FindJobError::CouldNotConnect;
 
     if (miss_on_failure && misses_from_failure > 300) {
       wcl::log::warning(

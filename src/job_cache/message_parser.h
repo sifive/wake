@@ -49,9 +49,9 @@ struct MessageParser {
 
     time_t now = time(nullptr);
     if (now > deadline) {
-      return MessageParserState::Timeout;    
+      return MessageParserState::Timeout;
     }
-      
+
     while (true) {
       uint8_t buffer[4096] = {};
       ssize_t count = read(fd, static_cast<void*>(buffer), 4096);
@@ -66,20 +66,21 @@ struct MessageParser {
         // in such a way that ECONNRESET is returned. This should be treated
         // as equivlient to a close which would normally appear as the count == 0
         // case above.
-        if (errno == ECONNRESET) return MessageParserState::StopSuccess;
+        if (errno == ECONNRESET) {
+          return MessageParserState::StopSuccess;
+        }
         // On EINTR we should just retry until we get EAGAIN/EWOULDBLOCK
         if (errno == EINTR) {
           continue;
         }
         // If we hit EAGAIN/EWOULDBLOCK then we might have more work to do but
         // we can't do that work just yet and need to continue.
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return MessageParserState::Continue;
+        if (errno == EAGAIN || errno == EWOULDBLOCK) return MessageParserState::Continue;
 
         return MessageParserState::StopFail;
       }
 
-      // Here we split this up
+      // Now we split the data we've received up by null bytes
       uint8_t* iter = buffer;
       uint8_t* buffer_end = buffer + count;
       while (iter < buffer_end) {
