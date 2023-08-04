@@ -44,6 +44,8 @@ struct MessageParser {
   MessageParser() = delete;
   MessageParser(int fd, uint64_t timeout) : fd(fd), deadline(time(nullptr) + timeout) {}
 
+  bool has_timed_out() const { return time(nullptr) > deadline; }
+
   MessageParserState read_messages(std::vector<std::string>& messages) {
     messages = {};
 
