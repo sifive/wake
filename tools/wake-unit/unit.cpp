@@ -20,6 +20,7 @@
 #include <cstring>
 #include <set>
 
+#include "json/json5.h"
 #include "util/diagnostic.h"
 #include "util/term.h"
 
@@ -95,6 +96,14 @@ int main(int argc, char** argv) {
     }
   }
   term_init(true, true);
+
+  auto res = JsonSubscriber::fd_t::open("wake.log");
+  if (!res) {
+    std::cerr << "Unable to init logging: wake.log failed to open: " << strerror(res.error())
+              << std::endl;
+  }
+  wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*res)));
+
   TestLogger logger;
   std::set<std::string> failed_tests;
   std::set<std::string> passing_tests;

@@ -23,6 +23,11 @@
 #include <memory>
 #include <vector>
 
+// Poll is an wrapper around epoll on linux but also works on
+// other operating systems. Today we only support linux but
+// in the past we supported other kernels. This is still the
+// the polling struct used throughout wake. It only allows
+// for read level-triggered polling.
 struct Poll {
   struct detail;
   std::unique_ptr<detail> imp;
@@ -38,5 +43,26 @@ struct Poll {
 
   int max_fds() const;
 };
+
+#ifdef __linux__
+
+#include <sys/epoll.h>
+// EPoll is a more advanced wrapper around the epoll interface.
+// It explicitly uses types from the linux epoll interface.
+// It allows for read and write polling as well as level
+// or edge triggered polling. It's just a nice wrapper around
+// epoll.
+struct EPoll {
+  int epfd;
+
+  EPoll();
+  ~EPoll();
+
+  void add(int fd, uint32_t events);
+  void remove(int fd);
+  std::vector<epoll_event> wait(struct timespec *timeout, sigset_t *saved);
+};
+
+#endif
 
 #endif

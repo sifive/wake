@@ -16,6 +16,7 @@
 package build_wake
 
 from wake import _
+from gcc_wake import _
 
 target jobCacheLib variant =
     require Pass schemaSql = source "src/job_cache/schema.sql"

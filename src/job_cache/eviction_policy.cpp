@@ -367,7 +367,8 @@ LRUEvictionPolicy::~LRUEvictionPolicy() {}
 int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> policy) {
   policy->init(cache_dir);
 
-  MessageParser msg_parser(STDIN_FILENO);
+  // Famous last words "a timeout of a year is plenty"
+  MessageParser msg_parser(STDIN_FILENO, 60 * 60 * 24 * 30 * 12);
   MessageParserState state;
   do {
     std::vector<std::string> msgs;

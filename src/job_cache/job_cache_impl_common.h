@@ -56,5 +56,21 @@ void symlink_no_fail(const char *target, const char *symlink_path);
 void unlink_no_fail(const char *file);
 void rmdir_no_fail(const char *dir);
 
-// Write the serialized JAST to fd with proper retries on failure
-wcl::optional<wcl::posix_error_t> send_json_message(int fd, const JAST &json);
+namespace job_cache {
+
+enum class SyncMessageReadError {
+  Fail,
+  Timeout,
+};
+
+// Continues reading until fd is closed by the other side, an error occurs, or a timeout occurs.
+// Returns every message read withint that time frame.
+wcl::result<std::vector<std::string>, SyncMessageReadError> sync_read_message(
+    int fd, uint64_t timeout_seconds);
+
+// Write the serialized JAST to fd synchronously, returning an error from write
+// ETIME is returned if a timeout occurs.
+wcl::optional<wcl::posix_error_t> sync_send_json_message(int fd, const JAST &json,
+                                                         uint64_t timeout_seconds);
+
+}  // namespace job_cache

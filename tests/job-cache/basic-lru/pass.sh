@@ -14,18 +14,18 @@ rm one.txt 2> /dev/null || true
 rm two.txt 2> /dev/null || true
 rm three.txt 2> /dev/null || true
 rm four.txt 2> /dev/null || true
-DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
+WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
 rm wake.db
 rm -rf .cache-misses
-DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
+WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
 rm wake.db
 rm -rf .cache-misses
-DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test three
+WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test three
 rm wake.db
 rm -rf .cache-misses
 
 # We should still be under the limit here. This is to ensure we mark test one as used
-DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
+WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
 rm wake.db
 rm -rf .cache-misses
 if [ -z "$(ls -A .cache-hit)" ]; then
@@ -34,13 +34,13 @@ if [ -z "$(ls -A .cache-hit)" ]; then
 fi
 
 # Now we're going to go over. Hopefully dropping two and three, but keeping one and four
-DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test four
+WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test four
 rm wake.db
 rm -rf .cache-misses
 
 # Now make sure we still get a hit on 1
 rm -rf .cache-hit  2> /dev/null || true
-DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
+WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
 rm wake.db
 if [ -z "$(ls -A .cache-hit)" ]; then
   echo "No cache hit found"
@@ -53,7 +53,7 @@ fi
 
 # And check four as well
 rm -rf .cache-hit
-DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test four
+WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test four
 rm wake.db
 if [ -z "$(ls -A .cache-hit)" ]; then
   echo "No cache hit found"
@@ -65,7 +65,7 @@ if [ -d ".cache-misses" ]; then
 fi
 
 # And check that we get misses on four and three
-DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
+WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
 rm wake.db
 if [ -z "$(ls -A .cache-misses)" ]; then
   echo "Expected a chache miss!!"
@@ -74,7 +74,7 @@ fi
 rm -rf .cache-misses
 
 
-DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test three
+WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_EXPERIMENTAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test three
 rm wake.db
 if [ -z "$(ls -A .cache-misses)" ]; then
   echo "Expected a chache miss!!"
