@@ -72,6 +72,8 @@ class MessageSender {
     state = MessageSenderState::Continue;
   }
 
+  bool has_timed_out() const { return time(nullptr) > deadline; }
+
   // errno from the call to `write` remains set if StopFail is returned
   MessageSenderState send() {
     wcl::log::info("MessageSender::send(): %d bytes left to send", int(data.end() - start))();

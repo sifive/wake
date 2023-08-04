@@ -36,6 +36,7 @@
 
 #include <ctime>
 #include <fstream>
+#include <unordered_set>
 
 #include "db_helpers.h"
 #include "eviction_command.h"
@@ -715,6 +716,24 @@ int DaemonCache::run() {
       if ((event.events & (EPOLLIN | EPOLLOUT)) == 0) {
         wcl::log::info("Unrecognized event on %d: events = %d", event.data.fd, event.events)();
       }
+    }
+
+    // Check for timeouts
+    std::unordered_set<int> clients_to_close;
+    for (auto &client : message_senders) {
+      if (client.second.has_timed_out()) {
+        clients_to_close.insert(client.first);
+      }
+    }
+
+    for (auto &client : message_parsers) {
+      if (client.second.has_timed_out()) {
+        clients_to_close.insert(client.first);
+      }
+    }
+
+    for (auto client_fd : clients_to_close) {
+      close_client(client_fd);
     }
   }
 
