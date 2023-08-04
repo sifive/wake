@@ -19,6 +19,4 @@ from wake import _
 from gcc_wake import _
 
 target buildFuseDaemon variant: Result (List Path) Error = match variant
-    # Fuse doesn't, and likely won't ever, support building for wasm
-    Pair "wasm-cpp14-release" _ = Pass Nil
     _ = tool @here Nil variant "lib/wake/fuse-waked" (json, fuse, util, Nil) Nil Nil

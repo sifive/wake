@@ -21,8 +21,6 @@
 
 #include "status.h"
 
-#ifndef __EMSCRIPTEN__
-
 #include <assert.h>
 #include <curses.h>
 #include <fcntl.h>
@@ -568,42 +566,3 @@ void status_finish() {
     setitimer(ITIMER_REAL, &timer, 0);
   }
 }
-
-#else
-#include <emscripten/emscripten.h>
-
-StatusState status_state;
-
-void status_init() {}
-
-// TODO: I need to make a stream buf specifically for emscripten
-void status_write(const char *name, const char *data, int len) {
-  // clang-format off
-  EM_ASM_INT({
-    console.log('[' + UTF8ToString($0) + '] ' + UTF8ToString($1));
-    return 0;
-  }, name, data);
-  // clang-format on
-}
-
-void status_refresh(bool idle) {}
-void status_finish() {}
-
-void status_set_colour(const char *name, int colour) {}
-void status_set_fd(const char *name, int fd) {}
-void status_set_bulk_fd(int fd, const char *streams) {}
-
-int status_get_colour(const char *name) { return 0; }
-
-int status_get_fd(const char *name) { return -1; }
-
-std::ostream &status_get_generic_stream(const char *name) { return std::cout; }
-
-void StatusBuf::emit_header() {}
-int StatusBuf::overflow(int c) { return 0; }
-StatusBuf::StatusBuf(std::string name, wcl::optional<std::string> extra, int color,
-                     TermInfoBuf &buf)
-    : buf(buf) {}
-StatusBuf::~StatusBuf() {}
-
-#endif
