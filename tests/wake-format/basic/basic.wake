@@ -1424,3 +1424,11 @@ def _ =
             %{x}
         fi
     """
+
+def x _ =
+    def (
+        A # test
+        b  
+    ) = c
+
+    b

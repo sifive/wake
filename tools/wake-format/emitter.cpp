@@ -1131,7 +1131,7 @@ wcl::optional<wcl::doc> Emitter::combine_apply_constructor(ctx_t ctx,
     return {};
   }
 
-  // If the LHS has a trailing comment then we must respect the regualr format
+  // If the LHS has a trailing comment then we must respect the regular format
   // Json # comment
   // ( ... )
   //
@@ -1517,7 +1517,8 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_DEF)
                .ws()
-               .prevent_explode(fmt().walk(is_expression, WALK_NODE))
+               .fmt_if_else(CST_PAREN, fmt().walk(is_expression, WALK_NODE),
+                            fmt().prevent_explode(fmt().walk(is_expression, WALK_NODE)))
                .consume_wsnlc()
                .space()
                .token(TOKEN_P_EQUALS)
