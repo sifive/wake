@@ -139,6 +139,7 @@ class Emitter {
                                                     const std::vector<CSTElement>& parts);
   wcl::optional<wcl::doc> combine_apply_explode_all(ctx_t ctx,
                                                     const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_apply_pattern(ctx_t ctx, const std::vector<CSTElement>& parts);
 
   // Returns a formatter that inserts the next node
   // on the current line if it fits, or on a new nested line

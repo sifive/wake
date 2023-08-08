@@ -1131,7 +1131,7 @@ wcl::optional<wcl::doc> Emitter::combine_apply_constructor(ctx_t ctx,
     return {};
   }
 
-  // If the LHS has a trailing comment then we must respect the regualr format
+  // If the LHS has a trailing comment then we must respect the regular format
   // Json # comment
   // ( ... )
   //
@@ -1164,6 +1164,20 @@ wcl::optional<wcl::doc> Emitter::combine_apply_explode_all(ctx_t ctx,
   return {wcl::in_place_t{}, std::move(builder).build()};
 }
 
+wcl::optional<wcl::doc> Emitter::combine_apply_pattern(ctx_t ctx,
+                                                       const std::vector<CSTElement>& parts) {
+  ctx = ctx.allow_explode();
+  wcl::doc_builder builder;
+  for (size_t i = 0; i < parts.size() - 1; i++) {
+    CSTElement part = parts[i];
+    builder.append(fmt().walk(WALK_NODE).space().compose(ctx.sub(builder), part, token_traits));
+  }
+
+  builder.append(walk_node(ctx.sub(builder), parts.back()));
+
+  return {wcl::in_place_t{}, std::move(builder).build()};
+}
+
 wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_APP, node, "Expected CST_APP");
@@ -1177,6 +1191,15 @@ wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
 
   if (ctx.explode_option != ExplodeOption::Prevent) {
     choices.push_back(combine_apply_explode_all(ctx, parts));
+  }
+
+  bool has_choice = false;
+  for (const auto& c : choices) {
+    if (c) has_choice |= true;
+  }
+
+  if (!has_choice) {
+    choices.push_back(combine_apply_pattern(ctx, parts));
   }
 
   MEMO_RET(select_best_choice(choices));
@@ -1517,7 +1540,8 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_DEF)
                .ws()
-               .prevent_explode(fmt().walk(is_expression, WALK_NODE))
+               .fmt_if_else(CST_PAREN, fmt().walk(is_expression, WALK_NODE),
+                            fmt().prevent_explode(fmt().walk(is_expression, WALK_NODE)))
                .consume_wsnlc()
                .space()
                .token(TOKEN_P_EQUALS)
@@ -2034,7 +2058,8 @@ wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) {
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_TARGET)
                .ws()
-               .prevent_explode(fmt().walk(is_expression, WALK_NODE))
+               .fmt_if_else(CST_PAREN, fmt().walk(is_expression, WALK_NODE),
+                            fmt().prevent_explode(fmt().walk(is_expression, WALK_NODE)))
                .consume_wsnlc()
                .space()
                .fmt_if(TOKEN_P_BSLASH,
