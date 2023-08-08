@@ -1699,6 +1699,20 @@ def _ =
     fi
     """
 
+target do (a: String) (
+    Type
+    b # comment about 'b'.
+    c
+) =
+    ""
+
+target (
+    Type
+    b # comment about 'b'.
+    c
+) =
+    ""
+
 def x _ =
     def (
         A # test
@@ -1706,3 +1720,40 @@ def x _ =
     ) = c
 
     b
+
+def x _ =
+    require Pass (
+        Type
+        x # test
+        z
+    ) = b
+
+    a
+
+def x _ =
+    require (
+        Type
+        x # test
+        z
+    ) = b
+
+    a
+
+def x =
+    def (x, a, z,) = b
+
+    z
+
+def x =
+    def (
+        x,
+        (
+            Type
+            y # comment
+            a
+        ),
+        a,
+        z
+    ) = b
+
+    z
