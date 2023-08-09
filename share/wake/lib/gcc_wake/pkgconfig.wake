@@ -76,11 +76,30 @@ target pkgConfigImp flags pkgs =
 export def pkgConfig (pkg: String): Option SysLib =
     def pkgs = tokenize ` ` pkg
 
-    require Some (version, _) = pkgConfigImp ("--short-errors", "--modversion",) pkgs
+    require Some (version, _) =
+        pkgConfigImp
+        (
+            "--short-errors",
+            "--modversion",
+        )
+        pkgs
     else None
 
-    def cflags = pkgConfigImp ("--silence-errors", "--cflags",) pkgs
-    def lflags = pkgConfigImp ("--silence-errors", "--libs",) pkgs
+    def cflags =
+        pkgConfigImp
+        (
+            "--silence-errors",
+            "--cflags",
+        )
+        pkgs
+
+    def lflags =
+        pkgConfigImp
+        (
+            "--silence-errors",
+            "--libs",
+        )
+        pkgs
 
     require Some cflags = cflags
     require Some lflags = lflags

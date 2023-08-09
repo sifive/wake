@@ -188,7 +188,12 @@ def computeHashes (prefix: String) (files: List String): List String =
         True ->
             require Pass stdin_file = write stdin_file_path (catWith "\n" to_hash)
 
-            hashPlan ("{wakePath}/../lib/wake/wake-hash", "@",) (stdin_file,)
+            hashPlan
+            (
+                "{wakePath}/../lib/wake/wake-hash",
+                "@",
+            )
+            (stdin_file,)
             | setPlanStdin stdin_file.getPathName
             | Pass
         False ->
