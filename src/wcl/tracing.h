@@ -40,6 +40,7 @@ namespace log {
 static constexpr const char* LOG_LEVEL = "level";
 static constexpr const char* LOG_TIME = "time";
 static constexpr const char* LOG_PID = "pid";
+static constexpr const char* LOG_HOSTNAME = "hostname";
 static constexpr const char* LOG_LEVEL_INFO = "info";
 static constexpr const char* LOG_LEVEL_WARNING = "warning";
 static constexpr const char* LOG_LEVEL_ERROR = "error";
@@ -66,6 +67,7 @@ struct Event {
   Event urgent() && __attribute__((warn_unused_result));
   Event time() && __attribute__((warn_unused_result));
   Event pid() && __attribute__((warn_unused_result));
+  Event hostname() && __attribute__((warn_unused_result));
   Event level(const char* level) && __attribute__((warn_unused_result));
 
   void operator()() &&;

@@ -945,8 +945,11 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
   std::string msg = cmd.serialize();
   msg += '\0';
 
+  wcl::log::info("Sending Read command to eviction loop")();
   if (write(evict_stdin, msg.data(), msg.size()) == -1) {
     wcl::log::warning("Failed to send eviction update: %s", strerror(errno))();
+  } else {
+    wcl::log::info("Successfully sent eviction the job")();
   }
 
   return FindJobResponse(wcl::make_some<MatchingJob>(std::move(result)));
@@ -1031,8 +1034,11 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   std::string msg = cmd.serialize();
   msg += '\0';
 
+  wcl::log::info("Sending Write command to eviction loop")();
   if (write(evict_stdin, msg.data(), msg.size()) == -1) {
     wcl::log::warning("Failed to send eviction update: %s", strerror(errno))();
+  } else {
+    wcl::log::info("Sucessfully sent eviction add update")();
   }
 }
 
