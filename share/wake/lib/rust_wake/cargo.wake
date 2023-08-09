@@ -34,13 +34,7 @@ export def cargoBuild (sources: List Path) (pathToCrate: String) (outputs: List 
     require Pass cargoPath = findCargoPath Unit
 
     require Pass outputs =
-        makeExecPlan
-        (
-            cargoPath,
-            "build",
-            "--release",
-        )
-        sources
+        makeExecPlan (cargoPath, "build", "--release", Nil) sources
         | setPlanLabel "cargo: {pathToCrate}"
         | setPlanDirectory pathToCrate
         | setPlanFnOutputs (\_ map ("{pathToCrate}/target/release/{_}") outputs)

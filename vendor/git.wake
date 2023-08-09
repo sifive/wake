@@ -83,12 +83,6 @@ def mk_node_semver_safe v =
 
     match (extract unsafe_version_regex v)
         version, commit, rest, Nil =
-            (
-                version,
-                "-plus-",
-                commit,
-                "-",
-                rest,
-            )
+            (version, "-plus-", commit, "-", rest, Nil)
             | cat
         _ = v

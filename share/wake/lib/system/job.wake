@@ -231,7 +231,7 @@ export def getPlanHash (plan: Plan): Integer =
     def isAttyStr = if isAtty then "true" else "false"
 
     def sig =
-        cat (
+        (
             isAttyStr,
             "\0\0",
             implode cmd,
@@ -242,6 +242,7 @@ export def getPlanHash (plan: Plan): Integer =
             "\0\0",
             stdin,
         )
+        | cat
 
     require Some out = intbase 16 (hashString sig)
     else unreachable "hash_str returned a non-hex string!!!"

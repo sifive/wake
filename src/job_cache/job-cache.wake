@@ -21,15 +21,4 @@ from gcc_wake import _
 target jobCacheLib variant =
     require Pass schemaSql = source "src/job_cache/schema.sql"
 
-    src
-    @here
-    variant
-    (
-        json,
-        gopt,
-        blake2,
-        wcl,
-        util,
-    )
-    (sqlite3,)
-    (schemaSql,)
+    src @here variant (json, gopt, blake2, wcl, util, Nil) (sqlite3,) (schemaSql,)
