@@ -487,7 +487,8 @@ std::vector<std::string> find_workspace_wakefiles_via_search(bool &ok, bool verb
   return filter_wakefiles(std::move(workfiles), workdir, verbose);
 }
 
-std::vector<std::string> find_workspace_wakefiles_via_manifest(const std::string &manifest_path) {
+std::vector<std::string> find_workspace_wakefiles_via_manifest(const std::string &manifest_path,
+                                                               const std::string &workdir) {
   std::vector<std::string> workfiles;
   std::vector<std::string> unreadable_files;
   DiagnosticIgnorer ignorer;
@@ -495,6 +496,8 @@ std::vector<std::string> find_workspace_wakefiles_via_manifest(const std::string
   StringSegment segment = file.segment();
   std::stringstream in;
   in.write(reinterpret_cast<const char *>(segment.start), segment.size());
+
+  std::string prefix = (workdir == ".") ? "" : (workdir + "/");
 
   std::string line;
   while (std::getline(in, line)) {
@@ -510,7 +513,7 @@ std::vector<std::string> find_workspace_wakefiles_via_manifest(const std::string
     if (line == "" || line[0] == '#') continue;
 
     if (is_readable(line.c_str())) {
-      workfiles.push_back(line);
+      workfiles.push_back(prefix + line);
     } else {
       unreadable_files.push_back(line);
     }
@@ -548,7 +551,7 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
 
   std::string manifest_path = workdir + "/.wakemanifest";
   if (is_readable(manifest_path.c_str())) {
-    workfiles = find_workspace_wakefiles_via_manifest(manifest_path);
+    workfiles = find_workspace_wakefiles_via_manifest(manifest_path, workdir);
   } else {
     workfiles = find_workspace_wakefiles_via_search(ok, verbose, workdir, user_warning_dest, exp);
   }
