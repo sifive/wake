@@ -651,7 +651,6 @@ JobTable::~JobTable() {
       int status;
       while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
         if (WIFSTOPPED(status)) continue;
-        wcl::log::info("Job with pid = %d completed", pid)();
         imp->pidmap.erase(pid);
       }
     }
@@ -863,7 +862,6 @@ static void launch(JobTable *jobtable) {
     sigprocmask(SIG_UNBLOCK, &set, 0);
     pid_t pid = wake_spawn(cmdline[0], cmdline, environ);
     sigprocmask(SIG_BLOCK, &set, 0);
-    wcl::log::info("Spawned job: label = '%s', pid = %d", job_label_str->c_str(), pid)();
 
     delete[] cmdline;
     delete[] environ;
@@ -1765,8 +1763,8 @@ static PRIMTYPE(type_job_cache_read) {
 }
 
 static PRIMFN(prim_job_cache_read) {
-  wcl::log::info("prim job_cache_read entered")();
-  auto defer = wcl::make_defer([]() { wcl::log::info("prim job_cache_read exiting")(); });
+  wcl::log::info("prim_job_cache_read enter")();
+  auto defer = wcl::make_defer([]() { wcl::log::info("prim_job_cache_read exit")(); });
   EXPECT(1);
   STRING(request_str, 0);
 
@@ -1820,8 +1818,8 @@ static PRIMTYPE(type_job_cache_add) {
 }
 
 static PRIMFN(prim_job_cache_add) {
-  wcl::log::info("prim job_cache_add entered")();
-  auto defer = wcl::make_defer([]() { wcl::log::info("prim job_cache_add exiting")(); });
+  wcl::log::info("prim_job_cache_add enter")();
+  auto defer = wcl::make_defer([]() { wcl::log::info("prim_job_cache_add exit")(); });
   EXPECT(1);
   STRING(request_str, 0);
 
@@ -1856,7 +1854,7 @@ static PRIMFN(prim_job_cache_add) {
   size_t need = String::reserve(result_json_str.size()) + reserve_result();
   runtime.heap.reserve(need);
 
-  wcl::log::info("Cahce::add successfully called")();
+  wcl::log::info("Cache::add successfully called")();
   RETURN(claim_result(runtime.heap, true, String::claim(runtime.heap, result_json_str)));
 }
 

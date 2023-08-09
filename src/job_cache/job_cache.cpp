@@ -308,8 +308,8 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
 }
 
 FindJobResponse Cache::read(const FindJobRequest &find_request) {
-  wcl::log::info("Starting cache read")();
-  auto defer = wcl::make_defer([]() { wcl::log::info("Done with cache read")(); });
+  wcl::log::info("Cache::read enter")();
+  auto defer = wcl::make_defer([]() { wcl::log::info("Cache::read exit")(); });
   static int misses_from_failure = 0;
 
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
@@ -356,8 +356,8 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
 }
 
 void Cache::add(const AddJobRequest &add_request) {
-  wcl::log::info("About to add a job")();
-  auto defer = wcl::make_defer([]() { wcl::log::info("Done adding the job")(); });
+  wcl::log::info("Cache::add enter")();
+  auto defer = wcl::make_defer([]() { wcl::log::info("Cache::add exit")(); });
   // serialize the request, send it, deserialize the response, return it
   JAST request(JSON_OBJECT);
   request.add("method", "cache/add");
