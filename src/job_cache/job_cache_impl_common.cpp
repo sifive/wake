@@ -376,7 +376,6 @@ wcl::optional<wcl::posix_error_t> sync_send_json_message(int fd, const JAST &jso
       return wcl::make_some<wcl::posix_error_t>(errno);
     }
     if (state == MessageSenderState::StopSuccess) {
-      wcl::log::info("Finished writing: %s", s.str().c_str())();
       return {};
     }
   }

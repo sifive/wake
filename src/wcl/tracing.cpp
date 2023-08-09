@@ -85,6 +85,16 @@ Event Event::pid() && {
   return std::move(*this);
 }
 
+Event Event::hostname() && {
+  char buf[512];
+  if (gethostname(buf, sizeof(buf)) == 0) {
+    items[LOG_HOSTNAME] = buf;
+  } else {
+    items[LOG_HOSTNAME] = strerror(errno);
+  }
+  return std::move(*this);
+}
+
 Event Event::level(const char* level) && {
   items[LOG_LEVEL] = level;
   return std::move(*this);
@@ -106,7 +116,7 @@ Event info(const char* fmt, ...) {
   va_start(args, fmt);
   auto defer = make_defer([&]() { va_end(args); });
 
-  return event().level(LOG_LEVEL_INFO).pid().time().message(fmt, args);
+  return event().level(LOG_LEVEL_INFO).pid().time().message(fmt, args).hostname();
 }
 
 Event warning(const char* fmt, ...) {
@@ -114,7 +124,7 @@ Event warning(const char* fmt, ...) {
   va_start(args, fmt);
   auto defer = make_defer([&]() { va_end(args); });
 
-  return event().level(LOG_LEVEL_WARNING).pid().time().message(fmt, args);
+  return event().level(LOG_LEVEL_WARNING).pid().time().message(fmt, args).hostname();
 }
 
 Event error(const char* fmt, ...) {
@@ -122,7 +132,7 @@ Event error(const char* fmt, ...) {
   va_start(args, fmt);
   auto defer = make_defer([&]() { va_end(args); });
 
-  return event().level(LOG_LEVEL_ERROR).pid().time().message(fmt, args);
+  return event().level(LOG_LEVEL_ERROR).pid().time().message(fmt, args).hostname();
 }
 
 void FormatSubscriber::receive(const Event& e) {

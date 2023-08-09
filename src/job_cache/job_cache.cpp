@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <util/execpath.h>
+#include <wcl/defer.h>
 #include <wcl/filepath.h>
 #include <wcl/optional.h>
 #include <wcl/tracing.h>
@@ -307,6 +308,8 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
 }
 
 FindJobResponse Cache::read(const FindJobRequest &find_request) {
+  wcl::log::info("Cache::read enter")();
+  auto defer = wcl::make_defer([]() { wcl::log::info("Cache::read exit")(); });
   static int misses_from_failure = 0;
 
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
@@ -316,6 +319,7 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
   for (int i = 0; i < 3; i++) {
     auto response = read_impl(find_request);
     if (response) {
+      wcl::log::info("Returning job response: cache_hit = %d", int(bool(response->match)));
       return *response;
     }
 
@@ -352,6 +356,8 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
 }
 
 void Cache::add(const AddJobRequest &add_request) {
+  wcl::log::info("Cache::add enter")();
+  auto defer = wcl::make_defer([]() { wcl::log::info("Cache::add exit")(); });
   // serialize the request, send it, deserialize the response, return it
   JAST request(JSON_OBJECT);
   request.add("method", "cache/add");
