@@ -257,7 +257,8 @@ def runTest (testScript: Path): Result Unit Error =
         Some _ =
             # TODO: use diff prim to compare jobStderr with expectedStderr
             def _ =
-                cat (testName, "\n", jobStderr,)
+                (testName, "\n", jobStderr, Nil)
+                | cat
                 | println
 
             Fail (makeError "Unexpected standard error. See above for details")
@@ -268,7 +269,8 @@ def runTest (testScript: Path): Result Unit Error =
         _ =
             # TODO: use diff prim to compare jobStdout with expectedStdout
             def _ =
-                cat (testName, "\n", jobStdout,)
+                (testName, "\n", jobStdout, Nil)
+                | cat
                 | println
 
             Fail (makeError "Unexpected standard output. See above for details")

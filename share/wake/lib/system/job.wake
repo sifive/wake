@@ -229,7 +229,20 @@ export def editPlanShare (f: Boolean => Boolean): Plan => Plan =
 export def getPlanHash (plan: Plan): Integer =
     def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ isAtty = plan
     def isAttyStr = if isAtty then "true" else "false"
-    def sig = cat (isAttyStr, "\0\0", implode cmd, "\0\0", implode env, "\0\0", dir, "\0\0", stdin,)
+
+    def sig =
+        (
+            isAttyStr,
+            "\0\0",
+            implode cmd,
+            "\0\0",
+            implode env,
+            "\0\0",
+            dir,
+            "\0\0",
+            stdin,
+        )
+        | cat
 
     require Some out = intbase 16 (hashString sig)
     else unreachable "hash_str returned a non-hex string!!!"
@@ -350,7 +363,10 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
             Fail e
         Pass (RunnerInput label cmd vis env dir stdin _ prefix _ _) =
             def mkVisJson (Path path hash) =
-                JObject ("path" :-> JString path, "hash" :-> JString hash,)
+                JObject (
+                    "path" :-> JString path,
+                    "hash" :-> JString hash,
+                )
 
             def jobCacheVisible = JArray (map mkVisJson vis)
 
@@ -466,7 +482,10 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
             def inputsTree = listToTree scmpCanonical inputs
 
             def mkOutputFileJson src =
-                JObject ("src" :-> JString src, "path" :-> JString "{wakeroot}/{src}",)
+                JObject (
+                    "src" :-> JString src,
+                    "path" :-> JString "{wakeroot}/{src}",
+                )
 
             def jobCacheOutputFiles = JArray (map mkOutputFileJson outputs)
 

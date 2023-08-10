@@ -1584,8 +1584,17 @@ def y =
     def x = -(1 + 2),
     def x = -a.b,
     def x = -(a b c),
-    def xs = (2, fib 3,)
-    def x = x, y, 3 + 2,
+
+    def xs = (
+        2,
+        fib 3,
+    )
+
+    def x =
+        x,
+        y,
+        3 + 2,
+
     def x = -a + b,
     def x = ! a + b,
     def x = !a.b,
@@ -1740,7 +1749,11 @@ def x _ =
     a
 
 def x =
-    def (x, a, z,) = b
+    def (
+        x,
+        a,
+        z,
+    ) = b
 
     z
 

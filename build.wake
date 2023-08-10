@@ -51,12 +51,12 @@ def bootstrapTarget targetFn variant =
     else Pass paths
 
     def cppSuffixRegex =
-        (".", variant.getPairFirst,)
+        (".", variant.getPairFirst, Nil)
         | cat
         | quote
 
     def cSuffixRegex =
-        (".", variant.getPairSecond,)
+        (".", variant.getPairSecond, Nil)
         | cat
         | quote
 
