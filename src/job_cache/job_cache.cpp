@@ -319,7 +319,7 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
   for (int i = 0; i < 3; i++) {
     auto response = read_impl(find_request);
     if (response) {
-      wcl::log::info("Returning job response: cache_hit = %d", int(bool(response->match)));
+      wcl::log::info("Returning job response: cache_hit = %d", int(bool(response->match)))();
       return *response;
     }
 

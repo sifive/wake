@@ -349,6 +349,9 @@ int main(int argc, char **argv) {
   if (clo.log_header) {
     config_override.log_header = wcl::make_some<std::string>(clo.log_header);
   }
+  if (clo.user_config) {
+    config_override.user_config = wcl::make_some<std::string>(clo.user_config);
+  }
   config_override.log_header_source_width = clo.log_header_source_width;
   config_override.log_header_align = clo.log_header_align;
   config_override.cache_miss_on_failure = clo.cache_miss_on_failure;
@@ -381,7 +384,7 @@ int main(int argc, char **argv) {
 
   // Open the job-cache if it exists
   std::unique_ptr<job_cache::Cache> cache;
-  const char *job_cache_dir = getenv("WAKE_EXPERIMENTAL_JOB_CACHE");
+  const char *job_cache_dir = getenv("WAKE_LOCAL_JOB_CACHE");
   if (job_cache_dir != nullptr) {
     cache = std::make_unique<job_cache::Cache>(job_cache_dir, WakeConfig::get()->max_cache_size,
                                                WakeConfig::get()->low_cache_size,

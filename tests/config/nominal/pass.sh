@@ -6,4 +6,4 @@ if [ $(uname) != Linux ] ; then
 fi
 
 WAKE="${1:+$1/wake}"
-"${WAKE:-wake}" --config
+WAKE_SHARED_CACHE_MAX_SIZE=1024 "${WAKE:-wake}" --config
