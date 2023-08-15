@@ -960,6 +960,13 @@ void Emitter::mark_no_format_nodes(CSTElement node) {
         FMT_ASSERT(!child.empty(), child, "Expected non-empty child");
 
         node_traits[block_item].turn_format_off();
+
+        // The CST_BLOCK may have other format off comments.
+        // It needs to be processed here so it isn't skipped.
+        // We don't need to skip the first non-token child since
+        //   1) its impossible to put a comment after a CST_BLOCK but before anything else
+        //   2) even if it was, there is no harm in turning off formatting twice
+        mark_no_format_nodes(child);
         continue;
       }
 
