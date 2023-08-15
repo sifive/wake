@@ -4,7 +4,7 @@ Wake config:
   log_header = 'foobar $source: ' (WakeRoot)
   log_header_source_width = '13' (WakeRoot)
   label_filter = '.*' (Default)
-  max_cache_size = '1024' (WakeRoot)
+  max_cache_size = '1024' (EnvVar)
   low_cache_size = '512' (WakeRoot)
   cache_miss_on_failure = 'true' (WakeRoot)
   log_header_align = 'true' (WakeRoot)

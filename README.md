@@ -174,6 +174,16 @@ Below is a full example
 }
 ```
 
+While there are many sources that a config option might come from, the following priority is always observed from lowest
+to highest:
+1) .wakeroot
+2) user config
+3) environment variables
+4) command line options
+
+So a command line option overides anything, an environment variable overrides user config and wakeroot, user config
+overrides wakeroot, and wakeroot overrides nothing
+
 # Documentation
 
 Documentation for wake can be found in [share/doc/wake](share/doc/wake).

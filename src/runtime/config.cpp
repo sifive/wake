@@ -335,14 +335,26 @@ bool WakeConfig::init(const std::string& wakeroot_path, const WakeConfigOverride
     }
   }
 
+  // The priority of config sources is the following from lowest priority to highest:
+  // 1) .wakeroot
+  // 2) user config
+  // 3) environment variables
+  // 4) command line options
+  //
+  // When parsing the user config, the user config path can't be in the user config
+  // but it can be anywhere else so before parsing the user config we parse wakeroot
+  // and then the other two sources. Once we parse the user config though we'll have
+  // go overwrite anything from the user config that should be form an env-var or
+  // a command line option.
+
   // Parse values from .wakeroot
   _config->set_all<WakeConfigProvenance::WakeRoot>(wakeroot_json);
 
   // Sometimes we need to the user_config with an env-var so we check env-vars first here
   _config->set_all_env_var();
 
-  // Further more users may choose to override the user config at the command line level so
-  // we run that too only to run it again later
+  // Furthermore users may choose to override the user config at the command line level so
+  // we run that to only to run it again later
   _config->override_all(overrides);
 
   // Parse user config
@@ -378,10 +390,12 @@ bool WakeConfig::init(const std::string& wakeroot_path, const WakeConfigOverride
   // Parse values from the user config
   _config->set_all<WakeConfigProvenance::UserConfig>(user_config_json);
 
-  // Set all env-vars again as they should override user configs
+  // Set all env-vars again as they should override user configs. Note that
+  // this is the second time we set the env-vars.
   _config->set_all_env_var();
 
-  // Finally apply command line overrides as they override everything
+  // Finally apply command line overrides as they override everything. Note that
+  // this is the second time we set the overrides.
   _config->override_all(overrides);
 
   return true;
