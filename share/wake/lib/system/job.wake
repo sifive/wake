@@ -538,7 +538,7 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
 
                 # Sometimes we want a read-only cache. For instance read-only pre-merge
                 # with read-write post-merge.
-                require None = getenv "WAKE_EXPERIMENTAL_JOB_CACHE_READ_ONLY"
+                require None = getenv "WAKE_LOCAL_JOB_CACHE_READ_ONLY"
                 else Pass ""
 
                 job_cache_add jobCacheAddJson
@@ -855,7 +855,7 @@ export def access (file: String) (mode: Integer): Boolean =
     (\f \m prim "access") file mode
 
 export def defaultRunner: Runner =
-    require Some _ = getenv "WAKE_EXPERIMENTAL_JOB_CACHE"
+    require Some _ = getenv "WAKE_LOCAL_JOB_CACHE"
     else fuseRunner
 
     # The fuseRunner does not actully mount over / and instead uses the

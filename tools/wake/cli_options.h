@@ -81,6 +81,7 @@ struct CommandLineOptions {
   const char *fd5;
   const char *label_filter;  // TODO: Allow unions of multiple filters
   const char *log_header;
+  const char *user_config;
 
   wcl::optional<int64_t> log_header_source_width;
 
@@ -155,6 +156,7 @@ struct CommandLineOptions {
       {0, "no-log-header-align", GOPT_ARGUMENT_FORBIDDEN},
       {0, "cache-miss-on-failure", GOPT_ARGUMENT_FORBIDDEN},
       {0, "no-cache-miss-on-failure", GOPT_ARGUMENT_FORBIDDEN},
+      {0, "user-config", GOPT_ARGUMENT_REQUIRED},
       {':', "shebang", GOPT_ARGUMENT_REQUIRED},
       {0, 0, GOPT_LAST}
     };
@@ -215,6 +217,7 @@ struct CommandLineOptions {
     fd5 = arg(options, "fd:5")->argument;
     label_filter = arg(options, "label-filter")->argument;
     log_header = arg(options, "log-header")->argument;
+    user_config = arg(options, "user-config")->argument;
 
     if (arg(options, "log-header-align")->count) {
       log_header_align = wcl::some(true);

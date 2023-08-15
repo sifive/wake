@@ -49,6 +49,9 @@ struct WakeConfigOverrides {
 
   // Determines if job cache should terminate on error or return a cache miss
   wcl::optional<bool> cache_miss_on_failure;
+
+  // Lets you specify an alternative user config
+  wcl::optional<std::string> user_config;
 };
 
 template <class T>
@@ -67,11 +70,13 @@ struct VersionPolicy {
   type version = "";
   static constexpr type VersionPolicy::*value = &VersionPolicy::version;
   static constexpr Override<input_type> override_value = nullptr;
+  static constexpr const char* env_var = nullptr;
 
   VersionPolicy() = default;
   static void set(VersionPolicy& p, const JAST& json);
   static void set_input(VersionPolicy& p, const input_type& v) { p.*value = v; }
   static void emit(const VersionPolicy& p, std::ostream& os) { os << p.*value; }
+  static void set_env_var(VersionPolicy& p, const char* env_var){};
 };
 
 struct UserConfigPolicy {
@@ -82,12 +87,14 @@ struct UserConfigPolicy {
   static constexpr bool allowed_in_userconfig = false;
   type user_config;
   static constexpr type UserConfigPolicy::*value = &UserConfigPolicy::user_config;
-  static constexpr Override<input_type> override_value = nullptr;
+  static constexpr Override<input_type> override_value = &WakeConfigOverrides::user_config;
+  static constexpr const char* env_var = "WAKE_USER_CONFIG";
 
   UserConfigPolicy();
   static void set(UserConfigPolicy& p, const JAST& json);
   static void set_input(UserConfigPolicy& p, const input_type& v) { p.*value = v; }
   static void emit(const UserConfigPolicy& p, std::ostream& os) { os << p.*value; }
+  static void set_env_var(UserConfigPolicy& p, const char* env_var) { p.*value = env_var; };
 };
 
 struct LogHeaderPolicy {
@@ -99,11 +106,13 @@ struct LogHeaderPolicy {
   type log_header = "[$stream] $source: ";
   static constexpr type LogHeaderPolicy::*value = &LogHeaderPolicy::log_header;
   static constexpr Override<input_type> override_value = &WakeConfigOverrides::log_header;
+  static constexpr const char* env_var = nullptr;
 
   LogHeaderPolicy() = default;
   static void set(LogHeaderPolicy& p, const JAST& json);
   static void set_input(LogHeaderPolicy& p, const input_type& v) { p.*value = v; }
   static void emit(const LogHeaderPolicy& p, std::ostream& os) { os << p.*value; }
+  static void set_env_var(LogHeaderPolicy& p, const char* env_var){};
 };
 
 struct LogHeaderSourceWidthPolicy {
@@ -117,11 +126,13 @@ struct LogHeaderSourceWidthPolicy {
       &LogHeaderSourceWidthPolicy::log_header_source_width;
   static constexpr Override<input_type> override_value =
       &WakeConfigOverrides::log_header_source_width;
+  static constexpr const char* env_var = nullptr;
 
   LogHeaderSourceWidthPolicy() {}
   static void set(LogHeaderSourceWidthPolicy& p, const JAST& json);
   static void set_input(LogHeaderSourceWidthPolicy& p, const input_type& v) { p.*value = v; }
   static void emit(const LogHeaderSourceWidthPolicy& p, std::ostream& os) { os << p.*value; }
+  static void set_env_var(LogHeaderSourceWidthPolicy& p, const char* env_var){};
 };
 
 struct LabelFilterPolicy {
@@ -133,6 +144,7 @@ struct LabelFilterPolicy {
   type label_filter;
   static constexpr type LabelFilterPolicy::*value = &LabelFilterPolicy::label_filter;
   static constexpr Override<input_type> override_value = &WakeConfigOverrides::label_filter;
+  static constexpr const char* env_var = nullptr;
 
   LabelFilterPolicy() : label_filter(std::make_unique<re2::RE2>(".*")) {}
 
@@ -145,6 +157,7 @@ struct LabelFilterPolicy {
   static void emit(const LabelFilterPolicy& p, std::ostream& os) {
     os << p.label_filter->pattern();
   }
+  static void set_env_var(LogHeaderSourceWidthPolicy& p, const char* value){};
 };
 
 struct SharedCacheMaxSize {
@@ -156,10 +169,14 @@ struct SharedCacheMaxSize {
   type max_cache_size = 25ULL << 30ULL;
   static constexpr type SharedCacheMaxSize::*value = &SharedCacheMaxSize::max_cache_size;
   static constexpr Override<input_type> override_value = &WakeConfigOverrides::max_cache_size;
+  static constexpr const char* env_var = "WAKE_SHARED_CACHE_MAX_SIZE";
 
   static void set(SharedCacheMaxSize& p, const JAST& json);
   static void set_input(SharedCacheMaxSize& p, const input_type& v) { p.*value = v; }
   static void emit(const SharedCacheMaxSize& p, std::ostream& os) { os << p.*value; }
+  static void set_env_var(SharedCacheMaxSize& p, const char* env_var) {
+    p.*value = std::stoull(env_var);
+  }
 };
 
 struct SharedCacheLowSize {
@@ -171,10 +188,14 @@ struct SharedCacheLowSize {
   type low_cache_size = 15ULL << 30ULL;
   static constexpr type SharedCacheLowSize::*value = &SharedCacheLowSize::low_cache_size;
   static constexpr Override<input_type> override_value = &WakeConfigOverrides::max_cache_size;
+  static constexpr const char* env_var = "WAKE_SHARED_CACHE_LOW_SIZE";
 
   static void set(SharedCacheLowSize& p, const JAST& json);
   static void set_input(SharedCacheLowSize& p, const input_type& v) { p.*value = v; }
   static void emit(const SharedCacheLowSize& p, std::ostream& os) { os << p.*value; }
+  static void set_env_var(SharedCacheLowSize& p, const char* env_var) {
+    p.*value = std::stoull(env_var);
+  }
 };
 
 struct SharedCacheMissOnFailure {
@@ -188,6 +209,7 @@ struct SharedCacheMissOnFailure {
       &SharedCacheMissOnFailure::cache_miss_on_failure;
   static constexpr Override<input_type> override_value =
       &WakeConfigOverrides::cache_miss_on_failure;
+  static constexpr const char* env_var = "WAKE_SHARED_CACHE_MISS_ON_FAILURE";
 
   static void set(SharedCacheMissOnFailure& p, const JAST& json);
   static void set_input(SharedCacheMissOnFailure& p, const input_type& v) { p.*value = v; }
@@ -196,6 +218,13 @@ struct SharedCacheMissOnFailure {
       os << "true";
     } else {
       os << "false";
+    }
+  }
+  static void set_env_var(SharedCacheMissOnFailure& p, const char* env_var) {
+    if (std::string(env_var) == "1") {
+      p.*value = true;
+    } else {
+      p.*value = false;
     }
   }
 };
@@ -209,6 +238,7 @@ struct LogHeaderAlignPolicy {
   type log_header_align = false;
   static constexpr type LogHeaderAlignPolicy::*value = &LogHeaderAlignPolicy::log_header_align;
   static constexpr Override<input_type> override_value = &WakeConfigOverrides::log_header_align;
+  static constexpr const char* env_var = nullptr;
 
   LogHeaderAlignPolicy() {}
   static void set(LogHeaderAlignPolicy& p, const JAST& json);
@@ -220,13 +250,14 @@ struct LogHeaderAlignPolicy {
       os << "false";
     }
   }
+  static void set_env_var(LogHeaderAlignPolicy& p, const char* env_var) {}
 };
 
 /********************************************************************
  * Generic WakeConfig implementation
  *********************************************************************/
 
-enum class WakeConfigProvenance { Default, WakeRoot, UserConfig, CommandLine };
+enum class WakeConfigProvenance { Default, WakeRoot, UserConfig, CommandLine, EnvVar };
 
 static inline const char* to_string(WakeConfigProvenance p) {
   switch (p) {
@@ -238,6 +269,8 @@ static inline const char* to_string(WakeConfigProvenance p) {
       return "UserConfig";
     case WakeConfigProvenance::CommandLine:
       return "Commandline";
+    case WakeConfigProvenance::EnvVar:
+      return "EnvVar";
   }
   return "Unknown (this is an error, please report this to Wake devs)";
 }
@@ -311,6 +344,17 @@ struct WakeConfigImpl : public Policies... {
   }
 
   template <class P>
+  auto set_env_var() {
+    return [this]() {
+      if (P::env_var == nullptr) return;
+      const char* env_var = getenv(P::env_var ? P::env_var : "");
+      if (env_var == nullptr) return;
+      provenance[P::key] = WakeConfigProvenance::EnvVar;
+      P::set_env_var(*this, env_var);
+    };
+  }
+
+  template <class P>
   auto override_policy(const WakeConfigOverrides& overrides) {
     return [&overrides, this]() {
       if (P::override_value && overrides.*P::override_value) {
@@ -337,6 +381,8 @@ struct WakeConfigImpl : public Policies... {
   void set_all(const JAST& json) {
     call_all(set_policy<p, Policies>(json)...);
   }
+
+  void set_all_env_var() { call_all(set_env_var<Policies>()...); }
 
   void override_all(const WakeConfigOverrides& overrides) {
     call_all(override_policy<Policies>(overrides)...);

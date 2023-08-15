@@ -1771,7 +1771,7 @@ static PRIMFN(prim_job_cache_read) {
   // First, the user may have not turned on the job cache
   if (!internal_job_cache) {
     std::string s =
-        "A job cache has not been specified. Please use WAKE_JOB_CACHE=<path> to turn on job "
+        "A job cache has not been specified. Please use WAKE_LOCAL_JOB_CACHE=<path> to turn on job "
         "caching";
     size_t need = String::reserve(s.size()) + reserve_result();
     runtime.heap.reserve(need);
@@ -1826,7 +1826,7 @@ static PRIMFN(prim_job_cache_add) {
   // First, the user may have not turned on the job cache
   if (!internal_job_cache) {
     std::string s =
-        "A job cache has not been specified. Please use WAKE_JOB_CACHE=<path> to turn on job "
+        "A job cache has not been specified. Please use WAKE_LOCAL_JOB_CACHE=<path> to turn on job "
         "caching";
     size_t need = String::reserve(s.size()) + reserve_result();
     runtime.heap.reserve(need);
