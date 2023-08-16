@@ -8,3 +8,4 @@ Wake config:
   low_cache_size = '16106127360' (Default)
   cache_miss_on_failure = 'false' (Default)
   log_header_align = 'false' (Default)
+  bulk_logging_dir = '' (Default)

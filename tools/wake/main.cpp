@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <chrono>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <random>
 #include <set>
@@ -190,6 +191,16 @@ class TerminalReporter : public DiagnosticReporter {
     }
   }
 };
+
+std::string get_date() {
+  auto now = std::chrono::system_clock::now();
+  auto time = std::chrono::system_clock::to_time_t(now);
+  std::stringstream ss;
+
+  ss << std::put_time(std::localtime(&time), "%Y-%m-%d");
+
+  return ss.str();
+}
 
 int main(int argc, char **argv) {
   // Make sure we always get core dumps but don't fail
@@ -365,6 +376,27 @@ int main(int argc, char **argv) {
     return 0;
   }
 
+  // Bulk logging
+  std::string bulk_dir = WakeConfig::get()->bulk_logging_dir;
+  if (!bulk_dir.empty()) {
+    std::string pid = std::to_string(getpid());
+    char buf[512];
+    if (gethostname(buf, sizeof(buf)) != 0) {
+      std::cerr << "Unable to init bulk logging: gethostname(): " << strerror(errno) << std::endl;
+      return 1;
+    }
+    std::string hostname = buf;
+    std::string bulk_log_file_path =
+        wcl::join_paths(bulk_dir, hostname + "-" + pid + "-" + get_date() + "-wake.log");
+    auto bulk_log_file_res = JsonSubscriber::fd_t::open(bulk_log_file_path.c_str());
+    if (!bulk_log_file_res) {
+      std::cerr << "Unable to init bulk logging: " << bulk_log_file_path
+                << " failed to open: " << strerror(bulk_log_file_res.error()) << std::endl;
+      return 1;
+    }
+    wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*bulk_log_file_res)));
+  }
+
   // if specified, check that .wakeroot is compatible with the wake version
   if (WakeConfig::get()->version != "") {
     std::string version_check =
@@ -386,9 +418,9 @@ int main(int argc, char **argv) {
   std::unique_ptr<job_cache::Cache> cache;
   const char *job_cache_dir = getenv("WAKE_LOCAL_JOB_CACHE");
   if (job_cache_dir != nullptr) {
-    cache = std::make_unique<job_cache::Cache>(job_cache_dir, WakeConfig::get()->max_cache_size,
-                                               WakeConfig::get()->low_cache_size,
-                                               WakeConfig::get()->cache_miss_on_failure);
+    cache = std::make_unique<job_cache::Cache>(
+        job_cache_dir, WakeConfig::get()->bulk_logging_dir, WakeConfig::get()->max_cache_size,
+        WakeConfig::get()->low_cache_size, WakeConfig::get()->cache_miss_on_failure);
     set_job_cache(cache.get());
   }
 

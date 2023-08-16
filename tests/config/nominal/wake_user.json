@@ -1,2 +1,3 @@
 {
+  "bulk_logging_dir": "/tmp/wake_bulk_logs"
 }

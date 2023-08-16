@@ -379,7 +379,7 @@ TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, wcl::xoshiro_256 gen) {
 
   mkdir(config.cache_dir.c_str(), 0777);
   mkdir(config.dir.c_str(), 0777);
-  job_cache::Cache cache(config.cache_dir, 1ULL << 24ULL, (1 << 23ULL) + (1 << 22ULL), false);
+  job_cache::Cache cache(config.cache_dir, "", 1ULL << 24ULL, (1 << 23ULL) + (1 << 22ULL), false);
 
   std::string out_dir = wcl::join_paths(config.dir, "outputs");
   for (size_t i = 0; i < config.number_of_steps; ++i) {

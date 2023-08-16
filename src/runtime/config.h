@@ -253,6 +253,26 @@ struct LogHeaderAlignPolicy {
   static void set_env_var(LogHeaderAlignPolicy& p, const char* env_var) {}
 };
 
+struct BulkLoggingDirPolicy {
+  using type = std::string;
+  using input_type = type;
+  static constexpr const char* key = "bulk_logging_dir";
+  static constexpr bool allowed_in_wakeroot = false;
+  static constexpr bool allowed_in_userconfig = true;
+  type bulk_logging_dir;
+  static constexpr type BulkLoggingDirPolicy::*value = &BulkLoggingDirPolicy::bulk_logging_dir;
+  static constexpr Override<input_type> override_value = nullptr;
+  static constexpr const char* env_var = "WAKE_BULK_LOGGING_DIR";
+
+  BulkLoggingDirPolicy() {}
+  static void set(BulkLoggingDirPolicy& p, const JAST& json);
+  static void set_input(BulkLoggingDirPolicy& p, const input_type& v) { p.*value = v; }
+  static void emit(const BulkLoggingDirPolicy& p, std::ostream& os) { os << p.*value; }
+  static void set_env_var(BulkLoggingDirPolicy& p, const char* env_var) {
+    p.bulk_logging_dir = env_var;
+  }
+};
+
 /********************************************************************
  * Generic WakeConfig implementation
  *********************************************************************/
@@ -398,7 +418,7 @@ struct WakeConfigImpl : public Policies... {
 using WakeConfigImplFull =
     WakeConfigImpl<UserConfigPolicy, VersionPolicy, LogHeaderPolicy, LogHeaderSourceWidthPolicy,
                    LabelFilterPolicy, SharedCacheMaxSize, SharedCacheLowSize,
-                   SharedCacheMissOnFailure, LogHeaderAlignPolicy>;
+                   SharedCacheMissOnFailure, LogHeaderAlignPolicy, BulkLoggingDirPolicy>;
 
 struct WakeConfig final : public WakeConfigImplFull {
   static bool init(const std::string& wakeroot_path, const WakeConfigOverrides& overrides);

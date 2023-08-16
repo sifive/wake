@@ -185,8 +185,8 @@ void Cache::launch_daemon() {
     std::string job_cache = wcl::make_canonical(find_execpath() + "/../bin/job-cache");
     std::string low_str = std::to_string(low_threshold);
     std::string max_str = std::to_string(max_size);
-    execl(job_cache.c_str(), "job-cached", cache_dir.c_str(), low_str.c_str(), max_str.c_str(),
-          nullptr);
+    execl(job_cache.c_str(), "job-cached", cache_dir.c_str(), bulk_logging_dir.c_str(),
+          low_str.c_str(), max_str.c_str(), nullptr);
 
     wcl::log::error("exec(%s): %s", job_cache.c_str(), strerror(errno)).urgent()();
     exit(1);
@@ -233,8 +233,9 @@ static void mkdir_all(std::string acc, Iter begin, Iter end) {
   }
 }
 
-Cache::Cache(std::string dir, uint64_t max, uint64_t low, bool miss) {
+Cache::Cache(std::string dir, std::string bulk_dir, uint64_t max, uint64_t low, bool miss) {
   cache_dir = dir;
+  bulk_logging_dir = bulk_dir;
   max_size = max;
   low_threshold = low;
   miss_on_failure = miss;

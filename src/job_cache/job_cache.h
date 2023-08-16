@@ -57,6 +57,7 @@ class Cache {
 
   // Daemon parameters
   std::string cache_dir;
+  std::string bulk_logging_dir;
   uint64_t max_size;
   uint64_t low_threshold;
 
@@ -68,7 +69,7 @@ class Cache {
   Cache() = delete;
   Cache(const Cache &) = delete;
 
-  Cache(std::string dir, uint64_t max, uint64_t low, bool miss);
+  Cache(std::string dir, std::string bulk_logging_dir, uint64_t max, uint64_t low, bool miss);
 
   FindJobResponse read(const FindJobRequest &find_request);
   void add(const AddJobRequest &add_request);

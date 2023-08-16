@@ -71,7 +71,7 @@ class DaemonCache {
   DaemonCache() = delete;
   DaemonCache(const DaemonCache &) = delete;
 
-  DaemonCache(std::string dir, uint64_t max, uint64_t low);
+  DaemonCache(std::string dir, std::string bulk_logging_dir, uint64_t max, uint64_t low);
 
   int run();
 };
