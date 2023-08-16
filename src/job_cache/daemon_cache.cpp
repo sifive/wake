@@ -72,6 +72,29 @@ static void initialize_logging() {
   }
   wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*log_file_res)));
 
+  const char *bulk_dir = getenv("WAKE_BULK_LOGGING_DIR");
+  if (bulk_dir) {
+    std::string pid = std::to_string(getpid());
+    char buf[512];
+    if (gethostname(buf, sizeof(buf)) != 0) {
+      std::cerr << "urgent warning: Could not init logging: gethostname(): " << strerror(errno)
+                << std::endl;
+      std::cerr << "urgent warning: Continuing without bulk logging." << std::endl;
+      return;
+    }
+    std::string hostname = buf;
+    std::string bulk_log_file_path =
+        wcl::join_paths(bulk_dir, hostname + "-" + pid + "-" + time_buffer + "-cache.log");
+    auto bulk_log_file_res = JsonSubscriber::fd_t::open(bulk_log_file_path.c_str());
+    if (!bulk_log_file_res) {
+      std::cerr << "urgent warning: Could not init bulk logging: " << bulk_log_file_path
+                << " failed to open: " << strerror(bulk_log_file_res.error()) << std::endl;
+      std::cerr << "urgent warning: Continuing without bulk logging." << std::endl;
+      return;
+    }
+    wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*bulk_log_file_res)));
+  }
+
   wcl::log::info("Initialized logging for job cache daemon")();
 
   auto res = wcl::directory_range::open(".");
