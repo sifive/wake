@@ -1481,3 +1481,15 @@ def x =
         z
     ) = b
     z
+
+def a =
+    # wake-format off
+    def b =
+        1+2
+
+    # wake-format off
+    def c =
+        3+5
+
+    5
+
