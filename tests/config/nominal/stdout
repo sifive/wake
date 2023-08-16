@@ -8,3 +8,4 @@ Wake config:
   low_cache_size = '512' (WakeRoot)
   cache_miss_on_failure = 'true' (WakeRoot)
   log_header_align = 'true' (WakeRoot)
+  bulk_logging_dir = '/tmp/wake_bulk_logs' (UserConfig)

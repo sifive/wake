@@ -25,21 +25,24 @@
 
 // argv[0] = program name
 // argv[1] = cache dir
-// argv[2] = low cache size
-// argv[3] = max cache size
+// argv[2] = bulk cache dir
+// argv[3] = low cache size
+// argv[4] = max cache size
 int main(int argc, char **argv) {
-  if (argc != 4) {
+  if (argc != 5) {
     std::cerr << "Usage: job-cache cache/directory 100 5000" << std::endl;
     return 1;
   }
 
   std::string cache_dir = std::string(argv[1]);
-  uint64_t low_cache_size = std::stoull(argv[2]);
-  uint64_t max_cache_size = std::stoull(argv[3]);
+  std::string bulk_logging_dir = std::string(argv[2]);
+  uint64_t low_cache_size = std::stoull(argv[3]);
+  uint64_t max_cache_size = std::stoull(argv[4]);
 
   int status = 1;
   {
-    job_cache::DaemonCache dcache(std::move(cache_dir), max_cache_size, low_cache_size);
+    job_cache::DaemonCache dcache(std::move(cache_dir), std::move(bulk_logging_dir), max_cache_size,
+                                  low_cache_size);
     status = dcache.run();
   }
 

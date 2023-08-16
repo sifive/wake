@@ -50,7 +50,7 @@ namespace {
 
 using namespace job_cache;
 
-static void initialize_logging() {
+static void initialize_logging(std::string bulk_dir) {
   const char *str_fmt = "%Y-%m-%d";
   const size_t str_fmt_len = 10;         // count("XXXX-XX-XX")
   const size_t filename_prefix_len = 7;  // count (".cache.")
@@ -72,8 +72,7 @@ static void initialize_logging() {
   }
   wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*log_file_res)));
 
-  const char *bulk_dir = getenv("WAKE_BULK_LOGGING_DIR");
-  if (bulk_dir) {
+  if (!bulk_dir.empty()) {
     std::string pid = std::to_string(getpid());
     char buf[512];
     if (gethostname(buf, sizeof(buf)) != 0) {
@@ -664,12 +663,12 @@ struct CacheDbImpl {
         matching_jobs(db) {}
 };
 
-DaemonCache::DaemonCache(std::string dir, uint64_t max, uint64_t low)
+DaemonCache::DaemonCache(std::string dir, std::string bulk_dir, uint64_t max, uint64_t low)
     : rng(wcl::xoshiro_256::get_rng_seed()), max_cache_size(max), low_cache_size(low) {
   mkdir_no_fail(dir.c_str());
   chdir_no_fail(dir.c_str());
 
-  initialize_logging();
+  initialize_logging(bulk_dir);
 
   wcl::log::info("Launching DaemonCache. dir = %s, max = %lu, low = %lu", dir.c_str(),
                  max_cache_size, low_cache_size)();

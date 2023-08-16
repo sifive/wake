@@ -344,27 +344,6 @@ int main(int argc, char **argv) {
   }
   wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*res)));
 
-  // Bulk logging
-  const char *bulk_dir = getenv("WAKE_BULK_LOGGING_DIR");
-  if (bulk_dir) {
-    std::string pid = std::to_string(getpid());
-    char buf[512];
-    if (gethostname(buf, sizeof(buf)) != 0) {
-      std::cerr << "Unable to init bulk logging: gethostname(): " << strerror(errno) << std::endl;
-      return 1;
-    }
-    std::string hostname = buf;
-    std::string bulk_log_file_path =
-        wcl::join_paths(bulk_dir, hostname + "-" + pid + "-" + get_date() + "-wake.log");
-    auto bulk_log_file_res = JsonSubscriber::fd_t::open(bulk_log_file_path.c_str());
-    if (!bulk_log_file_res) {
-      std::cerr << "Unable to init bulk logging: " << bulk_log_file_path
-                << " failed to open: " << strerror(bulk_log_file_res.error()) << std::endl;
-      return 1;
-    }
-    wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*bulk_log_file_res)));
-  }
-
   // Log urgent events to cerr
   auto cerr_subscriber = std::make_unique<wcl::log::SimpleFormatSubscriber>(std::cerr.rdbuf());
   auto filter_subscriber = std::make_unique<wcl::log::FilterSubscriber>(
@@ -397,6 +376,27 @@ int main(int argc, char **argv) {
     return 0;
   }
 
+  // Bulk logging
+  std::string bulk_dir = WakeConfig::get()->bulk_logging_dir;
+  if (!bulk_dir.empty()) {
+    std::string pid = std::to_string(getpid());
+    char buf[512];
+    if (gethostname(buf, sizeof(buf)) != 0) {
+      std::cerr << "Unable to init bulk logging: gethostname(): " << strerror(errno) << std::endl;
+      return 1;
+    }
+    std::string hostname = buf;
+    std::string bulk_log_file_path =
+        wcl::join_paths(bulk_dir, hostname + "-" + pid + "-" + get_date() + "-wake.log");
+    auto bulk_log_file_res = JsonSubscriber::fd_t::open(bulk_log_file_path.c_str());
+    if (!bulk_log_file_res) {
+      std::cerr << "Unable to init bulk logging: " << bulk_log_file_path
+                << " failed to open: " << strerror(bulk_log_file_res.error()) << std::endl;
+      return 1;
+    }
+    wcl::log::subscribe(std::make_unique<JsonSubscriber>(std::move(*bulk_log_file_res)));
+  }
+
   // if specified, check that .wakeroot is compatible with the wake version
   if (WakeConfig::get()->version != "") {
     std::string version_check =
@@ -418,9 +418,9 @@ int main(int argc, char **argv) {
   std::unique_ptr<job_cache::Cache> cache;
   const char *job_cache_dir = getenv("WAKE_LOCAL_JOB_CACHE");
   if (job_cache_dir != nullptr) {
-    cache = std::make_unique<job_cache::Cache>(job_cache_dir, WakeConfig::get()->max_cache_size,
-                                               WakeConfig::get()->low_cache_size,
-                                               WakeConfig::get()->cache_miss_on_failure);
+    cache = std::make_unique<job_cache::Cache>(
+        job_cache_dir, WakeConfig::get()->bulk_logging_dir, WakeConfig::get()->max_cache_size,
+        WakeConfig::get()->low_cache_size, WakeConfig::get()->cache_miss_on_failure);
     set_job_cache(cache.get());
   }
 
