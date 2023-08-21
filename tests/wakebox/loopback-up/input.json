@@ -1,0 +1,17 @@
+{
+  "command": [
+    "bash", "-c", "ip addr show dev lo"
+  ],
+  "environment": [
+    "USER=root",
+    "HOME=/root",
+    "PATH=/usr/bin:/bin:/usr/sbin"
+  ],
+  "directory": ".",
+  "stdin": "",
+  "user-id": 0,
+  "group-id": 0,
+  "isolate-network": true,
+  "mount-ops": [],
+  "visible": []
+}
