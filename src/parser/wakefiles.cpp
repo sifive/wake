@@ -520,7 +520,11 @@ std::vector<std::string> find_workspace_wakefiles_via_manifest(const std::string
   }
 
   for (const auto &file : unreadable_files) {
-    wcl::log::error("manifest file '%s' does not exist", file.c_str()).urgent()();
+    wcl::log::error(
+        "File '%s' listed in '%s/.wakemanifest' does not exist. Either remove the path from "
+        "'.wakemanifest' or create a valid wake file at '%s'.",
+        file.c_str(), workdir.c_str(), file.c_str())
+        .urgent()();
   }
 
   if (!unreadable_files.empty()) {
