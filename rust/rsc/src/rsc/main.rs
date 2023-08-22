@@ -1,5 +1,5 @@
 use axum::{routing::post, Router};
-use gumdrop::Options;
+use clap::Parser;
 use migration::{Migrator, MigratorTrait};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
@@ -13,28 +13,25 @@ mod types;
 #[path = "../common/config.rs"]
 mod config;
 
-#[derive(Debug, Options)]
+#[derive(Debug, Parser)]
 struct ServerOptions {
-    #[options(help_flag, help = "print help message")]
-    help: bool,
-
-    #[options(help = "Specify a config override file", meta = "CONFIG", no_short)]
+    #[arg(help = "Specify a config override file", value_name = "CONFIG", long)]
     config_override: Option<String>,
 
-    #[options(help = "Show's the config and then exits", no_short)]
+    #[arg(help = "Show's the config and then exits", long)]
     show_config: bool,
 
-    #[options(
+    #[arg(
         help = "Specify an override for the bind address",
-        meta = "SERVER_IP[:SERVER_PORT]",
-        no_short
+        value_name = "SERVER_IP[:SERVER_PORT]",
+        long
     )]
     server_addr: Option<String>,
 
-    #[options(
+    #[arg(
         help = "Specify an override for the database url",
-        meta = "DATABASE_URL",
-        no_short
+        value_name = "DATABASE_URL",
+        long
     )]
     database_url: Option<String>,
 }
@@ -46,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     // Parse our arguments
-    let args = ServerOptions::parse_args_default_or_exit();
+    let args = ServerOptions::parse();
 
     // Get our configuration
     let config = config::GSCConfig::new(config::GSCConfigOverride {
