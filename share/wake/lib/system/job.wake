@@ -656,7 +656,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
                 Pair Nil last = confirm False last (build Unit)
 
 # Only run if the first four arguments differ
-target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run echo stdout stderr label isatty =
+target runOnce cmd env dir stdin vis isatty run \ res usage finputs foutputs keep echo stdout stderr label =
     runAlways cmd env dir stdin res usage finputs foutputs vis keep run echo stdout stderr label isatty
 
 export def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) (LogLevel stderr) isatty =
@@ -666,18 +666,18 @@ export def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers
         env
         dir
         stdin
+        vis
+        isatty
+        run
         res
         usage
         finputs
         foutputs
-        vis
         (isKeep pers)
-        run
         echo
         stdout
         stderr
         label
-        isatty
     else
         runAlways
         cmd
