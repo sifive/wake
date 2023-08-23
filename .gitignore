@@ -51,4 +51,4 @@ Cargo.lock
 /rust/migration/target/*
 /rust/entity/target/*
 /rust/log_viewer/target/*
-/rust/gsc/target/*
+/rust/rsc/target/*

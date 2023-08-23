@@ -1,7 +1,8 @@
 use chrono::NaiveDateTime;
-use color_eyre::Report;
+use clap::Parser;
 use crossterm::style::{Color, StyledContent, Stylize};
-use gumdrop::Options;
+use miette::Error;
+use miette::IntoDiagnostic;
 use palette::{convert::FromColorUnclamped, encoding::Srgb, rgb::Rgb, Lab};
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::*;
@@ -119,27 +120,21 @@ fn get_log_level_color(level: &Option<String>) -> Color {
     }
 }
 
-fn read_lines_from(file: &str) -> Result<Vec<Event>, Report> {
-    let file = File::open(file)?;
+fn read_lines_from(file: &str) -> Result<Vec<Event>, Error> {
+    let file = File::open(file).into_diagnostic()?;
     let file = BufReader::new(file);
     let mut out = vec![];
     for line in file.lines() {
-        let line = line?;
-        let event: Event = serde_json::from_str(&line).map_err(|error| {
-            let message = format!("json(len = {}): {}", line.len(), line);
-            Report::new(error).wrap_err(message)
-        })?;
+        let line = line.into_diagnostic()?;
+        let event: Event = serde_json::from_str(&line).into_diagnostic()?;
         out.push(event);
     }
     Ok(out)
 }
 
-#[derive(Debug, Options)]
+#[derive(Debug, Parser)]
+#[command(author, version, about, long_about = None)]
 struct LogViewOptions {
-    #[options(help_flag, help = "print help message")]
-    help: bool,
-
-    #[options(free)]
     files: Vec<String>,
 }
 
@@ -149,7 +144,7 @@ struct RenderConfig {
     color_map: HashMap<i32, Color>,
 }
 
-fn render_line(config: &RenderConfig, event: &Event) -> Result<(), Report> {
+fn render_line(config: &RenderConfig, event: &Event) -> Result<(), Error> {
     let mut to_render: Vec<StyledContent<String>> = vec![];
     let color = *config.color_map.get(&event.pid).unwrap_or(&Color::White);
 
@@ -199,8 +194,8 @@ fn render_line(config: &RenderConfig, event: &Event) -> Result<(), Report> {
     Ok(())
 }
 
-fn render(color_map: HashMap<i32, Color>, events: Vec<Event>) -> Result<(), Report> {
-    let (max_width, _height) = crossterm::terminal::size()?;
+fn render(color_map: HashMap<i32, Color>, events: Vec<Event>) -> Result<(), Error> {
+    let (max_width, _height) = crossterm::terminal::size().into_diagnostic()?;
     let config = RenderConfig {
         max_width,
         color_map,
@@ -211,10 +206,10 @@ fn render(color_map: HashMap<i32, Color>, events: Vec<Event>) -> Result<(), Repo
     Ok(())
 }
 
-fn main() -> Result<(), Report> {
-    color_eyre::install()?;
+fn main() -> Result<(), Error> {
+    //color_eyre::install()?;
     let mut colors = generate_distinct_colors();
-    let opts = LogViewOptions::parse_args_default_or_exit();
+    let opts = LogViewOptions::parse();
     let mut events: Vec<Event> = vec![];
 
     // Parse all the files

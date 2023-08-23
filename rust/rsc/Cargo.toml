@@ -1,15 +1,15 @@
 [package]
-name = "gsc"
+name = "rsc"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "gsc"
-path = "src/gsc/main.rs"
+name = "rsc"
+path = "src/rsc/main.rs"
 
 [[bin]]
-name = "gsc_tool"
-path = "src/gsc_tool/main.rs"
+name = "rsc_tool"
+path = "src/rsc_tool/main.rs"
 
 [dependencies]
 entity = { path = "../entity" }
@@ -22,7 +22,6 @@ tracing-subscriber = "0.3"
 axum = "0.6.18"
 serde_bytes = "0.11.9"
 blake3 = "1.4.0"
-gumdrop = "0.8.1"
 data-encoding = "2.4.0"
 rand_core = "0.6.4"
 inquire = { version = "0.6.2", features = [] }
@@ -32,3 +31,5 @@ textwrap = "0.16.0"
 chrono = "0.4.26"
 config = "0.13.3"
 serde_json = "1.0.100"
+clap = { version = "4.3.23", features = ["derive"] }
+is-terminal = "0.4.9"

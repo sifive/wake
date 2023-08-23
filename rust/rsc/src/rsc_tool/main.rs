@@ -1,8 +1,8 @@
-use atty::Stream;
+use clap::{Parser, Subcommand};
 use data_encoding::BASE64;
 use entity::api_key;
-use gumdrop::Options;
 use inquire::Confirm;
+use is_terminal::IsTerminal;
 use migration::{DbErr, Migrator, MigratorTrait};
 use rand_core::{OsRng, RngCore};
 use sea_orm::{
@@ -91,7 +91,7 @@ async fn remove_api_key(
     };
 
     // We only want to prompt the user if the user can type into the terminal
-    if atty::is(Stream::Stdin) {
+    if std::io::stdin().is_terminal() {
         let should_delete = Confirm::new("Are you sure you want to delete this key?")
             .with_default(false)
             .with_help_message(format!("key = {}, desc = {:?}", key, result.desc).as_str())
@@ -117,82 +117,73 @@ async fn remove_api_key(
 }
 
 // Define all of our top level commands
-#[derive(Debug, Options)]
+#[derive(Debug, Parser)]
+#[command(author, version, about, long_about = None)]
 struct TopLevel {
-    // Options here can be accepted with any command (or none at all),
-    // but they must come before the command name.
-    #[options(help_flag, help = "print help message")]
-    help: bool,
-
-    #[options(help = "Specify a config override file", meta = "CONFIG", no_short)]
+    #[arg(help = "Specify a config override file", value_name = "CONFIG", long)]
     config_override: Option<String>,
 
-    #[options(
+    #[arg(
         help = "Specify and override for the database url",
-        meta = "DATABASE_URL",
-        no_short
+        value_name = "DATABASE_URL",
+        long
     )]
     database_url: Option<String>,
 
-    #[options(help = "Show's the config and then exits", no_short)]
+    #[arg(help = "Show's the config and then exits", long)]
     show_config: bool,
 
     // The `command` option will delegate option parsing to the command type,
     // starting at the first free argument.
-    #[options(command)]
+    #[command(subcommand)]
     api_key_command: Option<ApiKey>,
 }
 
-#[derive(Debug, Options)]
+#[derive(Debug, Subcommand)]
 enum ApiKey {
-    #[options(help = "list all api keys in the database")]
+    //#[options(help = "list all api keys in the database")]
     List(ListKeysOpts),
 
-    #[options(help = "add an api key to the database")]
+    //#[options(help = "add an api key to the database")]
     AddKey(AddKeyOpts),
 
-    #[options(help = "remove an api key from the database")]
+    //#[options(help = "remove an api key from the database")]
     RemoveKey(RemoveKeyOpts),
 }
 
-#[derive(Debug, Options)]
+#[derive(Debug, Parser)]
 struct AddKeyOpts {
-    #[options(help_flag, help = "print help message")]
-    help: bool,
-
-    #[options(
+    #[arg(
         help = "If specified this is the key that will be used, otherwise one will be generated",
-        meta = "KEY"
+        value_name = "KEY"
     )]
     key: Option<String>,
 
-    #[options(
-        required,
+    #[arg(
+        required = true,
         help = "The description of the key. This might tell you where the key is meant to be used",
-        meta = "DESC"
+        value_name = "DESC"
     )]
     desc: String,
 }
 
-#[derive(Debug, Options)]
-struct ListKeysOpts {
-    #[options(help_flag, help = "print help message")]
-    help: bool,
-}
+#[derive(Debug, Parser)]
+struct ListKeysOpts {}
 
-#[derive(Debug, Options)]
+#[derive(Debug, Parser)]
 struct RemoveKeyOpts {
-    #[options(help_flag, help = "print help message")]
-    help: bool,
-
-    #[options(required, help = "The key you want to remove", meta = "KEY")]
+    #[arg(
+        required = true,
+        help = "The key you want to remove",
+        value_name = "KEY"
+    )]
     key: String,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse our arguments
-    let args = TopLevel::parse_args_default_or_exit();
+    let args = TopLevel::parse();
 
     // Gather our config
     let config = config::GSCConfig::new(config::GSCConfigOverride {
