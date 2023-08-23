@@ -198,7 +198,7 @@ int main(int argc, char **argv) {
   FILE *user_warn = stdout;
   user_warn = fopen("/dev/null", "w");
   if (auto_find_files) {
-    bool ok;
+    bool ok = true;
     wakefiles = find_all_wakefiles(ok, true, false, ".", ".", user_warn);
     if (!ok) {
       std::cerr << "Failed to automatically discover wake files" << std::endl;

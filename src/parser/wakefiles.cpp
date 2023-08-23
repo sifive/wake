@@ -536,6 +536,7 @@ std::vector<std::string> find_workspace_wakefiles_via_manifest(const std::string
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose,
                                             const std::string &libdir, const std::string &workdir,
                                             FILE *user_warning_dest) {
+  ok = true;
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
