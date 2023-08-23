@@ -120,7 +120,7 @@ struct Hash256 {
 
 // If a file handle is not a symlink, directory, or regular file
 // then we consider it "exotic". This includes block devices,
-// character devices, FIFOs, and scokets.
+// character devices, FIFOs, and sockets.
 static wcl::optional<Hash256> hash_exotic() {
   Hash256 out;
   out.data[0] = 1;
