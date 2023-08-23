@@ -196,10 +196,12 @@ def computeHashes (prefix: String) (files: List String): List String =
             | Pass
     else mergeSelect which_files_to_hash (map (add _ "BadHash") to_hash) not_to_hash
 
-    require Pass stdout =
-        plan
-        | runJobWith localRunner
-        | getJobStdout
+    def job = runJobWith localRunner plan
+
+    require Exited 0 = getJobStatus job
+    else mergeSelect which_files_to_hash (map (add _ "BadHash") to_hash) not_to_hash
+
+    require Pass stdout = getJobStdout job
     else mergeSelect which_files_to_hash (map (add _ "BadHash") to_hash) not_to_hash
 
     # We want a better error message if the number of lines do not match
@@ -210,7 +212,7 @@ def computeHashes (prefix: String) (files: List String): List String =
         | filter (_ !=* "")
 
     require True = len hash_lines == to_hash_len
-    else unreachable "wake-hash returned {format hash_lines} lines but we expected {str to_hash_len} lines"
+    else panic "wake-hash returned {format hash_lines} lines but we expected {str to_hash_len} lines"
 
     # Finally actually add all the hashes
     def hashed =

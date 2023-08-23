@@ -42,6 +42,7 @@
 
 #include "blake2/blake2.h"
 #include "compat/nofollow.h"
+#include "wcl/optional.h"
 #include "wcl/unique_fd.h"
 #include "wcl/xoshiro_256.h"
 
@@ -117,9 +118,18 @@ struct Hash256 {
   bool operator!=(Hash256 other) { return !(*this == other); }
 };
 
-static Hash256 hash_dir() { return Hash256(); }
+// If a file handle is not a symlink, directory, or regular file
+// then we consider it "exotic". This includes block devices, 
+// character devices, FIFOs, and scokets.
+static wcl::optional<Hash256> hash_exotic() {
+  Hash256 out;
+  out.data[0] = 1;
+  return wcl::make_some<Hash256>(out);
+}
 
-static Hash256 hash_link(const char* link) {
+static wcl::optional<Hash256> hash_dir() { return wcl::some(Hash256()); }
+
+static wcl::optional<Hash256> hash_link(const char* link) {
   blake2b_state S;
   uint8_t hash[HASH_BYTES];
   std::vector<char> buffer(8192, 0);
@@ -128,7 +138,7 @@ static Hash256 hash_link(const char* link) {
     int bytes_read = readlink(link, buffer.data(), buffer.size());
     if (bytes_read < 0) {
       std::cerr << "wake-hash: readlink(" << link << "): " << strerror(errno) << std::endl;
-      exit(1);
+      return {};
     }
     if (static_cast<size_t>(bytes_read) != buffer.size()) {
       buffer.resize(bytes_read);
@@ -141,10 +151,10 @@ static Hash256 hash_link(const char* link) {
   blake2b_update(&S, reinterpret_cast<uint8_t*>(buffer.data()), buffer.size());
   blake2b_final(&S, &hash[0], sizeof(hash));
 
-  return Hash256::from_hash(&hash);
+  return wcl::some(Hash256::from_hash(&hash));
 }
 
-static Hash256 hash_file(const char* file, int fd) {
+static wcl::optional<Hash256> hash_file(const char* file, int fd) {
   blake2b_state S;
   uint8_t hash[HASH_BYTES], buffer[8192];
   ssize_t got;
@@ -158,16 +168,17 @@ static Hash256 hash_file(const char* file, int fd) {
     exit(1);
   }
 
-  return Hash256::from_hash(&hash);
+  return wcl::some(Hash256::from_hash(&hash));
 }
 
-static Hash256 do_hash(const char* file) {
+static wcl::optional<Hash256> do_hash(const char* file) {
   struct stat stat;
   auto fd = wcl::unique_fd::open(file, O_RDONLY | O_NOFOLLOW);
 
   if (!fd) {
     if (fd.error() == EISDIR) return hash_dir();
     if (fd.error() == ELOOP || errno == EMLINK) return hash_link(file);
+    if (fd.error() == ENXIO) return hash_exotic();
     std::cerr << "wake-hash open(" << file << "): " << strerror(errno);
     exit(1);
   }
@@ -180,15 +191,16 @@ static Hash256 do_hash(const char* file) {
 
   if (S_ISDIR(stat.st_mode)) return hash_dir();
   if (S_ISLNK(stat.st_mode)) return hash_link(file);
+  if (S_ISREG(stat.st_mode)) return hash_file(file, fd->get());
 
-  return hash_file(file, fd->get());
+  return hash_exotic();
 }
 
-std::vector<Hash256> hash_all_files(const std::vector<std::string>& files_to_hash) {
+std::vector<wcl::optional<Hash256>> hash_all_files(const std::vector<std::string>& files_to_hash) {
   std::atomic<size_t> counter{0};
   // We have to pre-alocate all the hashes so that we can overwrite them each
   // at anytime and maintain order
-  std::vector<Hash256> hashes(files_to_hash.size());
+  std::vector<wcl::optional<Hash256>> hashes(files_to_hash.size());
   // The cost of thread creation is fairly low with Linux on x86 so we allow opening up-to one
   // thread per-file.
   size_t num_threads = std::min(size_t(std::thread::hardware_concurrency()), files_to_hash.size());
@@ -245,11 +257,16 @@ int main(int argc, char** argv) {
     }
   }
 
-  std::vector<Hash256> hashes = hash_all_files(files_to_hash);
+  std::vector<wcl::optional<Hash256>> hashes = hash_all_files(files_to_hash);
 
-  // Now output them in the same order that we received them
+  // Now output them in the same order that we received them. If we could
+  // not hash something, return "BadHash" in that case.
   for (auto& hash : hashes) {
-    std::cout << hash.to_hex() << std::endl;
+    if (hash) {
+      std::cout << hash->to_hex() << std::endl;
+    } else {
+      std::cout << "BadHash" << std::endl;
+    }
   }
 
   return 0;

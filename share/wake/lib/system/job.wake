@@ -636,9 +636,8 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
             if hashcode name ==* hash then
                 Unit
             else if abort # The panic will not be deadcode dropped, because it's an alternative return of the effect-ful notOk
-            # This use of unreachable is not ok!
             then
-                unreachable "The hashcode of output file '{name}' has changed from {hash} (when wake last ran) to {hashcode name} (when inspected this time). Presumably it was hand edited. Please move this file out of the way. Aborting the build to prevent loss of your data."
+                panic "The hashcode of output file '{name}' has changed from {hash} (when wake last ran) to {hashcode name} (when inspected this time). Presumably it was hand edited. Please move this file out of the way. Aborting the build to prevent loss of your data."
             else
                 printlnLevel
                 logError
