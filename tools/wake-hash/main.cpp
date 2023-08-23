@@ -165,7 +165,7 @@ static wcl::optional<Hash256> hash_file(const char* file, int fd) {
 
   if (got < 0) {
     std::cerr << "wake-hash read(" << file << "): " << strerror(errno) << std::endl;
-    exit(1);
+    return {};
   }
 
   return wcl::some(Hash256::from_hash(&hash));
@@ -180,13 +180,13 @@ static wcl::optional<Hash256> do_hash(const char* file) {
     if (fd.error() == ELOOP || errno == EMLINK) return hash_link(file);
     if (fd.error() == ENXIO) return hash_exotic();
     std::cerr << "wake-hash open(" << file << "): " << strerror(errno);
-    exit(1);
+    return {};
   }
 
   if (fstat(fd->get(), &stat) != 0) {
     if (errno == EISDIR) return hash_dir();
     std::cerr << "wake-hash fstat(" << file << "): " << strerror(errno);
-    exit(1);
+    return {};
   }
 
   if (S_ISDIR(stat.st_mode)) return hash_dir();
