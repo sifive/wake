@@ -27,10 +27,10 @@ export def sortPaths (paths: List Path): List Path =
     sortBy fn paths
 
 # Concatenate two paths
-#  join "foo"  "bar"    => "foo/bar"
-#  join "foo"  "/bar "  => "/bar"
-#  join "/foo" "bar"    => "/foo/bar"
-#  join "foo"  "../bar" => "bar"
+#  in "foo"  "bar"    => "foo/bar"
+#  in "foo"  "/bar "  => "/bar"
+#  in "/foo" "bar"    => "/foo/bar"
+#  in "foo"  "../bar" => "bar"
 export def in (dir: String) (path: String): String =
     if matches `/.*` path then
         path
