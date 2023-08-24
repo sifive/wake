@@ -99,4 +99,10 @@ export def wait (f: a => b) (x: a): b =
 export def unreachable (reason: String): a =
     def f x = prim "unreachable"
 
-    f reason
+    f "REACHED UNREACHABLE CODE: {reason}"
+
+# Like unreachable but with a different error message
+export def panic (reason: String): a =
+    def f x = prim "panic"
+
+    f "PANIC: {reason}"
