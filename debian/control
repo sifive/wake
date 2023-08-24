@@ -10,7 +10,7 @@ Vcs-Git: https://github.com/sifive/wake.git
 
 Package: wake
 Architecture: any
-Depends: fuse, dash, ${shlibs:Depends}, ${misc:Depends}
+Depends: fuse, dash, iproute2, ${shlibs:Depends}, ${misc:Depends}
 Recommends: squashfuse
 Description: flexible build orchestration tool and language
  Wake is a build orchestration tool and language.

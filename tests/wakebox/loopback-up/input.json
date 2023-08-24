@@ -1,11 +1,11 @@
 {
   "command": [
-    "bash", "-c", "ip addr show dev lo"
+    "ip", "addr", "show", "dev", "lo"
   ],
   "environment": [
     "USER=root",
     "HOME=/root",
-    "PATH=/usr/bin:/bin:/usr/sbin"
+    "PATH=/usr/bin:/bin:/usr/sbin:/sbin"
   ],
   "directory": ".",
   "stdin": "",
