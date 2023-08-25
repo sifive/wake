@@ -773,27 +773,50 @@ export def getJobStderrRaw (job: Job): Result String Error =
 
     stdio job 2
 
+# Gives the full stdout of a job as a string, without any manipulation.
+# Returns the result successfully as long as the job was successfully launched
+# and closed its stdout handle at some point during its execution. This
+# generally occurs by the process simply terminating. The only case where
+# this would return a failure is if the job did not successfully launch.
 export def getJobFailedStdoutRaw (job: Job): Result String Error =
     stdio job 1
 
+# Gives the full stderr of a job as a string, without any manipulation.
+# Returns the result successfully as long as the job was successfully launched
+# and closed its stderr handle at some point during its execution. This
+# generally occurs by the process simply terminating. The only case
+# in which this would return a failure is if the job did not successfully
+# launch.
 export def getJobFailedStderrRaw (job: Job): Result String Error =
     stdio job 2
 
+# Gives the job's stdout if the job exited with an exit
+# code of zero. The output will be manipulated to not contain
+# ANSI escape codes.
 export def getJobStdout (job: Job): Result String Error =
     require Pass stdout = getJobStdoutRaw job
 
     Pass (stdout | filterTerminalCodes)
 
+# Gives the job's stderr if the job exited with an exit
+# code of zero. The output will be manipulated to not contain
+# ANSI escape codes.
 export def getJobStderr (job: Job): Result String Error =
     require Pass stderr = getJobStderrRaw job
 
     Pass (stderr | filterTerminalCodes)
 
+# Gives the job's stdout if the job was launched successfully
+# and closed its stdout at some point. The output will be
+# manipulated to not contain ANSI escape codes.
 export def getJobFailedStdout (job: Job): Result String Error =
     require Pass stdout = getJobFailedStdoutRaw job
 
     Pass (stdout | filterTerminalCodes)
 
+# Gives the job's stdout if the job was launched successfully
+# and closed its stdout at some point. The output will be
+# manipulated to not contain ANSI escape codes.
 export def getJobFailedStderr (job: Job): Result String Error =
     require Pass stderr = getJobFailedStderrRaw job
 
