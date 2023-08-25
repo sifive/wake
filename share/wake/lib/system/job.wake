@@ -494,8 +494,8 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
 
                 JArray (map mkVisJson readPaths)
 
-            require Pass stdout = getJobStdout job
-            require Pass stderr = getJobStderr job
+            require Pass stdout = getJobFailedStdout job
+            require Pass stderr = getJobFailedStderr job
 
             def jobCacheAddJson =
                 prettyJSON
@@ -762,9 +762,21 @@ def mapPath = match _
     Pass l = findFailFn treeOk l
 
 export def getJobStdoutRaw (job: Job): Result String Error =
+    require Exited 0 = getJobStatus job
+    else failWithError "job terminated with non-zero exit code"
+
     stdio job 1
 
 export def getJobStderrRaw (job: Job): Result String Error =
+    require Exited 0 = getJobStatus job
+    else failWithError "job terminated with non-zero exit code"
+
+    stdio job 2
+
+export def getJobFailedStdoutRaw (job: Job): Result String Error =
+    stdio job 1
+
+export def getJobFailedStderrRaw (job: Job): Result String Error =
     stdio job 2
 
 export def getJobStdout (job: Job): Result String Error =
@@ -774,6 +786,16 @@ export def getJobStdout (job: Job): Result String Error =
 
 export def getJobStderr (job: Job): Result String Error =
     require Pass stderr = getJobStderrRaw job
+
+    Pass (stderr | filterTerminalCodes)
+
+export def getJobFailedStdout (job: Job): Result String Error =
+    require Pass stdout = getJobFailedStdoutRaw job
+
+    Pass (stdout | filterTerminalCodes)
+
+export def getJobFailedStderr (job: Job): Result String Error =
+    require Pass stderr = getJobFailedStderrRaw job
 
     Pass (stderr | filterTerminalCodes)
 

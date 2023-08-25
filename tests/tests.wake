@@ -155,11 +155,11 @@ export def runUnitTests _: Result Unit Error =
     def removeCarriageReturns = replace `\r` ""
 
     require Pass jobStdout =
-        testJob.getJobStdout
+        testJob.getJobFailedStdout
         | rmap removeCarriageReturns
 
     require Pass jobStderr =
-        testJob.getJobStderr
+        testJob.getJobFailedStderr
         | rmap removeCarriageReturns
 
     require Pass _ = match testJob.isJobOk
@@ -236,11 +236,11 @@ def runTest (testScript: Path): Result Unit Error =
         | runJobWith localRunner # On OS/X you cannot mount fuse within fuse
 
     require Pass jobStdout =
-        testJob.getJobStdout
+        testJob.getJobFailedStdout
         | rmap (replace `\r` "")
 
     require Pass jobStderr =
-        testJob.getJobStderr
+        testJob.getJobFailedStderr
         | rmap (replace `\r` "")
 
     require Pass _ = match shouldPass testJob.isJobOk
