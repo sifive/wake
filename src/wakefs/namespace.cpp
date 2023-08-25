@@ -472,6 +472,17 @@ bool setup_user_namespaces(int id_user, int id_group, bool isolate_network,
   map_id("/proc/self/uid_map", euid, real_euid);
   map_id("/proc/self/gid_map", egid, real_egid);
 
+  // Raise the loopback device.
+  if (isolate_network) {
+    // This uses 'ip' from the host system, not from a modified mount table.
+    // We should be able to assume that 'lo' is the loopback device, as there
+    // has been no oportunity to modify it since when the net namespace was created.
+    if (0 != system("ip link set lo up")) {
+      std::cerr << "Failed to raise loopback network interface" << std::endl;
+      return false;
+    }
+  }
+
   return true;
 }
 
