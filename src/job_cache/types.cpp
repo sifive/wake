@@ -299,7 +299,7 @@ AddJobRequest AddJobRequest::from_implicit(const JAST &json) {
     req.cwd = wcl::join_paths(req.wakeroot, req.cwd);
   }
   req.command_line = json.get("command_line").value;
-  req.envrionment = json.get("envrionment").value;
+  req.environment = json.get("environment").value;
   req.stdin_str = json.get("stdin").value;
   req.runner_hash = json.get("runner_hash").value;
   req.stdout_str = json.get("stdout").value;
@@ -435,7 +435,7 @@ AddJobRequest::AddJobRequest(const JAST &json) {
     cwd = wcl::join_paths(wakeroot, cwd);
   }
   command_line = json.get("command_line").value;
-  envrionment = json.get("envrionment").value;
+  environment = json.get("environment").value;
   stdin_str = json.get("stdin").value;
   stdout_str = json.get("stdout").value;
   stderr_str = json.get("stderr").value;
@@ -512,7 +512,7 @@ JAST AddJobRequest::to_json() const {
   json.add("wakeroot", wakeroot);
   json.add("cwd", cwd);
   json.add("command_line", command_line);
-  json.add("envrionment", envrionment);
+  json.add("environment", environment);
   json.add("stdin", stdin_str);
   json.add("stdout", stdout_str);
   json.add("stderr", stderr_str);
@@ -570,7 +570,7 @@ FindJobRequest::FindJobRequest(const JAST &find_job_json) {
     cwd = wcl::join_paths(wakeroot, cwd);
   }
   command_line = find_job_json.get("command_line").value;
-  envrionment = find_job_json.get("envrionment").value;
+  environment = find_job_json.get("environment").value;
   stdin_str = find_job_json.get("stdin").value;
   client_cwd = find_job_json.get("client_cwd").value;
   runner_hash = find_job_json.get("runner_hash").value;
@@ -638,7 +638,7 @@ JAST FindJobRequest::to_json() const {
   json.add("wakeroot", wakeroot);
   json.add("cwd", cwd);
   json.add("command_line", command_line);
-  json.add("envrionment", envrionment);
+  json.add("environment", environment);
   json.add("stdin", stdin_str);
   json.add("client_cwd", client_cwd);
 

@@ -92,7 +92,7 @@ struct FindJobRequest {
   std::string wakeroot;
   std::string cwd;
   std::string command_line;
-  std::string envrionment;
+  std::string environment;
   std::string stdin_str;
   wcl::trie<std::string, std::string> dir_redirects;
   BloomFilter bloom;
@@ -184,7 +184,7 @@ struct AddJobRequest {
   std::string wakeroot;
   std::string cwd;
   std::string command_line;
-  std::string envrionment;
+  std::string environment;
   std::string stdin_str;
   BloomFilter bloom;
   std::string runner_hash;

@@ -76,7 +76,7 @@ struct TestJob {
     request.add("wakeroot", cwd);
     request.add("cwd", ".");
     request.add("command_line", cmd);
-    request.add("envrionment", env);
+    request.add("environment", env);
     request.add("stdin", stdin);
     // TODO: add options for stdout and stderr
     //       and check them in the test
@@ -132,7 +132,7 @@ struct TestJob {
     request.add("wakeroot", cwd);
     request.add("cwd", ".");
     request.add("command_line", cmd);
-    request.add("envrionment", env);
+    request.add("environment", env);
     request.add("stdin", stdin);
 
     char path_buf[4096];
