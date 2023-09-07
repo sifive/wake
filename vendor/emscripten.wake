@@ -19,12 +19,12 @@ from wake import _
 from gcc_wake import _
 
 def emccFn fn = match (whichInEnvPath "emcc")
-    None = Nil
-    Some x = fn x
+    None -> Nil
+    Some x -> fn x
 
 def emppFn fn = match (whichInEnvPath "em++")
-    None = Nil
-    Some x = fn x
+    None -> Nil
+    Some x -> fn x
 
 def emmake =
     whichInEnvPath "emmake"

@@ -134,8 +134,8 @@ export def (x: Double) <=>. (y: Double): Option Order =
 
 # IEEE 754 requires comparisons with NaN to return False (except for !=)
 def dhelper x y fn = match (x <=>. y)
-    Some x = fn x
-    None = False
+    Some x -> fn x
+    None -> False
 
 # Binary Less-Than Operator.
 # IEEE 754 requires comparison with NaN to return False
@@ -211,9 +211,9 @@ export def (x: Double) !=. (y: Double): Boolean =
 # dmin 1.0 3.0 = 1.0
 # dmin 3.0 1.0 = 1.0
 export def dmin (x: Double) (y: Double): Double = match (x <=>. y)
-    None = nan
-    Some LT = x
-    _ = y
+    None -> nan
+    Some LT -> x
+    _ -> y
 
 # Computes the maximum of two Doubles.
 # If either is nan, the result is nan
@@ -223,9 +223,9 @@ export def dmin (x: Double) (y: Double): Double = match (x <=>. y)
 # dmax 1.0 3.0 = 3.0
 # dmax 3.0 1.0 = 3.0
 export def dmax (x: Double) (y: Double): Double = match (x <=>. y)
-    None = nan
-    Some LT = y
-    _ = x
+    None -> nan
+    Some LT -> y
+    _ -> x
 
 # Product of a List of Doubles.
 # dprod (3.0, 3.0, 1.0, Nil) = 9.0
@@ -262,10 +262,10 @@ export def dformat (format: DoubleFormat): (digits: Integer) => Double => String
     def imp f p x = prim "dstr"
 
     def f = match format
-        DoubleFixed = 0
-        DoubleScientific = 1
-        DoubleHex = 2
-        DoubleDefault = 3
+        DoubleFixed -> 0
+        DoubleScientific -> 1
+        DoubleHex -> 2
+        DoubleDefault -> 3
 
     imp f
 
@@ -292,8 +292,8 @@ export def dstr: Double => String =
 # dint 55 = 55e0
 # dint (1 << 2000) = inf
 export def dint (x: Integer): Double = match (double (str x))
-    Some x = x
-    None = unreachable "parsing a large integer should return +/- inf"
+    Some x -> x
+    None -> unreachable "parsing a large integer should return +/- inf"
 
 # Conversion methods
 export data DoubleClass =
@@ -311,10 +311,10 @@ export def dclass (x: Double): DoubleClass =
     def imp x = prim "dclass"
 
     match (imp x)
-        1 = DoubleInfinite
-        2 = DoubleNaN
-        4 = DoubleSubNormal
-        _ = DoubleNormal
+        1 -> DoubleInfinite
+        2 -> DoubleNaN
+        4 -> DoubleSubNormal
+        _ -> DoubleNormal
 
 # Split 'x' into (Pair sig exp), such that:
 #   x = sig * 2^exp

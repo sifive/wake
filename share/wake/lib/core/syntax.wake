@@ -54,8 +54,8 @@ export def wait (f: a => b) (x: a): b =
     def imp x = prim "true"
 
     match (imp x)
-        True = f x
-        False = unreachable "true returned false"
+        True -> f x
+        False -> unreachable "true returned false"
 
 # Tell the wake interpreter that it is impossible to reach this expression.
 # The behaviour of an execution which DOES reach `unreachable` is undefined.

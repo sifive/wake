@@ -48,8 +48,8 @@ target pkgConfigImp flags pkgs =
     def cmdline = pkgConfig, flags ++ pkgs
 
     def addenv list = match (getenv "PKG_CONFIG_PATH")
-        Some p = "PKG_CONFIG_PATH={p}", list
-        None = list
+        Some p -> "PKG_CONFIG_PATH={p}", list
+        None -> list
 
     def result =
         makeExecPlan cmdline Nil

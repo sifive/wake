@@ -252,9 +252,9 @@ export def mmap (fn: k => v => w) (map: Map k v): Map k w =
         def Tree _ root = tree
 
         def helper = match _
-            Tip = Tip
+            Tip -> Tip
             # join3 and similar aren't required since the keys haven't changed.
-            Bin i l (Pair x y) r = Bin i (helper l) (Pair x (fn x y)) (helper r)
+            Bin i l (Pair x y) r -> Bin i (helper l) (Pair x (fn x y)) (helper r)
 
         helper root
         | Tree (makeCmpPair map.getMapComparison)
@@ -271,8 +271,8 @@ export def mmapPass (fn: k => v => Result w e) (map: Map k v): Result (Map k w) 
     def Tree _ root = map.getMapData
 
     def helper = match _
-        Tip = Pass Tip
-        Bin i l (Pair x y) r =
+        Tip -> Pass Tip
+        Bin i l (Pair x y) r ->
             def lResult = helper l
             def wResult = fn x y
             def rResult = helper r
@@ -392,10 +392,10 @@ export def mupperLE (key: k) (map: Map k v): Option (Pair k v) =
 #   listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "b" | mlookup "b" = None
 #   ```
 export def mlookup (key: k) (map: Map k v): Option v = match (mupperLE key map)
-    None = None
-    (Some (Pair l v)) = match (map.getMapComparison l key)
-        EQ = Some v
-        _ = None
+    None -> None
+    (Some (Pair l v)) -> match (map.getMapComparison l key)
+        EQ -> Some v
+        _ -> None
 
 # Check whether some key is associated with any value in the map.
 #

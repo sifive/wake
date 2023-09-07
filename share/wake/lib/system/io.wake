@@ -20,8 +20,8 @@ export def read (path: Path): Result String Error =
     def imp p = prim "read"
 
     match (imp path.getPathName)
-        Pass body = Pass body
-        Fail f = Fail (makeError f)
+        Pass body -> Pass body
+        Fail f -> Fail (makeError f)
 
 target writeImp inputs mode path content =
     def writeRunner =
@@ -29,13 +29,13 @@ target writeImp inputs mode path content =
         def pre input = Pair input Unit
 
         def post = match _
-            Pair (Fail f) _ = Fail f
-            Pair (Pass output) Unit =
+            Pair (Fail f) _ -> Fail f
+            Pair (Pass output) Unit ->
                 if mode < 0 || mode > 0x1ff then
                     Fail (makeError "write {path}: Invalid mode ({strOctal mode})")
                 else match (imp mode path content)
-                    Fail f = Fail (makeError f)
-                    Pass path = Pass (editRunnerOutputOutputs (path, _) output)
+                    Fail f -> Fail (makeError f)
+                    Pass path -> Pass (editRunnerOutputOutputs (path, _) output)
 
         makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
 
@@ -106,14 +106,14 @@ def mkdirRunner: Runner =
     def imp m p = prim "mkdir"
 
     def pre = match _
-        Fail f = Pair (Fail f) (Pair "" "")
-        Pass input = match input.getRunnerInputCommand
-            _, _, mode, dir, Nil = Pair (Pass input) (Pair mode dir)
-            _ = unreachable "mkdirImp violated command-line contract"
+        Fail f -> Pair (Fail f) (Pair "" "")
+        Pass input -> match input.getRunnerInputCommand
+            _, _, mode, dir, Nil -> Pair (Pass input) (Pair mode dir)
+            _ -> unreachable "mkdirImp violated command-line contract"
 
     def post = match _
-        Pair (Fail f) _ = Fail f
-        Pair (Pass output) (Pair smode dir) =
+        Pair (Fail f) _ -> Fail f
+        Pair (Pass output) (Pair smode dir) ->
             def mode =
                 int smode
                 | getOrElse 0x200
@@ -121,8 +121,8 @@ def mkdirRunner: Runner =
             if mode < 0 || mode > 0x1ff then
                 Fail (makeError "mkdir {dir}: Invalid mode ({smode})")
             else match (imp mode dir)
-                Fail f = Fail (makeError f)
-                Pass path = Pass (editRunnerOutputOutputs (path, _) output)
+                Fail f -> Fail (makeError f)
+                Pass path -> Pass (editRunnerOutputOutputs (path, _) output)
 
     makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
 
@@ -141,9 +141,9 @@ export def mkdirIn (parent: Path) (mode: Integer) (name: String): Result Path Er
 # Make all every element in the directory path with mode 0755
 export def mkdir (path: String): Result Path Error =
     def root = match _
-        "", x, t = Pair (mkdirImp Nil 0755 "/{x}") t
-        x, t = Pair (mkdirImp Nil 0755 x) t
-        Nil = unreachable "tokenize never returns an empty list"
+        "", x, t -> Pair (mkdirImp Nil 0755 "/{x}") t
+        x, t -> Pair (mkdirImp Nil 0755 x) t
+        Nil -> unreachable "tokenize never returns an empty list"
 
     def mkdirRecursive (Pair rootResult pathTail) =
         require Pass root = rootResult

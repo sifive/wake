@@ -18,7 +18,7 @@ package build_wake
 from wake import _
 
 target buildLSP variant: Result (List Path) Error = match variant
-    Pair "wasm-cpp14-release" _ =
+    Pair "wasm-cpp14-release" _ ->
         require Pass postJS = source "extensions/vscode/lsp-server/wasm/lsp-wake.post.js"
         require Pass preJS = source "extensions/vscode/lsp-server/wasm/lsp-wake.pre.js"
 
@@ -31,4 +31,4 @@ target buildLSP variant: Result (List Path) Error = match variant
             "--pre-js", preJS.getPathName,
 
         tool @here Nil variant "lib/wake/lsp-wake" (dst, util, wcl, Nil) (postJS, preJS, Nil) extraLFlags
-    _ = tool @here Nil variant "lib/wake/lsp-wake" (dst, util, wcl, Nil) Nil Nil
+    _ -> tool @here Nil variant "lib/wake/lsp-wake" (dst, util, wcl, Nil) Nil Nil

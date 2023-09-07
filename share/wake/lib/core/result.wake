@@ -43,48 +43,48 @@ export data Result pass fail =
 #   isPass (Pass 123) = True
 #   isPass (Fail 123) = False
 export def isPass: Result a b => Boolean = match _
-    Pass _ = True
-    Fail _ = False
+    Pass _ -> True
+    Fail _ -> False
 
 # isFail: report if the Result was a Fail
 #
 #   isFail (Pass 123) = False
 #   isFail (Fail 123) = True
 export def isFail: Result a b => Boolean = match _
-    Pass _ = False
-    Fail _ = True
+    Pass _ -> False
+    Fail _ -> True
 
 # getPass: retrieve the Pass value else None
 #
 #   getPass (Pass 123) = Some 123
 #   getPass (Fail 123) = None
 export def getPass: Result a b => Option a = match _
-    Pass x = Some x
-    Fail _ = None
+    Pass x -> Some x
+    Fail _ -> None
 
 # getFail: retrieve the Fail value else None
 #
 #   getFail (Pass 123) = None
 #   getFail (Fail 123) = Some 123
 export def getFail: Result a b => Option b = match _
-    Pass _ = None
-    Fail x = Some x
+    Pass _ -> None
+    Fail x -> Some x
 
 # getWhenFail: retrieve the Pass value, using a default value for Fail
 #
 #   getWhenFail 42 (Pass 123) = 123
 #   getWhenFail 42 (Pass 123) = 42
 export def getWhenFail (default: pass): Result pass fail => pass = match _
-    Pass a = a
-    Fail _ = default
+    Pass a -> a
+    Fail _ -> default
 
 # getWhenPass: retrieve the Fail value, using a default value for Pass
 #
 #   getWhenPass 42 (Pass 123) = 42
 #   getWhenPass 42 (Pass 123) = 123
 export def getWhenPass (default: fail): Result pass fail => fail = match _
-    Pass _ = default
-    Fail f = f
+    Pass _ -> default
+    Fail f -> f
 
 # rmap: apply a function to a Pass-ing result
 # If you find yourself using the function, consider using require instead.
@@ -92,20 +92,20 @@ export def getWhenPass (default: fail): Result pass fail => fail = match _
 #   rmap (_+1) (Pass 123) = Pass 124
 #   rmap (_+1) (Fail 123) = Fail 123
 export def rmap (fn: a => b): Result a fail => Result b fail = match _
-    Pass a = Pass (fn a)
-    Fail f = Fail f
+    Pass a -> Pass (fn a)
+    Fail f -> Fail f
 
 # rmapPass: apply a Fail-able function to a Pass-ing result
 # If you find yourself using the function, consider using require instead.
 export def rmapPass (fn: a => Result b fail): Result a fail => Result b fail = match _
-    Pass a = fn a
-    Fail f = Fail f
+    Pass a -> fn a
+    Fail f -> Fail f
 
 # Applies a Fail-able function to Fail value or propogates Pass
 # If you find yourself using the function, consider using require instead.
 export def rmapFail (fn: a => Result pass b): Result pass a => Result pass b = match _
-    Pass a = Pass a
-    Fail f = fn f
+    Pass a -> Pass a
+    Fail f -> fn f
 
 # Try to combine the elements of a `List` front-to-back, where each step might fail.
 # If any update step fails, the error value of the first such failure is
@@ -118,8 +118,8 @@ export def rmapFail (fn: a => Result pass b): Result pass a => Result pass b = m
 #  - `list`: The elements which should be combined.
 export def rfoldl (combiningFn: accumulator => element => Result accumulator error): (acc: accumulator) => (list: List element) => Result accumulator error =
     def loop acc = match _
-        Nil = Pass acc
-        element, rest =
+        Nil -> Pass acc
+        element, rest ->
             require Pass result = combiningFn acc element
 
             loop result rest
@@ -137,8 +137,8 @@ export def rfoldl (combiningFn: accumulator => element => Result accumulator err
 #  - `list`: The elements which should be combined.
 export def rfoldr (combiningFn: element => accumulator => Result accumulator error): (acc: accumulator) => (list: List element) => Result accumulator error =
     def loop acc = match _
-        Nil = Pass acc
-        element, rest =
+        Nil -> Pass acc
+        element, rest ->
             require Pass result = loop acc rest
 
             combiningFn element result
@@ -162,8 +162,8 @@ export def findFail: List (Result a b) => Result (List a) b =
 #   findFailFn toInt ("_56", "123", Nil) = Fail "not an Integer (_56)"
 export def findFailFn (fn: a => Result b fail): List a => Result (List b) fail =
     def helper = match _
-        Nil = Pass Nil
-        h, t =
+        Nil -> Pass Nil
+        h, t ->
             require Pass x = fn h
             require Pass tt = helper t
 
@@ -188,8 +188,8 @@ export def findPass: List (Result a b) => Result a (List b) =
 #   findPassFn toInt ("_56", "_23", "_77", Nil) = Fail ("bad: _56", "bad: _23", "bad: _77", Nil)
 export def findPassFn (fn: a => Result pass b): List a => Result pass (List b) =
     def helper = match _
-        Nil = Fail Nil
-        h, t =
+        Nil -> Fail Nil
+        h, t ->
             require Fail x = fn h
             require Fail tt = helper t
 
@@ -223,8 +223,8 @@ export def makeError (cause: String): Error =
 #     read file
 #     | addErrorContext "opening {file.getPathName}"
 export def addErrorContext (prefix: String): Result a Error => Result a Error = match _
-    Pass x = Pass x
-    Fail (Error cause stack) = Fail (Error "{prefix}: {cause}" stack)
+    Pass x -> Pass x
+    Fail (Error cause stack) -> Fail (Error "{prefix}: {cause}" stack)
 
 # failWithError: produce a Fail for us in error conditions
 #
