@@ -79,11 +79,11 @@ def gunzip zip =
     def out = replace `\.gz$` "" zip.getPathName
 
     def script =
-        "%
+        """
         set -e
         gzip -dc "%{zip.getPathName}" > "%{out}.tmp"
         mv "%{out}.tmp" "%{out}"
-        %"
+        """
 
     makeShellPlan script (zip, Nil)
     | setPlanLabel "gzip: extract {zip.getPathName}"
