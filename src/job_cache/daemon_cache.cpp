@@ -579,7 +579,7 @@ class SelectMatchingJobs {
     auto defer_reset = wcl::make_defer([this]() { find_jobs.reset(); });
     find_jobs.bind_string(1, find_job_request.cwd);
     find_jobs.bind_string(2, find_job_request.command_line);
-    find_jobs.bind_string(3, find_job_request.envrionment);
+    find_jobs.bind_string(3, find_job_request.environment);
     find_jobs.bind_string(4, find_job_request.stdin_str);
     find_jobs.bind_string(6, find_job_request.runner_hash);
 
@@ -1019,7 +1019,7 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   int64_t job_id;
   {
     impl->transact.run([this, &add_request, &job_id]() {
-      job_id = impl->jobs.insert(add_request.cwd, add_request.command_line, add_request.envrionment,
+      job_id = impl->jobs.insert(add_request.cwd, add_request.command_line, add_request.environment,
                                  add_request.stdin_str, add_request.bloom, add_request.runner_hash);
 
       // Add additional info
