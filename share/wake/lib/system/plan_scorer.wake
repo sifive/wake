@@ -25,33 +25,33 @@ publish runner =
 
 # Run a job, via a Runner chosen based on 'score' functions.
 export def runJob (p: Plan): Job = match p
-    Plan label cmd vis env dir stdin stdout stderr echo pers res usage finputs foutputs isatty =
+    Plan label cmd vis env dir stdin stdout stderr echo pers res usage finputs foutputs isatty ->
         def implode l = cat (foldr (_, "\0", _) Nil l)
         def bToInt b = if b then 1 else 0
 
         # Transform the 'List Runner' into 'List RunnerOption'
         def qualify runner = match runner
-            Runner name scorefn fn = match (scorefn p)
-                Pass x if x <=. 0.0 = Reject "{name}: non-positive score"
-                Pass x = Accept x fn
-                Fail x = Reject "{name} {x}"
+            Runner name scorefn fn -> match (scorefn p)
+                Pass x if x <=. 0.0 -> Reject "{name}: non-positive score"
+                Pass x -> Accept x fn
+                Fail x -> Reject "{name} {x}"
 
         def opts =
             subscribe runner
             | map qualify
 
         def best acc = match _ acc
-            (Reject _) _ = acc
-            (Accept score fn) (Pair bests _bestr) =
+            (Reject _) _ -> acc
+            (Accept score fn) (Pair bests _bestr) ->
                 if score >. bests then
                     Pair score (Some fn)
                 else
                     acc
 
         match (opts | foldl best (Pair 0.0 None) | getPairSecond)
-            Some r =
+            Some r ->
                 runJobImp label cmd env dir stdin res usage finputs foutputs vis pers r echo stdout stderr isatty
-            None =
+            None ->
                 def create label dir stdin env cmd signature visible keep echo stdout stderr isatty =
                     prim "job_create"
 
@@ -63,8 +63,8 @@ export def runJob (p: Plan): Job = match p
 
                 def error =
                     def pretty = match _
-                        Accept _ _ = ""
-                        Reject why = why
+                        Accept _ _ -> ""
+                        Reject why -> why
 
                     makeError "No runner for '{job.getJobDescription}' available, because: {map pretty opts | catWith ", "}"
 

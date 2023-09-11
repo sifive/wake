@@ -69,7 +69,7 @@ export tuple Runner =
 
 export def makeRunner name score pre post (Runner _ _ run) =
     def doit job preInput = match (pre preInput)
-        Pair runInput state =
+        Pair runInput state ->
             def runOutput = run job runInput
             def final _ = post (Pair runOutput state)
 
@@ -133,17 +133,17 @@ export tuple Plan =
     export IsAtty: Boolean
 
 def isOnce: Persistence => Boolean = match _
-    ReRun = False
-    _ = True
+    ReRun -> False
+    _ -> True
 
 def isKeep: Persistence => Boolean = match _
-    ReRun = False
-    Once = False
-    _ = True
+    ReRun -> False
+    Once -> False
+    _ -> True
 
 def isShare: Persistence => Boolean = match _
-    Share = True
-    _ = False
+    Share -> True
+    _ -> False
 
 # Convenience accessor methods
 
@@ -197,31 +197,31 @@ export def setPlanEnvVar (name: String) (value: String) (plan: Plan): Plan =
 # encountered once in any wake execution anyway.
 export def editPlanOnce (f: Boolean => Boolean): Plan => Plan =
     def helper = match _
-        ReRun if f False = Once
-        Once if ! f True = ReRun
-        Keep if ! f True = ReRun
-        Share if ! f True = ReRun
-        x = x
+        ReRun if f False -> Once
+        Once if ! f True -> ReRun
+        Keep if ! f True -> ReRun
+        Share if ! f True -> ReRun
+        x -> x
 
     editPlanPersistence helper
 
 export def editPlanKeep (f: Boolean => Boolean): Plan => Plan =
     def helper = match _
-        ReRun if f False = Keep
-        Once if f False = Keep
-        Keep if ! f True = Once
-        Share if ! f True = Once
-        x = x
+        ReRun if f False -> Keep
+        Once if f False -> Keep
+        Keep if ! f True -> Once
+        Share if ! f True -> Once
+        x -> x
 
     editPlanPersistence helper
 
 export def editPlanShare (f: Boolean => Boolean): Plan => Plan =
     def helper = match _
-        ReRun if f False = Share
-        Once if f False = Share
-        Keep if f False = Share
-        Share if ! f True = Keep
-        x = x
+        ReRun if f False -> Share
+        Once if f False -> Share
+        Keep if f False -> Share
+        Share if ! f True -> Keep
+        x -> x
 
     editPlanPersistence helper
 
@@ -292,19 +292,19 @@ export def localRunner: Runner =
     def badlaunch job error = prim "job_fail_launch"
 
     def doit job = match _
-        Fail e =
+        Fail e ->
             def _ = badlaunch job e
 
             Fail e
-        Pass (RunnerInput _ cmd vis env dir stdin _ _ predict isatty) =
+        Pass (RunnerInput _ cmd vis env dir stdin _ _ predict isatty) ->
             def Usage status runtime cputime mem in out = predict
 
             def _ =
                 launch job dir stdin env.implode cmd.implode status runtime cputime mem in out (bToInt isatty)
 
             match (getJobReality job)
-                Pass reality = Pass (RunnerOutput (map getPathName vis) Nil reality)
-                Fail f = Fail f
+                Pass reality -> Pass (RunnerOutput (map getPathName vis) Nil reality)
+                Fail f -> Fail f
 
     def score _ = Pass 1.0
 
@@ -321,26 +321,26 @@ def jField (jvalue: JValue) (key: String) =
     Pass value
 
 def jInteger = match _
-    Pass (JInteger x) = Pass x
-    Fail err = Fail err
-    _ = failWithError "not an integer"
+    Pass (JInteger x) -> Pass x
+    Fail err -> Fail err
+    _ -> failWithError "not an integer"
 
 def jString = match _
-    Pass (JString x) = Pass x
-    Fail err = Fail err
-    _ = failWithError "not a string"
+    Pass (JString x) -> Pass x
+    Fail err -> Fail err
+    _ -> failWithError "not a string"
 
 def jDouble = match _
-    Pass (JDouble x) = Pass x
-    Fail err = Fail err
-    _ = failWithError "not a number"
+    Pass (JDouble x) -> Pass x
+    Fail err -> Fail err
+    _ -> failWithError "not a number"
 
 def jArray (fn: Result JValue Error => Result a Error) = match _
-    Pass (JArray arr) =
+    Pass (JArray arr) ->
         map (fn _.Pass) arr
         | findFail
-    Fail err = Fail err
-    _ = failWithError "not an array"
+    Fail err -> Fail err
+    _ -> failWithError "not an array"
 
 def getPath input =
     require Pass elem = input
@@ -357,11 +357,11 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
     def job_cache_add str = prim "job_cache_add"
 
     def doit job runnerInput = match runnerInput
-        Fail e =
+        Fail e ->
             def _ = badlaunch job e
 
             Fail e
-        Pass (RunnerInput label cmd vis env dir stdin _ prefix _ _) =
+        Pass (RunnerInput label cmd vis env dir stdin _ prefix _ _) ->
             def mkVisJson (Path path hash) =
                 JObject (
                     "path" :-> JString path,
@@ -552,19 +552,19 @@ export def virtualRunner: Runner =
     def badlaunch job error = prim "job_fail_launch"
 
     def doit job = match _
-        Fail e =
+        Fail e ->
             def _ = badlaunch job e
 
             Fail e
-        Pass (RunnerInput _ _ vis _ _ _ _ _ predict _) =
+        Pass (RunnerInput _ _ vis _ _ _ _ _ predict _) ->
             def Usage status runtime cputime mem in out = predict
 
             def _ =
                 virtual job "" "" status runtime cputime mem in out # sets predict+reality
 
             match (getJobReality job)
-                Pass reality = Pass (RunnerOutput (map getPathName vis) Nil reality)
-                Fail f = Fail f
+                Pass reality -> Pass (RunnerOutput (map getPathName vis) Nil reality)
+                Fail f -> Fail f
 
     Runner "virtual" (\_ Pass 0.0) doit
 
@@ -611,8 +611,8 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
             run job (Pass (RunnerInput label cmd vis env dir stdin res prefix usage isatty))
 
         def final _ = match output
-            Fail e = badfinish job e
-            Pass (RunnerOutput inputs outputs (Usage status runtime cputime mem in out)) =
+            Fail e -> badfinish job e
+            Pass (RunnerOutput inputs outputs (Usage status runtime cputime mem in out)) ->
                 def input =
                     finputs inputs
                     | map simplify
@@ -648,11 +648,11 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
         job
 
     match keep
-        False = build Unit
-        True =
+        False -> build Unit
+        True ->
             match (cache dir stdin env.implode cmd.implode hash (map getPathName vis).implode (bToInt isatty))
-                Pair (job, _) last = confirm True last job
-                Pair Nil last = confirm False last (build Unit)
+                Pair (job, _) last -> confirm True last job
+                Pair Nil last -> confirm False last (build Unit)
 
 # Only run if the first four arguments differ
 target runOnce cmd env dir stdin vis isatty run \ res usage finputs foutputs keep echo stdout stderr label =
@@ -747,19 +747,19 @@ def treeOk file =
     def Pair f h = file
 
     match h
-        "BadHash" = failWithError "Could not hash {f}"
-        _ = Pass (Path f h)
+        "BadHash" -> failWithError "Could not hash {f}"
+        _ -> Pass (Path f h)
 
 def guardPath job = match _
-    Fail e = Fail e
-    Pass l if job.isJobOk = findFailFn treeOk l
-    _ =
+    Fail e -> Fail e
+    Pass l if job.isJobOk -> findFailFn treeOk l
+    _ ->
         failWithError
         "Non-zero exit status ({format job.getJobStatus}) for job {str job.getJobId}: '{job.getJobDescription}'"
 
 def mapPath = match _
-    Fail e = Fail e
-    Pass l = findFailFn treeOk l
+    Fail e -> Fail e
+    Pass l -> findFailFn treeOk l
 
 export def getJobStdoutRaw (job: Job): Result String Error =
     require Exited 0 = getJobStatus job
@@ -848,15 +848,15 @@ export def getJobOutput (job: Job): Result Path Error =
     require Pass outputs = getJobOutputs job
 
     match outputs
-        Nil =
+        Nil ->
             failWithError "No outputs available from job {str job.getJobId}: '{job.getJobDescription}'"
-        (singleOutput, Nil) = Pass singleOutput
-        _ =
+        (singleOutput, Nil) -> Pass singleOutput
+        _ ->
             failWithError "More than one output found from job {str job.getJobId}: '{job.getJobDescription}'"
 
 export def isJobOk (job: Job): Boolean = match (getJobReport job)
-    Fail _ = False
-    Pass u = u.getUsageStatus == 0
+    Fail _ -> False
+    Pass u -> u.getUsageStatus == 0
 
 export data Status =
     Exited Integer
@@ -864,8 +864,8 @@ export data Status =
     Aborted Error
 
 export def getJobStatus (job: Job): Status = match (getJobReport job)
-    Fail f = Aborted f
-    Pass u =
+    Fail f -> Aborted f
+    Pass u ->
         def status = u.getUsageStatus
 
         if status >= 0 then
@@ -942,9 +942,9 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
     def ok = access script xOK
 
     def pre = match _
-        Fail f = Pair (Fail f) ""
-        _ if !ok = Pair (Fail (makeError "Runner {script} is not executable")) ""
-        Pass (RunnerInput label command visible environment directory stdin res prefix record isatty) =
+        Fail f -> Pair (Fail f) ""
+        _ if !ok -> Pair (Fail (makeError "Runner {script} is not executable")) ""
+        Pass (RunnerInput label command visible environment directory stdin res prefix record isatty) ->
             def Usage status runtime cputime membytes inbytes outbytes = record
 
             def json =
@@ -995,23 +995,23 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
     def resultPath specPath = replace `spec-` "result-" specPath
 
     def post = match _
-        Pair (Fail f) _ = Fail f
-        Pair (Pass (RunnerOutput _ _ (Usage x _ _ _ _ _))) inFile if x != 0 =
+        Pair (Fail f) _ -> Fail f
+        Pair (Pass (RunnerOutput _ _ (Usage x _ _ _ _ _))) inFile if x != 0 ->
             Fail (makeError "Non-zero exit status ({str x}) for JSON runner {script} on {inFile}")
-        Pair (Pass _) inFile =
+        Pair (Pass _) inFile ->
             def outFile = resultPath inFile
             def json = parseJSONFile (Path outFile "BadHash")
 
             match json
-                Fail f = Fail f
-                Pass content =
+                Fail f -> Fail f
+                Pass content ->
                     def _ = markFileCleanable outFile
 
                     def field name = match _ _
-                        _ (Fail f) = Fail f
-                        None (Pass fn) =
+                        _ (Fail f) -> Fail f
+                        None (Pass fn) ->
                             Fail "{script} produced {outFile}, which is missing usage/{name}"
-                        (Some x) (Pass fn) = Pass (fn x)
+                        (Some x) (Pass fn) -> Pass (fn x)
 
                     def usage = content // `usage`
 
@@ -1031,7 +1031,7 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
                         | mapPartial getJString
 
                     match usageResult
-                        Fail f = Fail (makeError f)
-                        Pass usage = Pass (RunnerOutput (getK `inputs`) (getK `outputs`) usage)
+                        Fail f -> Fail (makeError f)
+                        Pass usage -> Pass (RunnerOutput (getK `inputs`) (getK `outputs`) usage)
 
     makeRunner "json-{script}" score pre post localRunner

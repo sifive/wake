@@ -39,7 +39,7 @@ def vendor (dir: String) (variant: Pair String String) (version: String) (header
     Pass (SysLib version headerPaths objects.flatten Nil Nil)
 
 def pkg name = match (pkgConfig name)
-    Some x = x
-    None =
+    Some x -> x
+    None ->
         makeSysLib ""
         | editSysLibLFlags ("-l{name}", _)

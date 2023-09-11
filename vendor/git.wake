@@ -20,8 +20,8 @@ from wake import _
 topic releaseAs: String
 
 def buildAs Unit = match (subscribe releaseAs)
-    version, Nil = Pass version
-    _ =
+    version, Nil -> Pass version
+    _ ->
         def cmdline = which "git", "describe", "--tags", "--dirty", Nil
 
         require Pass stdout =
@@ -46,8 +46,8 @@ def buildAs Unit = match (subscribe releaseAs)
 topic releaseOn: String
 
 def buildOn Unit = match (subscribe releaseOn)
-    date, Nil = Pass date
-    _ =
+    date, Nil -> Pass date
+    _ ->
         def cmdline = which "git", "show", "-s", "--format=%ci", "HEAD", Nil
 
         require Pass stdout =
@@ -82,7 +82,7 @@ def mk_node_semver_safe v =
     else v
 
     match (extract unsafe_version_regex v)
-        version, commit, rest, Nil =
+        version, commit, rest, Nil ->
             (version, "-plus-", commit, "-", rest, Nil)
             | cat
-        _ = v
+        _ -> v

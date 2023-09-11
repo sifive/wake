@@ -64,9 +64,9 @@ def re2cReal re2c file =
         | runJobWith defaultRunner
 
     match zip.getJobStatus
-        Exited 0 = Pass result
-        Aborted e = Fail e
-        z = failWithError "Non-zero exit status ({format z}) for '{zip.getJobDescription}'"
+        Exited 0 -> Pass result
+        Aborted e -> Fail e
+        z -> failWithError "Non-zero exit status ({format z}) for '{zip.getJobDescription}'"
 
 def re2cFake file =
     def cpp = replace `\.re$` ".cpp" file.getPathName
@@ -91,8 +91,8 @@ def gunzip zip =
     | getJobOutput
 
 def re2c (file: Path): Result Path Error = match (re2cOk Unit)
-    Pass re2c = re2cReal re2c file
-    Fail err =
+    Pass re2c -> re2cReal re2c file
+    Fail err ->
         def _ =
             if (getenv "UPGRADE_GENERATED" | getOrElse "0") ==* "1" then
                 println "[WARN] Requested re2c which is unsatisfiable. Using fake\n  why: {err.getErrorCause}"

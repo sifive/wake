@@ -46,8 +46,8 @@ publish environment =
 # Inject command-line specified path entries
 # Note: changing this value will likely cause a total workspace rebuild
 publish path = match (getenv "WAKE_PATH")
-    Some x = tokenize `:` x
-    None = Nil
+    Some x -> tokenize `:` x
+    None -> Nil
 
 # Setup a default path
 publish path =
@@ -58,9 +58,9 @@ publish path =
 
 # On MacOS and FreeBSD, many important system binaries are not in /usr/bin
 publish path = match sysname
-    "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
-    "FreeBSD" = "/usr/local/bin", Nil
-    _ = Nil
+    "Darwin" -> "/opt/local/bin", "/usr/local/bin", Nil
+    "FreeBSD" -> "/usr/local/bin", Nil
+    _ -> Nil
 
 # A topic used to globally add variables to the default environment of Plans
 export topic environment: String
@@ -112,8 +112,8 @@ export def editEnvironment (key: String) (fn: Option String => Option String) (e
     def Pair eq rest = splitBy (test key) environment
 
     match (head eq | omap value | fn)
-        Some v = "{key}={v}", rest
-        None = rest
+        Some v -> "{key}={v}", rest
+        None -> rest
 
 # Add a component to the PATH in a KEY=VALUE environment
 #
@@ -122,13 +122,13 @@ export def editEnvironment (key: String) (fn: Option String => Option String) (e
 #    | ...
 export def addEnvironmentPath (path: String) (environment: List String): List String =
     def mod = match _
-        None = Some path
-        Some x = Some "{path}:{x}"
+        None -> Some path
+        Some x -> Some "{path}:{x}"
 
     editEnvironment "PATH" mod environment
 
 # Optionally add a component to the PATH in a KEY=VALUE environment
 export def addEnvironmentPathOpt (pathopt: Option String) (environment: List String): List String =
     match pathopt
-        None = environment
-        Some x = addEnvironmentPath x environment
+        None -> environment
+        Some x -> addEnvironmentPath x environment

@@ -61,9 +61,9 @@ export def source (file: String): Result Path Error =
     require Pass allSources = sources dir base.quote
 
     match allSources
-        Nil = failWithError "{file}: not a source file"
-        x, Nil = Pass x
-        _ = unreachable "a quoted RegExp can never match more than one distinct String"
+        Nil -> failWithError "{file}: not a source file"
+        x, Nil -> Pass x
+        _ -> unreachable "a quoted RegExp can never match more than one distinct String"
 
 # Allows claiming of a file so long as the file is within
 # wake's workspace. Keep in mind that if another job
@@ -140,10 +140,10 @@ export def sources (dir: String) (filterRegexp: RegExp): Result (List Path) Erro
     def scan dir regexp = prim "sources"
 
     match got_sources
-        True =
+        True ->
             scan dir filterRegexp
             | findFailFn raw_source
-        False = unreachable "add_sources always returns True"
+        False -> unreachable "add_sources always returns True"
 
 # This API makes it possible to include a non-source file into a wake build.
 # Generally, one should obtain Paths from sources or as the output of Jobs.

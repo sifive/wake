@@ -605,12 +605,12 @@ export def vsortBy (cmpFn: a => a => Order): Vector a => Vector a =
         def doit x a b = Pair (Pair (ai + a) (bi + b)) x
 
         match (vat ai a) (vat bi b)
-            None None = unreachable "merged beyond vector limits"
-            (Some x) None = doit x 1 0
-            None (Some y) = doit y 0 1
-            (Some x) (Some y) = match (cmpFn x y)
-                GT = doit y 0 1
-                _ =
+            None None -> unreachable "merged beyond vector limits"
+            (Some x) None -> doit x 1 0
+            None (Some y) -> doit y 0 1
+            (Some x) (Some y) -> match (cmpFn x y)
+                GT -> doit y 0 1
+                _ ->
                     doit x 1 0 # x <= y prefers x for stable sort
 
     def mergeLoop = vunfoldl2 mergeStep
@@ -805,15 +805,15 @@ def vmapPartialTop =
 #   vmapPartial2 int ["3", "x", "44"] = [3, 44]
 export def vmapPartial2 (f: a => Option b): Vector a => Vector b =
     def intSome x = match (f x)
-        Some _ = 1
-        None = 0
+        Some _ -> 1
+        None -> 0
 
     #def destFn = vmapScan intSome (_+_) 0
     def destFn = vscanl (_ + intSome _) 0
 
     def step (Triple v dest out) i = match (f (vat_ i v))
-        Some x = vset out (vat_ i dest) x
-        None = Unit
+        Some x -> vset out (vat_ i dest) x
+        None -> Unit
 
     def loop = vappi2 step
 

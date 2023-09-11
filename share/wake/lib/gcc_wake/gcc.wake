@@ -155,8 +155,8 @@ publish linkO =
     makeLinkO "native-cpp14-static" (which "c++") (cpp14Flags ++ staticLFlags)
 
 def pickVariant variant variants = match (find (variant ==* _.getPairFirst) variants)
-    Some (Pair x _) = Pass x.getPairSecond
-    None =
+    Some (Pair x _) -> Pass x.getPairSecond
+    None ->
         def ok = catWith " " (map getPairFirst variants)
 
         failWithError "No variant matches {variant}; options: {ok}"
