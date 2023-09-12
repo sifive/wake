@@ -979,10 +979,11 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
 
             def specFilePath = "{build}/spec-{prefix}.json"
 
-            require Pass inFile =
+            require Pair (Pass inFile) _ =
                 write specFilePath (prettyJSON json)
                 | rmap getPathName
-            else Pair (Fail (makeError "Failed to 'write {specFilePath}'.")) ""
+                | addErrorContext "Failed to 'write {specFilePath}: '"
+                | (Pair _ "")
 
             def outFile = resultPath inFile
             def cmd = script, "-I", "-p", inFile, "-o", outFile, extraArgs
