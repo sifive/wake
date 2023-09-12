@@ -7,7 +7,6 @@ use tracing;
 
 mod add_job;
 mod api_key_check;
-mod eviction;
 mod read_job;
 mod types;
 
