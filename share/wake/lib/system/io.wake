@@ -15,6 +15,40 @@
 
 package wake
 
+export data PathType =
+    PathTypeRegularFile
+    PathTypeDirectory
+    PathTypeCharacterDevice
+    PathTypeBlockDevice
+    PathTypeFifo
+    PathTypeSymlink
+    PathTypeSocket
+
+export tuple Stat =
+    Type: PathType
+    Mode: Integer
+    Size: Integer
+
+def statTypeNumberToPathType (inodeType: Integer): PathType = match inodeType
+    0 -> PathTypeRegularFile
+    1 -> PathTypeDirectory
+    2 -> PathTypeCharacterDevice
+    3 -> PathTypeBlockDevice
+    4 -> PathTypeFifo
+    5 -> PathTypeSymlink
+    6 -> PathTypeSocket
+    _ -> unreachable "stat returned invalid file type"
+
+export def stat (path: Path): Result Stat Error =
+    def imp p = prim "stat"
+
+    require Pass (Pair size (Pair inodeType mode)) =
+        imp path.getPathName
+        | rmapError makeError
+
+    Stat (statTypeNumberToPathType inodeType) mode size
+    | Pass
+
 # Read the file contents of a Path
 export def read (path: Path): Result String Error =
     def imp p = prim "read"
