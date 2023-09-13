@@ -39,6 +39,35 @@ target writeImp inputs mode path content =
 
         makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
 
+    # There are a couple likely bad paths that we don't want the user writing to
+    # so we give good error messages for these cases
+    require False = path ==* ""
+    else
+        failWithError
+        "Attempt to write to the path of the empty string. This was likely a mixup between the path and the content."
+
+    require False = path ==* "."
+    else failWithError "Attempt to write to write to the root workspace"
+
+    # We don't want `write` to write to anything outside of the workspace via
+    # a relative path
+    require False = matches `\.\..*` path
+    else failWithError "Attempt to write outside of the workspace"
+
+    # We don't want `write` to write to anything outside of the workspace via
+    # an absolute path
+    require False = matches `/.*` path
+    else failWithError "Attempt to write to an absolute path"
+
+    # Source files should never be deleted so we check for this case
+    def scan dir regexp = prim "sources"
+    def isSource = exists (_ ==~ path) (scan "." path.quote)
+
+    require False = isSource
+    else failWithError "Attempt to write over a source file"
+
+    # If all those checks pass we go ahead and perform the write. The write will
+    # overwrite single files but it will not overwrite a whole directory with a file.
     makeExecPlan ("<write>", str mode, path, Nil) inputs
     | setPlanLabel "write: {path} {str mode}"
     | setPlanOnce False
