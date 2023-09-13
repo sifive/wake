@@ -251,7 +251,26 @@ static PRIMFN(prim_write) {
   REQUIRE(mpz_cmp_si(mode, 0x1ff) <= 0);
   long mask = mpz_get_si(mode);
 
-  deep_unlink(AT_FDCWD, path->c_str());
+  // We want `write` to overwrite existing files so that
+  // each time the build runs it isn't blocked by previous files.
+  // However we want it to fail if it attempts to delete a directory.
+  // We need to give the user a good error message in that case.
+  if (unlink(path->c_str()) < 0 && errno != ENOENT) {
+    if (errno == EISDIR) {
+      std::string error = path->c_str();
+      error +=
+          " is a directory and cannot be overwritten. If this is intentional please manually "
+          "delete this directory";
+      size_t len = std::min(error.size(), max_error);
+      String *out = String::claim(runtime.heap, error.c_str(), len);
+      RETURN(claim_result(runtime.heap, false, out));
+    }
+    std::string error = strerror(errno);
+    size_t len = std::min(error.size(), max_error);
+    String *out = String::claim(runtime.heap, error.c_str(), len);
+    RETURN(claim_result(runtime.heap, false, out));
+  }
+
   std::ofstream t(path->c_str(), std::ios_base::trunc);
   if (!t.fail()) {
     t.write(body->c_str(), body->size());
