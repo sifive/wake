@@ -1160,13 +1160,69 @@ wcl::optional<wcl::doc> Emitter::combine_apply_constructor(ctx_t ctx,
 wcl::optional<wcl::doc> Emitter::combine_apply_explode_all(ctx_t ctx,
                                                            const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
-  for (size_t i = 0; i < parts.size() - 1; i++) {
-    CSTElement part = parts[i];
-    builder.append(fmt().walk(WALK_NODE).freshline().compose(ctx.sub(builder).prefer_explode(),
-                                                             part, token_traits));
+  CSTElement part = parts[0];
+
+  bool collapse_paren_eligible = part.id() != CST_PAREN;
+  if (collapse_paren_eligible && has_trailing_comment(part, token_traits)) {
+    collapse_paren_eligible = false;
   }
 
-  builder.append(walk_node(ctx.sub(builder).prefer_explode(), parts.back()));
+  builder.append(fmt().walk(WALK_NODE).compose(ctx.sub(builder),
+                                                             part, token_traits));
+
+
+  for (size_t i = 1; i < parts.size(); i++) {
+    CSTElement part = parts[i];
+
+    // Collapse paren is only eligible for the first run of parens
+    if (part.id() !=  CST_PAREN)  {
+      collapse_paren_eligible  = false;
+    }
+
+
+    // If the RHS has a leading comment then we must respect the regular format
+    // Json
+    // # comment
+    // ( ... )
+    //
+    // can't become
+    //
+    // Json # comment (
+    //   ...
+    // )
+    if (collapse_paren_eligible && has_leading_comment(part, token_traits)) {
+      collapse_paren_eligible = false;
+    }
+
+    if (collapse_paren_eligible) {
+        builder.append(fmt().space().walk(WALK_NODE).compose(ctx.sub(builder).prefer_explode(),
+                                                                 part, token_traits));
+    } else {
+        ctx_t new_ctx = ctx.sub(builder);
+        if (part.id() != CST_PAREN) {
+          new_ctx = new_ctx.prefer_explode();
+        }
+        builder.append(fmt().freshline().walk(WALK_NODE).compose(new_ctx,
+                                                                 part, token_traits));
+    }
+
+    // If the RHS has a trailing comment then all following parts must respect the regular format
+    // Json
+    // ( ... ) # comment
+    // ( ... )
+    //
+    // can't become
+    //
+    // Json  (
+    //   ...
+    // ) # comment (
+    //   ...
+    // )
+    if (collapse_paren_eligible && has_trailing_comment(part, token_traits)) {
+      collapse_paren_eligible = false;
+    }
+
+  }
 
   return {wcl::in_place_t{}, std::move(builder).build()};
 }
@@ -1190,6 +1246,8 @@ wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   FMT_ASSERT(node.id() == CST_APP, node, "Expected CST_APP");
 
   auto parts = collect_apply_parts(node);
+
+  ctx = ctx.downgrade_explode();
 
   std::vector<wcl::optional<wcl::doc>> choices = {
       combine_apply_flat(ctx, parts),
@@ -1877,7 +1935,7 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
                        .walk(WALK_NODE)
                        .consume_wsnlc()))
                // clang-format on
-               .format(ctx, node.firstChildElement(), token_traits));
+               .format(ctx.downgrade_explode(), node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) {
@@ -1911,7 +1969,7 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
                    .token(TOKEN_P_PCLOSE)
                    .format(ctx, node.firstChildElement(), token_traits);
 
-  if (is_vertically_flat(no_nl, node, token_traits)) {
+  if (ctx.explode_option != ExplodeOption::Prefer && is_vertically_flat(no_nl, node, token_traits)) {
     MEMO_RET(no_nl);
   }
 
@@ -1921,7 +1979,7 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
           .nest(fmt().consume_wsnlc().freshline().walk(is_expression, WALK_NODE).consume_wsnlc())
           .freshline()
           .token(TOKEN_P_PCLOSE)
-          .format(ctx, node.firstChildElement(), token_traits));
+          .format(ctx.downgrade_explode(), node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_prim(ctx_t ctx, CSTElement node) {

@@ -1493,3 +1493,52 @@ def a =
 
     5
 
+def x = 
+    checkJFields (
+        Nil
+    ) ( 
+        (foo bar) ++
+        (bar bazz)
+    )
+    settings
+
+def x = 
+    foo (
+        (1+2)
+    )
+
+def x = 
+    foo (
+        (1+2)
+        (3+4)
+        # comment
+        (5+6)
+    )
+
+def x = 
+    checkJFields (
+        Nil
+    ) ( 
+        "OptionalField" :-> checkJString,
+        Nil
+    )
+    settings
+
+def x = 
+    checkJFields (
+        Nil
+    ) ( 
+        "OptionalField" :-> checkJString,
+        "OptionalField" :-> checkJString,
+    )
+    settings
+    (foo bar)
+    (bar bazz)
+
+def x = 
+  Type (
+    "..." :-> "..."
+  ) (
+    "..." :-> "..."
+  )
+

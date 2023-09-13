@@ -80,6 +80,14 @@ struct ctx_t {
     return copy;
   }
 
+  ctx_t downgrade_explode() {
+    ctx_t copy = *this;
+    if (copy.explode_option == ExplodeOption::Prefer) {
+        copy.explode_option = ExplodeOption::Allow;
+    }
+    return copy;
+  }
+
   ctx_t binop() {
     ctx_t copy = *this;
     copy.nested_binop = true;

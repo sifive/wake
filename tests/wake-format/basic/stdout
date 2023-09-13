@@ -574,8 +574,9 @@ publish compileC =
     emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
 
 publish compileC =
-    emccFn
-    (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags) (another) ("thing" "here"))
+    emccFn (
+        makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags) (another) ("thing" "here")
+    )
 
 publish compileC = # comment
     emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
@@ -1214,7 +1215,8 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
             JObject "label" :-> JString label,
             "command" :-> command | map JString | JArray,
             "environment" :-> environment | map JString | JArray
-        ) ("label" :-> JString label, "command" :-> command | map JString | JArray, Nil)
+        )
+        ("label" :-> JString label, "command" :-> command | map JString | JArray, Nil)
 
     def json = (
         JObject (
@@ -1781,4 +1783,35 @@ def a =
         3+5
 
     5
+
+def x =
+    checkJFields (Nil) ((foo bar) ++ (bar bazz)) settings
+
+def x =
+    foo ((1 + 2))
+
+def x =
+    foo (
+        (1 + 2)
+        (3 + 4)
+        # comment
+        (5 + 6)
+    )
+
+def x =
+    checkJFields (Nil) ("OptionalField" :-> checkJString, Nil) settings
+
+def x =
+    checkJFields (
+        Nil
+    ) (
+        "OptionalField" :-> checkJString,
+        "OptionalField" :-> checkJString,
+    )
+    settings
+    (foo bar)
+    (bar bazz)
+
+def x =
+    Type ("..." :-> "...") ("..." :-> "...")
 
