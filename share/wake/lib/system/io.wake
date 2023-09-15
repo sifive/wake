@@ -24,10 +24,48 @@ export data PathType =
     PathTypeSymlink
     PathTypeSocket
 
+export tuple Permission =
+    Read: Boolean
+    Write: Boolean
+    Execute: Boolean
+
+export def perm2bits (perm: Permission) =
+    def b3 = if getPermissionRead perm then 4 else 0
+    def b2 = if getPermissionWrite perm then 2 else 0
+    def b1 = if getPermissionExecute then 1 else 0
+
+    b1 + b2 + b3
+
+export def bits2perm (bits: Integer) =
+    def b3 = 4 == and bits 4
+    def b2 = 2 == and bits 2
+    def b1 = 1 == and bits 1
+
+    Permission b3 b2 b1 
+
+export def Mode = 
+    User: Permission
+    Group: Permission
+    Other: Permission
+
+export def bits2mode (bits: Integer) =
+   def otherBits = and bits 7
+   def groupBits = and bits (7 << 3)
+   def userBits = and bits (7 << 6)
+
+   Mode (bits2perm userBits) (bits2perm groupBits) (bits2perm otherBits)
+
+export def mode2bits (mode: Mode) =
+   def otherBits = perm2bits mode.getModeOther
+   def groupBits = perm2bits mode.getModeGroup << 3
+   def userBits = perm2bits mode.getModeUser << 6
+
+   otherBits + groupBits + userBits
+
 export tuple Stat =
     Type: PathType
-    Mode: Integer
-    Size: Integer
+    Mode: Mode
+    SizeBytes: Integer
 
 def statTypeNumberToPathType (inodeType: Integer): PathType = match inodeType
     0 -> PathTypeRegularFile
@@ -39,14 +77,14 @@ def statTypeNumberToPathType (inodeType: Integer): PathType = match inodeType
     6 -> PathTypeSocket
     _ -> unreachable "stat returned invalid file type"
 
-export def stat (path: Path): Result Stat Error =
+export target stat (path: Path): Result Stat Error =
     def imp p = prim "stat"
 
     require Pass (Pair size (Pair inodeType mode)) =
         imp path.getPathName
         | rmapError makeError
 
-    Stat (statTypeNumberToPathType inodeType) mode size
+    Stat (statTypeNumberToPathType inodeType) (bits2mode mode) size
     | Pass
 
 # Read the file contents of a Path
