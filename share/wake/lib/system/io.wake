@@ -32,7 +32,7 @@ export tuple Permission =
 export def perm2bits (perm: Permission) =
     def b3 = if getPermissionRead perm then 4 else 0
     def b2 = if getPermissionWrite perm then 2 else 0
-    def b1 = if getPermissionExecute then 1 else 0
+    def b1 = if getPermissionExecute perm then 1 else 0
 
     b1 + b2 + b3
 
@@ -43,15 +43,15 @@ export def bits2perm (bits: Integer) =
 
     Permission b3 b2 b1 
 
-export def Mode = 
+export tuple Mode = 
     User: Permission
     Group: Permission
     Other: Permission
 
 export def bits2mode (bits: Integer) =
    def otherBits = and bits 7
-   def groupBits = and bits (7 << 3)
-   def userBits = and bits (7 << 6)
+   def groupBits = and (bits >> 3) 7
+   def userBits = and (bits >> 6) 7
 
    Mode (bits2perm userBits) (bits2perm groupBits) (bits2perm otherBits)
 
