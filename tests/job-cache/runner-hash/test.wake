@@ -1,0 +1,29 @@
+from wake import _
+
+publish source = "some-input.txt",
+
+export def test (_: List String): Result (List String) Error =
+    # Read the current time with nanoseconds included
+    # This is intentionally unreproducable to force a
+    # different in the resource string for the test job
+    require Pass stdout =
+        makePlan "runner_hash_test: get nano" Nil "date -Ins"
+        | runJobWith localRunner
+        | getJobStdout
+
+    def hashResource x =
+        require Pass input = x
+
+        Pass (catWith "." input.getRunnerInputResources)
+
+    def runner = mkJobCacheRunner hashResource "/workspace" fuseRunner
+
+    require Pass source = source "some-input.txt"
+    require Pass outputs =
+        makePlan "runner_hash_test" (source,) "cat some-input.txt > test.txt && cat some-input.txt >> test.txt"
+        | setPlanResources (stdout,)
+        # | setPlanPersistence ReRun
+        | runJobWith runner
+        | getJobOutputs
+    Pass (map (_.getPathName) outputs)
+

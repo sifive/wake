@@ -446,6 +446,7 @@ AddJobRequest::AddJobRequest(const JAST &json) {
   ibytes = std::stoull(json.get("ibytes").value);
   obytes = std::stoull(json.get("obytes").value);
   client_cwd = json.get("client_cwd").value;
+  runner_hash = json.get("runner_hash").value;
   if (wcl::is_relative(client_cwd)) {
     wcl::log::error("AddJobRequest::AddJobRequest: client_cwd cannot be relative. found: '%s'",
                     client_cwd.c_str())
@@ -523,6 +524,7 @@ JAST AddJobRequest::to_json() const {
   json.add("ibytes", int64_t(ibytes));
   json.add("obytes", int64_t(obytes));
   json.add("client_cwd", client_cwd);
+  json.add("runner_hash", runner_hash);
 
   JAST input_files_json(JSON_ARRAY);
   for (const auto &input_file : inputs) {
@@ -641,6 +643,7 @@ JAST FindJobRequest::to_json() const {
   json.add("environment", environment);
   json.add("stdin", stdin_str);
   json.add("client_cwd", client_cwd);
+  json.add("runner_hash", runner_hash);
 
   JAST input_files(JSON_ARRAY);
   for (const auto &input_file : visible) {
