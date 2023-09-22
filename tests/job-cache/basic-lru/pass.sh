@@ -68,7 +68,7 @@ fi
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
 rm wake.db
 if [ -z "$(ls -A .cache-misses)" ]; then
-  echo "Expected a chache miss!!"
+  echo "Expected a cache miss!!"
   exit 1
 fi
 rm -rf .cache-misses
@@ -77,7 +77,7 @@ rm -rf .cache-misses
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test three
 rm wake.db
 if [ -z "$(ls -A .cache-misses)" ]; then
-  echo "Expected a chache miss!!"
+  echo "Expected a cache miss!!"
   exit 1
 fi
 rm -rf .cache-misses
