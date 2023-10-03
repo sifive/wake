@@ -215,13 +215,13 @@ static PRIMFN(prim_tokenize) {
   // NOTE: if there is not enough space, this routine will be re-entered.
   // This means tokens is recomputed with fresh/correct heap locations.
 
-  Value *out[tokens.size()];
+  std::vector<Value *> out;
   for (size_t i = 0; i < tokens.size(); ++i) {
     re2::StringPiece &p = tokens[i];
-    out[i] = String::claim(runtime.heap, p.data(), p.size());
+    out.emplace_back(String::claim(runtime.heap, p.data(), p.size()));
   }
 
-  RETURN(claim_list(runtime.heap, tokens.size(), out));
+  RETURN(claim_list(runtime.heap, tokens.size(), out.data()));
 }
 
 static PRIMTYPE(type_rcat) {
