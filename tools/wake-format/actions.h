@@ -26,11 +26,10 @@
 #include "predicates.h"
 #include "types.h"
 
-
-static inline wcl::doc rtrim_comment(const CSTElement& node) { 
-    std::string comment = node.fragment().segment().str();
-    comment.erase(comment.find_last_not_of(" ") + 1);
-    return wcl::doc::lit(comment);
+static inline wcl::doc rtrim_comment(const CSTElement& node) {
+  std::string comment = node.fragment().segment().str();
+  comment.erase(comment.find_last_not_of(" ") + 1);
+  return wcl::doc::lit(comment);
 }
 
 // This does nothing, good for kicking off a chain of formatters
@@ -145,9 +144,9 @@ struct TokenReplaceAction {
       for (auto n : it->second.after_bound) {
         space(builder, 1);
         if (n.id() == TOKEN_COMMENT) {
-            builder.append(rtrim_comment(n));
+          builder.append(rtrim_comment(n));
         } else {
-            builder.append(n.fragment().segment().str());
+          builder.append(n.fragment().segment().str());
         }
         newline(builder, 0);
       }
