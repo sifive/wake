@@ -215,7 +215,7 @@ static PRIMFN(prim_tokenize) {
   // NOTE: if there is not enough space, this routine will be re-entered.
   // This means tokens is recomputed with fresh/correct heap locations.
 
-  std::vector<Value*> out;
+  std::vector<Value *> out;
   for (size_t i = 0; i < tokens.size(); ++i) {
     re2::StringPiece &p = tokens[i];
     out.emplace_back(String::claim(runtime.heap, p.data(), p.size()));
