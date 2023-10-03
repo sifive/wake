@@ -580,7 +580,7 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
       is_floating_comment,
       fmt()
           .fmt_while(TOKEN_COMMENT,
-                     fmt().token(TOKEN_COMMENT).freshline().fmt_if(TOKEN_NL, fmt().next()))
+                     fmt().walk(WALK_TOKEN).freshline().fmt_if(TOKEN_NL, fmt().next()))
           .freshline()
           .newline()
           .join(consume_wsnl),
@@ -995,7 +995,12 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
     case TOKEN_WS:
       builder.append(wcl::doc::lit(" "));
       break;
-    case TOKEN_COMMENT:
+    case TOKEN_COMMENT: {
+      std::string comment = node.fragment().segment().str();
+      comment.erase(comment.find_last_not_of(" ") + 1);
+      builder.append(wcl::doc::lit(comment));
+      break;
+    }
     case TOKEN_P_BOPEN:
     case TOKEN_P_BCLOSE:
     case TOKEN_P_SOPEN:

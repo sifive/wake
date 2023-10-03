@@ -8,6 +8,7 @@ def five =
     5
 
 # ordinary comment
+# comment with trailing spaces
 
 def name Unit =
     def other = @here
@@ -26,7 +27,7 @@ def name Unit =
 def name Unit =
     def other = @here
 
-    # not floating
+    # not floating with trailing
 
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 

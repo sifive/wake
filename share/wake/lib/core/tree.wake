@@ -752,7 +752,7 @@ def insertMin x = match _
     Tip -> Bin 1 Tip x Tip
     Bin _ l y r -> balanceL (insertMin x l) y r
 
-# Written while reading the Haskell Set implementation 
+# Written while reading the Haskell Set implementation
 def balanceL l x r = match l r
     Tip Tip -> Bin 1 Tip x Tip
     (Bin ls ll lx lr) Tip -> match ll lr

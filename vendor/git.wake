@@ -68,7 +68,7 @@ def buildOn Unit = match (subscribe releaseOn)
 #       ^^^
 # which breaks node's version requiement and is considered invalid
 #
-# Capture the parts and insert '-plus-' between the version and the commit. 
+# Capture the parts and insert '-plus-' between the version and the commit.
 # Do nothing if the version is already safe.
 def mk_node_semver_safe v =
     #                            | Matches the version tag, which should be 3 numbers separated by '.' with an optional leading 'v'

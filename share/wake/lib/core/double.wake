@@ -387,7 +387,7 @@ export def dacos (x: Double): Double =
 export def dasin (x: Double): Double =
     (\_ prim "dasin") x
 
-# Calculates the inverse tangent of y/x, giving the angle of the point(x, y) in the coordinate plane. 
+# Calculates the inverse tangent of y/x, giving the angle of the point(x, y) in the coordinate plane.
 # The advantage of 2-argument datan over 1-argument datan is it is defined even where x is 0.
 # datan (-. 1.0) (-. 1.0) = pi * -0.75
 # datan (-. 1.0)     0.0  = pi * -0.50

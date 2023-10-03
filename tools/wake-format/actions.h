@@ -101,7 +101,10 @@ struct TokenReplaceAction {
         if (n.id() == TOKEN_COMMENT) {
           // Realign indent before writing the comment
           freshline(builder, ctx);
-          builder.append(n.fragment().segment().str());
+
+          std::string comment = n.fragment().segment().str();
+          comment.erase(comment.find_last_not_of(" ") + 1);
+          builder.append(wcl::doc::lit(comment));
           builder.append(wcl::doc::lit("\n"));
           continue;
         }
