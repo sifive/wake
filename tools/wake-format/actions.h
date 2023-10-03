@@ -28,7 +28,7 @@
 
 static inline wcl::doc rtrim_comment(const CSTElement& node) {
   std::string comment = node.fragment().segment().str();
-  comment.erase(comment.find_last_not_of(" ") + 1);
+  comment.erase(comment.find_last_not_of(" \t") + 1);
   return wcl::doc::lit(comment);
 }
 
