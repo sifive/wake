@@ -26,6 +26,12 @@
 #include "predicates.h"
 #include "types.h"
 
+static inline wcl::doc rtrim_comment(const CSTElement& node) {
+  std::string comment = node.fragment().segment().str();
+  comment.erase(comment.find_last_not_of(" \t") + 1);
+  return wcl::doc::lit(comment);
+}
+
 // This does nothing, good for kicking off a chain of formatters
 struct EpsilonAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
@@ -101,7 +107,8 @@ struct TokenReplaceAction {
         if (n.id() == TOKEN_COMMENT) {
           // Realign indent before writing the comment
           freshline(builder, ctx);
-          builder.append(n.fragment().segment().str());
+
+          builder.append(rtrim_comment(n));
           builder.append(wcl::doc::lit("\n"));
           continue;
         }
@@ -125,16 +132,22 @@ struct TokenReplaceAction {
       }
     }
 
-    if (str == nullptr) {
-      builder.append(node.fragment().segment().str());
-    } else {
+    if (str != nullptr) {
       builder.append(str);
+    } else if (node.id() == TOKEN_COMMENT) {
+      builder.append(rtrim_comment(node));
+    } else {
+      builder.append(node.fragment().segment().str());
     }
 
     if (it != traits.end()) {
       for (auto n : it->second.after_bound) {
         space(builder, 1);
-        builder.append(n.fragment().segment().str());
+        if (n.id() == TOKEN_COMMENT) {
+          builder.append(rtrim_comment(n));
+        } else {
+          builder.append(n.fragment().segment().str());
+        }
         newline(builder, 0);
       }
     }

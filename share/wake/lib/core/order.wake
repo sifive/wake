@@ -15,7 +15,7 @@
 
 package wake
 
-# Used for comparing quantities.  
+# Used for comparing quantities.
 # Can hold the following values:
 # ``LT`` = Less Than
 # ``EQ`` = Equal
