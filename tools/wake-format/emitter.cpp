@@ -1832,15 +1832,14 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node, size_t whitespace_pre
 
   auto multiline_str_fmt = fmt()
     .match(
-      pred(TOKEN_LSTR_BEGIN, fmt().token(TOKEN_LSTR_BEGIN).token(TOKEN_NL))
+      pred(TOKEN_LSTR_BEGIN, fmt().token(TOKEN_LSTR_BEGIN, symbolExample(TOKEN_MSTR_BEGIN)).token(TOKEN_NL))
      .pred(TOKEN_MSTR_BEGIN, fmt().token(TOKEN_MSTR_BEGIN).token(TOKEN_NL))
      .pred(TOKEN_LSTR_RESUME, fmt().token(TOKEN_LSTR_RESUME).token(TOKEN_NL))
      .pred(TOKEN_MSTR_RESUME, fmt().token(TOKEN_MSTR_RESUME).token(TOKEN_NL))
      // otherwise: fail
     )
     .join(multiline_string_loop)
-    .fmt_if(TOKEN_LSTR_END, fmt().next().freshline().lit(wcl::doc::lit("%\"")))
-    .fmt_if(TOKEN_MSTR_END, fmt().next().freshline().lit(wcl::doc::lit("\"\"\"")));
+    .fmt_if({TOKEN_MSTR_END, TOKEN_LSTR_END}, fmt().next().freshline().lit(wcl::doc::lit("\"\"\"")));
   // clang-format on
 
   auto node_fmt = fmt().walk(DISPATCH(walk_placeholder));
