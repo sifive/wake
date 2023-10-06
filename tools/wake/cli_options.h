@@ -56,6 +56,8 @@ struct CommandLineOptions {
   bool timeline;
   bool clean;
   bool list_outputs;
+  bool list_prims;
+  bool print_expr_type;
   wcl::optional<bool> log_header_align;
   wcl::optional<bool> cache_miss_on_failure;
 
@@ -146,6 +148,8 @@ struct CommandLineOptions {
       {0, "stderr", GOPT_ARGUMENT_REQUIRED},
       {0, "clean", GOPT_ARGUMENT_FORBIDDEN },
       {0, "list-outputs", GOPT_ARGUMENT_FORBIDDEN },
+      {0, "list-prims", GOPT_ARGUMENT_FORBIDDEN },
+      {0, "print-expr-type", GOPT_ARGUMENT_FORBIDDEN },
       {0, "fd:3", GOPT_ARGUMENT_REQUIRED},
       {0, "fd:4", GOPT_ARGUMENT_REQUIRED},
       {0, "fd:5", GOPT_ARGUMENT_REQUIRED},
@@ -194,6 +198,8 @@ struct CommandLineOptions {
     timeline = arg(options, "timeline")->count;
     clean = arg(options, "clean")->count;
     list_outputs = arg(options, "list-outputs")->count;
+    list_prims = arg(options, "list-prims")->count;
+    print_expr_type = arg(options, "print-expr-type")->count;
 
     percent_str = arg(options, "percent")->argument;
     jobs_str = arg(options, "jobs")->argument;

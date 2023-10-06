@@ -1,0 +1,401 @@
+package prim_wake
+
+export def prim_abs: Integer => Integer =
+    (\_ prim "abs")
+
+export def prim_access: String => Integer => Boolean =
+    (\_ \_ prim "access")
+
+export def prim_add: Integer => Integer => Integer =
+    (\_ \_ prim "add")
+
+export def prim_add_hash: String => String => String =
+    (\_ \_ prim "add_hash")
+
+export def prim_add_sources: String => Boolean =
+    (\_ prim "add_sources")
+
+export def prim_and: Integer => Integer => Integer =
+    (\_ \_ prim "and")
+
+export def prim_bin2str: Integer => String =
+    (\_ prim "bin2str")
+
+export def prim_breadcrumb: String => Unit =
+    (\_ prim "breadcrumb")
+
+export def prim_cmdline: List String =
+    (prim "cmdline")
+
+export def prim_code2str: Integer => String =
+    (\_ prim "code2str")
+
+export def prim_com: Integer => Integer =
+    (\_ prim "com")
+
+export def prim_cwd: String =
+    (prim "cwd")
+
+export def prim_dabs: Double => Double =
+    (\_ prim "dabs")
+
+export def prim_dacos: Double => Double =
+    (\_ prim "dacos")
+
+export def prim_dadd: Double => Double => Double =
+    (\_ \_ prim "dadd")
+
+export def prim_dasin: Double => Double =
+    (\_ prim "dasin")
+
+export def prim_datan: Double => Double => Double =
+    (\_ \_ prim "datan")
+
+export def prim_dclass: Double => Integer =
+    (\_ prim "dclass")
+
+export def prim_dcmp: Double => Double => List Order =
+    (\_ \_ prim "dcmp")
+
+export def prim_dcmp_nan_lt: Double => Double => Order =
+    (\_ \_ prim "dcmp_nan_lt")
+
+export def prim_dcos: Double => Double =
+    (\_ prim "dcos")
+
+export def prim_ddbl: String => List Double =
+    (\_ prim "ddbl")
+
+export def prim_ddiv: Double => Double => Double =
+    (\_ \_ prim "ddiv")
+
+export def prim_derf: Double => Double =
+    (\_ prim "derf")
+
+export def prim_derfc: Double => Double =
+    (\_ prim "derfc")
+
+export def prim_dexp: Double => Double =
+    (\_ prim "dexp")
+
+export def prim_dexpm1: Double => Double =
+    (\_ prim "dexpm1")
+
+export def prim_dfma: Double => Double => Double => Double =
+    (\_ \_ \_ prim "dfma")
+
+export def prim_dfrexp: Double => Pair Double Integer =
+    (\_ prim "dfrexp")
+
+export def prim_div: Integer => Integer => Integer =
+    (\_ \_ prim "div")
+
+export def prim_dldexp: Double => Integer => Double =
+    (\_ \_ prim "dldexp")
+
+export def prim_dlgamma: Double => Double =
+    (\_ prim "dlgamma")
+
+export def prim_dlog: Double => Double =
+    (\_ prim "dlog")
+
+export def prim_dlog1p: Double => Double =
+    (\_ prim "dlog1p")
+
+export def prim_dmodf: Double => Pair Integer Double =
+    (\_ prim "dmodf")
+
+export def prim_dmul: Double => Double => Double =
+    (\_ \_ prim "dmul")
+
+export def prim_dneg: Double => Double =
+    (\_ prim "dneg")
+
+export def prim_dpow: Double => Double => Double =
+    (\_ \_ prim "dpow")
+
+export def prim_dsin: Double => Double =
+    (\_ prim "dsin")
+
+export def prim_dstr: Integer => Integer => Double => String =
+    (\_ \_ \_ prim "dstr")
+
+export def prim_dsub: Double => Double => Double =
+    (\_ \_ prim "dsub")
+
+export def prim_dtan: Double => Double =
+    (\_ prim "dtan")
+
+export def prim_dtgamma: Double => Double =
+    (\_ prim "dtgamma")
+
+export def prim_execpath: String =
+    (prim "execpath")
+
+export def prim_exp: Integer => Integer => Integer =
+    (\_ \_ prim "exp")
+
+export def prim_explode: String => List String =
+    (\_ prim "explode")
+
+export def prim_extract: RegExp => String => List String =
+    (\_ \_ prim "extract")
+
+export def prim_files: String => RegExp => List String =
+    (\_ \_ prim "files")
+
+export def prim_filter_term_codes: String => String =
+    (\_ prim "filter_term_codes")
+
+export def prim_format: a => String =
+    (\_ prim "format")
+
+export def prim_gcd: Integer => Integer => Integer =
+    (\_ \_ prim "gcd")
+
+export def prim_get_hash: String => String =
+    (\_ prim "get_hash")
+
+export def prim_get_modtime: String => Integer =
+    (\_ prim "get_modtime")
+
+export def prim_getenv: String => List String =
+    (\_ prim "getenv")
+
+export def prim_glob2regexp: String => String =
+    (\_ prim "glob2regexp")
+
+export def prim_hash: Integer =
+    (prim "hash")
+
+export def prim_hash_str: String => String =
+    (\_ prim "hash_str")
+
+export def prim_icmp: Integer => Integer => Order =
+    (\_ \_ prim "icmp")
+
+export def prim_int: Integer => String => List Integer =
+    (\_ \_ prim "int")
+
+export def prim_job_cache: String => String => String => String => Integer => String => Integer => Pair (List Job) (List (Pair String String)) =
+    (\_ \_ \_ \_ \_ \_ \_ prim "job_cache")
+
+export def prim_job_cache_add: String => Result String String =
+    (\_ prim "job_cache_add")
+
+export def prim_job_cache_read: String => Result String String =
+    (\_ prim "job_cache_read")
+
+export def prim_job_create: String => String => String => String => String => Integer => String => Integer => String => String => String => Integer => Job =
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_create")
+
+export def prim_job_desc: Job => String =
+    (\_ prim "job_desc")
+
+export def prim_job_fail_finish: Job => Error => Unit =
+    (\_ \_ prim "job_fail_finish")
+
+export def prim_job_fail_launch: Job => Error => Unit =
+    (\_ \_ prim "job_fail_launch")
+
+export def prim_job_finish: Job => String => String => String => Integer => Double => Double => Integer => Integer => Integer => Unit =
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_finish")
+
+export def prim_job_id: Job => Integer =
+    (\_ prim "job_id")
+
+export def prim_job_launch: Job => String => String => String => String => Integer => Double => Double => Integer => Integer => Integer => Integer => Unit =
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_launch")
+
+export def prim_job_output: Job => Integer => Result String Error =
+    (\_ \_ prim "job_output")
+
+export def prim_job_reality: Job => Result (Pair (Pair Integer Double) (Pair (Pair Double Integer) (Pair Integer Integer))) Error =
+    (\_ prim "job_reality")
+
+export def prim_job_record: Job => List (Pair (Pair Integer Double) (Pair (Pair Double Integer) (Pair Integer Integer))) =
+    (\_ prim "job_record")
+
+export def prim_job_report: Job => Result (Pair (Pair Integer Double) (Pair (Pair Double Integer) (Pair Integer Integer))) Error =
+    (\_ prim "job_report")
+
+export def prim_job_tag: Job => String => String => Unit =
+    (\_ \_ \_ prim "job_tag")
+
+export def prim_job_tree: Job => Integer => Result (List (Pair String String)) Error =
+    (\_ \_ prim "job_tree")
+
+export def prim_job_virtual: Job => String => String => Integer => Double => Double => Integer => Integer => Integer => Unit =
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_virtual")
+
+export def prim_json_body: String => Result JValue String =
+    (\_ prim "json_body")
+
+export def prim_json_file: String => Result JValue String =
+    (\_ prim "json_file")
+
+export def prim_json_str: String => String =
+    (\_ prim "json_str")
+
+export def prim_lcat: List String => String =
+    (\_ prim "lcat")
+
+export def prim_lcm: Integer => Integer => Integer =
+    (\_ \_ prim "lcm")
+
+export def prim_level: Integer =
+    (prim "level")
+
+export def prim_match: RegExp => String => Boolean =
+    (\_ \_ prim "match")
+
+export def prim_mkdir: Integer => String => Result String String =
+    (\_ \_ prim "mkdir")
+
+export def prim_mod: Integer => Integer => Integer =
+    (\_ \_ prim "mod")
+
+export def prim_mul: Integer => Integer => Integer =
+    (\_ \_ prim "mul")
+
+export def prim_neg: Integer => Integer =
+    (\_ prim "neg")
+
+export def prim_or: Integer => Integer => Integer =
+    (\_ \_ prim "or")
+
+export def prim_panic: String => a =
+    (\_ prim "panic")
+
+export def prim_pid: Integer =
+    (prim "pid")
+
+export def prim_powm: Integer => Integer => Integer => Integer =
+    (\_ \_ \_ prim "powm")
+
+export def prim_print: String => String => Unit =
+    (\_ \_ prim "print")
+
+export def prim_quote: String => String =
+    (\_ prim "quote")
+
+export def prim_rcat: RegExp =
+    (prim "rcat")
+
+export def prim_rcmp: RegExp => RegExp => Order =
+    (\_ \_ prim "rcmp")
+
+export def prim_re2: String => Result RegExp String =
+    (\_ prim "re2")
+
+export def prim_re2str: RegExp => String =
+    (\_ prim "re2str")
+
+export def prim_read: String => Result String String =
+    (\_ prim "read")
+
+export def prim_relative: String => String => String =
+    (\_ \_ prim "relative")
+
+export def prim_replace: RegExp => String => String => String =
+    (\_ \_ \_ prim "replace")
+
+export def prim_root: Integer => Integer => Integer =
+    (\_ \_ prim "root")
+
+export def prim_sNFC: String => String =
+    (\_ prim "sNFC")
+
+export def prim_sNFKC: String => String =
+    (\_ prim "sNFKC")
+
+export def prim_scaseNFKC: String => String =
+    (\_ prim "scaseNFKC")
+
+export def prim_scmp: String => String => Order =
+    (\_ \_ prim "scmp")
+
+export def prim_search_path: String => String => String =
+    (\_ \_ prim "search_path")
+
+export def prim_shell_str: String => String =
+    (\_ prim "shell_str")
+
+export def prim_shl: Integer => Integer => Integer =
+    (\_ \_ prim "shl")
+
+export def prim_shr: Integer => Integer => Integer =
+    (\_ \_ prim "shr")
+
+export def prim_simplify: String => String =
+    (\_ prim "simplify")
+
+export def prim_sources: String => RegExp => List String =
+    (\_ \_ prim "sources")
+
+export def prim_stack: Unit => List String =
+    (\_ prim "stack")
+
+export def prim_str: Integer => Integer => String =
+    (\_ \_ prim "str")
+
+export def prim_str2bin: String => Integer =
+    (\_ prim "str2bin")
+
+export def prim_str2code: String => Integer =
+    (\_ prim "str2code")
+
+export def prim_strlen: String => Integer =
+    (\_ prim "strlen")
+
+export def prim_sub: Integer => Integer => Integer =
+    (\_ \_ prim "sub")
+
+# export def prim_tget: Target => (Target => a) => a =
+#     (\_ \_ prim "tget")
+
+# export def prim_tnew: String => Integer => Target =
+#     (\_ \_ prim "tnew")
+
+export def prim_tokenize: RegExp => String => List String =
+    (\_ \_ prim "tokenize")
+
+export def prim_true: a => Boolean =
+    (\_ prim "true")
+
+export def prim_uname: Pair String String =
+    (prim "uname")
+
+export def prim_unlink: String => Unit =
+    (\_ prim "unlink")
+
+export def prim_unreachable: String => a =
+    (\_ prim "unreachable")
+
+export def prim_use: a => a =
+    (\_ prim "use")
+
+export def prim_vcat: String =
+    (prim "vcat")
+
+export def prim_version: String =
+    (prim "version")
+
+# export def prim_vget: Array a => Integer => a =
+#     (\_ \_ prim "vget")
+
+# export def prim_vnew: Integer => Array a =
+#     (\_ prim "vnew")
+
+# export def prim_vset: Array a => Integer => a => Unit =
+#     (\_ \_ \_ prim "vset")
+
+export def prim_workspace: String =
+    (prim "workspace")
+
+export def prim_write: Integer => String => String => Result String String =
+    (\_ \_ \_ prim "write")
+
+export def prim_xor: Integer => Integer => Integer =
+    (\_ \_ prim "xor")
+

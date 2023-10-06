@@ -15,6 +15,8 @@
 
 package wake
 
+from prim_wake import _
+
 # The Double type is an IEEE 754 64-bit precision number.
 # Any wake literal which include a decimal point or an exponent is parsed into a Double.
 
@@ -22,13 +24,13 @@ package wake
 # dabs (+. 2.5) = 2.5
 # dabs (-. 2.5) = 2.5
 export def dabs (x: Double): Double =
-    (\_ prim "dabs") x
+    prim_dabs x
 
 # Unary negative sign for a Double.
 # -. (-. 2.5) =  2.5
 # -. (+. 2.5) = -2.5
 export def -.(x: Double): Double =
-    (\_ prim "dneg") x
+    prim_dneg x
 
 # Unary positive sign for a Double.
 # +. 2.5 = 2.5
@@ -39,31 +41,31 @@ export def +.(x: Double): Double =
 # 1.1 +. 2.0 = 3.1
 # 0.1 +. 0.5 = 0.6
 export def (x: Double) +. (y: Double): Double =
-    (\_ \_ prim "dadd") x y
+    prim_dadd x y
 
 # Binary subtraction operator for Double values.
 # 4.0 -. 2.2 = 1.8
 # 1.1 -. 2.0 = -. 0.9
 export def (x: Double) -. (y: Double): Double =
-    (\_ \_ prim "dsub") x y
+    prim_dsub x y
 
 # Binary multiplication operator for Double values.
 # 2.0 *. 3.3 = 6.6
 # 2.0 *. 4.1 = 8.2
 export def (x: Double) *. (y: Double): Double =
-    (\_ \_ prim "dmul") x y
+    prim_dmul x y
 
 # Binary division operator for Double valuess.
 # 4.0 /. 2.0 = 2.0
 # 5.0 /. 2.0 = 2.5
 export def (x: Double) /. (y: Double): Double =
-    (\_ \_ prim "ddiv") x y
+    prim_ddiv x y
 
 # Binary exponentiation operator for Double values.
 # 2.0 ^. 3.0 = 8.0
 # 0.5 ^. 2.0 = 0.25
 export def (x: Double) ^. (y: Double): Double =
-    (\_ \_ prim "dpow") x y
+    prim_dpow x y
 
 # Computes x*y + z with rounding only at the end.
 # The fused-multiply-add operation is useful in numeric algorithms.
@@ -71,7 +73,7 @@ export def (x: Double) ^. (y: Double): Double =
 # dfma 2.0 3.0 1.0 = 7.0
 # dfma 1.0 1.0 1.0 = 3.0
 export def dfma (x: Double) (y: Double) (z: Double): Double =
-    (\_ \_ \_ prim "dfma") x y z
+    prim_dfma x y z
 
 # Computes the n-th root.
 # droot 2.0 9.0  = 3.0
@@ -116,9 +118,7 @@ def root4 =
 # 4.5 <=>. 5.0 = Some LT
 # 4.0 <=>. 4.5 = Some GT
 export def dcmp (x: Double) (y: Double): Option Order =
-    def imp x y = prim "dcmp"
-
-    imp x y
+    prim_dcmp x y
     | head
 
 # Comparison of two Doubles.
@@ -258,16 +258,14 @@ export data DoubleFormat =
 #    DoubleScientific  1.000e+03  1.000e+00   # exactly 3 digits after the decimal
 #    DoubleHex         0x1.f40p+9 0x1.000p+0  # exactly 3 digits after the decimal
 #    DoubleDefault     1e+03      1e0         # at 3 digits of precision
-export def dformat (format: DoubleFormat): (digits: Integer) => Double => String =
-    def imp f p x = prim "dstr"
-
-    def f = match format
+export def dformat (format: DoubleFormat): (digits: Integer) => (value: Double) => String =
+    def format_int = match format
         DoubleFixed -> 0
         DoubleScientific -> 1
         DoubleHex -> 2
         DoubleDefault -> 3
 
-    imp f
+    (\d \v prim_dstr format_int d v)
 
 # Convert a String into a Double
 # Can parse any Double formatted by dformat.
@@ -275,7 +273,7 @@ export def dformat (format: DoubleFormat): (digits: Integer) => Double => String
 # double "1.0" = Some 1e0
 # double "xyz" = None
 export def double (doubleInString: String): Option Double =
-    (\_ prim "ddbl") doubleInString
+    prim_ddbl doubleInString
     | head
 
 # Format a Double losslessly in hex
@@ -308,9 +306,7 @@ export data DoubleClass =
 # dclass 1.0 = DoubleNormal
 # dclass 1.0e-322 = DoubleSubNormal
 export def dclass (x: Double): DoubleClass =
-    def imp x = prim "dclass"
-
-    match (imp x)
+    match (prim_dclass x)
         1 -> DoubleInfinite
         2 -> DoubleNaN
         4 -> DoubleSubNormal
@@ -325,7 +321,7 @@ export def dclass (x: Double): DoubleClass =
 # dfrexp 4.0 = Pair 0.5  3
 # dfrexp 3.0 = Pair 0.75 2
 export def dfrexp (x: Double): Pair Double Integer =
-    (\_ prim "dfrexp") x
+   prim_dfrexp x
 
 # Reverse the effects of dfrexp
 #
@@ -334,7 +330,7 @@ export def dfrexp (x: Double): Pair Double Integer =
 # dldexp 0.5  3 = 4.0
 # dldexp 0.75 2 = 3.0
 export def dldexp (fraction: Double) (exponent: Integer): Double =
-    (\_ \_ prim "dldexp") fraction exponent
+    prim_dldexp fraction exponent
 
 # Split 'x' into (Pair int fraction), such that:
 #   x = int + fraction
@@ -345,7 +341,7 @@ export def dldexp (fraction: Double) (exponent: Integer): Double =
 # dmodf 5.1 = Pair 5 0.1
 # dmodf (-.5.1) = Pair -5 -0.1
 export def dmodf (x: Double): Pair Integer Double =
-    (\_ prim "dmodf") x
+    prim_dmodf x
 
 # Handy numerical functions
 
@@ -355,7 +351,7 @@ export def dmodf (x: Double): Pair Integer Double =
 # dcos (pi/.2.0) =   0.0
 # dcos pi        = -.1.0
 export def dcos (radians: Double): Double =
-    (\_ prim "dcos") radians
+    prim_dcos radians
 
 # Calculates the sine of a Double.
 # dsin nan       = nan
@@ -363,14 +359,14 @@ export def dcos (radians: Double): Double =
 # dsin (pi/.2.0) = 1.0
 # dins pi        = 0.0
 export def dsin (radians: Double): Double =
-    (\_ prim "dsin") radians
+    prim_dsin radians
 
 # Calculates the tangent of a Double.
 # dtan (-.pi/.2.0) = -inf
 # dtan 0.0         =  0.0
 # dtan (  pi/.2.0) = +inf
 export def dtan (radians: Double): Double =
-    (\_ prim "dtan") radians
+    prim_dtan radians
 
 # Calculates the inverse cosine of a Double.
 # dacos (-.1.0) = pi
@@ -378,14 +374,14 @@ export def dtan (radians: Double): Double =
 # dacos 1.0     = 0.0
 # dacos 2.0     = nan
 export def dacos (x: Double): Double =
-    (\_ prim "dacos") x
+    prim_dacos x
 
 # Calculates the inverse sine of a Double.
 # dasin (-.1.0) = -.(pi/2.0)
 # dasin 0.0     = 0.0
 # dasin 1.0     = pi/2.0
 export def dasin (x: Double): Double =
-    (\_ prim "dasin") x
+    prim_dasin x
 
 # Calculates the inverse tangent of y/x, giving the angle of the point(x, y) in the coordinate plane.
 # The advantage of 2-argument datan over 1-argument datan is it is defined even where x is 0.
@@ -398,20 +394,20 @@ export def dasin (x: Double): Double =
 # datan     1.0  (-. 1.0) = pi *  0.75
 # datan     0.0  (-. 1.0) = pi *  1.00
 export def datan (x: Double) (y: Double): Double =
-    (\_ \_ prim "datan") x y
+    prim_datan x y
 
 # Calculates e^x.
 # dexp 0.0 = 1.0
 # dexp 1.0 = 2.71828
 # dexp (-.inf) = 0.0
 export def dexp (x: Double): Double =
-    (\_ prim "dexp") x
+    prim_dexp x
 
 # Calculates the natural logarithm of x.
 # dlog (dexp x) = x
 # dlog (-. 1.0) = nan
 export def dlog (x: Double): Double =
-    (\_ prim "dlog") x
+    prim_dlog x
 
 # Calculates e^.x -. 1.0
 # Useful for values of 'x' close to 0.0
@@ -419,7 +415,7 @@ export def dlog (x: Double): Double =
 # dexpm1 0.0     = 0.0
 # dexpm1 0.2     = 0.22
 export def dexpm1 (x: Double): Double =
-    (\_ prim "dexpm1") x
+    prim_dexpm1 x
 
 # Calculates dlog (1.0 +. x)
 # dlog1p (dexpm1 x) = x
@@ -428,29 +424,29 @@ export def dexpm1 (x: Double): Double =
 # dlog1p 0.0     = 0.0
 # dlog1p 0.2     = 0.18
 export def dlog1p (x: Double): Double =
-    (\_ prim "dlog1p") x
+    prim_dlog1p x
 
 # Calculate the 'error function'.
 # 2/sqrt(pi) Integral_{0..x} e^(-t^2) dt
 # This function is handy for statistics
 export def derf (x: Double): Double =
-    (\_ prim "derf") x
+    prim_derf x
 
 # Calculate the complementary 'error function' (1-erf).
 # 2/sqrt(pi) Integral_{0..x} e^(-t^2) dt
 # This function is handy for statistics
 export def derfc (x: Double): Double =
-    (\_ prim "derfc") x
+    prim_derfc x
 
 # Compute the gamma function; Integral_{0..inf} t^{x-1} e^t dt
 # This is an everywhere-defined factorial method; dtgamma (x+1) = x!
 export def dtgamma (x: Double): Double =
-    (\_ prim "dtgamma") x
+    prim_dtgamma x
 
 # Compute the logarithm of the gamma function
 # This is useful to approximate statistics like (n choose m)
 export def dlgamma (x: Double): Double =
-    (\_ prim "dlgamma") x
+    prim_dlgamma x
 
 # Useful constants
 

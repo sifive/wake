@@ -41,6 +41,7 @@ share/wake/lib/core/result.wake
 share/wake/lib/core/string.wake
 share/wake/lib/core/map.wake
 share/wake/lib/core/syntax.wake
+share/wake/lib/prim/prim.wake
 tools/wake-unit/wake-unit.wake
 tools/fuse-waked/fuse-waked.wake
 tools/lsp-wake/lsp.wake

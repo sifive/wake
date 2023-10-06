@@ -848,6 +848,13 @@ int main(int argc, char **argv) {
                   cmdline);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 
+  if (clo.list_prims) {
+    for (auto kvp : pmap) {
+      std::cout << kvp.first << std::endl;
+    }
+    return 0;
+  }
+
   bool isTreeBuilt = true;
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
   if (!isTreeBuilt) ok = false;
@@ -987,6 +994,10 @@ int main(int argc, char **argv) {
     }
     if (!clo.quiet || !pass) {
       HeapObject::format(os, v, clo.debug, clo.verbose ? 0 : -1);
+      os << std::endl;
+    }
+    if (clo.print_expr_type) {
+      type.format(os, type);
       os << std::endl;
     }
   }
