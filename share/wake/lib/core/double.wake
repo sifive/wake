@@ -265,7 +265,7 @@ export def dformat (format: DoubleFormat): (digits: Integer) => (value: Double) 
         DoubleHex -> 2
         DoubleDefault -> 3
 
-    (\d \v prim_dstr format_int d v)
+    prim_dstr format_int
 
 # Convert a String into a Double
 # Can parse any Double formatted by dformat.
