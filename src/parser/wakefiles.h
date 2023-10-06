@@ -30,6 +30,6 @@ bool push_files(std::vector<std::string> &out, const std::string &path, const re
 std::string glob2regexp(const std::string &glob);
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose,
                                             const std::string &libdir, const std::string &workdir,
-                                            FILE *user_warning_dest);
+                                            FILE *user_warning_dest, bool strict = true);
 
 #endif

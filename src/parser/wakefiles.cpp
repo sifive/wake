@@ -488,7 +488,8 @@ std::vector<std::string> find_workspace_wakefiles_via_search(bool &ok, bool verb
 }
 
 std::vector<std::string> find_workspace_wakefiles_via_manifest(const std::string &manifest_path,
-                                                               const std::string &workdir) {
+                                                               const std::string &workdir,
+                                                               bool strict) {
   std::vector<std::string> workfiles;
   std::vector<std::string> unreadable_files;
   DiagnosticIgnorer ignorer;
@@ -527,7 +528,7 @@ std::vector<std::string> find_workspace_wakefiles_via_manifest(const std::string
         .urgent()();
   }
 
-  if (!unreadable_files.empty()) {
+  if (strict && !unreadable_files.empty()) {
     exit(1);
   }
 
@@ -535,7 +536,7 @@ std::vector<std::string> find_workspace_wakefiles_via_manifest(const std::string
 }
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose,
                                             const std::string &libdir, const std::string &workdir,
-                                            FILE *user_warning_dest) {
+                                            FILE *user_warning_dest, bool strict) {
   ok = true;
   RE2::Options options;
   options.set_log_errors(false);
@@ -556,7 +557,7 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
 
   std::string manifest_path = workdir + "/.wakemanifest";
   if (is_readable(manifest_path.c_str())) {
-    workfiles = find_workspace_wakefiles_via_manifest(manifest_path, workdir);
+    workfiles = find_workspace_wakefiles_via_manifest(manifest_path, workdir, strict);
   } else {
     workfiles = find_workspace_wakefiles_via_search(ok, verbose, workdir, user_warning_dest, exp);
   }
