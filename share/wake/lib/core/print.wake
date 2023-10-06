@@ -15,6 +15,8 @@
 
 package wake
 
+from prim_wake import _
+
 # format: render any type into a printable String
 #
 #   format 44        = "44"
@@ -26,9 +28,7 @@ package wake
 #   format True      = "True"
 #   format (_)       = "<source-file.wake:line:column>"
 export def format (anyType: a): String =
-    def p x = prim "format"
-
-    p anyType
+    prim_format anyType
 
 # To construct a LogLevel
 export data LogLevel =
@@ -94,9 +94,7 @@ export def tap (consumerFn: a => b) (value: a): a =
 #   # Produce a yellow hello on stdout unless run with -q
 #   def Unit = printlnLevel logWarning "hello"
 export def printlnLevel (LogLevel name) (message: String): Unit =
-    def p stream outputStr = prim "print"
-
-    p name "{message}\n"
+    prim_print name "{message}\n"
 
 # println: print a colourless String with a newline, visible when run with -v.
 #
@@ -115,7 +113,5 @@ export def println: String => Unit =
 #   # Emit a structured message to 'wake.log'
 #   def _ = breadcrumb "encountered failing event"
 export def breadcrumb (x: String): Unit =
-    def p s = prim "breadcrumb"
-
-    p x
+    prim_breadcrumb x
 

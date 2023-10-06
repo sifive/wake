@@ -15,6 +15,8 @@
 
 package wake
 
+from prim_wake import _
+
 # Functions which may fail should return the `Result a Error` type.
 # This allows the caller to distinguish between Pass and Fail.
 # Appropriate use of the `require` keyword can chain Results together.
@@ -200,9 +202,7 @@ export def findPassFn (fn: a => Result pass b): List a => Result pass (List b) =
 # stack: dump a stack trace from the call site
 # This function currently only works with debug mode enabled.
 export def stack Unit: List String =
-    def f x = prim "stack"
-
-    f Unit
+    prim_stack Unit
 
 # An Error has a cause and a stack trace
 # Result types should generally use an Error for their Fail case.

@@ -15,6 +15,8 @@
 
 package wake
 
+from prim_wake import _
+
 # The JSON data type
 export data JValue =
     JString String
@@ -56,22 +58,16 @@ export def getJArray: JValue => Option (List JValue) = match _
     JArray x -> Some x
     _ -> None
 
-export def parseJSONBody (body: String): Result JValue Error =
-    def imp b = prim "json_body"
+export def parseJSONBody (body: String): Result JValue Error = match (prim_json_body body)
+    Pass jvalue -> Pass jvalue
+    Fail cause -> Fail (makeError cause)
 
-    match (imp body)
-        Pass jvalue -> Pass jvalue
-        Fail cause -> Fail (makeError cause)
-
-export def parseJSONFile (path: Path): Result JValue Error =
-    def imp f = prim "json_file"
-
-    match (imp path.getPathName)
-        Pass body -> Pass body
-        Fail f -> Fail (makeError f)
+export def parseJSONFile (path: Path): Result JValue Error = match (prim_json_file path.getPathName)
+    Pass body -> Pass body
+    Fail f -> Fail (makeError f)
 
 export def jsonEscape str =
-    prim "json_str"
+    prim_json_str str
 
 tuple JSONFormat =
     export String: String => String

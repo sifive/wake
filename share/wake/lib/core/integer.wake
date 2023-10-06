@@ -15,6 +15,8 @@
 
 package wake
 
+from prim_wake import _
+
 # The Integer type has unbounded precision (aka a "big" integer).
 # Any wake literal like 12331_1232 or 0x3123 is an Integer.
 
@@ -26,65 +28,65 @@ export def +(x: Integer): Integer =
 # Unary negative sign operator for Integer values.
 # (-5) = 0-5
 export def -(x: Integer): Integer =
-    (\_ prim "neg") x
+    prim_neg x
 
 # Unary two's complement operator for Integer values.
 # ~0 = -1
 # ~4 = -5
 export def ~(x: Integer): Integer =
-    (\_ prim "com") x
+    prim_com x
 
 # Binary addition operator for Integer values.
 # 1 + 2 = 3
 # 1 + 5 = 6
 export def (x: Integer) + (y: Integer): Integer =
-    (\_ \_ prim "add") x y
+    prim_add x y
 
 # Binary subtraction operator for Integer values.
 # 2 - 1 =  1
 # 3 - 4 = -1
 export def (x: Integer) - (y: Integer): Integer =
-    (\_ \_ prim "sub") x y
+    prim_sub x y
 
 # Binary multiplication operator for Integer values.
 #  3 *   4  = 12
 # -3 * (-4) = 12
 export def (x: Integer) * (y: Integer): Integer =
-    (\_ \_ prim "mul") x y
+    prim_mul x y
 
 # Binary division operator for Integer values.
 # 12 / 3 =  4
 # 13 / 3 =  4
 # -8 / 4 = -2
 export def (x: Integer) / (y: Integer): Integer =
-    (\_ \_ prim "div") x y
+    prim_div x y
 
 # Binary remainder operator for Integer values.
 # 11 % 5 = 1
 #  4 % 5 = 5
 #  7 % 5 = 2
 export def (x: Integer) % (y: Integer): Integer =
-    (\_ \_ prim "mod") x y
+    prim_mod x y
 
 # Binary left shift operator for Integer values.
 # 1 << 10 = 1024
 # 3 <<  8 =  768
 export def (x: Integer) << (y: Integer): Integer =
-    (\_ \_ prim "shl") x y
+    prim_shl x y
 
 # Binary right shift operator for Integer values.
 # 1024 >> 11 = 0
 # 1024 >>  9 = 2
 #  768 >>  8 = 3
 export def (x: Integer) >> (y: Integer): Integer =
-    (\_ \_ prim "shr") x y
+    prim_shr x y
 
 # Binary exponentiation operator for Integer values.
 # 2^8 = 256
 # 3^2 = 9
 # 5^3 = 125
 export def (x: Integer) ^ (y: Integer): Integer =
-    (\_ \_ prim "exp") x y
+    prim_exp x y
 
 # Returns the n-th root of x.
 # root 2  9    = Some 3
@@ -96,7 +98,7 @@ export def root (n: Integer) (x: Integer): Option Integer =
     if and n 1 == 0 && x < 0 then
         None
     else
-        Some ((\_ \_ prim "root") x n)
+        Some (prim_root x n)
 
 # Unary square root operator.
 # sqrt 9    = Some 3
@@ -106,62 +108,62 @@ export def sqrt (x: Integer): Option Integer =
 
 # Unary absolute-value operator.
 export def abs (x: Integer): Integer =
-    (\_ prim "abs") x
+    prim_abs x
 
 # Binary bitwise XOR operator.
 # xor 4 4 = 0
 # xor 4 3 = 7
 # xor (-4) (-3) = 1
 export def xor (x: Integer) (y: Integer): Integer =
-    (\_ \_ prim "xor") x y
+    prim_xor x y
 
 # Binary bitwise AND operator.
 # and 4 4 = 4
 # and 4 3 = 0
 # and (-4) (-3) = -4
 export def and (x: Integer) (y: Integer): Integer =
-    (\_ \_ prim "and") x y
+    prim_and x y
 
 # Binary bitwise OR operator.
 # or 4 4 = 4
 # or 4 3 = 7
 # or (-4) (-3) = -3
 export def or (x: Integer) (y: Integer): Integer =
-    (\_ \_ prim "or") x y
+    prim_or x y
 
 # Greatest Common Divisor.
 # gcd 4 4 = 4
 # gcd 4 3 = 1
 # gcd (-4) (-3) = 1
 export def gcd (x: Integer) (y: Integer): Integer =
-    (\_ \_ prim "gcd") x y
+    prim_gcd x y
 
 # Least Common Multiple.
 # lcm 4 4 = 4
 # lcm 4 3 = 12
 # lcm (-4) (-3) = 12
 export def lcm (x: Integer) (y: Integer): Integer =
-    (\_ \_ prim "lcm") x y
+    prim_lcm x y
 
 # Computes (x^y) % m.
 # powm 2 7 5 = 4
 # powm 3 2 2 = 1
 export def powm (x: Integer) (y: Integer) (m: Integer): Integer =
-    (\_ \_ \_ prim "powm") x y m
+    prim_powm x y m
 
 # Compare two Integers for Order
 # icmp 4 5 = LT
 # icmp 5 5 = EQ
 # icmp 5 4 = GT
 export def icmp (x: Integer) (y: Integer): Order =
-    (\_ \_ prim "icmp") x y
+    prim_icmp x y
 
 # Compare two Integers for Order
 # 4 <=> 5 = LT
 # 5 <=> 5 = EQ
 # 5 <=> 4 = GT
 export def (x: Integer) <=> (y: Integer): Order =
-    (\_ \_ prim "icmp") x y
+    prim_icmp x y
 
 # Binary Less-Than operator for Integers.
 # 4 < 5 = True

@@ -305,12 +305,11 @@ export data DoubleClass =
 # dclass nan = DoubleNaN
 # dclass 1.0 = DoubleNormal
 # dclass 1.0e-322 = DoubleSubNormal
-export def dclass (x: Double): DoubleClass =
-    match (prim_dclass x)
-        1 -> DoubleInfinite
-        2 -> DoubleNaN
-        4 -> DoubleSubNormal
-        _ -> DoubleNormal
+export def dclass (x: Double): DoubleClass = match (prim_dclass x)
+    1 -> DoubleInfinite
+    2 -> DoubleNaN
+    4 -> DoubleSubNormal
+    _ -> DoubleNormal
 
 # Split 'x' into (Pair sig exp), such that:
 #   x = sig * 2^exp
@@ -321,7 +320,7 @@ export def dclass (x: Double): DoubleClass =
 # dfrexp 4.0 = Pair 0.5  3
 # dfrexp 3.0 = Pair 0.75 2
 export def dfrexp (x: Double): Pair Double Integer =
-   prim_dfrexp x
+    prim_dfrexp x
 
 # Reverse the effects of dfrexp
 #
