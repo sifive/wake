@@ -30,8 +30,8 @@ namespace job_cache {
 
 struct EvictionPolicy {
   virtual void init(const std::string& cache_dir) = 0;
-  virtual void read(int id) = 0;
-  virtual void write(int id) = 0;
+  virtual void read(int job_id) = 0;
+  virtual void write(int64_t job_size) = 0;
   virtual ~EvictionPolicy() {}
 };
 
@@ -44,8 +44,8 @@ struct NilEvictionPolicy : EvictionPolicy {
     std::cerr << "NilEvictionPolicy::read(" << id << ")" << std::endl;
   }
 
-  virtual void write(int id) override {
-    std::cerr << "NilEvictionPolicy::write(" << id << ")" << std::endl;
+  virtual void write(int64_t size) override {
+    std::cerr << "NilEvictionPolicy::write(" << size << ")" << std::endl;
   }
 };
 
@@ -69,7 +69,7 @@ class LRUEvictionPolicy : public EvictionPolicy {
 
   virtual void read(int id) override;
 
-  virtual void write(int id) override;
+  virtual void write(int64_t size) override;
 };
 
 int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> policy);

@@ -981,7 +981,7 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
     redirect_path(input_dir);
   }
 
-  EvictionCommand cmd(EvictionCommandType::Read, job_id);
+  EvictionCommand cmd = EvictionCommand::make_read(job_id);
 
   std::string msg = cmd.serialize();
   msg += '\0';
@@ -1002,6 +1002,7 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   mkdir_no_fail(tmp_job_dir.c_str());
 
   // Copy the output files into the temp dir
+  int64_t total_file_size = 0;
   for (auto output_file : add_request.outputs) {
     // TODO(jake): See if this file already exists in another job to
     //             avoid the copy by using a link and also save disk
@@ -1012,20 +1013,20 @@ void DaemonCache::add(const AddJobRequest &add_request) {
       output_file.source = wcl::join_paths(add_request.client_cwd, output_file.source);
     }
 
-    copy_or_reflink(output_file.source.c_str(), blob_path.c_str());
+    total_file_size += copy_or_reflink(output_file.source.c_str(), blob_path.c_str());
   }
 
   // Start a transaction so that a job is never without its files.
   int64_t job_id;
   {
-    impl->transact.run([this, &add_request, &job_id]() {
+    impl->transact.run([this, &add_request, &job_id, total_file_size]() {
       job_id = impl->jobs.insert(add_request.cwd, add_request.command_line, add_request.environment,
                                  add_request.stdin_str, add_request.bloom, add_request.runner_hash);
 
       // Add additional info
       impl->jobs.insert_output_info(job_id, add_request.stdout_str, add_request.stderr_str,
                                     add_request.status, add_request.runtime, add_request.cputime,
-                                    add_request.mem, add_request.ibytes, add_request.obytes);
+                                    add_request.mem, add_request.ibytes, total_file_size);
 
       // Input Files
       for (const auto &input_file : add_request.inputs) {
@@ -1070,7 +1071,7 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   std::string job_dir = wcl::join_paths(job_group_dir, std::to_string(job_id));
   rename_no_fail(tmp_job_dir.c_str(), job_dir.c_str());
 
-  EvictionCommand cmd(EvictionCommandType::Write, job_id);
+  EvictionCommand cmd = EvictionCommand::make_write(total_file_size);
 
   std::string msg = cmd.serialize();
   msg += '\0';

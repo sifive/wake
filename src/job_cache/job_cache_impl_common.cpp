@@ -93,7 +93,7 @@ void rmdir_no_fail(const char *dir) {
 
 #include "util/term.h"
 
-static void copy(int src_fd, int dst_fd) {
+static int64_t copy(int src_fd, int dst_fd) {
   FdBuf src(src_fd);
   FdBuf dst(dst_fd);
   std::ostream out(&dst);
@@ -122,6 +122,8 @@ static void copy(int src_fd, int dst_fd) {
         .urgent()();
     exit(1);
   }
+
+  return buf.st_size;
 }
 
 // For modern linux use copy_file_range
@@ -138,7 +140,7 @@ static void copy(int src_fd, int dst_fd) {
 // unlink this file but they're not allowed to modify it in any
 // other way or else this function will race with that external
 // modification.
-static void copy(int src_fd, int dst_fd) {
+static int64_t copy(int src_fd, int dst_fd) {
   struct stat buf = {};
   // There's a race here between the fstat and the copy_file_range
   if (fstat(src_fd, &buf) < 0) {
@@ -151,6 +153,8 @@ static void copy(int src_fd, int dst_fd) {
         .urgent()();
     exit(1);
   }
+
+  return buf.st_size;
 }
 
 // For older linux distros use Linux's sendfile
@@ -167,7 +171,7 @@ static void copy(int src_fd, int dst_fd) {
 // other way or else this function will race with that external
 // modification.
 
-static void copy(int src_fd, int dst_fd) {
+static int64_t copy(int src_fd, int dst_fd) {
   struct stat buf = {};
   // There's a race here between the fstat and the copy_file_range
   if (fstat(src_fd, &buf) < 0) {
@@ -187,12 +191,14 @@ static void copy(int src_fd, int dst_fd) {
     idx = written;
     size -= written;
   } while (size != 0);
+
+  return buf.st_size;
 }
 #endif
 
 #ifdef FICLONE
 
-void copy_or_reflink(const char *src, const char *dst, mode_t mode, int extra_flags) {
+int64_t copy_or_reflink(const char *src, const char *dst, mode_t mode, int extra_flags) {
   auto src_fd = wcl::unique_fd::open(src, O_RDONLY);
   if (!src_fd) {
     wcl::log::error("open(%s): %s", src, strerror(src_fd.error())).urgent()();
@@ -209,13 +215,20 @@ void copy_or_reflink(const char *src, const char *dst, mode_t mode, int extra_fl
       wcl::log::error("ioctl(%s, FICLONE, %s): %s", dst, src, strerror(errno)).urgent()();
       exit(1);
     }
-    copy(src_fd->get(), dst_fd->get());
+    return copy(src_fd->get(), dst_fd->get());
   }
+
+  struct stat buf;
+  if (fstat(dst_fd->get(), &buf) < 0) {
+    wcl::log::error("fstat(%s): %s", dst, strerror(errno))();
+  }
+
+  return buf.st_size;
 }
 
 #else
 
-void copy_or_reflink(const char *src, const char *dst, mode_t mode, int extra_flags) {
+int64_t copy_or_reflink(const char *src, const char *dst, mode_t mode, int extra_flags) {
   auto src_fd = wcl::unique_fd::open(src, O_RDONLY);
   if (!src_fd) {
     wcl::log::error("open(%s): %s", src, strerror(src_fd.error())).urgent()();
@@ -227,7 +240,7 @@ void copy_or_reflink(const char *src, const char *dst, mode_t mode, int extra_fl
     exit(1);
   }
 
-  copy(src_fd->get(), dst_fd->get());
+  return copy(src_fd->get(), dst_fd->get());
 }
 
 #endif

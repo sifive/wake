@@ -45,7 +45,7 @@ void remove_backing_files(std::string dir,
                           size_t max_number_of_threads);
 
 // Tries to reflink src to dst but copies if that fails.
-void copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644, int extra_flags = 0);
+int64_t copy_or_reflink(const char *src, const char *dst, mode_t mode = 0644, int extra_flags = 0);
 
 // These functions handle errors for us by calling log_fatal
 // if we get an error we don't like.

@@ -32,9 +32,24 @@ enum class EvictionCommandType { Read, Write };
 struct EvictionCommand {
   EvictionCommandType type;
   int job_id;
+  int64_t size;
 
   EvictionCommand() {}
-  EvictionCommand(EvictionCommandType type, int job_id) : type(type), job_id(job_id) {}
+  EvictionCommand(EvictionCommandType type, int64_t datum) : type(type) {
+    if (type == EvictionCommandType::Read) {
+      job_id = datum;
+    } else {
+      size = datum;
+    }
+  }
+
+  static EvictionCommand make_read(int job_id) {
+    return EvictionCommand(EvictionCommandType::Read, job_id);
+  }
+
+  static EvictionCommand make_write(int64_t size) {
+    return EvictionCommand(EvictionCommandType::Write, size);
+  }
 
   static wcl::optional<EvictionCommand> parse(const std::string& str) {
     JAST json;
@@ -63,33 +78,39 @@ struct EvictionCommand {
       return {};
     }
 
-    const JAST& job_id = json.get("job_id");
-    if (job_id.kind != JSON_INTEGER) {
-      std::cerr << "Expected integer for 'job_id' key" << std::endl;
-      return {};
+    if (type == EvictionCommandType::Read) {
+      const JAST& job_id = json.get("job_id");
+      if (job_id.kind != JSON_INTEGER) {
+        std::cerr << "Expected integer for 'job_id' key" << std::endl;
+        return {};
+      }
+      return wcl::some(make_read(std::stoi(job_id.value)));
+    } else {
+      const JAST& size = json.get("size");
+      if (size.kind != JSON_INTEGER) {
+        std::cerr << "Expected integer for 'size' key" << std::endl;
+        return {};
+      }
+      return wcl::some(make_write(std::stoll(size.value)));
     }
-
-    return wcl::some(EvictionCommand{type, std::stoi(job_id.value)});
   }
 
   std::string serialize() {
     JAST json(JSON_OBJECT);
 
-    std::string command;
     switch (type) {
       case EvictionCommandType::Read:
-        command = "read";
+        json.add("command", "read");
+        json.add("job_id", job_id);
         break;
       case EvictionCommandType::Write:
-        command = "write";
+        json.add("command", "write");
+        json.add("size", size);
         break;
       default:
         std::cerr << "Unhandled type in EvictionCommand::serialize()" << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    json.add("command", command);
-    json.add("job_id", job_id);
 
     std::stringstream s;
     s << json;

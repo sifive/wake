@@ -47,6 +47,7 @@ struct LRUEvictionPolicyImpl {
   job_cache::PreparedStatement update_size;
   job_cache::PreparedStatement reset_size;
   job_cache::PreparedStatement get_size;
+  job_cache::PreparedStatement recompute_total_size;
   job_cache::PreparedStatement insert_last_use;
   job_cache::PreparedStatement set_last_use;
   job_cache::PreparedStatement get_last_use;
@@ -62,14 +63,19 @@ struct LRUEvictionPolicyImpl {
   // Update size to account for new job. Also return the size
   // so we can know if we should trigger a collection or not
   static constexpr const char* update_size_query =
-      "update total_size set size = size + (select sum(o.obytes) "
-      "from jobs j, job_output_info o "
-      "where j.job_id = ? and j.job_id = o.job)";
+      "update total_size set size = size + ?";
 
   static constexpr const char* reset_size_query = "update total_size set size = ?";
 
   // Unconditionally returns the current total_size
   static constexpr const char* get_size_query = "select size from total_size";
+
+  // Recompute the correct total size incase something gets out of sync
+  static constexpr const char* recompute_total_size_query =
+    "update total_size "
+    "set size = (select sum(o.obytes) "
+    "            from jobs j, job_output_info o"
+    "            where j.job_id = o.job)";
 
   // We need 3 qurries to do an upset because sqlite only added support in 2018
   // and we still test against very old CI bots.
@@ -98,6 +104,7 @@ struct LRUEvictionPolicyImpl {
         update_size(db, update_size_query),
         reset_size(db, reset_size_query),
         get_size(db, get_size_query),
+        recompute_total_size(db, recompute_total_size_query),
         insert_last_use(db, insert_last_use_query),
         set_last_use(db, set_last_use_query),
         get_last_use(db, get_last_use_query),
@@ -113,12 +120,16 @@ struct LRUEvictionPolicyImpl {
     find_least_recently_used.set_why("Could not find least recently used");
     remove_least_recently_used.set_why("Could not remove least recently used");
     reset_size.set_why("Could not reset size");
+    recompute_total_size.set_why("Could not recompute total size");
+
+    recompute_total_size.step();
+    recompute_total_size.reset();
   }
 
-  uint64_t add_job_size(uint64_t job_id) {
+  int64_t add_job_size(int64_t job_size) {
     uint64_t out = 0;
-    transact.run([this, &out, job_id]() {
-      update_size.bind_integer(1, job_id);
+    transact.run([this, &out, job_size]() {
+      update_size.bind_integer(1, job_size);
       update_size.step();
       update_size.reset();
       get_size.step();
@@ -348,14 +359,13 @@ void LRUEvictionPolicy::init(const std::string& cache_dir) {
 
 void LRUEvictionPolicy::read(int job_id) { impl->mark_new_use(job_id); }
 
-void LRUEvictionPolicy::write(int job_id) {
-  impl->mark_new_use(job_id);
-  uint64_t size = impl->add_job_size(job_id);
+void LRUEvictionPolicy::write(int64_t job_size) {
+  uint64_t size = impl->add_job_size(job_size);
   if (size > max_cache_size) {
     // TODO: Techically this is racy because the size
     //       can get out of sync. We should probably put
     //       these in a transaction.
-    impl->cleanup(size, max_cache_size - low_cache_size);
+    impl->cleanup(size, size - low_cache_size);
   }
 }
 
@@ -385,7 +395,7 @@ int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> 
           policy->read(cmd->job_id);
           break;
         case EvictionCommandType::Write:
-          policy->write(cmd->job_id);
+          policy->write(cmd->size);
           break;
         default:
           exit(EXIT_FAILURE);
