@@ -53,6 +53,7 @@ struct daemon_client {
 
 struct json_args {
   std::vector<std::string> command;
+  int command_timeout = -1;  // timeout in seconds.
   std::vector<std::string> environment;
   std::vector<std::string> visible;
   std::string directory;

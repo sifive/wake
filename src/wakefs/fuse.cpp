@@ -51,6 +51,11 @@
 #define HOST_NAME_MAX 255
 #endif
 
+#include <sys/syscall.h>
+#include <unistd.h>
+
+#include "util/poll.h"
+
 bool json_as_struct(const std::string &json, json_args &result) {
   JAST jast;
   if (!JAST::parse(json, std::cerr, jast)) return false;
@@ -60,6 +65,11 @@ bool json_as_struct(const std::string &json, json_args &result) {
   for (auto &x : jast.get("environment").children) result.environment.push_back(x.second.value);
 
   for (auto &x : jast.get("visible").children) result.visible.push_back(x.second.value);
+
+  JAST timeout_entry = jast.get("command_timeout");
+  if (timeout_entry.kind == JSON_INTEGER) {
+    result.command_timeout = std::stoi(timeout_entry.value);
+  }
 
   result.directory = jast.get("directory").value;
   result.stdin_file = jast.get("stdin").value;
@@ -217,9 +227,35 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   (void)close(STDOUT_FILENO);
   (void)close(STDERR_FILENO);
 
-  do waitpid(pid, &status, 0);
-  while (WIFSTOPPED(status));
+  int pidfd = syscall(SYS_pidfd_open, pid, 0);
+  if (pidfd < 0) {
+    std::cerr << "wakebox: Failed to open fd for pid" << std::endl;
+    exit(1);
+  }
 
+  EPoll epoll;
+  epoll.add(pidfd, EPOLLIN);
+
+  std::vector<epoll_event> events;
+  if (args.command_timeout <= 0) {
+    events = epoll.wait(nullptr, nullptr);
+  } else {
+    struct timespec timeout;
+    timeout.tv_sec = args.command_timeout;
+    timeout.tv_nsec = 0;
+    events = epoll.wait(&timeout, nullptr);
+  }
+
+  if (events.empty()) {
+    kill(pid, SIGKILL);
+    std::cerr << "wakebox: Timed out waiting for process to complete" << std::endl;
+    exit(124);
+  }
+
+  epoll.remove(pidfd);
+  close(pidfd);
+
+  waitpid(pid, &status, 0);
   if (WIFEXITED(status)) {
     status = WEXITSTATUS(status);
   } else {
