@@ -234,8 +234,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     }
 
     if (timeout_pid == 0) {
-      std::string sleep = "sleep " + std::to_string(args.command_timeout);
-      execve_wrapper({"/bin/sh", "-c", sleep}, {});
+      execve_wrapper({"/usr/bin/sleep", std::to_string(args.command_timeout)}, {});
     }
   }
 
@@ -244,7 +243,13 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     if (wait_pid == timeout_pid && WIFEXITED(status)) {
       kill(payload_pid, SIGKILL);
       std::cerr << "wakebox: Timed out waiting for process to complete" << std::endl;
-      exit(124);
+
+      struct timeval stopb;
+      gettimeofday(&stopb, 0);
+      std::string outputb;
+      args.daemon.disconnect(outputb);
+      RUsage usage = getRUsageChildren();
+      return collect_result_metadata(outputb, start, stopb, payload_pid, 124, usage, result_json);
     }
 
     if (wait_pid == payload_pid && !WIFSTOPPED(status)) {
@@ -263,7 +268,9 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     status = -WTERMSIG(status);
   }
 
-  // We only ever wait for one child, so this is that child's usage
+  // RUsage is calculated for all child processes that have 1) terminated and 2) been wait()ed on.
+  // Though we may fork two processes, we only ever wait on the payload process after termination
+  // (assuming it doesn't timeout) so the RUsage will only include the payload process useage.
   RUsage usage = getRUsageChildren();
 
   struct timeval stop;
