@@ -51,11 +51,6 @@
 #define HOST_NAME_MAX 255
 #endif
 
-#include <sys/syscall.h>
-#include <unistd.h>
-
-#include "util/poll.h"
-
 bool json_as_struct(const std::string &json, json_args &result) {
   JAST jast;
   if (!JAST::parse(json, std::cerr, jast)) return false;
@@ -153,8 +148,8 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   struct timeval start;
   gettimeofday(&start, 0);
 
-  pid_t pid = fork();
-  if (pid == 0) {
+  pid_t payload_pid = fork();
+  if (payload_pid == 0) {
     std::vector<std::string> command = args.command;
     std::vector<std::string> envs_from_mounts;
 #ifdef __linux__
@@ -227,35 +222,41 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   (void)close(STDOUT_FILENO);
   (void)close(STDERR_FILENO);
 
-  int pidfd = syscall(SYS_pidfd_open, pid, 0);
-  if (pidfd < 0) {
-    std::cerr << "wakebox: Failed to open fd for pid" << std::endl;
-    exit(1);
+  bool has_timeout = args.command_timeout > 0;
+  pid_t timeout_pid = -1;
+
+  // Launch timer process
+  if (has_timeout) {
+    timeout_pid = fork();
+    if (timeout_pid < 0) {
+      std::cerr << "wakebox: failed to fork timout process" << std::endl;
+      exit(1);
+    }
+
+    if (timeout_pid == 0) {
+      std::string sleep = "sleep " + std::to_string(args.command_timeout);
+      execve_wrapper({"/bin/sh", "-c", sleep}, {});
+    }
   }
 
-  EPoll epoll;
-  epoll.add(pidfd, EPOLLIN);
+  pid_t wait_pid;
+  while ((wait_pid = wait(&status)) != -1) {
+    if (wait_pid == timeout_pid && WIFEXITED(status)) {
+      kill(payload_pid, SIGKILL);
+      std::cerr << "wakebox: Timed out waiting for process to complete" << std::endl;
+      exit(124);
+    }
 
-  std::vector<epoll_event> events;
-  if (args.command_timeout <= 0) {
-    events = epoll.wait(nullptr, nullptr);
-  } else {
-    struct timespec timeout;
-    timeout.tv_sec = args.command_timeout;
-    timeout.tv_nsec = 0;
-    events = epoll.wait(&timeout, nullptr);
+    if (wait_pid == payload_pid && !WIFSTOPPED(status)) {
+      if (has_timeout) {
+        kill(timeout_pid, SIGKILL);
+      }
+      // Note: must not wait on timeout pid in this codepath
+      // otherwise it'll pollute rusage.
+      break;
+    }
   }
 
-  if (events.empty()) {
-    kill(pid, SIGKILL);
-    std::cerr << "wakebox: Timed out waiting for process to complete" << std::endl;
-    exit(124);
-  }
-
-  epoll.remove(pidfd);
-  close(pidfd);
-
-  waitpid(pid, &status, 0);
   if (WIFEXITED(status)) {
     status = WEXITSTATUS(status);
   } else {
@@ -271,5 +272,5 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   std::string output;
   args.daemon.disconnect(output);
 
-  return collect_result_metadata(output, start, stop, pid, status, usage, result_json);
+  return collect_result_metadata(output, start, stop, payload_pid, status, usage, result_json);
 }
