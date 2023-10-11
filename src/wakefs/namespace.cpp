@@ -43,6 +43,7 @@
 #include "fuse.h"
 #include "json/json5.h"
 #include "util/mkdir_parents.h"
+#include "util/squashfuse_helper.h"
 
 // Location in the parent namespace to base the new root on.
 static const std::string root_mount_prefix = "/tmp/.wakebox-mount";
@@ -197,6 +198,13 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
     return false;
   }
 
+
+  char squashfuse_notify_pipe_path[] = "/tmp/squashfuse_notify_XXXXXX/notify_pipe_fifo";
+  if (!mktempfifo(squashfuse_notify_pipe_path)) {
+    std::cerr << "mktempfifo ('" << std::string(squashfuse_notify_pipe_path) << "'): failed" << std::endl;
+    return false;
+  }
+
   pid_t pid = fork();
   if (pid == 0) {
     // kernel to send SIGKILL to squashfuse when wakebox terminates
@@ -204,39 +212,17 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
       std::cerr << "squashfuse prctl: " << strerror(errno) << std::endl;
       exit(1);
     }
-    execlp("squashfuse", "squashfuse", "-f", source.c_str(), mountpoint.c_str(), NULL);
+    execlp("squashfuse", "squashfuse", "-o", "notify_pipe", squashfuse_notify_pipe_path, "-f", source.c_str(), mountpoint.c_str(), NULL);
     std::cerr << "execlp squashfuse: " << strerror(errno) << std::endl;
     exit(1);
   }
 
-  // Wait for the mount to exist before we continue by checking if the
-  // stat() device id or the inode changes.
-  struct stat before;
-  if (0 != stat(mountpoint.c_str(), &before)) {
-    std::cerr << "stat (" << mountpoint << "): " << strerror(errno) << std::endl;
+  if (!wait_for_squashfuse_mount(squashfuse_notify_pipe_path)) {
+    std::cerr << "squashfs mount failed: wait_for_squashfuse_mount ('" << std::string(squashfuse_notify_pipe_path) << "'): " << source << std::endl;
     return false;
   }
 
-  for (int i = 0; i < 10; i++) {
-    struct stat after;
-    if (0 != stat(mountpoint.c_str(), &after)) {
-      std::cerr << "stat (" << mountpoint << "): " << strerror(errno) << std::endl;
-      return false;
-    }
-
-    if (!equal_dev_ids(before.st_dev, after.st_dev) || (before.st_ino != after.st_ino)) {
-      return true;
-    } else {
-      int ms = 10 << i;  // 10ms * 2^i
-      struct timespec delay;
-      delay.tv_sec = ms / 1000;
-      delay.tv_nsec = (ms % 1000) * INT64_C(1000000);
-      nanosleep(&delay, nullptr);
-    }
-  }
-
-  std::cerr << "squashfs mount failed: " << source << std::endl;
-  return false;
+  return true;
 }
 
 static bool squashfs_helper_mounts(const std::string &squashfs_base_path,
