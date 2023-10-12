@@ -237,7 +237,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
 
     if (timeout_pid == 0) {
       sleep(args.command_timeout);
-      exit(0);
+      exit(124);
     }
   }
 
@@ -250,7 +250,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
       gettimeofday(&stop, 0);
       std::string output;
       args.daemon.disconnect(output);
-      RUsage usage = getRUsageChildren();
+      RUsage usage = {};
       return collect_result_metadata(output, start, stop, payload_pid, 124, usage, true,
                                      result_json);
     }
