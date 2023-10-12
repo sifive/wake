@@ -1141,7 +1141,7 @@ void DaemonCache::launch_evict_loop() {
     // Finally enter the eviction loop, if it exits cleanly
     // go ahead and exit with its result.
     int result =
-        eviction_loop(".", std::make_unique<LRUEvictionPolicy>(max_cache_size, low_cache_size));
+        eviction_loop(".", std::make_unique<TTLEvictionPolicy>(24 * 60 * 60));
     exit(result);
   }
 
