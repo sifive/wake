@@ -385,7 +385,8 @@ class JobTable {
 
  public:
   static constexpr const char *insert_query =
-      "insert into jobs (directory, commandline, environment, stdin, bloom_filter, runner_hash, create_time)"
+      "insert into jobs (directory, commandline, environment, stdin, bloom_filter, runner_hash, "
+      "create_time)"
       "values (?, ?, ?, ?, ?, ?, ?)";
 
   static constexpr const char *add_output_info_query =
@@ -1027,7 +1028,8 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   {
     impl->transact.run([this, time, &add_request, &job_id]() {
       job_id = impl->jobs.insert(add_request.cwd, add_request.command_line, add_request.environment,
-                                 add_request.stdin_str, add_request.bloom, add_request.runner_hash, time);
+                                 add_request.stdin_str, add_request.bloom, add_request.runner_hash,
+                                 time);
 
       // Add additional info
       impl->jobs.insert_output_info(job_id, add_request.stdout_str, add_request.stderr_str,
