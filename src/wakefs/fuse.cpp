@@ -106,7 +106,8 @@ int execve_wrapper(const std::vector<std::string> &command,
 
 static bool collect_result_metadata(const std::string daemon_output, const struct timeval &start,
                                     const struct timeval &stop, const pid_t pid, const int status,
-                                    const RUsage &rusage, std::string &result_json) {
+                                    const RUsage &rusage, bool timed_out,
+                                    std::string &result_json) {
   JAST from_daemon;
   std::stringstream ss;
   if (!JAST::parse(daemon_output, ss, from_daemon)) {
@@ -126,6 +127,7 @@ static bool collect_result_metadata(const std::string daemon_output, const struc
 
   result_jast.add("inputs", JSON_ARRAY).children = std::move(from_daemon.get("inputs").children);
   result_jast.add("outputs", JSON_ARRAY).children = std::move(from_daemon.get("outputs").children);
+  result_jast.add_bool("timed_out", timed_out);
 
   char hostname[HOST_NAME_MAX + 1];
   if (0 == gethostname(hostname, sizeof(hostname))) result_jast.add("run-host", hostname);
@@ -249,7 +251,8 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
       std::string outputb;
       args.daemon.disconnect(outputb);
       RUsage usage = getRUsageChildren();
-      return collect_result_metadata(outputb, start, stopb, payload_pid, 124, usage, result_json);
+      return collect_result_metadata(outputb, start, stopb, payload_pid, 124, usage, true,
+                                     result_json);
     }
 
     if (wait_pid == payload_pid && !WIFSTOPPED(status)) {
@@ -279,5 +282,6 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   std::string output;
   args.daemon.disconnect(output);
 
-  return collect_result_metadata(output, start, stop, payload_pid, status, usage, result_json);
+  return collect_result_metadata(output, start, stop, payload_pid, status, usage, false,
+                                 result_json);
 }
