@@ -203,11 +203,6 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
       }
     }
 
-    if (args.command_timeout > 0) {
-      command.insert(command.begin(), std::to_string(args.command_timeout));
-      command.insert(command.begin(), "/usr/bin/timeout");
-    }
-
 #ifdef __linux__
     if (args.isolate_pids) {
       pidns_args nsargs = {command, args.environment};
@@ -227,8 +222,45 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   (void)close(STDOUT_FILENO);
   (void)close(STDERR_FILENO);
 
-  do waitpid(payload_pid, &status, 0);
-  while (WIFSTOPPED(status));
+  bool has_timeout = args.command_timeout > 0;
+  pid_t timeout_pid = -1;
+
+  // Launch timer process
+  if (has_timeout) {
+    timeout_pid = fork();
+    if (timeout_pid < 0) {
+      std::cerr << "wakebox: failed to fork timout process" << std::endl;
+      exit(1);
+    }
+
+    if (timeout_pid == 0) {
+      execve_wrapper({"/usr/bin/sleep", std::to_string(args.command_timeout)}, {});
+    }
+  }
+
+  pid_t wait_pid;
+  while ((wait_pid = wait(&status)) != -1) {
+    if (wait_pid == timeout_pid && WIFEXITED(status)) {
+      kill(payload_pid, SIGKILL);
+      std::cerr << "wakebox: Timed out waiting for process to complete" << std::endl;
+
+      struct timeval stopb;
+      gettimeofday(&stopb, 0);
+      std::string outputb;
+      args.daemon.disconnect(outputb);
+      RUsage usage = getRUsageChildren();
+      return collect_result_metadata(outputb, start, stopb, payload_pid, 124, usage, result_json);
+    }
+
+    if (wait_pid == payload_pid && !WIFSTOPPED(status)) {
+      if (has_timeout) {
+        kill(timeout_pid, SIGKILL);
+      }
+      // Note: must not wait on timeout pid in this codepath
+      // otherwise it'll pollute rusage.
+      break;
+    }
+  }
 
   if (WIFEXITED(status)) {
     status = WEXITSTATUS(status);
