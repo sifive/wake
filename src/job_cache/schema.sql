@@ -21,7 +21,8 @@ create table if not exists jobs(
   environment  blob    not null,
   stdin        text    not null,
   bloom_filter integer not null,
-  runner_hash  text    not null);
+  runner_hash  text    not null,
+  create_time  integer not null);
 create index if not exists job on jobs(directory, commandline, environment, stdin, runner_hash);
 
 -- This table stores all the details about a job that aren't known until

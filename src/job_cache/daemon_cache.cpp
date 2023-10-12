@@ -385,8 +385,8 @@ class JobTable {
 
  public:
   static constexpr const char *insert_query =
-      "insert into jobs (directory, commandline, environment, stdin, bloom_filter, runner_hash)"
-      "values (?, ?, ?, ?, ?, ?)";
+      "insert into jobs (directory, commandline, environment, stdin, bloom_filter, runner_hash, create_time)"
+      "values (?, ?, ?, ?, ?, ?, ?)";
 
   static constexpr const char *add_output_info_query =
       "insert into job_output_info"
@@ -406,7 +406,8 @@ class JobTable {
   }
 
   int64_t insert(const std::string &cwd, const std::string &cmd, const std::string &env,
-                 const std::string &stdin_str, BloomFilter bloom, const std::string &hash) {
+                 const std::string &stdin_str, BloomFilter bloom, const std::string &hash,
+                 int64_t time) {
     int64_t bloom_integer = *reinterpret_cast<const int64_t *>(bloom.data());
     add_job.bind_string(1, cwd);
     add_job.bind_string(2, cmd);
@@ -414,6 +415,7 @@ class JobTable {
     add_job.bind_string(4, stdin_str);
     add_job.bind_integer(5, bloom_integer);
     add_job.bind_string(6, hash);
+    add_job.bind_integer(7, time);
     add_job.step();
     int64_t job_id = sqlite3_last_insert_rowid(db->get());
     add_job.reset();
@@ -1001,6 +1003,11 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   std::string tmp_job_dir = "tmp_" + rng.unique_name();
   mkdir_no_fail(tmp_job_dir.c_str());
 
+  // Get the time so we know when this job was created
+  timespec tp;
+  clock_gettime(CLOCK_REALTIME, &tp);
+  int64_t time = 1000000ll * int64_t(tp.tv_sec) + tp.tv_nsec / 1000;
+
   // Copy the output files into the temp dir
   for (auto output_file : add_request.outputs) {
     // TODO(jake): See if this file already exists in another job to
@@ -1018,9 +1025,9 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   // Start a transaction so that a job is never without its files.
   int64_t job_id;
   {
-    impl->transact.run([this, &add_request, &job_id]() {
+    impl->transact.run([this, time, &add_request, &job_id]() {
       job_id = impl->jobs.insert(add_request.cwd, add_request.command_line, add_request.environment,
-                                 add_request.stdin_str, add_request.bloom, add_request.runner_hash);
+                                 add_request.stdin_str, add_request.bloom, add_request.runner_hash, time);
 
       // Add additional info
       impl->jobs.insert_output_info(job_id, add_request.stdout_str, add_request.stderr_str,
