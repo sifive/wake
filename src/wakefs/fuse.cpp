@@ -236,7 +236,8 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     }
 
     if (timeout_pid == 0) {
-      execve_wrapper({"/usr/bin/sleep", std::to_string(args.command_timeout)}, {});
+      sleep(args.command_timeout);
+      exit(0);
     }
   }
 
@@ -244,14 +245,13 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   while ((wait_pid = wait(&status)) != -1) {
     if (wait_pid == timeout_pid && WIFEXITED(status)) {
       kill(payload_pid, SIGKILL);
-      std::cerr << "wakebox: Timed out waiting for process to complete" << std::endl;
 
-      struct timeval stopb;
-      gettimeofday(&stopb, 0);
-      std::string outputb;
-      args.daemon.disconnect(outputb);
+      struct timeval stop;
+      gettimeofday(&stop, 0);
+      std::string output;
+      args.daemon.disconnect(output);
       RUsage usage = getRUsageChildren();
-      return collect_result_metadata(outputb, start, stopb, payload_pid, 124, usage, true,
+      return collect_result_metadata(output, start, stop, payload_pid, 124, usage, true,
                                      result_json);
     }
 
