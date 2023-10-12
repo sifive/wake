@@ -41,9 +41,11 @@
 #include <iostream>
 
 #include "fuse.h"
+#include "squashfuse_helper.h"
+
 #include "json/json5.h"
 #include "util/mkdir_parents.h"
-#include "util/squashfuse_helper.h"
+
 
 // Location in the parent namespace to base the new root on.
 static const std::string root_mount_prefix = "/tmp/.wakebox-mount";
@@ -183,8 +185,6 @@ static bool mount_tmpfs(const std::string &destination) {
   return true;
 }
 
-static bool equal_dev_ids(dev_t a, dev_t b) { return major(a) == major(b) && minor(a) == minor(b); }
-
 static bool do_squashfuse_mount(const std::string &source, const std::string &mountpoint) {
   // The squashfuse executable doesn't give a clear error message when the file is missing.
   if (access(source.c_str(), R_OK | F_OK) != 0) {
@@ -194,14 +194,13 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
 
   int err = mkdir_with_parents(mountpoint, 0555);
   if (0 != err) {
-    std::cerr << "mkdir_with_parents ('" << mountpoint << "'):" << strerror(err) << std::endl;
+    std::cerr << "mkdir_with_parents ('" << mountpoint << "'): " << strerror(err) << std::endl;
     return false;
   }
 
-
-  char squashfuse_notify_pipe_path[] = "/tmp/squashfuse_notify_XXXXXX/notify_pipe_fifo";
-  if (!mktempfifo(squashfuse_notify_pipe_path)) {
-    std::cerr << "mktempfifo ('" << std::string(squashfuse_notify_pipe_path) << "'): failed" << std::endl;
+  auto fifo_path_result = mktempfifo();
+  if (!fifo_path_result) {
+    std::cerr << "mktempfifo ('" << strerror(fifo_path_result.error()) << "'): " << std::endl;
     return false;
   }
 
@@ -209,17 +208,40 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
   if (pid == 0) {
     // kernel to send SIGKILL to squashfuse when wakebox terminates
     if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
-      std::cerr << "squashfuse prctl: " << strerror(errno) << std::endl;
+      std::cerr << "squashfuse_ll prctl: " << strerror(errno) << std::endl;
+      unlink(fifo_path_result->c_str());
       exit(1);
     }
-    execlp("squashfuse", "squashfuse", "-o", "notify_pipe", squashfuse_notify_pipe_path, "-f", source.c_str(), mountpoint.c_str(), NULL);
+    execlp("squashfuse_ll", "squashfuse_ll", "-o", "notify_pipe", fifo_path_result->c_str(), "-f", source.c_str(), mountpoint.c_str(), NULL);
     std::cerr << "execlp squashfuse: " << strerror(errno) << std::endl;
+    unlink(fifo_path_result->c_str());
     exit(1);
   }
 
-  if (!wait_for_squashfuse_mount(squashfuse_notify_pipe_path)) {
-    std::cerr << "squashfs mount failed: wait_for_squashfuse_mount ('" << std::string(squashfuse_notify_pipe_path) << "'): " << source << std::endl;
-    return false;
+  auto wait_for_mount_opt = wait_for_squashfuse_mount(*fifo_path_result);
+  if (wait_for_mount_opt) {
+    std::cerr << "Squashfuse mount failed: wait_for_squashfuse_mount ('" << *fifo_path_result << "'): " << source << ", Reason: ";
+    switch (wait_for_mount_opt->type)
+    {
+    case SquashFuseMountWaitErrorType::CannotOpenFifo:
+      std::cerr << "Could not open fifo: " << strerror(wait_for_mount_opt->posix_error) << std::endl;
+      return false;
+      break;
+    case SquashFuseMountWaitErrorType::FailureToReadFifo:
+      std::cerr << "Error reading fifo: " << strerror(wait_for_mount_opt->posix_error) << std::endl;
+      return false;
+      break;
+    case SquashFuseMountWaitErrorType::ReceivedZeroBytes:
+      std::cerr << "Zero bytes read from fifo." << std::endl;
+      return false;
+      break;
+    case SquashFuseMountWaitErrorType::MountFailed:
+      std::cerr << "Squashfuse wrote 'f' meaning it failed to mount." << std::endl;
+      return false;
+      break;
+    default:
+      break;
+    }
   }
 
   return true;

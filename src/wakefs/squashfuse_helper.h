@@ -15,10 +15,26 @@
  * limitations under the License.
  */
 
-#include <stdbool.h>
+#pragma once
+
+#include <string>
+#include "wcl/result.h"
+#include "wcl/optional.h"
+
+enum class SquashFuseMountWaitErrorType {
+  CannotOpenFifo,
+  FailureToReadFifo,
+  ReceivedZeroBytes,
+  MountFailed
+};
+struct SquashFuseMountWaitError {
+  SquashFuseMountWaitErrorType type;
+  wcl::posix_error_t posix_error;
+};
 
 // Create a named pipe (FIFO) with a temporary and random name
-bool mktempfifo(char *template_str);
+wcl::result<std::string, wcl::posix_error_t> mktempfifo();
 
 // Wait for a signal on the named pipe to confirm squashfuse mount
-bool wait_for_squashfuse_mount(char *squashfuse_notify_pipe_path);
+wcl::optional<SquashFuseMountWaitError> wait_for_squashfuse_mount(const std::string& squashfuse_fifo_path);
+
