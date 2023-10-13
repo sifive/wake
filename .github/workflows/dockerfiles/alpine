@@ -2,7 +2,7 @@ FROM alpine:3.14.0
 
 RUN apk add m4 g++ make pkgconf git tar xz gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev dash sqlite-static ncurses-static linux-headers
 # Squashfuse build dependences
-apk add fuse3-dev attr-dev libzstd-dev liblz4-dev liblzma-dev liblzo2-dev zlib-dev
+RUN apk add fuse3-dev attr-dev libzstd-dev liblz4-dev liblzma-dev liblzo2-dev zlib-dev
 
 WORKDIR /build
 
