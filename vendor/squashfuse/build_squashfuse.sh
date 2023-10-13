@@ -16,7 +16,7 @@ function cleanup () { rm -rf $TMPDIR; }
 trap cleanup EXIT
 
 wget https://github.com/vasi/squashfuse/releases/download/v$VERSION/squashfuse-$VERSION.tar.gz
-tar xzf squashfuse-$VERSION.tar.gz
+tar xzf squashfuse-$VERSION.tar.gz --no-same-owner
 
 TMP_INSTALL_DEST=$PWD/tmp_install_dest
 mkdir $TMP_INSTALL_DEST
