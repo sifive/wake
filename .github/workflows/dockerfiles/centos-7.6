@@ -6,6 +6,7 @@ RUN yum --setopt=skip_missing_names_on_install=False install -y epel-release
 RUN yum --setopt=skip_missing_names_on_install=False install -y tar xz dash git which make gcc gcc-c++ fuse fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel squashfuse iproute
 RUN yum --setopt=skip_missing_names_on_install=False install -y centos-release-scl
 RUN yum --setopt=skip_missing_names_on_install=False install -y devtoolset-9-gcc*
+RUN yum --setopt=skip_missing_names_on_install=False install -y xz-devel zlib-devel lz4-devel
 RUN rpmdev-setuptree
 
 
