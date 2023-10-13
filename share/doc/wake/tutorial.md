@@ -551,7 +551,7 @@ from plan_scorer import _
 
 export def infoH _args =
     def cmdline =
-        which "uname", "-sr", Nil
+        "{which "uname"} -sr"
     def plan =
         makePlan "get kernel" Nil cmdline
     def os =
@@ -582,7 +582,7 @@ use with jobs.
 
 `makePlan` is the main method wake uses to set up calls to external shell
 scripts or tools.  It takes three arguments: a readable name for what the job is
-doing, a list of paths of legal inputs, and a list of strings for the
+doing, a list of paths of legal inputs, and a string for the
 command-line.  We will go into more detail on that and `runJob` (which is where
 the command is actually invoked) in the next section.
 
@@ -1175,10 +1175,7 @@ def curl url extension =
         # include the `.tar.gz` (or `.json`) extension.
         "{@here}/{basename url}.{extension}"
     def cmdline =
-        which "curl",
-        "-o", outputFile,
-        url,
-        Nil
+        "{which "curl"} -o {outputFile} {url}"
     def curl =
         makePlan "download {url}" Nil cmdline
         | runJob
