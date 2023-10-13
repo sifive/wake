@@ -18,8 +18,9 @@
 #pragma once
 
 #include <string>
-#include "wcl/result.h"
+
 #include "wcl/optional.h"
+#include "wcl/result.h"
 
 enum class SquashFuseMountWaitErrorType {
   CannotOpenFifo,
@@ -36,5 +37,5 @@ struct SquashFuseMountWaitError {
 wcl::result<std::string, wcl::posix_error_t> mktempfifo();
 
 // Wait for a signal on the named pipe to confirm squashfuse mount
-wcl::optional<SquashFuseMountWaitError> wait_for_squashfuse_mount(const std::string& squashfuse_fifo_path);
-
+wcl::optional<SquashFuseMountWaitError> wait_for_squashfuse_mount(
+    const std::string& squashfuse_fifo_path);

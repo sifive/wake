@@ -41,11 +41,9 @@
 #include <iostream>
 
 #include "fuse.h"
-#include "squashfuse_helper.h"
-
 #include "json/json5.h"
+#include "squashfuse_helper.h"
 #include "util/mkdir_parents.h"
-
 
 // Location in the parent namespace to base the new root on.
 static const std::string root_mount_prefix = "/tmp/.wakebox-mount";
@@ -212,7 +210,8 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
       unlink(fifo_path_result->c_str());
       exit(1);
     }
-    execlp("squashfuse_ll", "squashfuse_ll", "-o", "notify_pipe", fifo_path_result->c_str(), "-f", source.c_str(), mountpoint.c_str(), NULL);
+    execlp("squashfuse_ll", "squashfuse_ll", "-o", "notify_pipe", fifo_path_result->c_str(), "-f",
+           source.c_str(), mountpoint.c_str(), NULL);
     std::cerr << "execlp squashfuse: " << strerror(errno) << std::endl;
     unlink(fifo_path_result->c_str());
     exit(1);
@@ -220,27 +219,29 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
 
   auto wait_for_mount_opt = wait_for_squashfuse_mount(*fifo_path_result);
   if (wait_for_mount_opt) {
-    std::cerr << "Squashfuse mount failed: wait_for_squashfuse_mount ('" << *fifo_path_result << "'): " << source << ", Reason: ";
-    switch (wait_for_mount_opt->type)
-    {
-    case SquashFuseMountWaitErrorType::CannotOpenFifo:
-      std::cerr << "Could not open fifo: " << strerror(wait_for_mount_opt->posix_error) << std::endl;
-      return false;
-      break;
-    case SquashFuseMountWaitErrorType::FailureToReadFifo:
-      std::cerr << "Error reading fifo: " << strerror(wait_for_mount_opt->posix_error) << std::endl;
-      return false;
-      break;
-    case SquashFuseMountWaitErrorType::ReceivedZeroBytes:
-      std::cerr << "Zero bytes read from fifo." << std::endl;
-      return false;
-      break;
-    case SquashFuseMountWaitErrorType::MountFailed:
-      std::cerr << "Squashfuse wrote 'f' meaning it failed to mount." << std::endl;
-      return false;
-      break;
-    default:
-      break;
+    std::cerr << "Squashfuse mount failed: wait_for_squashfuse_mount ('" << *fifo_path_result
+              << "'): " << source << ", Reason: ";
+    switch (wait_for_mount_opt->type) {
+      case SquashFuseMountWaitErrorType::CannotOpenFifo:
+        std::cerr << "Could not open fifo: " << strerror(wait_for_mount_opt->posix_error)
+                  << std::endl;
+        return false;
+        break;
+      case SquashFuseMountWaitErrorType::FailureToReadFifo:
+        std::cerr << "Error reading fifo: " << strerror(wait_for_mount_opt->posix_error)
+                  << std::endl;
+        return false;
+        break;
+      case SquashFuseMountWaitErrorType::ReceivedZeroBytes:
+        std::cerr << "Zero bytes read from fifo." << std::endl;
+        return false;
+        break;
+      case SquashFuseMountWaitErrorType::MountFailed:
+        std::cerr << "Squashfuse wrote 'f' meaning it failed to mount." << std::endl;
+        return false;
+        break;
+      default:
+        break;
     }
   }
 
