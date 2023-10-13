@@ -1,13 +1,15 @@
 #!/bin/bash
 
-set -x
+set -xe
 
-DEST="$1"
+DEST="$PWD"
 VERSION=0.5.0
 
 # Create a temp build dir
 TMPDIR=$(mktemp -d)
 cd $TMPDIR
+
+mkdir -p $DEST/licenses
 
 # Remove temp build dir on error or exit.
 function cleanup () { rm -rf $TMPDIR; }
@@ -32,7 +34,6 @@ cd squashfuse-$VERSION
 make -j $(nproc) install
 
 # Copy Binary
-cp $TMP_INSTALL_DEST/bin/wake_squashfuse_ll $DEST/bin
+cp $TMP_INSTALL_DEST/bin/wake_squashfuse_ll $DEST/bin/wake_squashfuse_ll
 # Copy License
-mkdir -p $DEST/licenses
-cp ./LICENSE $DEST/licenses
+cp ./LICENSE $DEST/licenses/LICENSE.squashfuse

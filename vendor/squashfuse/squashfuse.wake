@@ -18,12 +18,14 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def buildSquashfuse variant: Result (List Path) Error =
-    def Pair _ cVariant = variant
-
+def buildSquashfuse Unit: Result (List Path) Error =
     require Pass scriptPath = source "{@here}/build_squashfuse.sh"
+    require Pass binDir = mkdir "bin"
 
-    def x = makePlan "build squashfuse" (scriptPath,) "./build_squashfuse.sh"
+    require Pass outputs = 
+        makePlan "build squashfuse" (scriptPath, binDir,) "./{scriptPath.getPathName}"
+        | runJobWith defaultRunner
+        | getJobOutputs
 
-    0
+    Pass outputs
 

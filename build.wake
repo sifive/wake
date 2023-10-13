@@ -108,6 +108,15 @@ def doInstall dest kind =
     require Pass datfiles = sources "{@here}/share" `.*`
     require Pass log_viewer = buildWakeLogViewer Unit
     require Pass log_viewer = installAs "{dest}/bin/wake-log-viewer" log_viewer
+    require Pass squashfuse_files = buildSquashfuse Unit
+    require (squashfusePath, Nil) = filter (matches `bin/wake_squashfuse_ll` _.getPathName) squashfuse_files
+    else
+        failWithError "Could not find wake_squashfuse_ll binary for squashfuse"
+    require Pass squashfuseBinary = installAs "{dest}/bin/wake_squashfuse_ll" squashfusePath
+    require (licensePath, Nil) = filter (matches `licenses/LICENSE.squashfuse` _.getPathName) squashfuse_files
+    else
+        failWithError "Could not find LICENSE file for squashfuse"
+    require Pass squashfuseLicense = installAs "{dest}/licenses/LICENSE.squashfuse" licensePath
 
     def binfilesResult = all variant
     def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
@@ -118,7 +127,7 @@ def doInstall dest kind =
     require Pass binfiles = binfilesResult
     require Pass bininstall = findFailFn releaseBin binfiles
 
-    def outputs = readme, log_viewer, bininstall ++ datinstall
+    def outputs = readme, log_viewer, squashfuseBinary, squashfuseLicense, bininstall ++ datinstall
 
     Pass outputs
 

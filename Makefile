@@ -40,7 +40,6 @@ WAKE_OBJS := src/parser/lexer.o src/parser/parser.o src/json/jlexer.o \
 WAKE_ENV := WAKE_PATH=$(shell dirname $(shell which $(firstword $(CC))))
 
 all:		wake.db
-	./build_squashfuse.sh $(shell pwd)
 	$(WAKE_ENV) BOOTSTRAP_WAKE=true ./bin/wake build default
 
 clean:
