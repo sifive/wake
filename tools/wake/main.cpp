@@ -110,6 +110,108 @@ Set<long> upkeep_intersects(std::unordered_map<long, JobReflection> &captured_jo
   return sintersect(std::move(current), from_finite(std::move(ids)));
 }
 
+DescribePolicy get_describe_policy(const CommandLineOptions &clo) {
+  if (clo.debug) {
+    return DescribePolicy::debug();
+  }
+
+  if (clo.verbose) {
+    return DescribePolicy::verbose();
+  }
+
+  if (clo.metadata) {
+    return DescribePolicy::metadata();
+  }
+
+  if (clo.script) {
+    return DescribePolicy::script();
+  }
+
+  if (clo.tag) {
+    return DescribePolicy::tag_url(clo.tag);
+  }
+
+  return DescribePolicy::human();
+}
+
+void inspect_database(const CommandLineOptions &clo, Database &db, const std::string &wake_cwd) {
+  // tagdag is technically a db inspection, but its very different from the
+  // rest, just handle it and exit.
+  if (clo.tagdag) {
+    JAST json = create_tagdag(db, clo.tagdag);
+    std::cout << json << std::endl;
+    return;
+  }
+
+  std::unordered_map<long, JobReflection> captured_jobs = {};
+  Set<long> intersected_job_ids = suniversal<long>();
+
+  if (clo.job) {
+    auto hits = db.explain(std::atol(clo.job));
+    if (hits.empty())
+      std::cerr << "Job '" << clo.job << "' was not found in the database!" << std::endl;
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
+  }
+
+  if (!clo.input_files.empty()) {
+    std::vector<JobReflection> hits = {};
+    for (const std::string &input : clo.input_files) {
+      auto current = db.explain(wcl::make_canonical(wake_cwd + input), 1);
+      std::move(current.begin(), current.end(), std::back_inserter(hits));
+    }
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
+  }
+
+  if (!clo.output_files.empty()) {
+    std::vector<JobReflection> hits = {};
+    for (const std::string &output : clo.output_files) {
+      auto current = db.explain(wcl::make_canonical(wake_cwd + output), 2);
+      std::move(current.begin(), current.end(), std::back_inserter(hits));
+    }
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
+  }
+
+  if (clo.label) {
+    std::string glob = std::string(clo.label);
+    std::replace(glob.begin(), glob.end(), '*', '%');
+    std::replace(glob.begin(), glob.end(), '?', '_');
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.labels_matching(glob));
+  }
+
+  if (clo.last_use) {
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.last_use());
+  }
+
+  if (clo.last_exe) {
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.last_exe());
+  }
+
+  if (clo.failed) {
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.failed());
+  }
+
+  std::vector<JobReflection> intersected_jobs = {};
+  for (auto &it : captured_jobs) {
+    if (intersected_job_ids(it.first)) {
+      intersected_jobs.push_back(std::move(it.second));
+    }
+  }
+
+  if (intersected_jobs.empty()) {
+    std::cerr << "No jobs matched query" << std::endl;
+    exit(1);
+  }
+
+  describe(intersected_jobs, get_describe_policy(clo));
+}
+
 }  // namespace
 
 void print_help(const char *argv0) {
@@ -293,16 +395,13 @@ int main(int argc, char **argv) {
     clo.argv[1] = clo.shebang;
   }
 
+  bool is_db_inspection = clo.job || !clo.output_files.empty() || !clo.input_files.empty() ||
+                          clo.label || clo.last_use || clo.last_exe || clo.failed || clo.tagdag;
   // Arguments are forbidden with these options
-  bool noargs = clo.init || clo.job || clo.last_use || clo.last_exe || clo.failed || clo.tagdag ||
-                clo.html || clo.global || clo.exports || clo.api || clo.exec || clo.label ||
-                !clo.input_files.empty() || !clo.output_files.empty();
+  bool noargs =
+      is_db_inspection || clo.init || clo.html || clo.global || clo.exports || clo.api || clo.exec;
   bool targets = clo.argc == 1 && !noargs;
-
-  bool job_capture = clo.job || !clo.output_files.empty() || !clo.input_files.empty() ||
-                     clo.label || clo.last_use || clo.last_exe || clo.failed;
-  bool noparse = clo.init || clo.tagdag || job_capture;
-  bool notype = noparse || clo.parse;
+  bool notype = clo.init || is_db_inspection || clo.parse;
   bool noexecute = notype || clo.html || clo.tcheck || clo.dumpssa || clo.global || clo.exports ||
                    clo.api || targets;
 
@@ -523,102 +622,10 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  DescribePolicy policy = DescribePolicy::human();
-
-  if (clo.tag) {
-    policy = DescribePolicy::tag_url(clo.tag);
+  if (is_db_inspection) {
+    inspect_database(clo, db, wake_cwd);
+    return 0;
   }
-
-  if (clo.script) {
-    policy = DescribePolicy::script();
-  }
-
-  if (clo.metadata) {
-    policy = DescribePolicy::metadata();
-  }
-
-  if (clo.verbose) {
-    policy = DescribePolicy::verbose();
-  }
-
-  if (clo.debug) {
-    policy = DescribePolicy::debug();
-  }
-
-  std::unordered_map<long, JobReflection> captured_jobs = {};
-  Set<long> intersected_job_ids = suniversal<long>();
-
-  if (clo.job) {
-    auto hits = db.explain(std::atol(clo.job));
-    if (hits.empty())
-      std::cerr << "Job '" << clo.job << "' was not found in the database!" << std::endl;
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
-  }
-
-  if (!clo.input_files.empty()) {
-    std::vector<JobReflection> hits = {};
-    for (const std::string &input : clo.input_files) {
-      auto current = db.explain(wcl::make_canonical(wake_cwd + input), 1);
-      std::move(current.begin(), current.end(), std::back_inserter(hits));
-    }
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
-  }
-
-  if (!clo.output_files.empty()) {
-    std::vector<JobReflection> hits = {};
-    for (const std::string &output : clo.output_files) {
-      auto current = db.explain(wcl::make_canonical(wake_cwd + output), 2);
-      std::move(current.begin(), current.end(), std::back_inserter(hits));
-    }
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
-  }
-
-  if (clo.label) {
-    std::string glob = std::string(clo.label);
-    std::replace(glob.begin(), glob.end(), '*', '%');
-    std::replace(glob.begin(), glob.end(), '?', '_');
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.labels_matching(glob));
-  }
-
-  if (clo.last_use) {
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.last_use());
-  }
-
-  if (clo.last_exe) {
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.last_exe());
-  }
-
-  if (clo.failed) {
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.failed());
-  }
-
-  std::vector<JobReflection> intersected_jobs = {};
-  for (auto &it : captured_jobs) {
-    if (intersected_job_ids(it.first)) {
-      intersected_jobs.push_back(std::move(it.second));
-    }
-  }
-
-  if (job_capture && intersected_jobs.empty()) {
-    std::cerr << "No jobs matched query" << std::endl;
-    return 1;
-  }
-
-  describe(intersected_jobs, policy);
-
-  if (clo.tagdag) {
-    JAST json = create_tagdag(db, clo.tagdag);
-    std::cout << json << std::endl;
-  }
-
-  if (noparse) return 0;
 
   FILE *user_warn = stdout;
   wcl::opt_defer user_warn_defer;
