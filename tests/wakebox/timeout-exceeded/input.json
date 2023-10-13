@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/bin/sh", "-c", "sleep 2 && true"
+  ],
+  "environment": [
+    "USER=root",
+    "HOME=/root",
+    "PATH=/usr/bin:/bin:/usr/sbin:/sbin"
+  ],
+  "directory": ".",
+  "stdin": "",
+  "user-id": 0,
+  "group-id": 0,
+  "mount-ops": [],
+  "visible": [],
+  "command_timeout":  1
+}
