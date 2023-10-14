@@ -7,7 +7,7 @@ RUN yum --setopt=skip_missing_names_on_install=False install -y tar xz dash git 
 RUN yum --setopt=skip_missing_names_on_install=False install -y centos-release-scl
 RUN yum --setopt=skip_missing_names_on_install=False install -y devtoolset-9-gcc*
 # Squashfuse build dependences
-RUN yum --setopt=skip_missing_names_on_install=False install -y fuse3-devel libattr-devel libzstd-devel lz4-devel xz-devel lzo-devel zlib-devel
+RUN yum --setopt=skip_missing_names_on_install=False install -y fuse3-devel libattr-devel libzstd-devel lz4-devel xz-devel lzo-devel zlib-devel zstd lz4 xz lzo zlib
 RUN rpmdev-setuptree
 
 
