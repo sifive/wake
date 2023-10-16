@@ -6,8 +6,8 @@ export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
 
 ${1}/wakebox -p input.json -o result.json
 
-trap "rm result.json" EXIT
+trap "rm result.json hello" EXIT
 
-[ "$(cat result.json | jq '."timed-out"')" = "true" ] && exit 0
+[ "$(cat result.json | jq '."timed-out"')" = "true" ] && [ -f "hello" ] && exit 0
 
 exit 1
