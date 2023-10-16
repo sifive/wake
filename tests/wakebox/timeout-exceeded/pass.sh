@@ -8,6 +8,6 @@ ${1}/wakebox -p input.json -o result.json
 
 trap "rm result.json" EXIT
 
-[ "$(cat result.json | jq .timed_out)" = "true" ] && exit 0
+[ "$(cat result.json | jq .timed-out)" = "true" ] && exit 0
 
 exit 1

@@ -61,7 +61,7 @@ bool json_as_struct(const std::string &json, json_args &result) {
 
   for (auto &x : jast.get("visible").children) result.visible.push_back(x.second.value);
 
-  JAST timeout_entry = jast.get("command_timeout");
+  JAST timeout_entry = jast.get("command-timeout");
   if (timeout_entry.kind == JSON_INTEGER) {
     int timeout = std::stoi(timeout_entry.value);
     if (timeout <= 0) {
@@ -136,7 +136,7 @@ static bool collect_result_metadata(const std::string daemon_output, const struc
 
   result_jast.add("inputs", JSON_ARRAY).children = std::move(from_daemon.get("inputs").children);
   result_jast.add("outputs", JSON_ARRAY).children = std::move(from_daemon.get("outputs").children);
-  result_jast.add_bool("timed_out", timed_out);
+  result_jast.add_bool("timed-out", timed_out);
 
   char hostname[HOST_NAME_MAX + 1];
   if (0 == gethostname(hostname, sizeof(hostname))) result_jast.add("run-host", hostname);
@@ -233,11 +233,10 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   (void)close(STDOUT_FILENO);
   (void)close(STDERR_FILENO);
 
-  bool has_timeout = (bool)args.command_timeout;
   pid_t timeout_pid = -1;
 
   // Launch timer process
-  if (has_timeout) {
+  if (args.command_timeout) {
     timeout_pid = fork();
     if (timeout_pid < 0) {
       std::cerr << "wakebox: failed to fork timeout process" << std::endl;
@@ -245,6 +244,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     }
 
     if (timeout_pid == 0) {
+      prctl(PR_SET_NAME, "wb-timer", 0, 0, 0);
       sleep(*args.command_timeout);
       exit(124);
     }
@@ -265,7 +265,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     }
 
     if (wait_pid == payload_pid && !WIFSTOPPED(status)) {
-      if (has_timeout) {
+      if (args.command_timeout) {
         kill(timeout_pid, SIGKILL);
       }
       // Note: must not wait on timeout pid in this codepath

@@ -13,5 +13,5 @@
   "group-id": 0,
   "mount-ops": [],
   "visible": [],
-  "command_timeout":  1
+  "command-timeout":  1
 }
