@@ -63,7 +63,16 @@ bool json_as_struct(const std::string &json, json_args &result) {
 
   JAST timeout_entry = jast.get("command_timeout");
   if (timeout_entry.kind == JSON_INTEGER) {
-    result.command_timeout = std::stoi(timeout_entry.value);
+    int timeout = std::stoi(timeout_entry.value);
+    if (timeout <= 0) {
+      std::cerr << "timeout must be be an integer value greater than 0" << std::endl;
+      return false;
+    }
+
+    result.command_timeout = wcl::make_some<int>(timeout);
+  } else if (timeout_entry.kind != JSON_NULLVAL) {
+    std::cerr << "timeout must be be an integer value greater than 0" << std::endl;
+    return false;
   }
 
   result.directory = jast.get("directory").value;
@@ -224,19 +233,19 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   (void)close(STDOUT_FILENO);
   (void)close(STDERR_FILENO);
 
-  bool has_timeout = args.command_timeout > 0;
+  bool has_timeout = (bool)args.command_timeout;
   pid_t timeout_pid = -1;
 
   // Launch timer process
   if (has_timeout) {
     timeout_pid = fork();
     if (timeout_pid < 0) {
-      std::cerr << "wakebox: failed to fork timout process" << std::endl;
+      std::cerr << "wakebox: failed to fork timeout process" << std::endl;
       exit(1);
     }
 
     if (timeout_pid == 0) {
-      sleep(args.command_timeout);
+      sleep(*args.command_timeout);
       exit(124);
     }
   }
