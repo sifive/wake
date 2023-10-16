@@ -110,6 +110,18 @@ Set<long> upkeep_intersects(std::unordered_map<long, JobReflection> &captured_jo
   return sintersect(std::move(current), from_finite(std::move(ids)));
 }
 
+std::string globish_to_like(const std::string &str) {
+  std::string glob = str;
+  std::replace(glob.begin(), glob.end(), '*', '%');
+  std::replace(glob.begin(), glob.end(), '?', '_');
+  return glob;
+}
+
+std::string globish_to_like(const char *str) {
+  std::string glob(str);
+  return globish_to_like(glob);
+}
+
 DescribePolicy get_describe_policy(const CommandLineOptions &clo) {
   if (clo.debug) {
     return DescribePolicy::debug();
@@ -147,9 +159,7 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
   Set<long> intersected_job_ids = suniversal<long>();
 
   if (clo.job) {
-    auto hits = db.explain(std::atol(clo.job));
-    if (hits.empty())
-      std::cerr << "Job '" << clo.job << "' was not found in the database!" << std::endl;
+    auto hits = db.job_ids_matching(globish_to_like(clo.job));
     intersected_job_ids =
         upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
   }
@@ -157,7 +167,8 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
   if (!clo.input_files.empty()) {
     std::vector<JobReflection> hits = {};
     for (const std::string &input : clo.input_files) {
-      auto current = db.explain(wcl::make_canonical(wake_cwd + input), 1);
+      std::string glob = globish_to_like(wcl::make_canonical(wake_cwd + input));
+      auto current = db.input_files_matching(glob);
       std::move(current.begin(), current.end(), std::back_inserter(hits));
     }
     intersected_job_ids =
@@ -167,7 +178,8 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
   if (!clo.output_files.empty()) {
     std::vector<JobReflection> hits = {};
     for (const std::string &output : clo.output_files) {
-      auto current = db.explain(wcl::make_canonical(wake_cwd + output), 2);
+      std::string glob = globish_to_like(wcl::make_canonical(wake_cwd + output));
+      auto current = db.output_files_matching(glob);
       std::move(current.begin(), current.end(), std::back_inserter(hits));
     }
     intersected_job_ids =
@@ -175,11 +187,8 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
   }
 
   if (clo.label) {
-    std::string glob = std::string(clo.label);
-    std::replace(glob.begin(), glob.end(), '*', '%');
-    std::replace(glob.begin(), glob.end(), '?', '_');
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.labels_matching(glob));
+    intersected_job_ids = upkeep_intersects(captured_jobs, std::move(intersected_job_ids),
+                                            db.labels_matching(globish_to_like(clo.label)));
   }
 
   if (clo.last_use) {

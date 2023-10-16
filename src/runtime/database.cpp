@@ -386,14 +386,14 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
       "s.membytes, s.ibytes, s.obytes"
       " from  jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
-      " where j.job_id=?";
+      " where cast(j.job_id as TEXT) like ? order by j.job_id";
   const char *sql_find_owner =
       "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
       "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
       "s.membytes, s.ibytes, s.obytes"
       " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id join runs r on "
       "j.run_id=r.run_id"
-      " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id order by "
+      " where f.path like ? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id order by "
       "j.job_id";
   const char *sql_find_last_exe =
       "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
@@ -1295,15 +1295,15 @@ std::vector<JobReflection> Database::labels_matching(const std::string glob) {
   return find_all(this, imp->find_label);
 }
 
-std::vector<JobReflection> Database::explain(long job) {
+std::vector<JobReflection> Database::job_ids_matching(const std::string glob) {
   const char *why = "Could not bind args";
-  bind_integer(why, imp->find_job, 1, job);
+  bind_string(why, imp->find_job, 1, glob);
   return find_all(this, imp->find_job);
 }
 
-std::vector<JobReflection> Database::explain(const std::string &file, int use) {
+std::vector<JobReflection> Database::files_matching(const std::string &glob, int use) {
   const char *why = "Could not bind args";
-  bind_string(why, imp->find_owner, 1, file);
+  bind_string(why, imp->find_owner, 1, glob);
   bind_integer(why, imp->find_owner, 2, use);
   return find_all(this, imp->find_owner);
 }
