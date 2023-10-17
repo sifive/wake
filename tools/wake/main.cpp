@@ -117,9 +117,21 @@ std::string globish_to_like(const std::string &str) {
   return glob;
 }
 
-std::string globish_to_like(const char *str) {
-  std::string glob(str);
-  return globish_to_like(glob);
+template <class QueryF>
+Set<long> apply_inspection_query(std::unordered_map<long, JobReflection> &captured_jobs,
+                                 Set<long> current,
+                                 const std::vector<std::vector<std::string>> &query, QueryF qf) {
+  for (const std::vector<std::string> &and_part : query) {
+    std::vector<JobReflection> hits = {};
+    for (const std::string &or_part : and_part) {
+      if (or_part == "") continue;
+
+      std::vector<JobReflection> results = qf(globish_to_like(or_part));
+      std::move(results.begin(), results.end(), std::back_inserter(hits));
+    }
+    current = upkeep_intersects(captured_jobs, std::move(current), std::move(hits));
+  }
+  return current;
 }
 
 DescribePolicy get_describe_policy(const CommandLineOptions &clo) {
@@ -158,37 +170,28 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
   std::unordered_map<long, JobReflection> captured_jobs = {};
   Set<long> intersected_job_ids = suniversal<long>();
 
-  if (clo.job) {
-    auto hits = db.job_ids_matching(globish_to_like(clo.job));
+  if (!clo.job_ids.empty()) {
     intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
+        apply_inspection_query(captured_jobs, std::move(intersected_job_ids), clo.job_ids,
+                               [&](auto a) { return db.job_ids_matching(a); });
   }
 
   if (!clo.input_files.empty()) {
-    std::vector<JobReflection> hits = {};
-    for (const std::string &input : clo.input_files) {
-      std::string glob = globish_to_like(wcl::make_canonical(wake_cwd + input));
-      auto current = db.input_files_matching(glob);
-      std::move(current.begin(), current.end(), std::back_inserter(hits));
-    }
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
+    intersected_job_ids = apply_inspection_query(
+        captured_jobs, std::move(intersected_job_ids), clo.input_files,
+        [&](auto a) { return db.input_files_matching(wcl::make_canonical(wake_cwd + a)); });
   }
 
   if (!clo.output_files.empty()) {
-    std::vector<JobReflection> hits = {};
-    for (const std::string &output : clo.output_files) {
-      std::string glob = globish_to_like(wcl::make_canonical(wake_cwd + output));
-      auto current = db.output_files_matching(glob);
-      std::move(current.begin(), current.end(), std::back_inserter(hits));
-    }
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), std::move(hits));
+    intersected_job_ids = apply_inspection_query(
+        captured_jobs, std::move(intersected_job_ids), clo.output_files,
+        [&](auto a) { return db.output_files_matching(wcl::make_canonical(wake_cwd + a)); });
   }
 
-  if (clo.label) {
-    intersected_job_ids = upkeep_intersects(captured_jobs, std::move(intersected_job_ids),
-                                            db.labels_matching(globish_to_like(clo.label)));
+  if (!clo.labels.empty()) {
+    intersected_job_ids =
+        apply_inspection_query(captured_jobs, std::move(intersected_job_ids), clo.labels,
+                               [&](auto a) { return db.labels_matching(a); });
   }
 
   if (clo.last_use) {
@@ -404,8 +407,9 @@ int main(int argc, char **argv) {
     clo.argv[1] = clo.shebang;
   }
 
-  bool is_db_inspection = clo.job || !clo.output_files.empty() || !clo.input_files.empty() ||
-                          clo.label || clo.last_use || clo.last_exe || clo.failed || clo.tagdag;
+  bool is_db_inspection = !clo.job_ids.empty() || !clo.output_files.empty() ||
+                          !clo.input_files.empty() || !clo.labels.empty() || clo.last_use ||
+                          clo.last_exe || clo.failed || clo.tagdag;
   // Arguments are forbidden with these options
   bool noargs =
       is_db_inspection || clo.init || clo.html || clo.global || clo.exports || clo.api || clo.exec;

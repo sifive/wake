@@ -24,6 +24,7 @@
 
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
+#include "wcl/iterator.h"
 #include "wcl/optional.h"
 
 struct CommandLineOptions {
@@ -68,8 +69,6 @@ struct CommandLineOptions {
   const char *chdir;
   const char *in;
   const char *exec;
-  const char *job;
-  const char *label;
   char *shebang;
   const char *tagdag;
   const char *tag;
@@ -85,16 +84,20 @@ struct CommandLineOptions {
 
   wcl::optional<int64_t> log_header_source_width;
 
-  std::vector<std::string> input_files = {};
-  std::vector<std::string> output_files = {};
+  std::vector<std::vector<std::string>> job_ids = {};
+  std::vector<std::vector<std::string>> input_files = {};
+  std::vector<std::vector<std::string>> output_files = {};
+  std::vector<std::vector<std::string>> labels = {};
 
   int argc;
   char **argv;
 
   CommandLineOptions(int argc_in, char **argv_in) {
     argv = argv_in;
+    std::vector<char *> job_ids_buffer(argc_in, nullptr);
     std::vector<char *> input_files_buffer(argc_in, nullptr);
     std::vector<char *> output_files_buffer(argc_in, nullptr);
+    std::vector<char *> labels_buffer(argc_in, nullptr);
 
     // clang-format off
     struct option options[] {
@@ -115,10 +118,10 @@ struct CommandLineOptions {
       {'C', "chdir", GOPT_ARGUMENT_REQUIRED},
       {0, "in", GOPT_ARGUMENT_REQUIRED},
       {'x', "exec", GOPT_ARGUMENT_REQUIRED},
-      {0, "job", GOPT_ARGUMENT_REQUIRED},
+      {0, "job", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, job_ids_buffer.data(), (unsigned int)argc_in},
       {'i', "input", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, input_files_buffer.data(), (unsigned int)argc_in},
       {'o', "output", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, output_files_buffer.data(), (unsigned int)argc_in},
-      {0, "label", GOPT_ARGUMENT_REQUIRED},
+      {0, "label", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, labels_buffer.data(), (unsigned int)argc_in},
       {'l', "last", GOPT_ARGUMENT_FORBIDDEN},
       {0, "last-used", GOPT_ARGUMENT_FORBIDDEN},
       {0, "last-executed", GOPT_ARGUMENT_FORBIDDEN},
@@ -204,8 +207,6 @@ struct CommandLineOptions {
     chdir = arg(options, "chdir")->argument;
     in = arg(options, "in")->argument;
     exec = arg(options, "exec")->argument;
-    job = arg(options, "job")->argument;
-    label = arg(options, "label")->argument;
     shebang = arg(options, "shebang")->argument;
     tagdag = arg(options, "tag-dag")->argument;
     tag = arg(options, "tag")->argument;
@@ -238,12 +239,32 @@ struct CommandLineOptions {
     auto lhsw_str = arg(options, "log-header-source-width")->argument;
     if (lhsw_str) log_header_source_width = wcl::make_some<int64_t>(std::stol(lhsw_str));
 
+    for (unsigned int i = 0; i < arg(options, "job")->count; i++) {
+      std::string line(job_ids_buffer[i]);
+      std::vector<std::string> parts = wcl::split_by_fn(
+          ',', line.begin(), line.end(), [](auto a, auto b) { return std::string(a, b); });
+      job_ids.emplace_back(std::move(parts));
+    }
+
     for (unsigned int i = 0; i < arg(options, "input")->count; i++) {
-      input_files.emplace_back(std::string(input_files_buffer[i]));
+      std::string line(input_files_buffer[i]);
+      std::vector<std::string> parts = wcl::split_by_fn(
+          ',', line.begin(), line.end(), [](auto a, auto b) { return std::string(a, b); });
+      input_files.emplace_back(std::move(parts));
     }
 
     for (unsigned int i = 0; i < arg(options, "output")->count; i++) {
-      output_files.emplace_back(std::string(output_files_buffer[i]));
+      std::string line(output_files_buffer[i]);
+      std::vector<std::string> parts = wcl::split_by_fn(
+          ',', line.begin(), line.end(), [](auto a, auto b) { return std::string(a, b); });
+      output_files.emplace_back(std::move(parts));
+    }
+
+    for (unsigned int i = 0; i < arg(options, "label")->count; i++) {
+      std::string line(labels_buffer[i]);
+      std::vector<std::string> parts = wcl::split_by_fn(
+          ',', line.begin(), line.end(), [](auto a, auto b) { return std::string(a, b); });
+      labels.emplace_back(std::move(parts));
     }
 
     if (!percent_str) {
