@@ -30,6 +30,10 @@ PASSED:
   filepath_range_only_slash
   filepath_range_two_slash
   filepath_relative_to
+  iterator_split_by_empty
+  iterator_split_by_no_delim
+  iterator_split_by_nominal
+  iterator_split_by_only_delim
   job_cache_basic_fuzz
   job_cache_basic_par_fuzz
   option_assign1
