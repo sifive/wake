@@ -11,13 +11,12 @@
   "stdin": "",
   "user-id": 0,
   "group-id": 0,
-  "mount-ops": [],
-  "visible": [],
-  "command-timeout":  1,
   "mount-ops": [
     {
       "type": "workspace",
       "destination": "."
     }
-  ]
+  ],
+  "visible": [],
+  "command-timeout":  1,
 }
