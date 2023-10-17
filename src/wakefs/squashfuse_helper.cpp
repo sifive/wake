@@ -14,14 +14,10 @@
 #include <unistd.h>
 #include <wcl/defer.h>
 #include <wcl/result.h>
+#include <wcl/unique_fd.h>
 #include <wcl/xoshiro_256.h>
 
 #include <iostream>
-
-void cleanup_fifo(std::string squashfuse_fifo_path, int squashfuse_notify_pipe_fd) {
-  close(squashfuse_notify_pipe_fd);
-  unlink(squashfuse_fifo_path.c_str());
-}
 
 // Works like mkfifo but it gets created in a mktemp() style.
 wcl::result<std::string, wcl::posix_error_t> mktempfifo() {
@@ -38,28 +34,24 @@ wcl::result<std::string, wcl::posix_error_t> mktempfifo() {
 
 wcl::optional<SquashFuseMountWaitError> wait_for_squashfuse_mount(
     const std::string& squashfuse_fifo_path) {
-  int squashfuse_notify_pipe_fd = open(squashfuse_fifo_path.c_str(), O_RDONLY);
-  if (squashfuse_notify_pipe_fd == -1) {
+  auto squashfuse_notify_pipe_fd = wcl::unique_fd::open(squashfuse_fifo_path.c_str(), O_RDONLY);
+  if (!squashfuse_notify_pipe_fd) {
     return wcl::some(SquashFuseMountWaitError{SquashFuseMountWaitErrorType::CannotOpenFifo, errno});
   }
 
-  auto defer =
-      wcl::make_defer([&]() { cleanup_fifo(squashfuse_fifo_path, squashfuse_notify_pipe_fd); });
+  auto defer = wcl::make_defer([&]() { unlink(squashfuse_fifo_path.c_str()); });
 
   char squashfuse_notify_result = '\0';
-  ssize_t bytesRead =
-      read(squashfuse_notify_pipe_fd, &squashfuse_notify_result, sizeof(squashfuse_notify_result));
+  ssize_t bytesRead = read(squashfuse_notify_pipe_fd->get(), &squashfuse_notify_result,
+                           sizeof(squashfuse_notify_result));
   if (bytesRead == -1) {
-    // std::cerr << "Error reading squashfuse fifo notify_pipe" << std::endl;
     return wcl::some(
         SquashFuseMountWaitError{SquashFuseMountWaitErrorType::FailureToReadFifo, errno});
   } else if (bytesRead == 0) {
-    // std::cerr << "Error: Zero bytes were read from squashfuse fifo notify_pipe" << std::endl;
     return wcl::some(SquashFuseMountWaitError{SquashFuseMountWaitErrorType::ReceivedZeroBytes, -1});
   }
 
   if (squashfuse_notify_result == 'f') {
-    // std::cerr << "Failure: squashfuse fifo notify_pipe returned 'f'" << std::endl;
     return wcl::some(SquashFuseMountWaitError{SquashFuseMountWaitErrorType::MountFailed, -1});
   }
 
