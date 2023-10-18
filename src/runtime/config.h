@@ -115,6 +115,24 @@ struct LogHeaderPolicy {
   static void set_env_var(LogHeaderPolicy& p, const char* env_var){};
 };
 
+struct SharedCacheEvictionPolicy {
+  using type = std::string;
+  using input_type = type;
+  static constexpr const char* key = "shared_cache_eviction_policy";
+  static constexpr bool allowed_in_wakeroot = true;
+  static constexpr bool allowed_in_userconfig = true;
+  type eviction_policy = "time_to_live";
+  static constexpr type SharedCacheEvictionPolicy::*value = &SharedCacheEvictionPolicy::eviction_policy;
+  static constexpr Override<input_type> override_value = nullptr;
+  static constexpr const char* env_var = "WAKE_SHARED_CACHE_EVICTION_POLICY";
+
+  SharedCacheEvictionPolicy() = default;
+  static void set(SharedCacheEvictionPolicy& p, const JAST& json);
+  static void set_input(SharedCacheEvictionPolicy& p, const input_type& v) { p.*value = v; }
+  static void emit(const SharedCacheEvictionPolicy& p, std::ostream& os) { os << p.*value; }
+  static void set_env_var(SharedCacheEvictionPolicy& p, const char* env_var){};
+};
+
 struct LogHeaderSourceWidthPolicy {
   using type = int64_t;
   using input_type = type;
@@ -187,13 +205,32 @@ struct SharedCacheLowSize {
   static constexpr bool allowed_in_userconfig = true;
   type low_cache_size = 15ULL << 30ULL;
   static constexpr type SharedCacheLowSize::*value = &SharedCacheLowSize::low_cache_size;
-  static constexpr Override<input_type> override_value = &WakeConfigOverrides::max_cache_size;
+  static constexpr Override<input_type> override_value = &WakeConfigOverrides::low_cache_size;
   static constexpr const char* env_var = "WAKE_SHARED_CACHE_LOW_SIZE";
 
   static void set(SharedCacheLowSize& p, const JAST& json);
   static void set_input(SharedCacheLowSize& p, const input_type& v) { p.*value = v; }
   static void emit(const SharedCacheLowSize& p, std::ostream& os) { os << p.*value; }
   static void set_env_var(SharedCacheLowSize& p, const char* env_var) {
+    p.*value = std::stoull(env_var);
+  }
+};
+
+struct SharedCacheTTL {
+  using type = uint64_t;
+  using input_type = type;
+  static constexpr const char* key = "shared_cache_ttl";
+  static constexpr bool allowed_in_wakeroot = true;
+  static constexpr bool allowed_in_userconfig = true;
+  type time_to_live = 7 * 24 * 60 * 60; // 1 week in seconds as the default
+  static constexpr type SharedCacheTTL::*value = &SharedCacheTTL::time_to_live;
+  static constexpr Override<input_type> override_value = nullptr;
+  static constexpr const char* env_var = "WAKE_SHARED_CACHE_TTL";
+
+  static void set(SharedCacheTTL& p, const JAST& json);
+  static void set_input(SharedCacheTTL& p, const input_type& v) { p.*value = v; }
+  static void emit(const SharedCacheTTL& p, std::ostream& os) { os << p.*value; }
+  static void set_env_var(SharedCacheTTL& p, const char* env_var) {
     p.*value = std::stoull(env_var);
   }
 };
@@ -418,7 +455,8 @@ struct WakeConfigImpl : public Policies... {
 using WakeConfigImplFull =
     WakeConfigImpl<UserConfigPolicy, VersionPolicy, LogHeaderPolicy, LogHeaderSourceWidthPolicy,
                    LabelFilterPolicy, SharedCacheMaxSize, SharedCacheLowSize,
-                   SharedCacheMissOnFailure, LogHeaderAlignPolicy, BulkLoggingDirPolicy>;
+                   SharedCacheMissOnFailure, LogHeaderAlignPolicy, BulkLoggingDirPolicy,
+                   SharedCacheTTL, SharedCacheEvictionPolicy>;
 
 struct WakeConfig final : public WakeConfigImplFull {
   static bool init(const std::string& wakeroot_path, const WakeConfigOverrides& overrides);

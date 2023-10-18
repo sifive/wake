@@ -217,6 +217,8 @@ POLICY_STATIC_DEFINES(SharedCacheLowSize)
 POLICY_STATIC_DEFINES(SharedCacheMissOnFailure)
 POLICY_STATIC_DEFINES(LogHeaderAlignPolicy)
 POLICY_STATIC_DEFINES(BulkLoggingDirPolicy)
+POLICY_STATIC_DEFINES(SharedCacheEvictionPolicy)
+POLICY_STATIC_DEFINES(SharedCacheTTL)
 
 /********************************************************************
  * Non-Trivial Defaults
@@ -290,6 +292,21 @@ void BulkLoggingDirPolicy::set(BulkLoggingDirPolicy& p, const JAST& json) {
     p.bulk_logging_dir = *json_bulk_dir;
   }
 }
+
+void SharedCacheTTL::set(SharedCacheTTL& p, const JAST& json) {
+  auto json_ttl = json.expect_integer();
+  if (json_ttl) {
+    p.time_to_live = *json_ttl;
+  }
+}
+
+void SharedCacheEvictionPolicy::set(SharedCacheEvictionPolicy& p, const JAST& json) {
+  auto json_policy = json.expect_string();
+  if (json_policy) {
+    p.eviction_policy = *json_policy;
+  }
+}
+
 
 /********************************************************************
  * Core Implementation
