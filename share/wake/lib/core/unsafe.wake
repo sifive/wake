@@ -1,0 +1,68 @@
+# Copyright 2023 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package wake
+
+tuple Unsafe a =
+    Value: a
+
+export def unsafe_avoid_using_run (x: Unsafe a): a = x.getUnsafeValue
+
+# pure/return for unsafe
+export def makeUnsafe (v: a): Unsafe a = Unsafe v
+
+# fmap for unsafe
+export def unsafeMap (f: a => b) (x: Unsafe a): Unsafe b =
+    makeUnsafe (f x.getUnsafeValue)
+
+# <*> for unsafe
+export def unsafeApp (f: Unsafe (a => b)) (x: Unsafe a): Unsafe b =
+    f.getUnsafeValue x.getUnsafeValue
+    | makeUnsafe
+
+# liftA2 for unsafe
+export def unsafeLiftA2 (f: a => b => c) (x: Unsafe a) (y: Unsafe b): Unsafe c =
+    f x.getUnsafeValue y.getUnsafeValue
+    | makeUnsafe
+
+# bind for unsafe
+export def unsafeBind (f: a => Unsafe b) (x: Unsafe a): Unsafe b =
+    f x.getUnsafeValue
+
+# bind for unsafe but flipped
+export def unsafeBindFlip (x: Unsafe a) (f: a => Unsafe b): Unsafe b =
+    f x.getUnsafeValue
+
+# bind2 for unsafe
+export def unsafeBind2 (f: a => b => Unsafe c) (x: Unsafe a) (y: Unsafe b): Unsafe c =
+    f x.getUnsafeValue y.getUnsafeValue
+
+# join for unsafe
+export def unsafeJoin (x: Unsafe (Unsafe a)): Unsafe a =
+  x.getUnsafeValue
+
+# unsafe compose
+export def unsafeCompose (f: a => Unsafe b) (g: b => Unsafe c): a => Unsafe c =
+  f _
+  | unsafeBind g
+
+# rmap for unsafe
+export def unsafeRMap (f: a => Unsafe (Result b c)) (x: Unsafe (Result a c)): Unsafe (Result b c) =
+  def xRes = x.getUnsafeValue
+  match xRes
+    Pass x -> f x
+    Fail e -> makeUnsafe (Fail e)
+
+from wake export type Unsafe
