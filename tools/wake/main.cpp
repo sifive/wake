@@ -124,8 +124,6 @@ Set<long> apply_inspection_query(std::unordered_map<long, JobReflection> &captur
   for (const std::vector<std::string> &and_part : query) {
     std::vector<JobReflection> hits = {};
     for (const std::string &or_part : and_part) {
-      if (or_part == "") continue;
-
       std::vector<JobReflection> results = qf(globish_to_like(or_part));
       std::move(results.begin(), results.end(), std::back_inserter(hits));
     }
