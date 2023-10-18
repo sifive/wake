@@ -61,6 +61,20 @@ bool json_as_struct(const std::string &json, json_args &result) {
 
   for (auto &x : jast.get("visible").children) result.visible.push_back(x.second.value);
 
+  JAST timeout_entry = jast.get("command-timeout");
+  if (timeout_entry.kind == JSON_INTEGER) {
+    int timeout = std::stoi(timeout_entry.value);
+    if (timeout <= 0) {
+      std::cerr << "timeout must be be an integer value greater than 0" << std::endl;
+      return false;
+    }
+
+    result.command_timeout = wcl::make_some<int>(timeout);
+  } else if (timeout_entry.kind != JSON_NULLVAL) {
+    std::cerr << "timeout must be be an integer value greater than 0" << std::endl;
+    return false;
+  }
+
   result.directory = jast.get("directory").value;
   result.stdin_file = jast.get("stdin").value;
 
@@ -101,7 +115,8 @@ int execve_wrapper(const std::vector<std::string> &command,
 
 static bool collect_result_metadata(const std::string daemon_output, const struct timeval &start,
                                     const struct timeval &stop, const pid_t pid, const int status,
-                                    const RUsage &rusage, std::string &result_json) {
+                                    const RUsage &rusage, bool timed_out,
+                                    std::string &result_json) {
   JAST from_daemon;
   std::stringstream ss;
   if (!JAST::parse(daemon_output, ss, from_daemon)) {
@@ -121,6 +136,7 @@ static bool collect_result_metadata(const std::string daemon_output, const struc
 
   result_jast.add("inputs", JSON_ARRAY).children = std::move(from_daemon.get("inputs").children);
   result_jast.add("outputs", JSON_ARRAY).children = std::move(from_daemon.get("outputs").children);
+  result_jast.add_bool("timed-out", timed_out);
 
   char hostname[HOST_NAME_MAX + 1];
   if (0 == gethostname(hostname, sizeof(hostname))) result_jast.add("run-host", hostname);
@@ -143,8 +159,8 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   struct timeval start;
   gettimeofday(&start, 0);
 
-  pid_t pid = fork();
-  if (pid == 0) {
+  pid_t payload_pid = fork();
+  if (payload_pid == 0) {
     std::vector<std::string> command = args.command;
     std::vector<std::string> envs_from_mounts;
 #ifdef __linux__
@@ -217,8 +233,46 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   (void)close(STDOUT_FILENO);
   (void)close(STDERR_FILENO);
 
-  do waitpid(pid, &status, 0);
-  while (WIFSTOPPED(status));
+  pid_t timeout_pid = -1;
+
+  // Launch timer process
+  if (args.command_timeout) {
+    timeout_pid = fork();
+    if (timeout_pid < 0) {
+      std::cerr << "wakebox: failed to fork timeout process" << std::endl;
+      exit(1);
+    }
+
+    if (timeout_pid == 0) {
+      prctl(PR_SET_NAME, "wb-timer", 0, 0, 0);
+      sleep(*args.command_timeout);
+      exit(124);
+    }
+  }
+
+  pid_t wait_pid;
+  while ((wait_pid = wait(&status)) != -1) {
+    if (wait_pid == timeout_pid && WIFEXITED(status)) {
+      kill(payload_pid, SIGKILL);
+
+      struct timeval stop;
+      gettimeofday(&stop, 0);
+      std::string output;
+      args.daemon.disconnect(output);
+      RUsage usage = {};
+      return collect_result_metadata(output, start, stop, payload_pid, 124, usage, true,
+                                     result_json);
+    }
+
+    if (wait_pid == payload_pid && !WIFSTOPPED(status)) {
+      if (args.command_timeout) {
+        kill(timeout_pid, SIGKILL);
+      }
+      // Note: must not wait on timeout pid in this codepath
+      // otherwise it'll pollute rusage.
+      break;
+    }
+  }
 
   if (WIFEXITED(status)) {
     status = WEXITSTATUS(status);
@@ -226,7 +280,9 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     status = -WTERMSIG(status);
   }
 
-  // We only ever wait for one child, so this is that child's usage
+  // RUsage is calculated for all child processes that have 1) terminated and 2) been wait()ed on.
+  // Though we may fork two processes, we only ever wait on the payload process after termination
+  // (assuming it doesn't timeout) so the RUsage will only include the payload process useage.
   RUsage usage = getRUsageChildren();
 
   struct timeval stop;
@@ -235,5 +291,6 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
   std::string output;
   args.daemon.disconnect(output);
 
-  return collect_result_metadata(output, start, stop, pid, status, usage, result_json);
+  return collect_result_metadata(output, start, stop, payload_pid, status, usage, false,
+                                 result_json);
 }

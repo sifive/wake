@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# It's not valid to call wakebox with an empty PATH.
+# So we fill PATH with some typical values.
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+
+${1}/wakebox -p input.json -o result.json
+
+trap "rm result.json hello" EXIT
+
+[ "$(cat result.json | jq '."timed-out"')" = "true" ] && \
+[ "$(cat result.json | jq -r '.outputs[]')" = "hello" ] && exit 0
+
+exit 1

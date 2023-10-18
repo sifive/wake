@@ -158,7 +158,12 @@ int run_batch(const char *params_path, bool has_output, bool use_stdin_file, boo
   ifs.close();
 
   fuse_args args(get_cwd(), use_stdin_file);
-  if (!json_as_struct(json, args)) return 1;
+  if (!json_as_struct(json, args)) {
+    std::cerr << "Failed to process spec '" << params_path << "'. Verify valid json and schema."
+              << std::endl;
+    return 1;
+  }
+
   args.command_running_dir = pick_running_dir(args);
 
   if (args.command.empty() || args.command[0].empty()) {
