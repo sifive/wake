@@ -1,0 +1,71 @@
+# Copyright 2023 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package build_wake
+
+from wake import _
+from gcc_wake import _
+
+def buildSquashfuse Unit: Result (List Path) Error =
+    def buildcmd =
+        """
+        set -xe
+
+        DEST=$PWD
+        VERSION=0.5.0
+
+        # Create a temp build dir
+        TMPDIR=$(mktemp -d)
+        cd $TMPDIR
+
+        mkdir -p $DEST/licenses
+
+        # Remove temp build dir on error or exit.
+        cleanup () { rm -rf $TMPDIR; }
+        trap cleanup EXIT
+
+        wget https://github.com/vasi/squashfuse/releases/download/v$VERSION/squashfuse-$VERSION.tar.gz
+        tar xzf squashfuse-$VERSION.tar.gz --no-same-owner
+
+        TMP_INSTALL_DEST=$PWD/tmp_install_dest
+        mkdir $TMP_INSTALL_DEST
+
+        # Build and configure
+        cd squashfuse-$VERSION
+
+        ./configure \
+            --disable-demo \
+            --disable-high-level \
+            --prefix=$TMP_INSTALL_DEST \
+            --program-prefix=wake_
+
+        # Make and Install
+        make -j $(nproc) install
+
+        # Copy Binary
+        cp $TMP_INSTALL_DEST/bin/wake_squashfuse_ll $DEST/bin/wake_squashfuse_ll
+        # Copy License
+        cp ./LICENSE $DEST/licenses/LICENSE.squashfuse
+        """
+
+    require Pass binDir = mkdir "bin"
+
+    require Pass outputs =
+        makePlan "build squashfuse" (binDir,) buildcmd
+        | runJobWith defaultRunner
+        | getJobOutputs
+
+    Pass outputs
+

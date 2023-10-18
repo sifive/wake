@@ -40,6 +40,7 @@ compile_commands.json
 /lib/wake/wake-hash
 /lib/wake/wake-hash.*
 /lib/wake/libpreload-wake.*
+/licenses/LICENSE*
 /vendor/lemon/lemon.*
 /tmp
 *.swp

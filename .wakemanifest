@@ -56,6 +56,7 @@ vendor/whereami/whereami.wake
 vendor/gopt/gopt.wake
 vendor/fuse.wake
 vendor/blake2/blake2.wake
+vendor/squashfuse/squashfuse.wake
 vendor/sqlite3.wake
 vendor/lemon/lemon.wake
 vendor/emscripten.wake
