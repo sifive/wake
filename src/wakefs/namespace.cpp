@@ -210,9 +210,12 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
       unlink(fifo_path_result->c_str());
       exit(1);
     }
-    execlp("wake_squashfuse_ll", "wake_squashfuse_ll", "-o", "notify_pipe",
-           fifo_path_result->c_str(), "-f", source.c_str(), mountpoint.c_str(), NULL);
-    std::cerr << "execlp squashfuse: " << strerror(errno) << std::endl;
+
+    auto notify_pipe_arg = std::string("notify_pipe=") + *fifo_path_result;
+
+    execlp("wake_squashfuse_ll", "wake_squashfuse_ll", "-o", notify_pipe_arg.c_str(), "-f",
+           source.c_str(), mountpoint.c_str(), NULL);
+    std::cerr << "execlp wake_squashfuse_ll: " << strerror(errno) << std::endl;
     unlink(fifo_path_result->c_str());
     exit(1);
   }

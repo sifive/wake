@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/bin/bash", "/tmp/squashfs/foo.sh"
+  ],
+  "foo": 97,
+  "environment": [
+    "USER=root",
+    "HOME=/root",
+    "PATH=/usr/bin:/bin:/usr/sbin:/sbin"
+  ],
+  "directory": ".",
+  "stdin": "",
+  "user-id": 0,
+  "group-id": 0,
+  "mount-ops": [
+    {
+      "type": "squashfs",
+      "source": "pass.squashfs"
+    }
+  ],
+  "visible": []
+}
