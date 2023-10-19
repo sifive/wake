@@ -21,6 +21,7 @@ cleanup () {
     # Sleep in hopes that fuse will close the session in time
     sleep 3
     rm -rf "$TMPDIR" 
+    echo "?: $?"
 }
 trap cleanup EXIT
 
@@ -41,3 +42,4 @@ mksquashfs "$SQUASH_ROOT_DIR" "$SQUASHFS_FILENAME" -comp xz -all-root -noappend 
 # Check result
 [ "$(jq .usage.status "$RESULT_JSON")" -ne 97 ] && exit 98
 
+exit 0
