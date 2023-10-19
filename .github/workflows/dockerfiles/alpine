@@ -1,7 +1,7 @@
 FROM alpine:3.14.0
 
 RUN apk add m4 g++ make pkgconf git tar xz gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev bash dash sqlite-static ncurses-static linux-headers jq
-77efbe7a (Added test case and fixed squashfuse call)
+
 # Squashfuse build dependences
 RUN apk add fuse3-dev attr-dev zstd-dev lz4-dev xz-dev lzo-dev zlib-dev
 
