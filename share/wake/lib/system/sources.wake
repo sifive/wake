@@ -145,6 +145,17 @@ export def sources (dir: String) (filterRegexp: RegExp): Result (List Path) Erro
             | findFailFn raw_source
         False -> unreachable "add_sources always returns True"
 
+export def show _ =
+     require Pass items = sources "." `.*`
+
+     def _ =
+         items
+         | map (\x println x.getPathName)
+
+     def _ = println "c: {items | len | format}"
+
+     Pass Unit
+
 # This API makes it possible to include a non-source file into a wake build.
 # Generally, one should obtain Paths from sources or as the output of Jobs.
 # This API is useful for things like a command-line-supplied input file.

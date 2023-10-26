@@ -32,6 +32,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <wcl/filepath.h>
+#include <wcl/optional.h>
 
 #include <algorithm>
 #include <cstring>
@@ -211,16 +212,18 @@ std::string check_version(bool workspace, const char *config_version, const char
   return "";  // ok!
 }
 
-static std::string slurp(int dirfd, const char *const *argv, bool &fail) {
+static wcl::optional<std::string> slurp(int dirfd, const char *const *argv) {
   std::stringstream str;
   char buf[4096];
   int got, status, pipefd[2];
   pid_t pid;
 
   if (pipe(pipefd) == -1) {
-    fail = true;
     fprintf(stderr, "Failed to open pipe %s\n", strerror(errno));
-  } else if ((pid = fork()) == 0) {
+    return {};
+  }
+
+  if ((pid = fork()) == 0) {
     if (fchdir(dirfd) == -1) {
       fprintf(stderr, "Failed to chdir: %s\n", strerror(errno));
       exit(1);
@@ -233,45 +236,48 @@ static std::string slurp(int dirfd, const char *const *argv, bool &fail) {
     execvp(argv[0], const_cast<char *const *>(argv));
     fprintf(stderr, "Failed to execlp(git): %s\n", strerror(errno));
     exit(1);
-  } else {
+  }
+
+    bool failed = false;
     close(pipefd[1]);
     while ((got = read(pipefd[0], buf, sizeof(buf))) > 0) str.write(buf, got);
     if (got == -1) {
       fprintf(stderr, "Failed to read from git: %s\n", strerror(errno));
-      fail = true;
+      failed = true;
     }
     close(pipefd[0]);
     while (waitpid(pid, &status, 0) != pid) {
     }
     if (WIFSIGNALED(status)) {
       fprintf(stderr, "Failed to reap git: killed by %d\n", WTERMSIG(status));
-      fail = true;
+      failed = true;
     } else if (WEXITSTATUS(status)) {
       fprintf(stderr, "Failed to reap git: exited with %d\n", WEXITSTATUS(status));
-      fail = true;
+      failed = true;
     }
+  if (failed) {
+    return {};
   }
-  return str.str();
+
+  return wcl::make_some<std::string>(str.str());
 }
 
-static std::vector<std::string> scan_git(int dirfd) {
-  std::vector<std::string> files;
+static std::vector<std::string> scan_git(int dirfd, const char *const *argv) {
+  wcl::optional<std::string> fileStr = slurp(dirfd, argv);
 
-  bool failed;
-  static const char *fileArgs[] = {"git", "ls-files", "-z", "--recurse-submodules", nullptr};
-  std::string fileStr(slurp(dirfd, &fileArgs[0], failed));
-
-  if (failed) {
+  if (!fileStr) {
     fprintf(stderr, "Failed to discover source files from git\n");
     exit(1);
   }
 
-  const char *tok = fileStr.data();
-  const char *end = tok + fileStr.size();
+  const char *tok = fileStr->data();
+  const char *end = tok + fileStr->size();
+
+  std::vector<std::string> files;
 
   for (const char *scan = tok; scan != end; ++scan) {
-    if (*scan == 0 && scan != tok) {
-      files.emplace_back(tok);
+    if (*scan == '\n' && scan != tok) {
+      files.emplace_back(tok, scan);
       tok = scan + 1;
     }
   }
@@ -284,12 +290,17 @@ bool find_all_sources(Runtime &runtime, bool workspace) {
   if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1) fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
 
   std::vector<std::string> sources;
+  std::vector<std::string> lfs_sources;
 
   // Source discovery requires git
   struct stat unused;
   if (stat(".git", &unused) == 0) {
-    sources = scan_git(dirfd);
+    static const char *git_files[] = {"git", "ls-files", "--recurse-submodules", nullptr};
+    sources = scan_git(dirfd,&git_files[0]);
     std::sort(sources.begin(), sources.end());
+    static const char *git_lfs_files[] = {"git", "lfs", "ls-files", "--name-only", nullptr};
+    lfs_sources = scan_git(dirfd,&git_lfs_files[0]);
+    std::sort(lfs_sources.begin(), lfs_sources.end());
   }
 
   size_t need = Record::reserve(sources.size());
