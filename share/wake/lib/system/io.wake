@@ -30,9 +30,23 @@ export tuple Permission =
     Execute: Boolean
 
 export def perm2bits (perm: Permission) =
-    def b3 = if getPermissionRead perm then 4 else 0
-    def b2 = if getPermissionWrite perm then 2 else 0
-    def b1 = if getPermissionExecute perm then 1 else 0
+    def b3 =
+        if getPermissionRead perm then
+            4
+        else
+            0
+
+    def b2 =
+        if getPermissionWrite perm then
+            2
+        else
+            0
+
+    def b1 =
+        if getPermissionExecute perm then
+            1
+        else
+            0
 
     b1 + b2 + b3
 
@@ -41,26 +55,26 @@ export def bits2perm (bits: Integer) =
     def b2 = 2 == and bits 2
     def b1 = 1 == and bits 1
 
-    Permission b3 b2 b1 
+    Permission b3 b2 b1
 
-export tuple Mode = 
+export tuple Mode =
     User: Permission
     Group: Permission
     Other: Permission
 
 export def bits2mode (bits: Integer) =
-   def otherBits = and bits 7
-   def groupBits = and (bits >> 3) 7
-   def userBits = and (bits >> 6) 7
+    def otherBits = and bits 7
+    def groupBits = and (bits >> 3) 7
+    def userBits = and (bits >> 6) 7
 
-   Mode (bits2perm userBits) (bits2perm groupBits) (bits2perm otherBits)
+    Mode (bits2perm userBits) (bits2perm groupBits) (bits2perm otherBits)
 
 export def mode2bits (mode: Mode) =
-   def otherBits = perm2bits mode.getModeOther
-   def groupBits = perm2bits mode.getModeGroup << 3
-   def userBits = perm2bits mode.getModeUser << 6
+    def otherBits = perm2bits mode.getModeOther
+    def groupBits = perm2bits mode.getModeGroup << 3
+    def userBits = perm2bits mode.getModeUser << 6
 
-   otherBits + groupBits + userBits
+    otherBits + groupBits + userBits
 
 export tuple Stat =
     Type: PathType
