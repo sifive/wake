@@ -342,11 +342,15 @@ export def hashString (x: String): String =
 
     hashStr x
 
+# Returns the string given but with all upper case letters converted
+# to lower case
 export def toLower (x: String): String =
     def lower x = prim "tolower"
 
     lower x
 
+# Returns the string given but with all lower case letters converted
+# to upper case
 export def toUpper (x: String): String =
     def upper x = prim "toupper"
 
