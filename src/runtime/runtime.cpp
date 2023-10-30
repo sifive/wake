@@ -53,7 +53,8 @@ Runtime::Runtime(Profile *profile_, int profile_heap, double heap_factor)
       heap(profile_heap, heap_factor),
       stack(heap.root<Work>(nullptr)),
       output(heap.root<HeapObject>(nullptr)),
-      sources(heap.root<HeapObject>(nullptr)) {
+      sources(heap.root<HeapObject>(nullptr)),
+      lfs_sources(heap.root<HeapObject>(nullptr)) {
   if (profile) {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));

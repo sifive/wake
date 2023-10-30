@@ -303,6 +303,12 @@ bool find_all_sources(Runtime &runtime, bool workspace) {
     std::sort(lfs_sources.begin(), lfs_sources.end());
   }
 
+  std::cerr << "lfs:" << std::endl;
+  for (auto f : lfs_sources) {
+      std::cerr << "  " << f << std::endl;
+  }
+
+  {
   size_t need = Record::reserve(sources.size());
   for (auto &x : sources) need += String::reserve(x.size());
   runtime.heap.guarantee(need);
@@ -312,10 +318,31 @@ bool find_all_sources(Runtime &runtime, bool workspace) {
     out->at(i)->instant_fulfill(String::claim(runtime.heap, sources[i]));
 
   runtime.sources = out;
+  }
+
+  {
+  size_t need = Record::reserve(lfs_sources.size());
+  for (auto &x : lfs_sources) need += String::reserve(x.size());
+  runtime.heap.guarantee(need);
+
+  Record *out = Record::claim(runtime.heap, &Constructor::array, lfs_sources.size());
+  for (size_t i = 0; i < out->size(); ++i)
+    out->at(i)->instant_fulfill(String::claim(runtime.heap, lfs_sources[i]));
+
+  runtime.lfs_sources = out;
+  }
   return true;
 }
 
 static PRIMTYPE(type_sources) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(Data::typeString);
+  return args.size() == 2 && args[0]->unify(Data::typeString) && args[1]->unify(Data::typeRegExp) &&
+         out->unify(list);
+}
+
+static PRIMTYPE(type_lfs_sources) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(Data::typeString);
@@ -335,6 +362,35 @@ static PRIMFN(prim_sources) {
   long skip = 0;
   Promise *low = runtime.sources->at(0);
   Promise *high = low + runtime.sources->size();
+
+  std::string root = wcl::make_canonical(arg0->as_str());
+  if (root != ".") {
+    auto prefixL = root + "/";
+    auto prefixH = root + "0";  // '/' + 1 = '0'
+    skip = root.size() + 1;
+    low = std::lower_bound(low, high, prefixL, promise_lexical);
+    high = std::lower_bound(low, high, prefixH, promise_lexical);
+  }
+
+  std::vector<Value *> found;
+  for (Promise *i = low; i != high; ++i) {
+    String *s = i->coerce<String>();
+    re2::StringPiece piece(s->c_str() + skip, s->size() - skip);
+    if (RE2::FullMatch(piece, *arg1->exp)) found.push_back(s);
+  }
+
+  runtime.heap.reserve(reserve_list(found.size()));
+  RETURN(claim_list(runtime.heap, found.size(), found.data()));
+}
+
+static PRIMFN(prim_lfs_sources) {
+  EXPECT(2);
+  STRING(arg0, 0);
+  REGEXP(arg1, 1);
+
+  long skip = 0;
+  Promise *low = runtime.lfs_sources->at(0);
+  Promise *high = low + runtime.lfs_sources->size();
 
   std::string root = wcl::make_canonical(arg0->as_str());
   if (root != ".") {
@@ -503,6 +559,7 @@ void prim_register_sources(PrimMap &pmap) {
   // Sources do not change after wake starts
   prim_register(pmap, "add_sources", prim_add_sources, type_add_sources, PRIM_PURE);
   prim_register(pmap, "sources", prim_sources, type_sources, PRIM_PURE);
+  prim_register(pmap, "lfs_sources", prim_lfs_sources, type_lfs_sources, PRIM_PURE);
   // Simple functions
   prim_register(pmap, "simplify", prim_simplify, type_simplify, PRIM_PURE);
   prim_register(pmap, "relative", prim_relative, type_relative, PRIM_PURE);

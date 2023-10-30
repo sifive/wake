@@ -135,24 +135,51 @@ export def claim (file: String): Result Path Error =
     # Finally if the file is inside of wake's workspace and can't be sourced we're in the clear
     raw_claim relPath
 
+# Pull the lfs source paths from the runtime.
+def lfs_sources (dir: String) (filterRegexp: RegExp): List String =
+    def scan dir regexp = prim "lfs_sources"
+    scan dir filterRegexp
+
 # Find sources files
 export def sources (dir: String) (filterRegexp: RegExp): Result (List Path) Error =
     def scan dir regexp = prim "sources"
 
-    match got_sources
-        True ->
-            scan dir filterRegexp
-            | findFailFn raw_source
-        False -> unreachable "add_sources always returns True"
+    require True = got_sources
+    else unreachable "add_sources always returns True"
+
+    def fetch file =
+        def job =
+            makeExecPlan ("git", "lfs", "pull", "-I", file, "-X", "''", Nil) Nil
+            | setPlanLabel "git lfs fetch: {file}"
+            | setPlanPersistence ReRun
+            | setPlanEnvironment Nil
+           # | setPlanFnOutputs (file, _)
+            | runJobWith localRunner
+
+        require True = job.isJobOk
+        else failWithError "Failed to fetch git lfs file"
+
+        raw_source file
+
+    def lfs_raw_sources =
+        lfs_sources dir filterRegexp
+        | map fetch
+
+    def raw_sources =
+        scan dir filterRegexp
+        | map raw_source
+
+    raw_sources ++ lfs_raw_sources
+    | findFail
 
 export def show _ =
+     # TODO: make this more narrow otherwise wake gets grumpy
      require Pass items = sources "." `.*`
+
 
      def _ =
          items
-         | map (\x println x.getPathName)
-
-     def _ = println "c: {items | len | format}"
+         | map (\x x | format | println)
 
      Pass Unit
 

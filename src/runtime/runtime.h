@@ -50,6 +50,7 @@ struct Runtime {
   RootPointer<Work> stack;
   RootPointer<HeapObject> output;
   RootPointer<Record> sources;  // Vector String
+  RootPointer<Record> lfs_sources;  // Vector String
 
   Runtime(Profile *profile_, int profile_heap, double heap_factor);
   ~Runtime();
