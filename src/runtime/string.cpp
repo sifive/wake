@@ -517,16 +517,6 @@ static PRIMFN(prim_sNFKC) {
   RETURN(out.copy(runtime.heap));
 }
 
-static PRIMFN(prim_scaseNFKC) {
-  EXPECT(1);
-  STRING(arg0, 0);
-
-  UTF8Out out(arg0, UTF8PROC_COMPOSE | UTF8PROC_COMPAT | UTF8PROC_IGNORE | UTF8PROC_LUMP |
-                        UTF8PROC_CASEFOLD | UTF8PROC_REJECTNA);
-
-  RETURN(out.copy(runtime.heap));
-}
-
 static PRIMTYPE(type_code2str) {
   return args.size() == 1 && args[0]->unify(Data::typeInteger) && out->unify(Data::typeString);
 }

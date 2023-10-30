@@ -223,11 +223,15 @@ export def unicodeIdentifier (str: String): String =
 
     p str
 
-# unicodeLowercase: eliminate case distinctions; C => c
+# unicodeLowercase: converts upper case codepoints to thier lower case counterparts
 export def unicodeLowercase (str: String): String =
-    def p s = prim "scaseNFKC"
+    def p s = prim "tolower"
 
     p str
+
+# unicodeUppercase: converts lower case codepoints to their upper case counterparts
+export def unicodeUppercase (str: String): String =
+    def p s = prim "toupper"
 
 # sortStrings: sort a list of strings as a human would judge them.
 export def sortStrings (list: List String): List String =
@@ -341,17 +345,3 @@ export def hashString (x: String): String =
     def hashStr x = prim "hash_str"
 
     hashStr x
-
-# Returns the string given but with all upper case letters converted
-# to lower case
-export def toLower (x: String): String =
-    def lower x = prim "tolower"
-
-    lower x
-
-# Returns the string given but with all lower case letters converted
-# to upper case
-export def toUpper (x: String): String =
-    def upper x = prim "toupper"
-
-    upper x
