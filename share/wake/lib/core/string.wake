@@ -341,3 +341,13 @@ export def hashString (x: String): String =
     def hashStr x = prim "hash_str"
 
     hashStr x
+
+export def toLower (x: String): String =
+    def lower x = prim "tolower"
+
+    lower x
+
+export def toUpper (x: String): String =
+    def upper x = prim "toupper"
+
+    upper x

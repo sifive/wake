@@ -680,6 +680,56 @@ static PRIMFN(prim_hash_str) {
   RETURN(String::alloc(runtime.heap, std::move(hex)));
 }
 
+static PRIMTYPE(type_to_upper) {
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeString);
+}
+
+static PRIMFN(prim_to_upper) {
+  EXPECT(1);
+  STRING(str, 0);
+
+  const char *in = str->c_str();
+  ssize_t in_size = str->length;
+  std::string out;
+  while (in_size > 0) {
+    int32_t codepoint = 0;
+    ssize_t size = utf8proc_iterate(reinterpret_cast<const uint8_t *>(in), in_size, &codepoint);
+    in += size;
+    in_size -= size;
+    int32_t upper = utf8proc_toupper(codepoint);
+    char buf[4] = {0};
+    ssize_t bytes = utf8proc_encode_char(upper, reinterpret_cast<uint8_t *>(buf));
+    out.insert(out.end(), buf, buf + bytes);
+  }
+
+  RETURN(String::alloc(runtime.heap, std::move(out)));
+}
+
+static PRIMTYPE(type_to_lower) {
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeString);
+}
+
+static PRIMFN(prim_to_lower) {
+  EXPECT(1);
+  STRING(str, 0);
+
+  const char *in = str->c_str();
+  ssize_t in_size = str->length;
+  std::string out;
+  while (in_size > 0) {
+    int32_t codepoint = 0;
+    ssize_t size = utf8proc_iterate(reinterpret_cast<const uint8_t *>(in), in_size, &codepoint);
+    in += size;
+    in_size -= size;
+    int32_t upper = utf8proc_tolower(codepoint);
+    char buf[4] = {0};
+    ssize_t bytes = utf8proc_encode_char(upper, reinterpret_cast<uint8_t *>(buf));
+    out.insert(out.end(), buf, buf + bytes);
+  }
+
+  RETURN(String::alloc(runtime.heap, std::move(out)));
+}
+
 void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "strlen", prim_strlen, type_strlen, PRIM_PURE);
   prim_register(pmap, "vcat", prim_vcat, type_vcat, PRIM_PURE);
@@ -710,4 +760,6 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "write", prim_write, type_write, PRIM_IMPURE);
   prim_register(pmap, "read", prim_read, type_read, PRIM_ORDERED);
   prim_register(pmap, "breadcrumb", prim_breadcrumb, type_breadcrumb, PRIM_IMPURE);
+  prim_register(pmap, "toupper", prim_to_upper, type_to_upper, PRIM_PURE);
+  prim_register(pmap, "tolower", prim_to_lower, type_to_lower, PRIM_PURE);
 }
