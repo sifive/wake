@@ -233,6 +233,8 @@ export def unicodeLowercase (str: String): String =
 export def unicodeUppercase (str: String): String =
     def p s = prim "toupper"
 
+    p str
+
 # sortStrings: sort a list of strings as a human would judge them.
 export def sortStrings (list: List String): List String =
     sortBy (_ <=>~ _) list
