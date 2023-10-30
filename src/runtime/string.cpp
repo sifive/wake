@@ -734,7 +734,6 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "scmp", prim_scmp, type_scmp, PRIM_PURE);
   prim_register(pmap, "sNFC", prim_sNFC, type_normalize, PRIM_PURE);
   prim_register(pmap, "sNFKC", prim_sNFKC, type_normalize, PRIM_PURE);
-  prim_register(pmap, "scaseNFKC", prim_scaseNFKC, type_normalize, PRIM_PURE);
   prim_register(pmap, "code2str", prim_code2str, type_code2str, PRIM_PURE);
   prim_register(pmap, "bin2str", prim_bin2str, type_code2str, PRIM_PURE);
   prim_register(pmap, "str2code", prim_str2code, type_str2code, PRIM_PURE);
