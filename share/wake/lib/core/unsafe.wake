@@ -36,7 +36,7 @@ export def makeUnsafe (v: a): Unsafe a =
 #   unsafeMap (_ + 10) (makeUnsafe 10) = makeUnsafe 20
 # ```
 export def unsafeMap (f: a => b) (x: Unsafe a): Unsafe b =
-    unsafeBind x (f _ | makeUnsafe)
+    unsafeFlatMap (f _ | makeUnsafe) x
 
 # Implements application of an unsafe function to an unsafe value.
 # This allows functions that do not take unsafe values to be applied
@@ -57,7 +57,7 @@ export def unsafeMap (f: a => b) (x: Unsafe a): Unsafe b =
 #   | unsafeApp (makeUnsafe "bar")
 # ```
 export def unsafeApp (f: Unsafe (a => b)) (x: Unsafe a): Unsafe b =
-    unsafeBind f (unsafeMap _ x)
+    unsafeFlatMap (unsafeMap _ x) f
 
 # Lets you turn an function returning an unsafe value into a unsafe function
 # that returns a safe value. This let's you use these functions more naturally
@@ -68,18 +68,20 @@ export def unsafeApp (f: Unsafe (a => b)) (x: Unsafe a): Unsafe b =
 # ```
 #   def unsafeFiles = ...
 #   def unsafeRunner = ...
-#   (unsafeSubsume unsafeFiles).unsafeBind (\files
-#   unsafeRunner.unsafeBind (\runner
-#     makePlan ...
-#     | setPlanFnOutputs (\_ files outputDir)
-#     | runJobWith runner
+#   (unsafeSubsume unsafeFiles)
+#   | unsafeFlatMap (\files
+#     unsafeRunner
+#     | unsafeFlatMap (\runner
+#       makePlan ...
+#       | setPlanFnOutputs (\_ files outputDir)
+#       | runJobWith runner
 #   ))
 # ```
 export def unsafeSubsume (f: a => Unsafe b): Unsafe (a => b) =
     makeUnsafe (\x (f x).getUnsafeValue)
 
 # Takes a function returning an unsafe value, and maps it over an unsafe
-# value, flattening out the double unsafe before returning. This is equivlent
+# value, flattening out the double unsafe before returning. This is equivalent
 # to first using unsafeMap and then calling unsafeFlatten. This might not
 # sound that useful but it winds up being the primary way that unsafe
 # code is composed. It lets you chain multiple unsafe operations togethor
@@ -94,20 +96,6 @@ export def unsafeSubsume (f: a => Unsafe b): Unsafe (a => b) =
 #   ) unsafeRunner
 # ```
 export def unsafeFlatMap (f: a => Unsafe b) (x: Unsafe a): Unsafe b =
-    unsafeBind x f
-
-# Takes an unsafe value and pipes it through a function returning an
-# an unsafe value. This is equivlient to unsafeFlatMap with its
-# arguments reversed. This can be nice to have over unsafeFlatMap
-# for syntatic reasons. You can think of it as "binding" the unsafe
-# value to the argument of the function. This is particularlly
-# nice when a lambda is used for the function argument.
-#
-# Example:
-# ```
-#   x.unsafeBind (\x y.unsafeBind (\y f x y))
-# ```
-export def unsafeBind (x: Unsafe a) (f: a => Unsafe b): Unsafe b =
     f x.getUnsafeValue
 
 # This unwraps a double unsafe into a single unsafe. This sort of type
@@ -123,7 +111,8 @@ export def unsafeFlatten (x: Unsafe (Unsafe a)): Unsafe a =
 # with a pattern match but this can lead to branch expolsion if you have too
 # many cases to deal with.
 export def unsafeRMap (f: a => Unsafe (Result b c)) (x: Unsafe (Result a c)): Unsafe (Result b c) =
-    x.unsafeBind (
+    x
+    | unsafeFlatMap (
         match _
             Pass v -> f v
             Fail e -> makeUnsafe (Fail e)
@@ -133,7 +122,8 @@ export def unsafeRMap (f: a => Unsafe (Result b c)) (x: Unsafe (Result a c)): Un
 # possible unsafe values you may sometimes find it useful to turn to this function
 # instead.
 export def unsafeOMap (f: a => Unsafe (Option b)) (x: Unsafe (Option a)): Unsafe (Option b) =
-    x.unsafeBind (
+    x
+    | unsafeFlatMap (
         match _
             Some v -> f v
             None -> makeUnsafe None
