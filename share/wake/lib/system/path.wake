@@ -179,7 +179,7 @@ def computeHashes (prefix: String) (files: List String): List String =
     def add f h = prim "add_hash"
 
     def hashPlan cmd vis =
-        Plan "<hash>" cmd vis Nil "." "" logNever logError logDebug ReRun Nil hashUsage id id False
+        Plan "<hash>" cmd vis Nil "." "" logNever Nil logError Nil logDebug ReRun Nil hashUsage id id False
 
     def stdin_file_path = "to_hash.{prefix}.stdin"
 
@@ -240,7 +240,7 @@ target hashcode (f: String): String =
         reuse
     else
         def hashPlan cmd =
-            Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun Nil hashUsage id id False
+            Plan "" cmd Nil Nil "." "" logNever Nil logError Nil logDebug ReRun Nil hashUsage id id False
 
         def job =
             hashPlan ("<hash>", f, Nil)
@@ -259,7 +259,7 @@ target hashcode (f: String): String =
 # Allow an untracked file to be removed via `wake --clean`
 export target markFileCleanable (filepath: String): Result Unit Error =
     def hashPlan cmd =
-        Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun Nil hashUsage id id False
+        Plan "" cmd Nil Nil "." "" logNever Nil logError Nil logDebug ReRun Nil hashUsage id id False
 
     def job =
         hashPlan ("<hash>", filepath, Nil)
