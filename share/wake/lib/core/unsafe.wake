@@ -1,0 +1,132 @@
+# Copyright 2023 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package wake
+
+tuple Unsafe a =
+    Value: a
+
+# Unwraps an unsafe value into a safe value. This should only
+# be used if there is good reason to escape the unsafe monad
+# and a comment should be given explaining why this should be
+# considered safe.
+export def unsafe_avoid_using_run (x: Unsafe a): a =
+    x.getUnsafeValue
+
+# Turns an safe value into an unsafe value
+export def makeUnsafe (v: a): Unsafe a =
+    Unsafe v
+
+# maps a safe function over an unsafe value.
+#
+# Examples:
+# ```
+#   unsafeMap (_ + 10) (makeUnsafe 10) = makeUnsafe 20
+# ```
+export def unsafeMap (f: a => b) (x: Unsafe a): Unsafe b =
+    unsafeFlatMap (f _ | makeUnsafe) x
+
+# Implements application of an unsafe function to an unsafe value.
+# This allows functions that do not take unsafe values to be applied
+# to unsafe values. The effect works well with currying so it
+# allows one to chain the applications. This especially useful
+# for constructing tuples from unsafe values
+#
+# Example:
+# ```
+#   tuple MyTuple =
+#      MyString: String
+#      MyInteger: Integer
+#      MyOtherString: String
+#
+#   makeUnsafe MyTuple
+#   | unsafeApp (makeUnsafe "foo")
+#   | unsafeApp (makeUnsafe 10)
+#   | unsafeApp (makeUnsafe "bar")
+# ```
+export def unsafeApp (f: Unsafe (a => b)) (x: Unsafe a): Unsafe b =
+    unsafeFlatMap (unsafeMap _ x) f
+
+# Lets you turn an function returning an unsafe value into a unsafe function
+# that returns a safe value. This let's you use these functions more naturally
+# in tricky locations like inside of higher order functions with the wrong
+# type.
+#
+# Example:
+# ```
+#   def unsafeFiles = ...
+#   def unsafeRunner = ...
+#   (unsafeSubsume unsafeFiles)
+#   | unsafeFlatMap (\files
+#     unsafeRunner
+#     | unsafeFlatMap (\runner
+#       makePlan ...
+#       | setPlanFnOutputs (\_ files outputDir)
+#       | runJobWith runner
+#   ))
+# ```
+export def unsafeSubsume (f: a => Unsafe b): Unsafe (a => b) =
+    makeUnsafe (\x (f x).getUnsafeValue)
+
+# Takes a function returning an unsafe value, and maps it over an unsafe
+# value, flattening out the double unsafe before returning. This is equivalent
+# to first using unsafeMap and then calling unsafeFlatten. This might not
+# sound that useful but it winds up being the primary way that unsafe
+# code is composed. It lets you chain multiple unsafe operations togethor
+# in such a way that you can access their pure values inside the mapping
+# function. unsafeFlatMap is unseful in a pipe sequence of unsafe operations.
+#
+# ```
+#   def myUnsafeRunner = ...
+#   unsafeFlatMap (\runner
+#     makePlan "unsafe" Nil "echo foo > foo.txt; echo bar > bar.txt"
+#     | setPlanFnOutputs runner
+#   ) unsafeRunner
+# ```
+export def unsafeFlatMap (f: a => Unsafe b) (x: Unsafe a): Unsafe b =
+    f x.getUnsafeValue
+
+# This unwraps a double unsafe into a single unsafe. This sort of type
+# will sometimes appear when mapping a function returning an unsafe value
+# over a safe value. Consider using unsafeFlatMap in that case instead.
+export def unsafeFlatten (x: Unsafe (Unsafe a)): Unsafe a =
+    unsafeFlatMap (\x x) x
+
+# unsafeRMap functions just like rmap but its use is more often required
+# than rmap. This is because while rmap's can often be replaced with a
+# require in Wake, unsafe results cannot be used with require. In order
+# to cope with this however we can use unsafeRMap. You could use unsafeFlatMap
+# with a pattern match but this can lead to branch expolsion if you have too
+# many cases to deal with.
+export def unsafeRMap (f: a => Unsafe (Result b c)) (x: Unsafe (Result a c)): Unsafe (Result b c) =
+    x
+    | unsafeFlatMap (
+        match _
+            Pass v -> f v
+            Fail e -> makeUnsafe (Fail e)
+    )
+
+# unsafeOMap functions like omap but for unsafe values. Since using require is not
+# possible unsafe values you may sometimes find it useful to turn to this function
+# instead.
+export def unsafeOMap (f: a => Unsafe (Option b)) (x: Unsafe (Option a)): Unsafe (Option b) =
+    x
+    | unsafeFlatMap (
+        match _
+            Some v -> f v
+            None -> makeUnsafe None
+    )
+
+from wake export type Unsafe
