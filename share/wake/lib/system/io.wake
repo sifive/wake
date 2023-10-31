@@ -68,8 +68,8 @@ target writeImp inputs mode path content =
 
     # If all those checks pass we go ahead and perform the write. The write will
     # overwrite single files but it will not overwrite a whole directory with a file.
-    makeExecPlan ("<write>", str mode, path, Nil) inputs
-    | setPlanLabel "write: {path} {str mode}"
+    makeExecPlan ("<write>", "0{strOctal mode}", path, Nil) inputs
+    | setPlanLabel "write: {path} 0{strOctal mode}"
     | setPlanOnce False
     | setPlanEnvironment Nil
     | runJobWith writeRunner
