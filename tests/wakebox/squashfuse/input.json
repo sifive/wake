@@ -1,6 +1,7 @@
 {
   "command": [
-    "/bin/bash", "/tmp/squashfs/foo.sh"
+    "/bin/bash",
+    "/tmp/squashfs/foo.sh"
   ],
   "foo": 97,
   "environment": [
@@ -15,7 +16,7 @@
   "mount-ops": [
     {
       "type": "squashfs",
-      "source": "pass.squashfs"
+      "source": "tmp/pass.squashfs"
     }
   ],
   "visible": []

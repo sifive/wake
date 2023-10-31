@@ -8,13 +8,10 @@ export PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:$WAKE_BIN_DIR"
 set -ex
 
 # Preserve original directory location
-TEST_DIR="$PWD"
-INPUT_JSON="$TEST_DIR/input.json"
-RESULT_JSON="$TEST_DIR/result.json"
-
-# Create a temp build dir
-TMPDIR=$(mktemp -d)
-cd "$TMPDIR"
+INPUT_JSON="input.json"
+RESULT_JSON="result.json"
+TMPDIR="tmp"
+mkdir tmp
 
 # Remove temp build dir on error or exit.
 cleanup () {
@@ -36,10 +33,15 @@ echo "/tmp/squashfs" > "$SQUASH_ROOT_DIR/.wakebox/mountpoint"
 
 mksquashfs "$SQUASH_ROOT_DIR" "$SQUASHFS_FILENAME" -comp xz -all-root -noappend -no-xattrs
 
+tree
+
 # Run the test
 "$WAKE_BIN_DIR/wakebox" -p "$INPUT_JSON" -o "$RESULT_JSON" --isolate-retcode
 
 # Check result
 [ "$(jq .usage.status "$RESULT_JSON")" -ne 97 ] && exit 98
+
+# Cleanup
+rm $RESULT_JSON
 
 exit 0
