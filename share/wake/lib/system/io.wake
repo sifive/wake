@@ -15,6 +15,106 @@
 
 package wake
 
+# The file type a path known to wake.
+#
+# Most Paths will be regular files, sylinks, or directories. Paths to other types are generally
+# not well supported by wake.
+export data PathType =
+    PathTypeRegularFile
+    PathTypeDirectory
+    PathTypeCharacterDevice
+    PathTypeBlockDevice
+    PathTypeFifo
+    PathTypeSymlink
+    PathTypeSocket
+
+# The various flags of a given file permission.
+export tuple Permission =
+    # The actor may read the file.
+    Read: Boolean
+    # The actor may write to the file.
+    Write: Boolean
+    # The actor may execute the file.
+    Execute: Boolean
+
+# Converts a Permission tuple to a masked Linux permission bit field.
+#
+# perm2bits (Permission False True True) -> 3
+# perm2bits (Permission True True False) -> 6
+export def perm2bits (perm: Permission) =
+    def b3 = if perm.getPermissionRead then 4 else 0
+    def b2 = if perm.getPermissionWrite then 2 else 0
+    def b1 = if perm.getPermissionExecute then 1 else 0
+
+    b1 + b2 + b3
+
+# Converts a masked Linux permission bit field to a Permission tuple
+#
+# bits2perm 3 -> (Permission False True True)
+# bits2perm 6 -> (Permission True True False)
+export def bits2perm (bits: Integer) =
+    def b3 = 4 == and bits 4
+    def b2 = 2 == and bits 2
+    def b1 = 1 == and bits 1
+
+    Permission b3 b2 b1
+
+# The full permission set of a given Path
+export tuple Mode =
+    User: Permission
+    Group: Permission
+    Other: Permission
+
+# Converts an unmasked permission bit field into a Mode tuple
+#
+# bits2mode 365 -> Mode (Permission True False True) (Permission True False True) (Permission True False True)
+export def bits2mode (bits: Integer) =
+    def otherBits = and bits 7
+    def groupBits = and (bits >> 3) 7
+    def userBits = and (bits >> 6) 7
+
+    Mode (bits2perm userBits) (bits2perm groupBits) (bits2perm otherBits)
+
+#  Converts Mode tuple into an unmasked permission bit field
+#
+# mode2bits Mode (Permission True False True) (Permission True False True) (Permission True False True) -> 365
+export def mode2bits (mode: Mode) =
+    def otherBits = perm2bits mode.getModeOther
+    def groupBits = perm2bits mode.getModeGroup << 3
+    def userBits = perm2bits mode.getModeUser << 6
+
+    otherBits + groupBits + userBits
+
+# The system Stat of a given Path
+export tuple Stat =
+    # The Path's file type
+    Type: PathType
+    # The Path's complete permissions
+    Mode: Mode
+    # The size in bytes of the Path's content
+    SizeBytes: Integer
+
+def statTypeNumberToPathType (inodeType: Integer): PathType = match inodeType
+    0 -> PathTypeRegularFile
+    1 -> PathTypeDirectory
+    2 -> PathTypeCharacterDevice
+    3 -> PathTypeBlockDevice
+    4 -> PathTypeFifo
+    5 -> PathTypeSymlink
+    6 -> PathTypeSocket
+    _ -> unreachable "stat returned invalid file type"
+
+# Returns the system Stat for a given path
+export target stat (path: Path): Result Stat Error =
+    def imp p = prim "stat"
+
+    require Pass (Pair size (Pair inodeType mode)) =
+        imp path.getPathName
+        | rmapError makeError
+
+    Stat (statTypeNumberToPathType inodeType) (bits2mode mode) size
+    | Pass
+
 # Read the file contents of a Path
 export def read (path: Path): Result String Error =
     def imp p = prim "read"

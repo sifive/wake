@@ -192,6 +192,86 @@ static PRIMFN(prim_breadcrumb) {
   RETURN(claim_unit(runtime.heap));
 }
 
+static PRIMTYPE(type_stat) {
+  TypeVar result;
+  TypeVar p1;
+  TypeVar p2;
+  Data::typePair.clone(p1);
+  Data::typePair.clone(p2);
+  Data::typeResult.clone(result);
+  p2[0].unify(Data::typeInteger);
+  p2[1].unify(Data::typeInteger);
+  p1[0].unify(Data::typeInteger);
+  p1[1].unify(p2);
+  result[0].unify(p1);
+  result[1].unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(result);
+}
+
+static PRIMFN(prim_stat) {
+  EXPECT(1);
+  STRING(path, 0);
+
+  size_t max_error = path->size() + 100;
+
+  struct stat buf;
+  if (stat(path->c_str(), &buf) < 0) {
+    std::stringstream str;
+    str << "stat " << path->c_str() << ": " << strerror(errno);
+    std::string s = str.str();
+
+    size_t len = std::min(s.size(), max_error);
+    String *out = String::claim(runtime.heap, s.c_str(), len);
+    RETURN(claim_result(runtime.heap, false, out));
+  }
+
+  int mode = 0;
+  mode |= !!(buf.st_mode & S_IXOTH) << 0;
+  mode |= !!(buf.st_mode & S_IWOTH) << 1;
+  mode |= !!(buf.st_mode & S_IROTH) << 2;
+  mode |= !!(buf.st_mode & S_IXGRP) << 3;
+  mode |= !!(buf.st_mode & S_IWGRP) << 4;
+  mode |= !!(buf.st_mode & S_IRGRP) << 5;
+  mode |= !!(buf.st_mode & S_IXUSR) << 6;
+  mode |= !!(buf.st_mode & S_IWUSR) << 7;
+  mode |= !!(buf.st_mode & S_IRUSR) << 8;
+
+  int type = -1;
+  switch (buf.st_mode & S_IFMT) {
+    case S_IFREG:
+      type = 0;
+      break;
+    case S_IFDIR:
+      type = 1;
+      break;
+    case S_IFCHR:
+      type = 2;
+      break;
+    case S_IFBLK:
+      type = 3;
+      break;
+    case S_IFIFO:
+      type = 4;
+      break;
+    case S_IFLNK:
+      type = 5;
+      break;
+    case S_IFSOCK:
+      type = 6;
+      break;
+  }
+
+  runtime.heap.reserve(reserve_result() + Integer::reserve(mode) + Integer::reserve(type) +
+                       Integer::reserve(buf.st_size) + 2 * reserve_tuple2());
+  auto mode_out = Integer::claim(runtime.heap, mode);
+  auto type_out = Integer::claim(runtime.heap, type);
+  auto size_out = Integer::claim(runtime.heap, buf.st_size);
+  auto p1 = claim_tuple2(runtime.heap, type_out, mode_out);
+  auto p2 = claim_tuple2(runtime.heap, size_out, p1);
+
+  RETURN(claim_result(runtime.heap, true, p2));
+}
+
 static PRIMFN(prim_read) {
   EXPECT(1);
   STRING(path, 0);
@@ -751,4 +831,5 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "breadcrumb", prim_breadcrumb, type_breadcrumb, PRIM_IMPURE);
   prim_register(pmap, "toupper", prim_to_upper, type_to_upper, PRIM_PURE);
   prim_register(pmap, "tolower", prim_to_lower, type_to_lower, PRIM_PURE);
+  prim_register(pmap, "stat", prim_stat, type_stat, PRIM_ORDERED);
 }
