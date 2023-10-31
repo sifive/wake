@@ -223,7 +223,7 @@ export def unicodeIdentifier (str: String): String =
 
     p str
 
-# unicodeLowercase: converts upper case codepoints to thier lower case counterparts
+# unicodeLowercase: converts upper case codepoints to their lower case counterparts
 export def unicodeLowercase (str: String): String =
     def p s = prim "tolower"
 
