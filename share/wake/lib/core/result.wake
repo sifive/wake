@@ -95,13 +95,12 @@ export def rmap (fn: a => b): Result a fail => Result b fail = match _
     Pass a -> Pass (fn a)
     Fail f -> Fail f
 
-# rmapError: apply a function to a Failing-ing result
+# rmapError: apply a function to a Fail-ing result
 #
 #   rmapError (_+1) (Pass 123) = Pass 123
 #   rmapError (_+1) (Fail 123) = Fail 124
-export def rmapError (fn: a => b): Result c a => Result c b = match _
-    Pass a -> Pass a
-    Fail f -> Fail (fn f)
+export def rmapError (fn: a => b): Result c a => Result c b =
+    rmapFail (fn _ | Fail)
 
 # rmapPass: apply a Fail-able function to a Pass-ing result
 # If you find yourself using the function, consider using require instead.
