@@ -34,6 +34,7 @@
 #include <unordered_set>
 
 #include "status.h"
+#include "wcl/iterator.h"
 
 // Increment every time the database schema changes
 #define SCHEMA_VERSION "6"
@@ -75,6 +76,7 @@ struct Database::detail {
   sqlite3_stmt *find_last_use;
   sqlite3_stmt *find_failed;
   sqlite3_stmt *find_label;
+  sqlite3_stmt *find_tag;
   sqlite3_stmt *fetch_hash;
   sqlite3_stmt *delete_jobs;
   sqlite3_stmt *delete_dups;
@@ -127,6 +129,7 @@ struct Database::detail {
         find_last_use(0),
         find_failed(0),
         find_label(0),
+        find_tag(0),
         fetch_hash(0),
         delete_jobs(0),
         delete_dups(0),
@@ -425,6 +428,15 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "s.membytes, s.ibytes, s.obytes"
       " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
       " where j.label like ? order by j.job_id";
+  const char *sql_find_tag =
+      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
+      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
+      "s.membytes, s.ibytes, s.obytes"
+      " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id "
+      "inner join tags t on j.job_id = t.job_id"
+      " where t.uri like ? AND t.content like ? order by j.job_id";
+
+  // const char *sql_get_tags = "select job_id, uri, content from tags where job_id=?";
   const char *sql_fetch_hash = "select hash from files where path=? and modified=?";
   const char *sql_delete_jobs =
       "delete from jobs where job_id in"
@@ -533,6 +545,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_find_last_use, find_last_use);
   PREPARE(sql_find_failed, find_failed);
   PREPARE(sql_find_label, find_label);
+  PREPARE(sql_find_tag, find_tag);
   PREPARE(sql_fetch_hash, fetch_hash);
   PREPARE(sql_delete_jobs, delete_jobs);
   PREPARE(sql_delete_dups, delete_dups);
@@ -598,6 +611,7 @@ void Database::close() {
   FINALIZE(find_last_use);
   FINALIZE(find_failed);
   FINALIZE(find_label);
+  FINALIZE(find_tag);
   FINALIZE(fetch_hash);
   FINALIZE(delete_jobs);
   FINALIZE(delete_dups);
@@ -1289,13 +1303,13 @@ std::vector<JobReflection> Database::last_exe() { return find_all(this, imp->fin
 
 std::vector<JobReflection> Database::last_use() { return find_all(this, imp->find_last_use); }
 
-std::vector<JobReflection> Database::labels_matching(const std::string glob) {
+std::vector<JobReflection> Database::labels_matching(const std::string &glob) {
   const char *why = "Could not bind args";
   bind_string(why, imp->find_label, 1, glob);
   return find_all(this, imp->find_label);
 }
 
-std::vector<JobReflection> Database::job_ids_matching(const std::string glob) {
+std::vector<JobReflection> Database::job_ids_matching(const std::string &glob) {
   const char *why = "Could not bind args";
   bind_string(why, imp->find_job, 1, glob);
   return find_all(this, imp->find_job);
@@ -1306,6 +1320,24 @@ std::vector<JobReflection> Database::files_matching(const std::string &glob, int
   bind_string(why, imp->find_owner, 1, glob);
   bind_integer(why, imp->find_owner, 2, use);
   return find_all(this, imp->find_owner);
+}
+
+std::vector<JobReflection> Database::tags_matching(const std::string &uri_glob,
+                                                   const std::string &content_glob) {
+  const char *why = "Could not bind args";
+  bind_string(why, imp->find_tag, 1, uri_glob);
+  bind_string(why, imp->find_tag, 2, content_glob);
+  return find_all(this, imp->find_tag);
+}
+
+std::vector<JobReflection> Database::tags_matching(const std::string &glob) {
+  std::vector<std::string> parts = wcl::split_by_fn(
+      '=', glob.begin(), glob.end(), [](auto a, auto b) { return std::string(a, b); });
+  if (parts.size() != 2) {
+    std::cerr << "Tag query must have exactly one '=' per tag" << std::endl;
+    return {};
+  }
+  return tags_matching(parts[0], parts[1]);
 }
 
 std::vector<JobEdge> Database::get_edges() {

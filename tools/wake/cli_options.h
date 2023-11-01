@@ -71,7 +71,6 @@ struct CommandLineOptions {
   const char *exec;
   char *shebang;
   const char *tagdag;
-  const char *tag;
   const char *api;
   const char *fd1;
   const char *fd2;
@@ -88,6 +87,7 @@ struct CommandLineOptions {
   std::vector<std::vector<std::string>> input_files = {};
   std::vector<std::vector<std::string>> output_files = {};
   std::vector<std::vector<std::string>> labels = {};
+  std::vector<std::vector<std::string>> tags = {};
 
   int argc;
   char **argv;
@@ -98,6 +98,7 @@ struct CommandLineOptions {
     std::vector<char *> input_files_buffer(argc_in, nullptr);
     std::vector<char *> output_files_buffer(argc_in, nullptr);
     std::vector<char *> labels_buffer(argc_in, nullptr);
+    std::vector<char *> tags_buffer(argc_in, nullptr);
 
     // clang-format off
     struct option options[] {
@@ -122,6 +123,7 @@ struct CommandLineOptions {
       {'i', "input", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, input_files_buffer.data(), (unsigned int)argc_in},
       {'o', "output", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, output_files_buffer.data(), (unsigned int)argc_in},
       {0, "label", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, labels_buffer.data(), (unsigned int)argc_in},
+      {0, "tag", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, tags_buffer.data(), (unsigned int)argc_in},
       {'l', "last", GOPT_ARGUMENT_FORBIDDEN},
       {0, "last-used", GOPT_ARGUMENT_FORBIDDEN},
       {0, "last-executed", GOPT_ARGUMENT_FORBIDDEN},
@@ -143,7 +145,6 @@ struct CommandLineOptions {
       {0, "stop-after-ssa", GOPT_ARGUMENT_FORBIDDEN},
       {0, "no-optimize", GOPT_ARGUMENT_FORBIDDEN},
       {0, "tag-dag", GOPT_ARGUMENT_REQUIRED},
-      {0, "tag", GOPT_ARGUMENT_REQUIRED},
       {0, "export-api", GOPT_ARGUMENT_REQUIRED},
       {0, "stdout", GOPT_ARGUMENT_REQUIRED},
       {0, "stderr", GOPT_ARGUMENT_REQUIRED},
@@ -209,7 +210,6 @@ struct CommandLineOptions {
     exec = arg(options, "exec")->argument;
     shebang = arg(options, "shebang")->argument;
     tagdag = arg(options, "tag-dag")->argument;
-    tag = arg(options, "tag")->argument;
     api = arg(options, "export-api")->argument;
     fd1 = arg(options, "stdout")->argument;
     fd2 = arg(options, "stderr")->argument;
@@ -265,6 +265,13 @@ struct CommandLineOptions {
       std::vector<std::string> parts = wcl::split_by_fn(
           ',', line.begin(), line.end(), [](auto a, auto b) { return std::string(a, b); });
       labels.emplace_back(std::move(parts));
+    }
+
+    for (unsigned int i = 0; i < arg(options, "tag")->count; i++) {
+      std::string line(tags_buffer[i]);
+      std::vector<std::string> parts = wcl::split_by_fn(
+          ',', line.begin(), line.end(), [](auto a, auto b) { return std::string(a, b); });
+      tags.emplace_back(std::move(parts));
     }
 
     if (!percent_str) {
