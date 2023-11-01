@@ -435,8 +435,6 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id "
       "inner join tags t on j.job_id = t.job_id"
       " where t.uri like ? AND t.content like ? order by j.job_id";
-
-  // const char *sql_get_tags = "select job_id, uri, content from tags where job_id=?";
   const char *sql_fetch_hash = "select hash from files where path=? and modified=?";
   const char *sql_delete_jobs =
       "delete from jobs where job_id in"
