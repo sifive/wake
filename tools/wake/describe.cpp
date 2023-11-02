@@ -212,7 +212,17 @@ void describe_human(const std::vector<JobReflection> &jobs) {
   std::ostream out(&tbuf);
   for (size_t i = 0; i < jobs.size(); i++) {
     const auto &job = jobs[i];
-    out << term_colour(TERM_GREEN) << "# " << job.label << "(" << job.job << ")\n";
+    out << term_colour(TERM_GREEN) << "# " << job.label << " (" << job.job << ")";
+
+    if (!job.tags.empty()) {
+      out << " [";
+      for (auto &tag : job.tags) {
+        out << tag.uri << "=" << tag.content << ",";
+      }
+      out << "]";
+    }
+
+    out << "\n";
     out << term_normal() << "$ " << term_colour(TERM_CYAN);
     for (size_t i = 0; i < job.commandline.size(); i++) {
       const auto &cmd_part = job.commandline[i];
@@ -244,12 +254,6 @@ void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy) {
     }
     case DescribePolicy::HUMAN: {
       describe_human(jobs);
-      break;
-    }
-    case DescribePolicy::TAG_URI: {
-      for (auto &job : jobs)
-        for (auto &tag : job.tags)
-          if (tag.uri == policy.tag_uri) std::cout << tag.content << std::endl;
       break;
     }
     case DescribePolicy::METADATA: {

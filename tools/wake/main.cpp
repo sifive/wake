@@ -149,10 +149,6 @@ DescribePolicy get_describe_policy(const CommandLineOptions &clo) {
     return DescribePolicy::script();
   }
 
-  if (clo.tag) {
-    return DescribePolicy::tag_url(clo.tag);
-  }
-
   return DescribePolicy::human();
 }
 
@@ -190,6 +186,12 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
     intersected_job_ids =
         apply_inspection_query(captured_jobs, std::move(intersected_job_ids), clo.labels,
                                [&](auto a) { return db.labels_matching(a); });
+  }
+
+  if (!clo.tags.empty()) {
+    intersected_job_ids =
+        apply_inspection_query(captured_jobs, std::move(intersected_job_ids), clo.tags,
+                               [&](auto a) { return db.tags_matching(a); });
   }
 
   if (clo.last_use) {
@@ -406,8 +408,8 @@ int main(int argc, char **argv) {
   }
 
   bool is_db_inspection = !clo.job_ids.empty() || !clo.output_files.empty() ||
-                          !clo.input_files.empty() || !clo.labels.empty() || clo.last_use ||
-                          clo.last_exe || clo.failed || clo.tagdag;
+                          !clo.input_files.empty() || !clo.labels.empty() || !clo.tags.empty() ||
+                          clo.last_use || clo.last_exe || clo.failed || clo.tagdag;
   // Arguments are forbidden with these options
   bool noargs =
       is_db_inspection || clo.init || clo.html || clo.global || clo.exports || clo.api || clo.exec;

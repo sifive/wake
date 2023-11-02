@@ -24,17 +24,10 @@
 #include "runtime/database.h"
 
 struct DescribePolicy {
-  enum type { TAG_URI, SCRIPT, HUMAN, METADATA, DEBUG, VERBOSE } type;
+  enum type { SCRIPT, HUMAN, METADATA, DEBUG, VERBOSE } type;
   union {
     const char *tag_uri;
   };
-
-  static DescribePolicy tag_url(const char *tag_uri) {
-    DescribePolicy policy;
-    policy.type = TAG_URI;
-    policy.tag_uri = tag_uri;
-    return policy;
-  }
 
   static DescribePolicy script() {
     DescribePolicy policy;
