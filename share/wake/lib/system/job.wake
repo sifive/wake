@@ -112,10 +112,10 @@ export tuple Plan =
     export Stdin: String
     # How should standard output be displayed during a build
     export Stdout: LogLevel
-    # The workspace-relative paths to which the stdout will be appended
-    export TeeStdout: List String
     # How should standard error be displayed during a build
     export Stderr: LogLevel
+    # The workspace-relative paths to which the stdout will be appended
+    export TeeStdout: List String
     # The workspace-relative paths to which the stderr will be appended
     export TeeStderr: List String
     # Echo the command to this stream
@@ -279,7 +279,7 @@ def bToInt b =
 
 # Set reasonable defaults for all Plan arguments
 export def makeExecPlan (cmd: List String) (visible: List Path): Plan =
-    Plan "" cmd visible environment "." "" logInfo Nil logWarning Nil logEcho Share Nil defaultUsage id id False
+    Plan "" cmd visible environment "." "" logInfo logWarning Nil Nil logEcho Share Nil defaultUsage id id False
 
 export def makeShellPlan (script: String) (visible: List Path): Plan =
     makeExecPlan (which "dash", "-c", script, Nil) visible
@@ -575,8 +575,8 @@ export def virtualRunner: Runner =
 def implode l =
     cat (foldr (_, "\0", _) Nil l)
 
-def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo stdout teeout stderr teeerr label isatty: Job =
-    def create label dir stdin env cmd signature visible keep echo stdout teeoutFlat stderr teeerrFlat isatty =
+def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echoLevel stdoutLevel stderrLevel stdoutFiles stderrFiles label isatty: Job =
+    def create label dir stdin env cmd signature visible keep echoLevel stdoutLevel stderrLevel stdoutFilesFlat stderrFilesFlat isatty =
         prim "job_create"
 
     def finish job inputs outputs all_outputs status runtime cputime membytes ibytes obytes =
@@ -586,8 +586,11 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
     def cache dir stdin env cmd signature visible isatty = prim "job_cache"
     def signature cmd res fni fno keep = prim "hash"
     def hash = signature cmd res finputs foutputs keep
-    def teeoutFlat = catWith "\0" teeout
-    def teeerrFlat = catWith "\0" teeerr
+
+    def catTeeFiles paths = catWith "\0" paths
+
+    def stdoutFilesFlat = catTeeFiles stdoutFiles
+    def stderrFilesFlat = catTeeFiles stderrFiles
 
     def build Unit =
         def visStrings = map getPathName vis
@@ -602,11 +605,11 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
             hash
             visStrings.implode
             (bToInt keep)
-            echo
-            stdout
-            teeoutFlat
-            stderr
-            teeerrFlat
+            echoLevel
+            stdoutLevel
+            stderrLevel
+            stdoutFilesFlat
+            stderrFilesFlat
             (bToInt isatty)
 
         def prefix = str (getJobId job)
@@ -663,10 +666,10 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
                 Pair Nil last -> confirm False last (build Unit)
 
 # Only run if the first four arguments differ
-target runOnce cmd env dir stdin vis isatty run \ res usage finputs foutputs keep echo stdout teeout stderr teeerr label =
-    runAlways cmd env dir stdin res usage finputs foutputs vis keep run echo stdout teeout stderr teeerr label isatty
+target runOnce cmd env dir stdin vis isatty run \ res usage finputs foutputs keep echoLevel stdoutLevel stderrLevel stdoutFiles stderrFiles label =
+    runAlways cmd env dir stdin res usage finputs foutputs vis keep run echoLevel stdoutLevel stderrLevel stdoutFiles stderrFiles label isatty
 
-export def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) teeout (LogLevel stderr) teeerr isatty =
+export def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) (LogLevel stderr) stdoutFiles stderrFiles isatty =
     if isOnce pers then
         runOnce
         cmd
@@ -683,9 +686,9 @@ export def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers
         (isKeep pers)
         echo
         stdout
-        teeout
         stderr
-        teeerr
+        stdoutFiles
+        stderrFiles
         label
     else
         runAlways
@@ -702,14 +705,14 @@ export def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers
         run
         echo
         stdout
-        teeout
         stderr
-        teeerr
+        stdoutFiles
+        stderrFiles
         label
         isatty
 
-export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout teeout stderr teeerr echo pers res usage finputs foutputs isatty) =
-    runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run echo stdout teeout stderr teeerr isatty
+export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdoutLevel stderrLevel stdoutFiles stderrFiles echoLevel pers res usage finputs foutputs isatty) =
+    runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run echoLevel stdoutLevel stderrLevel stdoutFiles stderrFiles isatty
 
 # Set the value of a tag on a Job
 # This is useful for post-build reflection into the database

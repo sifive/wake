@@ -106,9 +106,8 @@ struct Job final : public GCObject<Job, Value> {
   bool keep;
   std::string echo;
   std::string stream_out;
-  std::vector<std::string> tee_out;
   std::string stream_err;
-  std::vector<std::string> tee_err;
+  std::string stdout_files, stderr_files;
   HeapPointer<Value> bad_launch;
   HeapPointer<Value> bad_finish;
   double pathtime;
@@ -127,8 +126,8 @@ struct Job final : public GCObject<Job, Value> {
   HeapPointer<Continuation> q_report;   // waken once job finished (inputs+outputs+report available)
 
   Job(Database *db_, String *label_, String *dir_, String *stdin_file_, String *environ,
-      String *cmdline_, bool keep, const char *echo, const char *stream_out, std::vector<std::string> tee_out,
-      const char *stream_err, std::vector<std::string> tee_err);
+      String *cmdline_, bool keep, const char *echo, const char *stream_out,
+      const char *stream_err, std::string stdout_files, std::string stderr_files);
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg);
@@ -278,20 +277,20 @@ struct JobEntry {
   std::string echo_line;
   std::list<Status>::iterator status;
   std::unique_ptr<std::streambuf> stdout_linebuf;
-  std::vector<std::unique_ptr<std::ofstream>> stdout_teefiles;
   std::unique_ptr<std::streambuf> stderr_linebuf;
+  std::vector<std::unique_ptr<std::ofstream>> stdout_teefiles;
   std::vector<std::unique_ptr<std::ofstream>> stderr_teefiles;
 
   JobEntry(JobTable::detail *imp_, RootPointer<Job> &&job_, std::unique_ptr<std::streambuf> stdout,
-           std::vector<std::unique_ptr<std::ofstream>> stdout_teefiles_, std::unique_ptr<std::streambuf> stderr, std::vector<std::unique_ptr<std::ofstream>> stderr_teefiles_)
+           std::unique_ptr<std::streambuf> stderr, std::vector<std::unique_ptr<std::ofstream>> stdout_teefiles_, std::vector<std::unique_ptr<std::ofstream>> stderr_teefiles_)
       : imp(imp_),
         job(std::move(job_)),
         pid(0),
         pipe_stdout(-1),
         pipe_stderr(-1),
         stdout_linebuf(std::move(stdout)),
-        stdout_teefiles(std::move(stdout_teefiles_)),
         stderr_linebuf(std::move(stderr)),
+        stdout_teefiles(std::move(stdout_teefiles_)),
         stderr_teefiles(std::move(stderr_teefiles_)) {}
   ~JobEntry();
 
@@ -831,17 +830,21 @@ static void launch(JobTable *jobtable) {
       err = std::make_unique<NullBuf>();
     }
 
-    auto stdout_teefiles = std::vector<std::unique_ptr<std::ofstream>>();
-    for (auto tee_path : task.job->tee_out) {
-      stdout_teefiles.push_back(std::make_unique<std::ofstream>(tee_path, std::ios::out | std::ios::app));
+    auto stdout_files = split_null(task.job->stdout_files);
+    auto stdout_tee_streams = std::vector<std::unique_ptr<std::ofstream>>();
+    for (int i = 0; stdout_files[i]; ++i) {
+      stdout_tee_streams.push_back(std::make_unique<std::ofstream>(stdout_files[i], std::ios::out | std::ios::app));
     }
-    auto stderr_teefiles = std::vector<std::unique_ptr<std::ofstream>>();
-    for (auto tee_path : task.job->tee_err) {
-      stderr_teefiles.push_back(std::make_unique<std::ofstream>(tee_path, std::ios::out | std::ios::app));
+    auto stderr_files = split_null(task.job->stdout_files);
+    auto stderr_tee_streams = std::vector<std::unique_ptr<std::ofstream>>();
+    for (int i = 0; stderr_files[i]; ++i) {
+      stderr_tee_streams.push_back(std::make_unique<std::ofstream>(stderr_files[i], std::ios::out | std::ios::app));
     }
+    delete[] stdout_files;
+    delete[] stderr_files;
 
     std::shared_ptr<JobEntry> entry = std::make_shared<JobEntry>(
-        jobtable->imp.get(), std::move(task.job), std::move(out), std::move(stdout_teefiles), std::move(err), std::move(stderr_teefiles));
+        jobtable->imp.get(), std::move(task.job), std::move(out), std::move(err), std::move(stdout_tee_streams), std::move(stderr_tee_streams));
 
     int stdout_stream[2];
     int stderr_stream[2];
@@ -1110,8 +1113,8 @@ bool JobTable::wait(Runtime &runtime) {
 }
 
 Job::Job(Database *db_, String *label_, String *dir_, String *stdin_file_, String *environ,
-         String *cmdline_, bool keep_, const char *echo_, const char *stream_out_, std::vector<std::string> tee_out_,
-         const char *stream_err_, std::vector<std::string> tee_err_)
+         String *cmdline_, bool keep_, const char *echo_, const char *stream_out_,
+         const char *stream_err_, std::string stdout_files_, std::string stderr_files_)
     : db(db_),
       label(label_),
       cmdline(cmdline_),
@@ -1124,9 +1127,9 @@ Job::Job(Database *db_, String *label_, String *dir_, String *stdin_file_, Strin
       keep(keep_),
       echo(echo_),
       stream_out(stream_out_),
-      tee_out(tee_out_),
       stream_err(stream_err_),
-      tee_err(tee_err_) {
+      stdout_files(stdout_files_),
+      stderr_files(stderr_files_) {
   start.tv_sec = stop.tv_sec = 0;
   start.tv_nsec = stop.tv_nsec = 0;
 
@@ -1326,22 +1329,6 @@ static PRIMTYPE(type_job_create) {
          args[13]->unify(Data::typeInteger) && out->unify(Data::typeJob);
 }
 
-std::vector<std::string> null_sep_list(const std::string &str) {
-  size_t pos = 0;
-  std::vector<std::string> out = std::vector<std::string>();
-  do {
-    size_t next = str.find('\0', pos);
-    if (next == std::string::npos) {
-      out.push_back(str.substr(pos));
-      break;
-    } else {
-      out.push_back(str.substr(pos, next - pos));
-    }
-    pos = next + 1;
-  } while (pos < str.size());
-  return out;
-}
-
 static PRIMFN(prim_job_create) {
   JobTable *jobtable = static_cast<JobTable *>(data);
   EXPECT(14);
@@ -1355,21 +1342,18 @@ static PRIMFN(prim_job_create) {
   INTEGER_MPZ(keep, 7);
   STRING(echo, 8);
   STRING(stream_out, 9);
-  STRING(tee_out_flat, 10);
-  STRING(stream_err, 11);
-  STRING(tee_err_flat, 12);
+  STRING(stream_err, 10);
+  STRING(stdout_files, 11);
+  STRING(stderr_files, 12);
   INTEGER_MPZ(is_atty, 13);
 
   Hash hash;
   REQUIRE(mpz_sizeinbase(signature, 2) <= 8 * sizeof(hash.data));
   mpz_export(&hash.data[0], 0, 1, sizeof(hash.data[0]), 0, 0, signature);
 
-  std::vector<std::string> tee_out = null_sep_list(tee_out_flat->as_str());
-  std::vector<std::string> tee_err = null_sep_list(tee_err_flat->as_str());
-
   Job *out =
       Job::alloc(runtime.heap, jobtable->imp->db, label, dir, stdin_file, env, cmd,
-                 mpz_cmp_si(keep, 0), echo->c_str(), stream_out->c_str(), tee_out, stream_err->c_str(), tee_err);
+                 mpz_cmp_si(keep, 0), echo->c_str(), stream_out->c_str(), stream_err->c_str(), stdout_files->as_str(), stderr_files->as_str());
 
   out->record = jobtable->imp->db->predict_job(out->code.data[0], &out->pathtime);
 
@@ -1448,7 +1432,7 @@ static PRIMFN(prim_job_cache) {
   Value *joblist;
   if (reuse.found && !jobtable->imp->check) {
     Job *jobp = Job::claim(runtime.heap, jobtable->imp->db, dir, dir, stdin_file, env, cmd, true,
-                           STREAM_ECHO, STREAM_INFO, std::vector<std::string>(), STREAM_WARNING, std::vector<std::string>());
+                           STREAM_ECHO, STREAM_INFO, STREAM_WARNING, "", "");
     jobp->state = STATE_FORKED | STATE_STDOUT | STATE_STDERR | STATE_MERGED | STATE_FINISHED;
     jobp->job = job;
     jobp->record = reuse;

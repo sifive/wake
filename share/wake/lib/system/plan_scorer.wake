@@ -25,7 +25,7 @@ publish runner =
 
 # Run a job, via a Runner chosen based on 'score' functions.
 export def runJob (p: Plan): Job = match p
-    Plan label cmd vis env dir stdin stdout teeout stderr teeerr echo pers res usage finputs foutputs isatty ->
+    Plan label cmd vis env dir stdin stdoutLevel stderrLevel stdoutFiles stderrFiles echoLevel pers res usage finputs foutputs isatty ->
         def implode l = cat (foldr (_, "\0", _) Nil l)
         def bToInt b = if b then 1 else 0
 
@@ -50,18 +50,18 @@ export def runJob (p: Plan): Job = match p
 
         match (opts | foldl best (Pair 0.0 None) | getPairSecond)
             Some r ->
-                runJobImp label cmd env dir stdin res usage finputs foutputs vis pers r echo stdout teeout stderr teeerr isatty
+                runJobImp label cmd env dir stdin res usage finputs foutputs vis pers r echoLevel stdoutLevel stderrLevel stdoutFiles stderrFiles isatty
             None ->
-                def create label dir stdin env cmd signature visible keep echo stdout teeoutFlat stderr teeerrFlat isatty =
+                def create label dir stdin env cmd signature visible keep echoLevel stdoutLevel stderrLevel stdoutFilesFlat stderrFilesFlat isatty =
                     prim "job_create"
 
                 def badfinish job e = prim "job_fail_finish"
                 def badlaunch job e = prim "job_fail_launch"
-                def teeoutFlat = catWith "\0" teeout
-                def teeerrFlat = catWith "\0" teeerr
+                def stdoutFilesFlat = catWith "\0" stdoutFiles
+                def stderrFilesFlat = catWith "\0" stderrFiles
 
                 def job =
-                    create label dir stdin env.implode cmd.implode 0 "" 0 "echo" "info" teeoutFlat "error" teeerrFlat (bToInt isatty)
+                    create label dir stdin env.implode cmd.implode 0 "" 0 "echo" "info" stdoutFilesFlat "error" stderrFilesFlat (bToInt isatty)
 
                 def error =
                     def pretty = match _
