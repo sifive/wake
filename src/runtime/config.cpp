@@ -212,13 +212,10 @@ POLICY_STATIC_DEFINES(VersionPolicy)
 POLICY_STATIC_DEFINES(LogHeaderPolicy)
 POLICY_STATIC_DEFINES(LogHeaderSourceWidthPolicy)
 POLICY_STATIC_DEFINES(LabelFilterPolicy)
-POLICY_STATIC_DEFINES(SharedCacheMaxSize)
-POLICY_STATIC_DEFINES(SharedCacheLowSize)
 POLICY_STATIC_DEFINES(SharedCacheMissOnFailure)
 POLICY_STATIC_DEFINES(LogHeaderAlignPolicy)
 POLICY_STATIC_DEFINES(BulkLoggingDirPolicy)
-POLICY_STATIC_DEFINES(SharedCacheEvictionPolicy)
-POLICY_STATIC_DEFINES(SharedCacheTTL)
+POLICY_STATIC_DEFINES(EvictionConfigPolicy)
 
 /********************************************************************
  * Non-Trivial Defaults
@@ -258,20 +255,6 @@ void LogHeaderSourceWidthPolicy::set(LogHeaderSourceWidthPolicy& p, const JAST& 
   }
 }
 
-void SharedCacheMaxSize::set(SharedCacheMaxSize& p, const JAST& json) {
-  auto json_max_cache_size = json.expect_integer();
-  if (json_max_cache_size) {
-    p.max_cache_size = *json_max_cache_size;
-  }
-}
-
-void SharedCacheLowSize::set(SharedCacheLowSize& p, const JAST& json) {
-  auto json_low_cache_size = json.expect_integer();
-  if (json_low_cache_size) {
-    p.low_cache_size = *json_low_cache_size;
-  }
-}
-
 void SharedCacheMissOnFailure::set(SharedCacheMissOnFailure& p, const JAST& json) {
   auto json_shared_cache_miss_on_failure = json.expect_boolean();
   if (json_shared_cache_miss_on_failure) {
@@ -293,20 +276,33 @@ void BulkLoggingDirPolicy::set(BulkLoggingDirPolicy& p, const JAST& json) {
   }
 }
 
-void SharedCacheTTL::set(SharedCacheTTL& p, const JAST& json) {
-  auto json_ttl = json.expect_integer();
-  if (json_ttl) {
-    p.time_to_live = *json_ttl;
+void EvictionConfigPolicy::set(EvictionConfigPolicy& p, const JAST& json) {
+  auto type = json.get_opt("type");
+  if (!type) {
+    return;
+  }
+  auto type_str = (*type)->expect_string();
+  if (!type_str) {
+    return;
+  }
+  if (*type_str == "ttl") {
+    auto json_ttl = json.get("seconds_to_live").expect_integer();
+    if (json_ttl) {
+      p.eviction_config.ttl.seconds_to_live = *json_ttl;
+      p.eviction_config.type = job_cache::EvictionPolicyType::TTL;
+    }
+  }
+
+  if (*type_str == "lru") {
+    auto json_low = json.get("low_cache_size").expect_integer();
+    auto json_max = json.get("max_cache_size").expect_integer();
+    if (json_low && json_max) {
+      p.eviction_config.lru.low_size = *json_low;
+      p.eviction_config.lru.max_size = *json_max;
+      p.eviction_config.type = job_cache::EvictionPolicyType::LRU;
+    }
   }
 }
-
-void SharedCacheEvictionPolicy::set(SharedCacheEvictionPolicy& p, const JAST& json) {
-  auto json_policy = json.expect_string();
-  if (json_policy) {
-    p.eviction_policy = *json_policy;
-  }
-}
-
 
 /********************************************************************
  * Core Implementation

@@ -56,10 +56,10 @@ struct TTLEvictionPolicyImpl {
       "delete from jobs where create_time < ?";
 
   TTLEvictionPolicyImpl(std::string dir, std::shared_ptr<job_cache::Database> db)
-    : cache_dir(dir),
-      transact(db),
-      jobs_older_than(db, jobs_older_than_query),
-      remove_jobs_older_than(db, remove_jobs_older_than_query) {}
+      : cache_dir(dir),
+        transact(db),
+        jobs_older_than(db, jobs_older_than_query),
+        remove_jobs_older_than(db, remove_jobs_older_than_query) {}
 
   void cleanup(int64_t seconds_to_live) {
     std::vector<std::pair<int64_t, std::string>> jobs_to_remove;
@@ -423,23 +423,28 @@ LRUEvictionPolicy::~LRUEvictionPolicy() {}
 void TTLEvictionPolicy::init(const std::string& cache_dir) {
   std::shared_ptr<job_cache::Database> db = std::make_unique<job_cache::Database>(cache_dir);
   impl = std::make_unique<TTLEvictionPolicyImpl>(cache_dir, db);
+  impl->cleanup(seconds_to_live);
 
   // To keep this thread alive, we assign it to a static thread object.
   // This starts the collection but if the programs ends so too will this thread.
   gc_thread = std::thread(garbage_collect_orphan_folders, db);
 }
 
-void TTLEvictionPolicy::read(int job_id) { }
+void TTLEvictionPolicy::read(int job_id) {}
 
 void TTLEvictionPolicy::write(int job_id) {
-  impl->cleanup(seconds_to_live);
+    static time_t time_of_last_cleanup = 0;
+    time_t current = time(nullptr);
+    // We spend a bit of time seeing if we even need to clean anything up
+    if (current - time_of_last_cleanup > 5) {
+      impl->cleanup(seconds_to_live);
+      time_of_last_cleanup = current;
+    }
 }
 
-TTLEvictionPolicy::TTLEvictionPolicy(uint64_t seconds_to_live)
-    : seconds_to_live(seconds_to_live) {}
+TTLEvictionPolicy::TTLEvictionPolicy(uint64_t seconds_to_live) : seconds_to_live(seconds_to_live) {}
 
 TTLEvictionPolicy::~TTLEvictionPolicy() {}
-
 
 int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> policy) {
   policy->init(cache_dir);
