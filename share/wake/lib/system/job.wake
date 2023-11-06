@@ -587,10 +587,12 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echoLev
     def signature cmd res fni fno keep = prim "hash"
     def hash = signature cmd res finputs foutputs keep
 
-    def catTeeFiles paths = catWith "\0" paths
-
-    def stdoutFilesFlat = catTeeFiles stdoutFiles
-    def stderrFilesFlat = catTeeFiles stderrFiles
+    def catTeeFiles paths =
+        # Null byte added here rather than via `catWith "\0"` in order to have a null byte after the
+        # *final* path as well, as required by `split_null`.
+        map ("{simplify _}\0") paths
+        | distinctBy scmp
+        | cat
 
     def build Unit =
         def visStrings = map getPathName vis
@@ -608,8 +610,8 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echoLev
             echoLevel
             stdoutLevel
             stderrLevel
-            stdoutFilesFlat
-            stderrFilesFlat
+            (catTeeFiles stdoutFiles)
+            (catTeeFiles stderrFiles)
             (bToInt isatty)
 
         def prefix = str (getJobId job)

@@ -107,7 +107,7 @@ struct Job final : public GCObject<Job, Value> {
   std::string echo;
   std::string stream_out;
   std::string stream_err;
-  std::string stdout_files, stderr_files;
+  std::string stdout_teefiles, stderr_teefiles;
   HeapPointer<Value> bad_launch;
   HeapPointer<Value> bad_finish;
   double pathtime;
@@ -127,7 +127,7 @@ struct Job final : public GCObject<Job, Value> {
 
   Job(Database *db_, String *label_, String *dir_, String *stdin_file_, String *environ,
       String *cmdline_, bool keep, const char *echo, const char *stream_out,
-      const char *stream_err, std::string stdout_files, std::string stderr_files);
+      const char *stream_err, std::string stdout_teefiles, std::string stderr_teefiles);
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg);
@@ -278,11 +278,11 @@ struct JobEntry {
   std::list<Status>::iterator status;
   std::unique_ptr<std::streambuf> stdout_linebuf;
   std::unique_ptr<std::streambuf> stderr_linebuf;
-  std::vector<std::unique_ptr<std::ofstream>> stdout_teefiles;
-  std::vector<std::unique_ptr<std::ofstream>> stderr_teefiles;
+  std::vector<std::string> stdout_teefiles;
+  std::vector<std::string> stderr_teefiles;
 
   JobEntry(JobTable::detail *imp_, RootPointer<Job> &&job_, std::unique_ptr<std::streambuf> stdout,
-           std::unique_ptr<std::streambuf> stderr, std::vector<std::unique_ptr<std::ofstream>> stdout_teefiles_, std::vector<std::unique_ptr<std::ofstream>> stderr_teefiles_)
+           std::unique_ptr<std::streambuf> stderr, std::vector<std::string> stdout_teefiles_, std::vector<std::string> stderr_teefiles_)
       : imp(imp_),
         job(std::move(job_)),
         pid(0),
@@ -329,6 +329,8 @@ struct JobTable::detail {
   std::unordered_map<int, std::unique_ptr<std::streambuf>> fd_bufs;
   std::unordered_map<int, std::unique_ptr<TermInfoBuf>> term_bufs;
 
+  std::unordered_map<std::string, std::unique_ptr<std::ofstream>> teefiles;
+
   detail() {}
 
   ~detail() {
@@ -344,6 +346,9 @@ struct JobTable::detail {
     }
     for (auto &entry : term_bufs) {
       entry.second.release();
+    }
+    for (auto &entry : teefiles) {
+      entry.second->close();
     }
   }
 
@@ -830,21 +835,27 @@ static void launch(JobTable *jobtable) {
       err = std::make_unique<NullBuf>();
     }
 
-    auto stdout_files = split_null(task.job->stdout_files);
-    auto stdout_tee_streams = std::vector<std::unique_ptr<std::ofstream>>();
-    for (int i = 0; stdout_files[i]; ++i) {
-      stdout_tee_streams.push_back(std::make_unique<std::ofstream>(stdout_files[i], std::ios::out | std::ios::app));
+    auto stdout_teefiles = split_null(task.job->stdout_teefiles);
+    auto stdout_tee_names = std::vector<std::string>();
+    for (int i = 0; stdout_teefiles[i]; ++i) {
+      stdout_tee_names.push_back(stdout_teefiles[i]);
+      if (jobtable->imp->teefiles.find(stdout_teefiles[i]) == jobtable->imp->teefiles.end()) {
+        jobtable->imp->teefiles[stdout_teefiles[i]] = std::make_unique<std::ofstream>(stdout_teefiles[i], std::ios::out | std::ios::trunc);
+      }
     }
-    auto stderr_files = split_null(task.job->stdout_files);
-    auto stderr_tee_streams = std::vector<std::unique_ptr<std::ofstream>>();
-    for (int i = 0; stderr_files[i]; ++i) {
-      stderr_tee_streams.push_back(std::make_unique<std::ofstream>(stderr_files[i], std::ios::out | std::ios::app));
+    auto stderr_teefiles = split_null(task.job->stderr_teefiles);
+    auto stderr_tee_names = std::vector<std::string>();
+    for (int i = 0; stderr_teefiles[i]; ++i) {
+      stderr_tee_names.push_back(stderr_teefiles[i]);
+      if (jobtable->imp->teefiles.find(stderr_teefiles[i]) == jobtable->imp->teefiles.end()) {
+        jobtable->imp->teefiles[stderr_teefiles[i]] = std::make_unique<std::ofstream>(stderr_teefiles[i], std::ios::out | std::ios::trunc);
+      }
     }
-    delete[] stdout_files;
-    delete[] stderr_files;
+    delete[] stdout_teefiles;
+    delete[] stderr_teefiles;
 
     std::shared_ptr<JobEntry> entry = std::make_shared<JobEntry>(
-        jobtable->imp.get(), std::move(task.job), std::move(out), std::move(err), std::move(stdout_tee_streams), std::move(stderr_tee_streams));
+        jobtable->imp.get(), std::move(task.job), std::move(out), std::move(err), std::move(stdout_tee_names), std::move(stderr_tee_names));
 
     int stdout_stream[2];
     int stderr_stream[2];
@@ -993,9 +1004,6 @@ bool JobTable::wait(Runtime &runtime) {
           imp->poll.remove(fd);
           close(fd);
           entry->pipe_stdout = -1;
-          for (auto &tee_fd : entry->stdout_teefiles) {
-            tee_fd->close();
-          }
           entry->status->wait_stdout = false;
           entry->job->state |= STATE_STDOUT;
           runtime.heap.guarantee(WJob::reserve());
@@ -1005,7 +1013,8 @@ bool JobTable::wait(Runtime &runtime) {
           entry->job->db->save_output(entry->job->job, 1, buffer, got, entry->runtime(now));
           if (!imp->batch) {
             entry->stdout_linebuf->sputn(buffer, got);
-            for (auto &tee_fd : entry->stdout_teefiles) {
+            for (auto &teefile : entry->stdout_teefiles) {
+              auto &tee_fd = imp->teefiles.at(teefile);
               tee_fd->write(buffer, got);
             }
           }
@@ -1018,9 +1027,6 @@ bool JobTable::wait(Runtime &runtime) {
           imp->poll.remove(fd);
           close(fd);
           entry->pipe_stderr = -1;
-          for (auto &tee_fd : entry->stderr_teefiles) {
-            tee_fd->close();
-          }
           entry->status->wait_stderr = false;
           entry->job->state |= STATE_STDERR;
           runtime.heap.guarantee(WJob::reserve());
@@ -1030,7 +1036,8 @@ bool JobTable::wait(Runtime &runtime) {
           entry->job->db->save_output(entry->job->job, 2, buffer, got, entry->runtime(now));
           if (!imp->batch) {
             entry->stderr_linebuf->sputn(buffer, got);
-            for (auto &tee_fd : entry->stderr_teefiles) {
+            for (auto &teefile : entry->stderr_teefiles) {
+              auto &tee_fd = imp->teefiles.at(teefile);
               tee_fd->write(buffer, got);
             }
           }
@@ -1114,7 +1121,7 @@ bool JobTable::wait(Runtime &runtime) {
 
 Job::Job(Database *db_, String *label_, String *dir_, String *stdin_file_, String *environ,
          String *cmdline_, bool keep_, const char *echo_, const char *stream_out_,
-         const char *stream_err_, std::string stdout_files_, std::string stderr_files_)
+         const char *stream_err_, std::string stdout_teefiles_, std::string stderr_teefiles_)
     : db(db_),
       label(label_),
       cmdline(cmdline_),
@@ -1128,8 +1135,8 @@ Job::Job(Database *db_, String *label_, String *dir_, String *stdin_file_, Strin
       echo(echo_),
       stream_out(stream_out_),
       stream_err(stream_err_),
-      stdout_files(stdout_files_),
-      stderr_files(stderr_files_) {
+      stdout_teefiles(stdout_teefiles_),
+      stderr_teefiles(stderr_teefiles_) {
   start.tv_sec = stop.tv_sec = 0;
   start.tv_nsec = stop.tv_nsec = 0;
 
@@ -1343,8 +1350,8 @@ static PRIMFN(prim_job_create) {
   STRING(echo, 8);
   STRING(stream_out, 9);
   STRING(stream_err, 10);
-  STRING(stdout_files, 11);
-  STRING(stderr_files, 12);
+  STRING(stdout_teefiles, 11);
+  STRING(stderr_teefiles, 12);
   INTEGER_MPZ(is_atty, 13);
 
   Hash hash;
@@ -1353,7 +1360,7 @@ static PRIMFN(prim_job_create) {
 
   Job *out =
       Job::alloc(runtime.heap, jobtable->imp->db, label, dir, stdin_file, env, cmd,
-                 mpz_cmp_si(keep, 0), echo->c_str(), stream_out->c_str(), stream_err->c_str(), stdout_files->as_str(), stderr_files->as_str());
+                 mpz_cmp_si(keep, 0), echo->c_str(), stream_out->c_str(), stream_err->c_str(), stdout_teefiles->as_str(), stderr_teefiles->as_str());
 
   out->record = jobtable->imp->db->predict_job(out->code.data[0], &out->pathtime);
 
