@@ -1142,11 +1142,12 @@ void DaemonCache::launch_evict_loop() {
     std::unique_ptr<EvictionPolicy> policy;
     switch (config.type) {
       case EvictionPolicyType::TTL:
+        wcl::log::info("Using TTL eviction policy")();
         policy = std::make_unique<TTLEvictionPolicy>(config.ttl.seconds_to_live);
         break;
       case EvictionPolicyType::LRU:
-        policy = std::make_unique<LRUEvictionPolicy>(config.lru.low_size,
-                                                     config.lru.max_size);
+        wcl::log::info("Using LRU eviction policy")();
+        policy = std::make_unique<LRUEvictionPolicy>(config.lru.low_size, config.lru.max_size);
         break;
     }
     int result = eviction_loop(".", std::move(policy));

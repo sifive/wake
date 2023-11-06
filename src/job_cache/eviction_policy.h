@@ -59,7 +59,7 @@ class LRUEvictionPolicy : public EvictionPolicy {
   std::thread gc_thread;
 
  public:
-  explicit LRUEvictionPolicy(uint64_t max_cache_size, uint64_t low_cache_size);
+  explicit LRUEvictionPolicy(uint64_t low_cache_size, uint64_t max_cache_size);
   LRUEvictionPolicy() = delete;
   LRUEvictionPolicy(const LRUEvictionPolicy&) = delete;
   LRUEvictionPolicy(LRUEvictionPolicy&&) = delete;
@@ -77,7 +77,6 @@ struct TTLEvictionPolicyImpl;
 class TTLEvictionPolicy : public EvictionPolicy {
   // We need to touch the database so we use pimpl to hide the implementation
   std::unique_ptr<TTLEvictionPolicyImpl> impl;
-  uint64_t low_cache_size;
   uint64_t seconds_to_live;
   std::thread gc_thread;
 
@@ -93,8 +92,6 @@ class TTLEvictionPolicy : public EvictionPolicy {
   virtual void read(int id) override;
 
   virtual void write(int id) override;
-
-    
 };
 
 int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> policy);

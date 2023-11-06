@@ -66,8 +66,10 @@ struct TTLEvictionPolicyImpl {
     // Compute the deadline, after which we collect everything
     int64_t deadline = current_time_microseconds() - seconds_to_live * 1000000ll;
 
+    wcl::log::info("Performing a cleanup!")();
+
     transact.run([this, &jobs_to_remove, deadline]() {
-      auto reset1 = wcl::make_defer([this]() { jobs_older_than.reset(); });
+      auto reset = wcl::make_defer([this]() { jobs_older_than.reset(); });
       jobs_older_than.bind_integer(1, deadline);
       // First find the use time that we want to remove from
       while (jobs_older_than.step() == SQLITE_ROW) {
@@ -81,7 +83,7 @@ struct TTLEvictionPolicyImpl {
 
       // If there are jobs to remove then we go about actully removing them here
       if (!jobs_to_remove.empty()) {
-        auto reset2 = wcl::make_defer([this]() { remove_jobs_older_than.reset(); });
+        auto reset = wcl::make_defer([this]() { remove_jobs_older_than.reset(); });
         remove_jobs_older_than.bind_integer(1, deadline);
         remove_jobs_older_than.step();
 
@@ -224,6 +226,8 @@ struct LRUEvictionPolicyImpl {
       uint64_t last_use = 0;
       uint64_t to_remove = bytes_to_remove;
       uint64_t removed_so_far = 0;
+
+      wcl::log::info("Cleaning up %lu bytes from %lu total bytes", bytes_to_remove, current_size)();
 
       {
         auto reset1 = wcl::make_defer([this]() { find_least_recently_used.reset(); });
@@ -415,8 +419,10 @@ void LRUEvictionPolicy::write(int job_id) {
   }
 }
 
-LRUEvictionPolicy::LRUEvictionPolicy(uint64_t max, uint64_t low)
-    : max_cache_size(max), low_cache_size(low) {}
+LRUEvictionPolicy::LRUEvictionPolicy(uint64_t low, uint64_t max)
+    : max_cache_size(max), low_cache_size(low) {
+  wcl::log::info("Creating LRU eviction policy, max = %lu, low = %lu", max, low)();
+}
 
 LRUEvictionPolicy::~LRUEvictionPolicy() {}
 
@@ -433,13 +439,13 @@ void TTLEvictionPolicy::init(const std::string& cache_dir) {
 void TTLEvictionPolicy::read(int job_id) {}
 
 void TTLEvictionPolicy::write(int job_id) {
-    static time_t time_of_last_cleanup = 0;
-    time_t current = time(nullptr);
-    // We spend a bit of time seeing if we even need to clean anything up
-    if (current - time_of_last_cleanup > 5) {
-      impl->cleanup(seconds_to_live);
-      time_of_last_cleanup = current;
-    }
+  static time_t time_of_last_cleanup = 0;
+  time_t current = time(nullptr);
+  // We spend a bit of time seeing if we even need to clean anything up
+  if (current - time_of_last_cleanup > 5) {
+    impl->cleanup(seconds_to_live);
+    time_of_last_cleanup = current;
+  }
 }
 
 TTLEvictionPolicy::TTLEvictionPolicy(uint64_t seconds_to_live) : seconds_to_live(seconds_to_live) {}

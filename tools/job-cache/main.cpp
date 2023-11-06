@@ -83,11 +83,6 @@ struct ArgParser {
   }
 };
 
-// argv[0] = program name
-// argv[1] = cache dir
-// argv[2] = bulk cache dir
-// argv[3] = low cache size
-// argv[4] = max cache size
 int main(int argc, char** argv) {
   Argument cache_dir("--cache-dir");
   Argument bulk_logging_dir("--bulk-logging-dir");
@@ -128,7 +123,7 @@ int main(int argc, char** argv) {
   if (*eviction_policy.value == "ttl") {
     if (!seconds_to_live.value) {
       std::cerr << "If the `ttl` eviction policy is selected, " << seconds_to_live.key
-                                                               << " must also be set" << std::endl;
+                << " must also be set" << std::endl;
     }
     try {
       config = job_cache::EvictionConfig::ttl_config(std::stoll(*seconds_to_live.value));
@@ -149,8 +144,8 @@ int main(int argc, char** argv) {
                 << " must also be set";
     }
     try {
-      config =
-          job_cache::EvictionConfig::lru_config(std::stoll(*low_cache_size.value), std::stoll(*max_cache_size.value));
+      config = job_cache::EvictionConfig::lru_config(std::stoll(*low_cache_size.value),
+                                                     std::stoll(*max_cache_size.value));
     } catch (...) {
       std::cerr << "`" << *seconds_to_live.value << "` is not a valid number of seconds"
                 << std::endl;
@@ -160,7 +155,8 @@ int main(int argc, char** argv) {
 
   int status = 1;
   {
-    job_cache::DaemonCache dcache(std::move(*cache_dir.value), std::move(*bulk_logging_dir.value), config);
+    job_cache::DaemonCache dcache(std::move(*cache_dir.value), std::move(*bulk_logging_dir.value),
+                                  config);
     status = dcache.run();
   }
 
