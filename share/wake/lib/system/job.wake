@@ -631,6 +631,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echoLev
 
                 def output =
                     foutputs outputs
+                    | filter (\f !exists (f ==* _) (stdoutFiles ++ stderrFiles))
                     | computeHashes prefix
                     | implode
 
