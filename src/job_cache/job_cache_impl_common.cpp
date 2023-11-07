@@ -274,8 +274,7 @@ void remove_job_backing_files(const std::string &dir, int64_t job_id) {
   rmdir_no_fail(job_dir.c_str());
 }
 
-void remove_backing_files(std::string dir,
-                          std::vector<std::pair<int64_t, std::string>> job_ids,
+void remove_backing_files(std::string dir, std::vector<std::pair<int64_t, std::string>> job_ids,
                           size_t max_number_of_threads) {
   // Calculate a good number of threads to use.
   size_t actual_num_threads = std::min(max_number_of_threads, std::max(1UL, job_ids.size()));

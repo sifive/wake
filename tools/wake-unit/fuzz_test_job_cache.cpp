@@ -409,8 +409,8 @@ TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, bool lru, wcl::xoshiro_
   }
 }
 
-TEST_FUNC(void, fuzz_many_with_ns, int num_procs, const FuzzLoopConfig& config,
-          bool lru, wcl::xoshiro_256 gen) {
+TEST_FUNC(void, fuzz_many_with_ns, int num_procs, const FuzzLoopConfig& config, bool lru,
+          wcl::xoshiro_256 gen) {
   // Note that there will be processes in the o
   bool result = run_as_init_proc([&]() -> int {
     // We want to keep a certain number of processes

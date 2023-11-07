@@ -184,26 +184,19 @@ void Cache::launch_daemon() {
   if (daemonize(cache_dir.c_str())) {
     std::string job_cache = wcl::make_canonical(find_execpath() + "/../bin/job-cache");
     switch (config.type) {
-    case EvictionPolicyType::LRU: {
-      std::string low_str = std::to_string(config.lru.low_size);
-      std::string max_str = std::to_string(config.lru.max_size);
-      execl(job_cache.c_str(), "job-cached",
-            "--cache-dir", cache_dir.c_str(),
-            "--bulk-logging-dir", bulk_logging_dir.c_str(),
-            "--eviction-type", "lru",
-            "--low-cache-size", low_str.c_str(),
-            "--max-cache-size", max_str.c_str(), nullptr);
-      }
-      break;
-    case EvictionPolicyType::TTL: {
-      std::string ttl = std::to_string(config.ttl.seconds_to_live);
-      execl(job_cache.c_str(), "job-cached",
-            "--cache-dir", cache_dir.c_str(),
-            "--bulk-logging-dir", bulk_logging_dir.c_str(),
-            "--eviction-type", "ttl",
-            "--seconds-to-live", ttl.c_str(), nullptr);
-      }
-      break;
+      case EvictionPolicyType::LRU: {
+        std::string low_str = std::to_string(config.lru.low_size);
+        std::string max_str = std::to_string(config.lru.max_size);
+        execl(job_cache.c_str(), "job-cached", "--cache-dir", cache_dir.c_str(),
+              "--bulk-logging-dir", bulk_logging_dir.c_str(), "--eviction-type", "lru",
+              "--low-cache-size", low_str.c_str(), "--max-cache-size", max_str.c_str(), nullptr);
+      } break;
+      case EvictionPolicyType::TTL: {
+        std::string ttl = std::to_string(config.ttl.seconds_to_live);
+        execl(job_cache.c_str(), "job-cached", "--cache-dir", cache_dir.c_str(),
+              "--bulk-logging-dir", bulk_logging_dir.c_str(), "--eviction-type", "ttl",
+              "--seconds-to-live", ttl.c_str(), nullptr);
+      } break;
     }
 
     wcl::log::error("exec(%s): %s", job_cache.c_str(), strerror(errno)).urgent()();
