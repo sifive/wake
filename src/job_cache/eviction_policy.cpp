@@ -50,7 +50,7 @@ struct TTLEvictionPolicyImpl {
   job_cache::PreparedStatement remove_jobs_older_than;
 
   static constexpr const char* jobs_older_than_query =
-      "select job_id, cmd from jobs where create_time < ?";
+      "select job_id, commandline from jobs where create_time < ?";
 
   static constexpr const char* remove_jobs_older_than_query =
       "delete from jobs where create_time < ?";
@@ -442,7 +442,7 @@ void TTLEvictionPolicy::write(int job_id) {
   static time_t time_of_last_cleanup = 0;
   time_t current = time(nullptr);
   // We spend a bit of time seeing if we even need to clean anything up
-  if (current - time_of_last_cleanup > 5) {
+  if (current - time_of_last_cleanup > 1) {
     impl->cleanup(seconds_to_live);
     time_of_last_cleanup = current;
   }
