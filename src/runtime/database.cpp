@@ -37,7 +37,7 @@
 #include "wcl/iterator.h"
 
 // Increment every time the database schema changes
-#define SCHEMA_VERSION "6"
+#define SCHEMA_VERSION "7"
 
 #define VISIBLE 0
 #define INPUT 1
@@ -241,7 +241,6 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "  job_id   integer not null references jobs(job_id) on delete cascade,"
       "  file_id  integer not null references files(file_id),"
       "  unique(job_id, access, file_id) on conflict ignore);"
-      "create index if not exists filesearch on filetree(file_id, access, job_id);"
       "create table if not exists log("
       "  log_id     integer primary key autoincrement,"
       "  job_id     integer not null references jobs(job_id) on delete cascade,"
