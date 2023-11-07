@@ -1,9 +1,5 @@
 #! /bin/sh
 
-if [ $(uname) != Linux ] ; then
-  exit 0
-fi
-
 set -e
 WAKE="${1:+$1/wake}"
 rm wake.db 2> /dev/null || true

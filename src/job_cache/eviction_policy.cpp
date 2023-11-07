@@ -81,7 +81,7 @@ struct TTLEvictionPolicyImpl {
         jobs_to_remove.emplace_back(job_id, std::move(cmd));
       }
 
-      // If there are jobs to remove then we go about actully removing them here
+      // If there are jobs to remove then we go about actually removing them here
       if (!jobs_to_remove.empty()) {
         auto reset = wcl::make_defer([this]() { remove_jobs_older_than.reset(); });
         remove_jobs_older_than.bind_integer(1, deadline);
