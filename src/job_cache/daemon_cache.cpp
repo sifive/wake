@@ -906,7 +906,7 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
 
       // Finally copy the file (as efficently as we can) to
       // the destination.
-      std::string tmp_dst = pair.first + "." + rng.unique_name();
+      std::string tmp_dst = pair.first ".local-cache-tmp." + rng.unique_name();
       copy_or_reflink(tmp_file.c_str(), tmp_dst.c_str(), mode, O_EXCL);
       rename_no_fail(tmp_dst.c_str(), pair.first.c_str());
     }
@@ -927,7 +927,7 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
       mkdir_all(pair.second.begin(), pair.second.end());
 
       // Lastly make the symlink
-      std::string tmp_link = pair.first + "." + rng.unique_name();
+      std::string tmp_link = pair.first + ".local-cache-tmp." + rng.unique_name();
       symlink_no_fail(output_symlink.value.c_str(), tmp_link.c_str());
       rename_no_fail(tmp_link.c_str(), pair.first.c_str());
     }
