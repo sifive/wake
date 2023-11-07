@@ -1147,7 +1147,7 @@ void DaemonCache::launch_evict_loop() {
         policy = std::make_unique<TTLEvictionPolicy>(config.ttl.seconds_to_live);
         break;
       case EvictionPolicyType::LRU:
-        wcl::log::info("Using LRU eviction policy, max = %lu, min = %lu", config.lru.low_size,
+        wcl::log::info("Using LRU eviction policy, low = %lu, max = %lu", config.lru.low_size,
                        config.lru.max_size)();
         policy = std::make_unique<LRUEvictionPolicy>(config.lru.low_size, config.lru.max_size);
         break;
