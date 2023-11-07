@@ -906,7 +906,7 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
 
       // Finally copy the file (as efficently as we can) to
       // the destination.
-      std::string tmp_dst = pair.first ".local-cache-tmp." + rng.unique_name();
+      std::string tmp_dst = pair.first + ".local-cache-tmp." + rng.unique_name();
       copy_or_reflink(tmp_file.c_str(), tmp_dst.c_str(), mode, O_EXCL);
       rename_no_fail(tmp_dst.c_str(), pair.first.c_str());
     }
