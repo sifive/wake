@@ -42,6 +42,64 @@
 
 namespace job_cache {
 
+struct TTLEvictionPolicyImpl {
+  std::string cache_dir;
+  job_cache::Transaction transact;
+  std::thread cleaning_thread;
+  job_cache::PreparedStatement jobs_older_than;
+  job_cache::PreparedStatement remove_jobs_older_than;
+
+  static constexpr const char* jobs_older_than_query =
+      "select job_id, commandline from jobs where create_time < ?";
+
+  static constexpr const char* remove_jobs_older_than_query =
+      "delete from jobs where create_time < ?";
+
+  TTLEvictionPolicyImpl(std::string dir, std::shared_ptr<job_cache::Database> db)
+      : cache_dir(dir),
+        transact(db),
+        jobs_older_than(db, jobs_older_than_query),
+        remove_jobs_older_than(db, remove_jobs_older_than_query) {}
+
+  void cleanup(int64_t seconds_to_live) {
+    std::vector<std::pair<int64_t, std::string>> jobs_to_remove;
+    // Compute the deadline, after which we collect everything
+    int64_t deadline = current_time_microseconds() - seconds_to_live * 1000000ll;
+
+    wcl::log::info("Performing a cleanup!")();
+
+    transact.run([this, &jobs_to_remove, deadline]() {
+      auto reset = wcl::make_defer([this]() { jobs_older_than.reset(); });
+      jobs_older_than.bind_integer(1, deadline);
+      // First find the use time that we want to remove from
+      while (jobs_older_than.step() == SQLITE_ROW) {
+        int64_t job_id = jobs_older_than.read_integer(0);
+        std::string cmd = jobs_older_than.read_string(1);
+        for (auto& ch : cmd) {
+          if (ch == '\0') ch = ' ';
+        }
+        jobs_to_remove.emplace_back(job_id, std::move(cmd));
+      }
+
+      // If there are jobs to remove then we go about actually removing them here
+      if (!jobs_to_remove.empty()) {
+        auto reset = wcl::make_defer([this]() { remove_jobs_older_than.reset(); });
+        remove_jobs_older_than.bind_integer(1, deadline);
+        remove_jobs_older_than.step();
+
+        // Now we remove the jobs in the background.
+        // NOTE: We don't wait for this to finish
+        // There might be an already running thread finishing up some cleaning.
+        // Instead of killing it we should join it before starting a new one.
+        if (cleaning_thread.joinable()) cleaning_thread.join();
+        // Launch the cleaning thread
+        cleaning_thread = std::thread(remove_backing_files, cache_dir, std::move(jobs_to_remove),
+                                      4 * std::thread::hardware_concurrency());
+      }
+    });
+  }
+};
+
 struct LRUEvictionPolicyImpl {
   std::string cache_dir;
   job_cache::PreparedStatement update_size;
@@ -168,6 +226,8 @@ struct LRUEvictionPolicyImpl {
       uint64_t last_use = 0;
       uint64_t to_remove = bytes_to_remove;
       uint64_t removed_so_far = 0;
+
+      wcl::log::info("Cleaning up %lu bytes from %lu total bytes", bytes_to_remove, current_size)();
 
       {
         auto reset1 = wcl::make_defer([this]() { find_least_recently_used.reset(); });
@@ -359,10 +419,38 @@ void LRUEvictionPolicy::write(int job_id) {
   }
 }
 
-LRUEvictionPolicy::LRUEvictionPolicy(uint64_t max, uint64_t low)
-    : max_cache_size(max), low_cache_size(low) {}
+LRUEvictionPolicy::LRUEvictionPolicy(uint64_t low, uint64_t max)
+    : max_cache_size(max), low_cache_size(low) {
+  wcl::log::info("Creating LRU eviction policy, max = %lu, low = %lu", max, low)();
+}
 
 LRUEvictionPolicy::~LRUEvictionPolicy() {}
+
+void TTLEvictionPolicy::init(const std::string& cache_dir) {
+  std::shared_ptr<job_cache::Database> db = std::make_unique<job_cache::Database>(cache_dir);
+  impl = std::make_unique<TTLEvictionPolicyImpl>(cache_dir, db);
+  impl->cleanup(seconds_to_live);
+
+  // To keep this thread alive, we assign it to a static thread object.
+  // This starts the collection but if the programs ends so too will this thread.
+  gc_thread = std::thread(garbage_collect_orphan_folders, db);
+}
+
+void TTLEvictionPolicy::read(int job_id) {}
+
+void TTLEvictionPolicy::write(int job_id) {
+  static time_t time_of_last_cleanup = 0;
+  time_t current = time(nullptr);
+  // We spend a bit of time seeing if we even need to clean anything up
+  if (current - time_of_last_cleanup > 1) {
+    impl->cleanup(seconds_to_live);
+    time_of_last_cleanup = current;
+  }
+}
+
+TTLEvictionPolicy::TTLEvictionPolicy(uint64_t seconds_to_live) : seconds_to_live(seconds_to_live) {}
+
+TTLEvictionPolicy::~TTLEvictionPolicy() {}
 
 int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> policy) {
   policy->init(cache_dir);

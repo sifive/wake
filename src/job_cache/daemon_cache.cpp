@@ -666,15 +666,14 @@ struct CacheDbImpl {
         matching_jobs(db) {}
 };
 
-DaemonCache::DaemonCache(std::string dir, std::string bulk_dir, uint64_t max, uint64_t low)
-    : rng(wcl::xoshiro_256::get_rng_seed()), max_cache_size(max), low_cache_size(low) {
+DaemonCache::DaemonCache(std::string dir, std::string bulk_dir, EvictionConfig config)
+    : rng(wcl::xoshiro_256::get_rng_seed()), config(config) {
   mkdir_no_fail(dir.c_str());
   chdir_no_fail(dir.c_str());
 
   initialize_logging(bulk_dir);
 
-  wcl::log::info("Launching DaemonCache. dir = %s, max = %lu, low = %lu", dir.c_str(),
-                 max_cache_size, low_cache_size)();
+  wcl::log::info("Launching DaemonCache. dir = %s", dir.c_str())();
 
   impl = std::make_unique<CacheDbImpl>(".");
 
@@ -1140,8 +1139,20 @@ void DaemonCache::launch_evict_loop() {
 
     // Finally enter the eviction loop, if it exits cleanly
     // go ahead and exit with its result.
-    int result =
-        eviction_loop(".", std::make_unique<LRUEvictionPolicy>(max_cache_size, low_cache_size));
+    std::unique_ptr<EvictionPolicy> policy;
+    switch (config.type) {
+      case EvictionPolicyType::TTL:
+        wcl::log::info("Using TTL eviction policy, seconds_to_live = %lu",
+                       config.ttl.seconds_to_live)();
+        policy = std::make_unique<TTLEvictionPolicy>(config.ttl.seconds_to_live);
+        break;
+      case EvictionPolicyType::LRU:
+        wcl::log::info("Using LRU eviction policy, max = %lu, min = %lu", config.lru.low_size,
+                       config.lru.max_size)();
+        policy = std::make_unique<LRUEvictionPolicy>(config.lru.low_size, config.lru.max_size);
+        break;
+    }
+    int result = eviction_loop(".", std::move(policy));
     exit(result);
   }
 

@@ -51,6 +51,39 @@ enum class FindJobError {
   CouldNotConnect,
 };
 
+struct LRUConfig {
+  int64_t low_size, max_size;
+};
+
+struct TTLConfig {
+  int64_t seconds_to_live;
+};
+
+enum class EvictionPolicyType { TTL, LRU };
+
+struct EvictionConfig {
+  union {
+    LRUConfig lru;
+    TTLConfig ttl;
+  };
+  EvictionPolicyType type;
+
+  static EvictionConfig lru_config(int64_t low_size, int64_t max_size) {
+    EvictionConfig out;
+    out.type = EvictionPolicyType::LRU;
+    out.lru.low_size = low_size;
+    out.lru.max_size = max_size;
+    return out;
+  }
+
+  static EvictionConfig ttl_config(int64_t seconds_to_live) {
+    EvictionConfig out;
+    out.type = EvictionPolicyType::TTL;
+    out.ttl.seconds_to_live = seconds_to_live;
+    return out;
+  }
+};
+
 class Cache {
  private:
   bool miss_on_failure = false;
@@ -58,8 +91,7 @@ class Cache {
   // Daemon parameters
   std::string cache_dir;
   std::string bulk_logging_dir;
-  uint64_t max_size;
-  uint64_t low_threshold;
+  EvictionConfig config;
 
   void launch_daemon();
   wcl::result<wcl::unique_fd, ConnectError> backoff_try_connect(int attempts);
@@ -69,7 +101,7 @@ class Cache {
   Cache() = delete;
   Cache(const Cache &) = delete;
 
-  Cache(std::string dir, std::string bulk_logging_dir, uint64_t max, uint64_t low, bool miss);
+  Cache(std::string dir, std::string bulk_logging_dir, EvictionConfig config, bool miss);
 
   FindJobResponse read(const FindJobRequest &find_request);
   void add(const AddJobRequest &add_request);

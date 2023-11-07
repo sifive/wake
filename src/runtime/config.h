@@ -24,6 +24,7 @@
 #include <set>
 #include <string>
 
+#include "job_cache/job_cache.h"
 #include "json/json5.h"
 
 struct WakeConfigOverrides {
@@ -160,44 +161,6 @@ struct LabelFilterPolicy {
   static void set_env_var(LogHeaderSourceWidthPolicy& p, const char* value){};
 };
 
-struct SharedCacheMaxSize {
-  using type = uint64_t;
-  using input_type = type;
-  static constexpr const char* key = "max_cache_size";
-  static constexpr bool allowed_in_wakeroot = true;
-  static constexpr bool allowed_in_userconfig = true;
-  type max_cache_size = 25ULL << 30ULL;
-  static constexpr type SharedCacheMaxSize::*value = &SharedCacheMaxSize::max_cache_size;
-  static constexpr Override<input_type> override_value = &WakeConfigOverrides::max_cache_size;
-  static constexpr const char* env_var = "WAKE_SHARED_CACHE_MAX_SIZE";
-
-  static void set(SharedCacheMaxSize& p, const JAST& json);
-  static void set_input(SharedCacheMaxSize& p, const input_type& v) { p.*value = v; }
-  static void emit(const SharedCacheMaxSize& p, std::ostream& os) { os << p.*value; }
-  static void set_env_var(SharedCacheMaxSize& p, const char* env_var) {
-    p.*value = std::stoull(env_var);
-  }
-};
-
-struct SharedCacheLowSize {
-  using type = uint64_t;
-  using input_type = type;
-  static constexpr const char* key = "low_cache_size";
-  static constexpr bool allowed_in_wakeroot = true;
-  static constexpr bool allowed_in_userconfig = true;
-  type low_cache_size = 15ULL << 30ULL;
-  static constexpr type SharedCacheLowSize::*value = &SharedCacheLowSize::low_cache_size;
-  static constexpr Override<input_type> override_value = &WakeConfigOverrides::max_cache_size;
-  static constexpr const char* env_var = "WAKE_SHARED_CACHE_LOW_SIZE";
-
-  static void set(SharedCacheLowSize& p, const JAST& json);
-  static void set_input(SharedCacheLowSize& p, const input_type& v) { p.*value = v; }
-  static void emit(const SharedCacheLowSize& p, std::ostream& os) { os << p.*value; }
-  static void set_env_var(SharedCacheLowSize& p, const char* env_var) {
-    p.*value = std::stoull(env_var);
-  }
-};
-
 struct SharedCacheMissOnFailure {
   using type = bool;
   using input_type = type;
@@ -271,6 +234,35 @@ struct BulkLoggingDirPolicy {
   static void set_env_var(BulkLoggingDirPolicy& p, const char* env_var) {
     p.bulk_logging_dir = env_var;
   }
+};
+
+struct EvictionConfigPolicy {
+  using type = job_cache::EvictionConfig;
+  using input_type = type;
+  static constexpr const char* key = "eviction_config";
+  static constexpr bool allowed_in_wakeroot = true;
+  static constexpr bool allowed_in_userconfig = true;
+  type eviction_config;
+  static constexpr type EvictionConfigPolicy::*value = &EvictionConfigPolicy::eviction_config;
+  static constexpr Override<input_type> override_value = nullptr;
+  static constexpr const char* env_var = nullptr;
+
+  EvictionConfigPolicy() { eviction_config = job_cache::EvictionConfig::ttl_config(7 * 24 * 3600); }
+  static void set(EvictionConfigPolicy& p, const JAST& json);
+  static void set_input(EvictionConfigPolicy& p, const input_type& v) { p.*value = v; }
+  static void emit(const EvictionConfigPolicy& p, std::ostream& os) {
+    os << "{";
+    bool is_ttl = p.eviction_config.type == job_cache::EvictionPolicyType::TTL;
+    os << "type = " << (is_ttl ? "ttl" : "lru") << ", ";
+    if (is_ttl) {
+      os << "seconds_to_live = " << p.eviction_config.ttl.seconds_to_live;
+    } else {
+      os << "low_cache_size = " << p.eviction_config.lru.low_size << ", ";
+      os << "max_cache_size = " << p.eviction_config.lru.max_size;
+    }
+    os << "}";
+  }
+  static void set_env_var(EvictionConfigPolicy& p, const char* env_var) {}
 };
 
 /********************************************************************
@@ -417,8 +409,8 @@ struct WakeConfigImpl : public Policies... {
 
 using WakeConfigImplFull =
     WakeConfigImpl<UserConfigPolicy, VersionPolicy, LogHeaderPolicy, LogHeaderSourceWidthPolicy,
-                   LabelFilterPolicy, SharedCacheMaxSize, SharedCacheLowSize,
-                   SharedCacheMissOnFailure, LogHeaderAlignPolicy, BulkLoggingDirPolicy>;
+                   LabelFilterPolicy, EvictionConfigPolicy, SharedCacheMissOnFailure,
+                   LogHeaderAlignPolicy, BulkLoggingDirPolicy>;
 
 struct WakeConfig final : public WakeConfigImplFull {
   static bool init(const std::string& wakeroot_path, const WakeConfigOverrides& overrides);

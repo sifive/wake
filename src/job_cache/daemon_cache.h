@@ -44,8 +44,7 @@ class DaemonCache {
   int evict_stdin;
   int evict_stdout;
   int evict_pid;
-  uint64_t max_cache_size;
-  uint64_t low_cache_size;
+  EvictionConfig config;
   std::string key;
   int listen_socket_fd;
   EPoll poll;
@@ -71,7 +70,7 @@ class DaemonCache {
   DaemonCache() = delete;
   DaemonCache(const DaemonCache &) = delete;
 
-  DaemonCache(std::string dir, std::string bulk_logging_dir, uint64_t max, uint64_t low);
+  DaemonCache(std::string dir, std::string bulk_logging_dir, EvictionConfig config);
 
   int run();
 };

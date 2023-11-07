@@ -374,12 +374,17 @@ void signal_and_wait(pid_t pid, int sig, int us) {
   usleep(us);
 }
 
-TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, wcl::xoshiro_256 gen) {
+TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, bool lru, wcl::xoshiro_256 gen) {
   Pool<TestJob> job_pool;
 
   mkdir(config.cache_dir.c_str(), 0777);
   mkdir(config.dir.c_str(), 0777);
-  job_cache::Cache cache(config.cache_dir, "", 1ULL << 24ULL, (1 << 23ULL) + (1 << 22ULL), false);
+  uint64_t low_size = (1 << 23ULL) + (1 << 22ULL);
+  uint64_t max_size = (1 << 24ULL);
+  uint64_t seconds_to_live = 10;
+  job_cache::EvictionConfig lru_config = job_cache::EvictionConfig::lru_config(low_size, max_size);
+  job_cache::EvictionConfig ttl_config = job_cache::EvictionConfig::ttl_config(seconds_to_live);
+  job_cache::Cache cache(config.cache_dir, "", (lru ? lru_config : ttl_config), false);
 
   std::string out_dir = wcl::join_paths(config.dir, "outputs");
   for (size_t i = 0; i < config.number_of_steps; ++i) {
@@ -404,7 +409,7 @@ TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, wcl::xoshiro_256 gen) {
   }
 }
 
-TEST_FUNC(void, fuzz_many_with_ns, int num_procs, const FuzzLoopConfig& config,
+TEST_FUNC(void, fuzz_many_with_ns, int num_procs, const FuzzLoopConfig& config, bool lru,
           wcl::xoshiro_256 gen) {
   // Note that there will be processes in the o
   bool result = run_as_init_proc([&]() -> int {
@@ -421,7 +426,7 @@ TEST_FUNC(void, fuzz_many_with_ns, int num_procs, const FuzzLoopConfig& config,
       if (pid == 0) {
         wcl::log::info("test proc was forked!")();
         // We need to construct a different generator so the jobs aren't stomping on each other
-        TEST_FUNC_CALL(fuzz_loop, config, wcl::xoshiro_256(wcl::xoshiro_256::get_rng_seed()));
+        TEST_FUNC_CALL(fuzz_loop, config, lru, wcl::xoshiro_256(wcl::xoshiro_256::get_rng_seed()));
         wcl::log::info("process exiting naturally: num_errors = %d", (int)NUM_ERRORS())();
         exit(NUM_ERRORS() != 0);
       }
@@ -520,7 +525,8 @@ TEST(job_cache_basic_fuzz) {
   config.number_of_steps = 10000;
   config.cache_dir = ".job_cache_test";
   config.dir = "job_cache_test";
-  TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+  TEST_FUNC_CALL(fuzz_loop, config, true, gen);
+  TEST_FUNC_CALL(fuzz_loop, config, false, std::move(gen));
 }
 
 // This is our most powerful style oftest, it's a chaos
@@ -534,7 +540,8 @@ TEST(job_cache_par_chaos_fuzz, "pid-namespace") {
   config.number_of_steps = 10000;
   config.cache_dir = ".job_cache_test_chaos";
   config.dir = "job_cache_test_chaos";
-  TEST_FUNC_CALL(fuzz_many_with_ns, 20, config, std::move(gen));
+  TEST_FUNC_CALL(fuzz_many_with_ns, 20, config, true, gen);
+  TEST_FUNC_CALL(fuzz_many_with_ns, 20, config, false, std::move(gen));
 }
 
 // This is one of our more powerful tests, its lightly tests the
@@ -548,7 +555,8 @@ TEST(job_cache_par_chaos_fuzz_large_messages, "pid-namespace") {
   config.number_of_steps = 100;
   config.cache_dir = ".job_cache_test_chaos";
   config.dir = "job_cache_test_chaos";
-  TEST_FUNC_CALL(fuzz_many_with_ns, 10, config, std::move(gen));
+  TEST_FUNC_CALL(fuzz_many_with_ns, 10, config, true, gen);
+  TEST_FUNC_CALL(fuzz_many_with_ns, 10, config, false, std::move(gen));
 }
 
 // This test appears to work but it takes quite a long time and
@@ -565,7 +573,8 @@ TEST(job_cache_large_message_fuzz, "large") {
   config.number_of_steps = 100;
   config.cache_dir = ".job_cache_test_large";
   config.dir = "job_cache_test_large";
-  TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+  TEST_FUNC_CALL(fuzz_loop, config, true, gen);
+  TEST_FUNC_CALL(fuzz_loop, config, false, gen);
 }
 
 // This test works like 10 instances of the above test
@@ -592,7 +601,7 @@ TEST(job_cache_large_message_par_fuzz, "huge") {
     // position without failures from other threads being logged.
     futs.emplace_back(std::async([&]() {
       wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
-      TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+      TEST_FUNC_CALL(fuzz_loop, config, true, std::move(gen));
     }));
   }
   for (auto& fut : futs) {
@@ -612,7 +621,8 @@ TEST(job_cache_huge_message_fuzz, "huge") {
   config.number_of_steps = 10;
   config.cache_dir = ".job_cache_test_huge";
   config.dir = "job_cache_test_huge";
-  TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+  TEST_FUNC_CALL(fuzz_loop, config, true, gen);
+  TEST_FUNC_CALL(fuzz_loop, config, false, std::move(gen));
 }
 
 // This test is the back bone of our testing strategy,
@@ -639,7 +649,7 @@ TEST(job_cache_basic_par_fuzz, "threaded") {
     // position without failures from other threads being logged.
     futs.emplace_back(std::async([&]() {
       wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
-      TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+      TEST_FUNC_CALL(fuzz_loop, config, false, std::move(gen));
     }));
   }
   for (auto& fut : futs) {
@@ -669,7 +679,7 @@ TEST(job_cache_large_par_fuzz, "large") {
     // position without failures from other threads being logged.
     futs.emplace_back(std::async([&]() {
       wcl::xoshiro_256 gen(wcl::xoshiro_256::get_rng_seed());
-      TEST_FUNC_CALL(fuzz_loop, config, std::move(gen));
+      TEST_FUNC_CALL(fuzz_loop, config, false, std::move(gen));
     }));
   }
   for (auto& fut : futs) {

@@ -42,6 +42,13 @@
 #include "wcl/unique_fd.h"
 #include "wcl/xoshiro_256.h"
 
+int64_t current_time_microseconds() {
+  // Get the time so we know when this job was created
+  timespec tp;
+  clock_gettime(CLOCK_REALTIME, &tp);
+  return 1000000ll * int64_t(tp.tv_sec) + tp.tv_nsec / 1000;
+}
+
 // moves the file or directory, crashes on error
 void rename_no_fail(const char *old_path, const char *new_path) {
   if (rename(old_path, new_path) < 0) {
@@ -267,8 +274,7 @@ void remove_job_backing_files(const std::string &dir, int64_t job_id) {
   rmdir_no_fail(job_dir.c_str());
 }
 
-void remove_backing_files(std::string dir,
-                          const std::vector<std::pair<int64_t, std::string>> &job_ids,
+void remove_backing_files(std::string dir, std::vector<std::pair<int64_t, std::string>> job_ids,
                           size_t max_number_of_threads) {
   // Calculate a good number of threads to use.
   size_t actual_num_threads = std::min(max_number_of_threads, std::max(1UL, job_ids.size()));
