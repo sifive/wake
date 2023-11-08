@@ -206,13 +206,16 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
   if (pid == 0) {
     // kernel to send SIGKILL to squashfuse when wakebox terminates
     if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
-      std::cerr << "squashfuse_ll prctl: " << strerror(errno) << std::endl;
+      std::cerr << "wake_squashfuse_ll prctl: " << strerror(errno) << std::endl;
       unlink(fifo_path_result->c_str());
       exit(1);
     }
-    execlp("squashfuse_ll", "squashfuse_ll", "-o", "notify_pipe", fifo_path_result->c_str(), "-f",
+
+    auto notify_pipe_arg = std::string("notify_pipe=") + *fifo_path_result;
+
+    execlp("wake_squashfuse_ll", "wake_squashfuse_ll", "-o", notify_pipe_arg.c_str(), "-f",
            source.c_str(), mountpoint.c_str(), NULL);
-    std::cerr << "execlp squashfuse: " << strerror(errno) << std::endl;
+    std::cerr << "execlp wake_squashfuse_ll: " << strerror(errno) << std::endl;
     unlink(fifo_path_result->c_str());
     exit(1);
   }
@@ -226,20 +229,16 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
         std::cerr << "Could not open fifo: " << strerror(wait_for_mount_opt->posix_error)
                   << std::endl;
         return false;
-        break;
       case SquashFuseMountWaitErrorType::FailureToReadFifo:
         std::cerr << "Error reading fifo: " << strerror(wait_for_mount_opt->posix_error)
                   << std::endl;
         return false;
-        break;
       case SquashFuseMountWaitErrorType::ReceivedZeroBytes:
         std::cerr << "Zero bytes read from fifo." << std::endl;
         return false;
-        break;
       case SquashFuseMountWaitErrorType::MountFailed:
         std::cerr << "Squashfuse wrote 'f' meaning it failed to mount." << std::endl;
         return false;
-        break;
       default:
         break;
     }

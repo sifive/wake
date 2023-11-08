@@ -57,13 +57,14 @@ or that your colleagues already built, you might appreciate wake.
 
 On Debian/Ubuntu (wheezy or later):
 
-    sudo apt-get install makedev fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev dash
+    sudo apt-get install makedev fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev dash fuse3 libfuse3-dev libattr1-dev libzstd-dev liblz4-dev liblzma-dev liblzo2-dev zlib1g-dev
 
 On Redhat (6.6 or later):
 
     sudo yum install epel-release epel-release centos-release-scl
     # On RHEL6: sudo yum install devtoolset-6-gcc devtoolset-6-gcc-c++
-    sudo yum install makedev fuse fuse-devel sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel dash
+    sudo yum install makedev fuse fuse-devel sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel dash fuse3 fuse3-devel libattr-devel libzstd-devel lz4-devel xz-devel lzo-devel zlib-devel zstd lz4 xz lzo zlib
+
 
 On FreeBSD (12 or later):
 
@@ -75,7 +76,7 @@ On FreeBSD (12 or later):
 
 On Alpine Linux (3.14.0 or later):
 
-    apk add g++ make pkgconf git gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev dash
+    apk add m4 g++ make pkgconf git tar xz gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev bash dash sqlite-static ncurses-static linux-headers
 
   Alpine releases as old as 3.11.5 may work depending on the use case, but due
   to a limitation in older musl versions some jobs may be rebuilt unnecessarily.
@@ -116,26 +117,34 @@ Give FUSE permission to run as stated in the instructions and you should be good
     ./bin/wake install $HOME/stuff # or wherever
 
 
-| Name                                                     | Version | License       |
-| -------------------------------------------------------- | ------- | ------------- |
-| **External dependencies**                                |         |               |
-| [c++ 11](https://www.gnu.org/software/gcc/)              | >= 4.7  | GPLv3         |
-| [dash](http://gondor.apana.org.au/~herbert/dash/)        | >= 0.5  | BSD 3-clause  |
-| [sqlite3-dev](https://www.sqlite.org/)                   | >= 3.6  | public domain |
-| [libgmp-dev](https://gmplib.org)                         | >= 4.3  | LGPL v3       |
-| [libfuse-dev](https://github.com/libfuse/libfuse)        | >= 2.8  | LGPL v2.1     |
-| [libre2-dev](https://github.com/google/re2)              | >= 2013 | BSD 3-clause  |
-| [libncurses5-dev](https://www.gnu.org/software/ncurses/) | >= 5.7  | MIT           |
-| [m4](https://www.gnu.org/software/m4/)                   | >= 1.4  | GPLv3         |
-| **Optional dependencies**                                |         |               |
-| [re2c](http://re2c.org)                                  | >= 1.0  | public domain |
-| [utf8proc](https://juliastrings.github.io/utf8proc/)     | >= 2.0  | MIT           |
-| **Internal dependencies**                                |         |               |
-| [lemon](https://www.sqlite.org/lemon.html)               | 2021-09 | public domain |
-| [gopt](http://www.purposeful.co.uk/software/gopt/)       | 10.0    | TFL           |
-| [SipHash](https://github.com/veorq/SipHash)              | 2017-02 | CC0           |
-| [BLAKE2](https://github.com/BLAKE2/libb2)                | 2018-07 | CC0           |
-| [whereami](https://github.com/gpakosz/whereami)          | 2018-09 | WTFPLV2       |
+| Name                                                     | Version   | License        |
+| -------------------------------------------------------- | -------   | -------------  |
+| **External dependencies**                                |           |                |
+| [c++ 11](https://www.gnu.org/software/gcc/)              | >= 4.7    | GPLv3          |
+| [dash](http://gondor.apana.org.au/~herbert/dash/)        | >= 0.5    | BSD 3-clause   |
+| [sqlite3-dev](https://www.sqlite.org/)                   | >= 3.6    | public domain  |
+| [libattr1-dev](https://savannah.nongnu.org/projects/attr)| >= 2.4.46 | GPLv2          |
+| [libgmp-dev](https://gmplib.org)                         | >= 4.3    | LGPL v3        |
+| [libfuse-dev](https://github.com/libfuse/libfuse)        | >= 2.8    | LGPL v2.1      |
+| [libfuse3-dev](https://github.com/libfuse/libfuse)       | >= 2.8    | LGPL v2.1      |
+| [libre2-dev](https://github.com/google/re2)              | >= 2013   | BSD 3-clause   |
+| [libncurses5-dev](https://www.gnu.org/software/ncurses/) | >= 5.7    | MIT            |
+| [m4](https://www.gnu.org/software/m4/)                   | >= 1.4    | GPLv3          |
+| [libzstd-dev](https://facebook.github.io/zstd/)          | >= 1.5.5  | GPLv2+ and BSD |
+| [liblz4-dev](https://lz4.github.io/lz4/)                 | >= 1.8.3  | GPLv2+ and BSD |
+| [liblzma-dev/xz-devel](https://tukaani.org/xz/)          | >= 5.2.2  | Depends        |
+| [liblzo2-dev](http://www.oberhumer.com/opensource/lzo/)  | >= 2.06   | GPLv2+         |
+| [zlib1g-dev](https://zlib.net/)                          | >= 1.2.7  | zlib and Boost |
+| **Optional dependencies**                                |           |                |
+| [re2c](http://re2c.org)                                  | >= 1.0    | public domain  |
+| [utf8proc](https://juliastrings.github.io/utf8proc/)     | >= 2.0    | MIT            |
+| **Internal dependencies**                                |           |                |
+| [lemon](https://www.sqlite.org/lemon.html)               | 2021-09   | public domain  |
+| [gopt](http://www.purposeful.co.uk/software/gopt/)       | 10.0      | TFL            |
+| [SipHash](https://github.com/veorq/SipHash)              | 2017-02   | CC0            |
+| [BLAKE2](https://github.com/BLAKE2/libb2)                | 2018-07   | CC0            |
+| [whereami](https://github.com/gpakosz/whereami)          | 2018-09   | WTFPLV2        |
+| [squashfuse](https://github.com/vasi/squashfuse)         | >= 0.5.0  | BSD 2-clause   |
 
 # Configuring wake
 
