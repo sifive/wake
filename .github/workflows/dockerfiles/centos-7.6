@@ -3,11 +3,9 @@ FROM centos:7.6.1810
 RUN yum -y update && yum clean all
 RUN yum --setopt=skip_missing_names_on_install=False install -y rpm-build rpm-devel rpmlint make python bash coreutils diffutils patch rpmdevtools wget
 RUN yum --setopt=skip_missing_names_on_install=False install -y epel-release
-RUN yum --setopt=skip_missing_names_on_install=False install -y tar xz dash git which make gcc gcc-c++ fuse fuse3 fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel iproute jq
+RUN yum --setopt=skip_missing_names_on_install=False install -y tar xz dash git which make gcc gcc-c++ fuse fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel squashfuse iproute
 RUN yum --setopt=skip_missing_names_on_install=False install -y centos-release-scl
 RUN yum --setopt=skip_missing_names_on_install=False install -y devtoolset-9-gcc*
-# Squashfuse build dependences
-RUN yum --setopt=skip_missing_names_on_install=False install -y fuse3-devel libattr-devel libzstd-devel lz4-devel xz-devel lzo-devel zlib-devel zstd lz4 xz lzo zlib
 RUN rpmdev-setuptree
 
 
