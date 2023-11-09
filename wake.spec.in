@@ -6,9 +6,9 @@ License:       Apache-2; MIT; TFL; WTFPL; CC0
 URL:           https://github.com/sifive/wake
 Vendor:        SiFive, Inc.
 Source0:       https://github.com/sifive/wake/releases/%{name}_%{version}.tar.xz
-Requires:      fuse fuse3 dash iproute libzstd lz4 xz lzo zlib
+Requires:      fuse dash squashfuse iproute
 Prefix:        /usr
-BuildRequires: fuse-devel fuse3-devel dash sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel libzstd-devel lz4-devel xz-devel lzo-devel zlib-devel
+BuildRequires: fuse-devel dash sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel
 
 %description
 Wake is a build orchestration tool and language.
@@ -35,12 +35,10 @@ mkdir -p %{buildroot}/var/cache/wake
 /usr/bin/wake-log-viewer
 /usr/bin/wake-format
 /usr/bin/job-cache
-/usr/bin/wake_squashfuse_ll
 /usr/lib/wake
 /usr/share/wake
 %dir /var/cache/wake
 %doc /usr/share/doc/wake
-%license /usr/licenses/LICENSE.squashfuse
 
 %changelog
 # let's skip this for now

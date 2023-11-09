@@ -42,7 +42,6 @@
 
 #include "fuse.h"
 #include "json/json5.h"
-#include "squashfuse_helper.h"
 #include "util/mkdir_parents.h"
 
 // Location in the parent namespace to base the new root on.
@@ -183,6 +182,8 @@ static bool mount_tmpfs(const std::string &destination) {
   return true;
 }
 
+static bool equal_dev_ids(dev_t a, dev_t b) { return major(a) == major(b) && minor(a) == minor(b); }
+
 static bool do_squashfuse_mount(const std::string &source, const std::string &mountpoint) {
   // The squashfuse executable doesn't give a clear error message when the file is missing.
   if (access(source.c_str(), R_OK | F_OK) != 0) {
@@ -192,13 +193,7 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
 
   int err = mkdir_with_parents(mountpoint, 0555);
   if (0 != err) {
-    std::cerr << "mkdir_with_parents ('" << mountpoint << "'): " << strerror(err) << std::endl;
-    return false;
-  }
-
-  auto fifo_path_result = mktempfifo();
-  if (!fifo_path_result) {
-    std::cerr << "mktempfifo ('" << strerror(fifo_path_result.error()) << "'): " << std::endl;
+    std::cerr << "mkdir_with_parents ('" << mountpoint << "'):" << strerror(err) << std::endl;
     return false;
   }
 
@@ -206,46 +201,42 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
   if (pid == 0) {
     // kernel to send SIGKILL to squashfuse when wakebox terminates
     if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
-      std::cerr << "squashfuse_ll prctl: " << strerror(errno) << std::endl;
-      unlink(fifo_path_result->c_str());
+      std::cerr << "squashfuse prctl: " << strerror(errno) << std::endl;
       exit(1);
     }
-    execlp("squashfuse_ll", "squashfuse_ll", "-o", "notify_pipe", fifo_path_result->c_str(), "-f",
-           source.c_str(), mountpoint.c_str(), NULL);
+    execlp("squashfuse", "squashfuse", "-f", source.c_str(), mountpoint.c_str(), NULL);
     std::cerr << "execlp squashfuse: " << strerror(errno) << std::endl;
-    unlink(fifo_path_result->c_str());
     exit(1);
   }
 
-  auto wait_for_mount_opt = wait_for_squashfuse_mount(*fifo_path_result);
-  if (wait_for_mount_opt) {
-    std::cerr << "Squashfuse mount failed: wait_for_squashfuse_mount ('" << *fifo_path_result
-              << "'): " << source << ", Reason: ";
-    switch (wait_for_mount_opt->type) {
-      case SquashFuseMountWaitErrorType::CannotOpenFifo:
-        std::cerr << "Could not open fifo: " << strerror(wait_for_mount_opt->posix_error)
-                  << std::endl;
-        return false;
-        break;
-      case SquashFuseMountWaitErrorType::FailureToReadFifo:
-        std::cerr << "Error reading fifo: " << strerror(wait_for_mount_opt->posix_error)
-                  << std::endl;
-        return false;
-        break;
-      case SquashFuseMountWaitErrorType::ReceivedZeroBytes:
-        std::cerr << "Zero bytes read from fifo." << std::endl;
-        return false;
-        break;
-      case SquashFuseMountWaitErrorType::MountFailed:
-        std::cerr << "Squashfuse wrote 'f' meaning it failed to mount." << std::endl;
-        return false;
-        break;
-      default:
-        break;
+  // Wait for the mount to exist before we continue by checking if the
+  // stat() device id or the inode changes.
+  struct stat before;
+  if (0 != stat(mountpoint.c_str(), &before)) {
+    std::cerr << "stat (" << mountpoint << "): " << strerror(errno) << std::endl;
+    return false;
+  }
+
+  for (int i = 0; i < 10; i++) {
+    struct stat after;
+    if (0 != stat(mountpoint.c_str(), &after)) {
+      std::cerr << "stat (" << mountpoint << "): " << strerror(errno) << std::endl;
+      return false;
+    }
+
+    if (!equal_dev_ids(before.st_dev, after.st_dev) || (before.st_ino != after.st_ino)) {
+      return true;
+    } else {
+      int ms = 10 << i;  // 10ms * 2^i
+      struct timespec delay;
+      delay.tv_sec = ms / 1000;
+      delay.tv_nsec = (ms % 1000) * INT64_C(1000000);
+      nanosleep(&delay, nullptr);
     }
   }
 
-  return true;
+  std::cerr << "squashfs mount failed: " << source << std::endl;
+  return false;
 }
 
 static bool squashfs_helper_mounts(const std::string &squashfs_base_path,
