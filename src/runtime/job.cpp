@@ -678,22 +678,17 @@ JobTable::~JobTable() {
   }
 }
 
-static char **split_null(std::string &str) {
-  int nulls = 0;
-  for (char c : str) nulls += (c == 0);
-  char **out = new char *[nulls + 1];
-
-  nulls = 0;
-  out[0] = const_cast<char *>(str.c_str());
-  char *end = out[0] + str.size();
-  for (char *scan = out[0]; scan != end; ++scan) {
-    if (*scan == 0) {
-      ++nulls;
-      out[nulls] = scan + 1;
+static std::vector<std::string> split_null(std::string &str) {
+  std::vector<std::string> out;
+  std::string buf;
+  for (char c : str) {
+    if (c == '\0') {
+      out.emplace_back(std::move(buf));
+    } else {
+      buf += c;
     }
   }
-  out[nulls] = 0;
-
+  out.emplace_back(std::move(buf));
   return out;
 }
 
@@ -835,24 +830,22 @@ static void launch(JobTable *jobtable) {
       err = std::make_unique<NullBuf>();
     }
 
-    auto stdout_teefiles = split_null(task.job->stdout_teefiles);
+    const auto stdout_teefiles = split_null(task.job->stdout_teefiles);
     auto stdout_tee_names = std::vector<std::string>();
-    for (int i = 0; stdout_teefiles[i]; ++i) {
-      stdout_tee_names.push_back(stdout_teefiles[i]);
-      if (jobtable->imp->teefiles.find(stdout_teefiles[i]) == jobtable->imp->teefiles.end()) {
-        jobtable->imp->teefiles[stdout_teefiles[i]] = std::make_unique<std::ofstream>(stdout_teefiles[i], std::ios::out | std::ios::trunc);
+    for (const auto &file : stdout_teefiles) {
+      stdout_tee_names.push_back(file);
+      if (jobtable->imp->teefiles.find(file) == jobtable->imp->teefiles.end()) {
+        jobtable->imp->teefiles[file] = std::make_unique<std::ofstream>(file, std::ios::out | std::ios::trunc);
       }
     }
-    auto stderr_teefiles = split_null(task.job->stderr_teefiles);
+    const auto stderr_teefiles = split_null(task.job->stderr_teefiles);
     auto stderr_tee_names = std::vector<std::string>();
-    for (int i = 0; stderr_teefiles[i]; ++i) {
-      stderr_tee_names.push_back(stderr_teefiles[i]);
-      if (jobtable->imp->teefiles.find(stderr_teefiles[i]) == jobtable->imp->teefiles.end()) {
-        jobtable->imp->teefiles[stderr_teefiles[i]] = std::make_unique<std::ofstream>(stderr_teefiles[i], std::ios::out | std::ios::trunc);
+    for (const auto &file : stderr_teefiles) {
+      stderr_tee_names.push_back(file);
+      if (jobtable->imp->teefiles.find(file) == jobtable->imp->teefiles.end()) {
+        jobtable->imp->teefiles[file] = std::make_unique<std::ofstream>(file, std::ios::out | std::ios::trunc);
       }
     }
-    delete[] stdout_teefiles;
-    delete[] stderr_teefiles;
 
     std::shared_ptr<JobEntry> entry = std::make_shared<JobEntry>(
         jobtable->imp.get(), std::move(task.job), std::move(out), std::move(err), std::move(stdout_tee_names), std::move(stderr_tee_names));
@@ -893,8 +886,6 @@ static void launch(JobTable *jobtable) {
     pid_t pid = wake_spawn(cmdline[0], cmdline, environ);
     sigprocmask(SIG_BLOCK, &set, 0);
 
-    delete[] cmdline;
-    delete[] environ;
     ++jobtable->imp->num_running;
     jobtable->imp->pidmap[pid] = entry;
     entry->job->pid = entry->pid = pid;
