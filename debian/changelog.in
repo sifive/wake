@@ -2,6 +2,12 @@ wake (@VERSION@-1) unstable; urgency=medium
 
   * Auto-generated release package.
 
+ -- Ashley Coleman <ashley.coleman@sifive.com>  Mon, 13 Nov 2023 09:00:00 -0800
+
+wake (40.0.0-1) unstable; urgency=medium
+
+  * Auto-generated release package.
+
  -- Ashley Coleman <ashley.coleman@sifive.com>  Fri, 10 Nov 2023 09:00:00 -0800
 
 wake (39.1.0-1) unstable; urgency=medium
