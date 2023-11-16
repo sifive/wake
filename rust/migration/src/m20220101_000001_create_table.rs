@@ -190,7 +190,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-#[derive(Iden)]
+#[derive(DeriveIden)]
 enum OutputDir {
     Table,
     Id,
@@ -199,7 +199,7 @@ enum OutputDir {
     JobId,
 }
 
-#[derive(Iden)]
+#[derive(DeriveIden)]
 enum OutputSymlink {
     Table,
     Id,
@@ -208,7 +208,7 @@ enum OutputSymlink {
     JobId,
 }
 
-#[derive(Iden)]
+#[derive(DeriveIden)]
 enum OutputFile {
     Table,
     Id,
@@ -218,7 +218,7 @@ enum OutputFile {
     JobId,
 }
 
-#[derive(Iden)]
+#[derive(DeriveIden)]
 enum VisibleFile {
     Table,
     Id,
@@ -233,7 +233,7 @@ enum VisibleFile {
 // not track the inputs that were actully read, only the
 // visible files. This greatly simplifies lookup and allows
 // for a fast lookup by hash alone.
-#[derive(Iden)]
+#[derive(DeriveIden)]
 pub enum Job {
     Table,
     Id,

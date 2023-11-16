@@ -8,4 +8,4 @@ name = "entity"
 path = "src/mod.rs"
 
 [dependencies]
-sea-orm = "0.11.3"
+sea-orm = "0.12.6"
