@@ -47,7 +47,7 @@ pub async fn add_job(
                 let job = insert_job.save(txn).await?;
                 let job_id = job.id.unwrap();
 
-                let visible_files: Vec<visible_file::ActiveModel> = vis
+                let visible_files: Vec<_> = vis
                     .into_iter()
                     .map(|vis_file| visible_file::ActiveModel {
                         id: ActiveValue::NotSet,
@@ -62,7 +62,7 @@ pub async fn add_job(
                     .exec(txn)
                     .await?;
 
-                let out_files: Vec<output_file::ActiveModel> = output_files
+                let out_files: Vec<_> = output_files
                     .into_iter()
                     .map(|out_file| output_file::ActiveModel {
                         id: ActiveValue::NotSet,
@@ -78,7 +78,7 @@ pub async fn add_job(
                     .exec(txn)
                     .await?;
 
-                let out_symlinks: Vec<output_symlink::ActiveModel> = output_symlinks
+                let out_symlinks: Vec<_> = output_symlinks
                     .into_iter()
                     .map(|out_symlink| output_symlink::ActiveModel {
                         id: ActiveValue::NotSet,
@@ -93,7 +93,7 @@ pub async fn add_job(
                     .exec(txn)
                     .await?;
 
-                let dirs: Vec<output_dir::ActiveModel> = output_dirs
+                let dirs: Vec<_> = output_dirs
                     .into_iter()
                     .map(|dir| output_dir::ActiveModel {
                         id: ActiveValue::NotSet,
