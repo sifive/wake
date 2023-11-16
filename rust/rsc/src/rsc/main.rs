@@ -5,6 +5,7 @@ use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use tracing;
 
+use sea_orm::EntityTrait;
 mod add_job;
 mod api_key_check;
 mod read_job;
@@ -96,6 +97,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 move |body| read_job::read_job(body, shared_state)
             }),
         );
+
+    // Start TTL Job Eviction
+    let ttl_state = state.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(1000));
+        loop {
+            interval.tick().await;
+            println!("tick");
+
+            let jobs: Vec<entity::job::Model> = entity::job::Entity::find()
+                .all(ttl_state.as_ref())
+                .await
+                .unwrap();
+
+            //            println!("{:?}", jobs[0]);
+        }
+    });
 
     // run it with hyper on localhost:3000
     axum::Server::bind(&config.server_addr.parse()?)

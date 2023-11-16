@@ -37,7 +37,7 @@ pub async fn read_job(
                     .one(txn)
                     .await?
                 else {
-                  return Ok((0, ReadJobResponse::NoMatch));
+                    return Ok((0, ReadJobResponse::NoMatch));
                 };
 
                 let output_files = matching_job

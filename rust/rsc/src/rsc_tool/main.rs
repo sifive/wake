@@ -120,7 +120,12 @@ async fn remove_api_key(
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 struct TopLevel {
-    #[arg(help = "Specify a config override file", value_name = "CONFIG", long)]
+    #[arg(
+        help = "Specify a config override file",
+        value_name = "CONFIG",
+        short,
+        long
+    )]
     config_override: Option<String>,
 
     #[arg(
@@ -155,14 +160,16 @@ enum ApiKey {
 struct AddKeyOpts {
     #[arg(
         help = "If specified this is the key that will be used, otherwise one will be generated",
-        value_name = "KEY"
+        value_name = "KEY",
+        long
     )]
     key: Option<String>,
 
     #[arg(
         required = true,
         help = "The description of the key. This might tell you where the key is meant to be used",
-        value_name = "DESC"
+        value_name = "DESC",
+        long
     )]
     desc: String,
 }
@@ -212,9 +219,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(err)?;
     }
 
-    let Some(api_key_args) = args.api_key_command
-    else {
-        return Ok(())
+    let Some(api_key_args) = args.api_key_command else {
+        return Ok(());
     };
 
     match api_key_args {

@@ -22,14 +22,12 @@ pub async fn api_key_check_middleware<B>(
 
     // First get the key, if the user doesn't provide
     // a key give up on them.
-    let Some(key) = headers.get(AUTHORIZATION)
-    else {
+    let Some(key) = headers.get(AUTHORIZATION) else {
         return unauth();
     };
 
     // Convert the key to unicode if possible
-    let Ok(key) = key.to_str()
-    else {
+    let Ok(key) = key.to_str() else {
         return unauth();
     };
 
