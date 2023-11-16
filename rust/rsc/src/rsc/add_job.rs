@@ -47,61 +47,61 @@ pub async fn add_job(
                 let job = insert_job.save(txn).await?;
                 let job_id = job.id.unwrap();
 
-                let mut visible_files = Vec::new();
-                for vis_file in vis {
-                    visible_files.push(visible_file::ActiveModel {
+                let visible_files: Vec<visible_file::ActiveModel> = vis
+                    .into_iter()
+                    .map(|vis_file| visible_file::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(vis_file.path),
                         hash: ActiveValue::Set(vis_file.hash.into()),
                         job_id: ActiveValue::Set(job_id),
-                    });
-                }
+                    })
+                    .collect();
 
                 VisibleFile::insert_many(visible_files)
                     .on_empty_do_nothing()
                     .exec(txn)
                     .await?;
 
-                let mut out_files = Vec::new();
-                for out_file in output_files {
-                    out_files.push(output_file::ActiveModel {
+                let out_files: Vec<output_file::ActiveModel> = output_files
+                    .into_iter()
+                    .map(|out_file| output_file::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(out_file.path),
                         hash: ActiveValue::Set(out_file.hash.into()),
                         mode: ActiveValue::Set(out_file.mode),
                         job_id: ActiveValue::Set(job_id),
-                    });
-                }
+                    })
+                    .collect();
 
                 OutputFile::insert_many(out_files)
                     .on_empty_do_nothing()
                     .exec(txn)
                     .await?;
 
-                let mut out_symlinks = Vec::new();
-                for out_symlink in output_symlinks {
-                    out_symlinks.push(output_symlink::ActiveModel {
+                let out_symlinks: Vec<output_symlink::ActiveModel> = output_symlinks
+                    .into_iter()
+                    .map(|out_symlink| output_symlink::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(out_symlink.path),
                         content: ActiveValue::Set(out_symlink.content),
                         job_id: ActiveValue::Set(job_id),
-                    });
-                }
+                    })
+                    .collect();
 
                 OutputSymlink::insert_many(out_symlinks)
                     .on_empty_do_nothing()
                     .exec(txn)
                     .await?;
 
-                let mut dirs = Vec::new();
-                for dir in output_dirs {
-                    dirs.push(output_dir::ActiveModel {
+                let dirs: Vec<output_dir::ActiveModel> = output_dirs
+                    .into_iter()
+                    .map(|dir| output_dir::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(dir.path),
                         mode: ActiveValue::Set(dir.mode),
                         job_id: ActiveValue::Set(job_id),
-                    });
-                }
+                    })
+                    .collect();
 
                 OutputDir::insert_many(dirs)
                     .on_empty_do_nothing()
