@@ -1,6 +1,9 @@
 use axum::{http::StatusCode, Json};
+use entity::prelude::{OutputDir, OutputFile, OutputSymlink, VisibleFile};
 use entity::{job, output_dir, output_file, output_symlink, visible_file};
-use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, DbErr, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, DatabaseConnection, DbErr, EntityTrait, TransactionTrait,
+};
 use std::sync::Arc;
 use tracing;
 
@@ -44,49 +47,67 @@ pub async fn add_job(
                 let job = insert_job.save(txn).await?;
                 let job_id = job.id.unwrap();
 
-                // TODO: Convert these loops to singular add_many calls
-                for vis_file in vis {
-                    visible_file::ActiveModel {
+                let visible_files: Vec<_> = vis
+                    .into_iter()
+                    .map(|vis_file| visible_file::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(vis_file.path),
                         hash: ActiveValue::Set(vis_file.hash.into()),
                         job_id: ActiveValue::Set(job_id),
-                    }
-                    .save(txn)
-                    .await?;
-                }
+                    })
+                    .collect();
 
-                for out_file in output_files {
-                    output_file::ActiveModel {
+                VisibleFile::insert_many(visible_files)
+                    .on_empty_do_nothing()
+                    .exec(txn)
+                    .await?;
+
+                let out_files: Vec<_> = output_files
+                    .into_iter()
+                    .map(|out_file| output_file::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(out_file.path),
                         hash: ActiveValue::Set(out_file.hash.into()),
                         mode: ActiveValue::Set(out_file.mode),
                         job_id: ActiveValue::Set(job_id),
-                    }
-                    .save(txn)
+                    })
+                    .collect();
+
+                OutputFile::insert_many(out_files)
+                    .on_empty_do_nothing()
+                    .exec(txn)
                     .await?;
-                }
-                for out_symlink in output_symlinks {
-                    output_symlink::ActiveModel {
+
+                let out_symlinks: Vec<_> = output_symlinks
+                    .into_iter()
+                    .map(|out_symlink| output_symlink::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(out_symlink.path),
                         content: ActiveValue::Set(out_symlink.content),
                         job_id: ActiveValue::Set(job_id),
-                    }
-                    .save(txn)
+                    })
+                    .collect();
+
+                OutputSymlink::insert_many(out_symlinks)
+                    .on_empty_do_nothing()
+                    .exec(txn)
                     .await?;
-                }
-                for dir in output_dirs {
-                    output_dir::ActiveModel {
+
+                let dirs: Vec<_> = output_dirs
+                    .into_iter()
+                    .map(|dir| output_dir::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(dir.path),
                         mode: ActiveValue::Set(dir.mode),
                         job_id: ActiveValue::Set(job_id),
-                    }
-                    .save(txn)
+                    })
+                    .collect();
+
+                OutputDir::insert_many(dirs)
+                    .on_empty_do_nothing()
+                    .exec(txn)
                     .await?;
-                }
+
                 Ok(())
             })
         })
