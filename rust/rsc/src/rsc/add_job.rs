@@ -1,6 +1,9 @@
 use axum::{http::StatusCode, Json};
+use entity::prelude::{OutputDir, OutputFile, OutputSymlink, VisibleFile};
 use entity::{job, output_dir, output_file, output_symlink, visible_file};
-use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, DbErr, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, DatabaseConnection, DbErr, EntityTrait, TransactionTrait,
+};
 use std::sync::Arc;
 use tracing;
 
@@ -44,49 +47,67 @@ pub async fn add_job(
                 let job = insert_job.save(txn).await?;
                 let job_id = job.id.unwrap();
 
-                // TODO: Convert these loops to singular add_many calls
+                let mut visible_files = Vec::new();
                 for vis_file in vis {
-                    visible_file::ActiveModel {
+                    visible_files.push(visible_file::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(vis_file.path),
                         hash: ActiveValue::Set(vis_file.hash.into()),
                         job_id: ActiveValue::Set(job_id),
-                    }
-                    .save(txn)
-                    .await?;
+                    });
                 }
 
+                VisibleFile::insert_many(visible_files)
+                    .on_empty_do_nothing()
+                    .exec(txn)
+                    .await?;
+
+                let mut out_files = Vec::new();
                 for out_file in output_files {
-                    output_file::ActiveModel {
+                    out_files.push(output_file::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(out_file.path),
                         hash: ActiveValue::Set(out_file.hash.into()),
                         mode: ActiveValue::Set(out_file.mode),
                         job_id: ActiveValue::Set(job_id),
-                    }
-                    .save(txn)
-                    .await?;
+                    });
                 }
+
+                OutputFile::insert_many(out_files)
+                    .on_empty_do_nothing()
+                    .exec(txn)
+                    .await?;
+
+                let mut out_symlinks = Vec::new();
                 for out_symlink in output_symlinks {
-                    output_symlink::ActiveModel {
+                    out_symlinks.push(output_symlink::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(out_symlink.path),
                         content: ActiveValue::Set(out_symlink.content),
                         job_id: ActiveValue::Set(job_id),
-                    }
-                    .save(txn)
-                    .await?;
+                    });
                 }
+
+                OutputSymlink::insert_many(out_symlinks)
+                    .on_empty_do_nothing()
+                    .exec(txn)
+                    .await?;
+
+                let mut dirs = Vec::new();
                 for dir in output_dirs {
-                    output_dir::ActiveModel {
+                    dirs.push(output_dir::ActiveModel {
                         id: ActiveValue::NotSet,
                         path: ActiveValue::Set(dir.path),
                         mode: ActiveValue::Set(dir.mode),
                         job_id: ActiveValue::Set(job_id),
-                    }
-                    .save(txn)
-                    .await?;
+                    });
                 }
+
+                OutputDir::insert_many(dirs)
+                    .on_empty_do_nothing()
+                    .exec(txn)
+                    .await?;
+
                 Ok(())
             })
         })
