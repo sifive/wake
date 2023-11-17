@@ -6,7 +6,7 @@ use is_terminal::IsTerminal;
 use migration::{DbErr, Migrator, MigratorTrait};
 use rand_core::{OsRng, RngCore};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    ActiveModelTrait, ActiveValue::*, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
 };
 use std::io::{Error, ErrorKind};
 use tracing;
@@ -34,9 +34,9 @@ async fn add_api_key(
 
     // Go ahead and insert the key
     let insert_key = api_key::ActiveModel {
-        id: ActiveValue::NotSet,
-        key: ActiveValue::Set(key.clone()),
-        desc: ActiveValue::Set(opts.desc.clone()),
+        id: NotSet,
+        key: Set(key.clone()),
+        desc: Set(opts.desc.clone()),
     };
     tracing::info!("Adding key = {} as valid API key", &key);
     insert_key.insert(conn).await?;
@@ -212,9 +212,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(err)?;
     }
 
-    let Some(api_key_args) = args.api_key_command
-    else {
-        return Ok(())
+    let Some(api_key_args) = args.api_key_command else {
+        return Ok(());
     };
 
     match api_key_args {

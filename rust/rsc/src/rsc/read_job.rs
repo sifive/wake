@@ -3,8 +3,8 @@ use axum::Json;
 use chrono::Utc;
 use entity::{job, job_uses, output_dir, output_file, output_symlink};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait,
-    QueryFilter, TransactionTrait,
+    ActiveModelTrait, ActiveValue::*, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
+    ModelTrait, QueryFilter, TransactionTrait,
 };
 use std::sync::Arc;
 use tracing;
@@ -13,9 +13,9 @@ use tracing;
 async fn record_use(job_id: i32, conn: Arc<DatabaseConnection>) {
     let timestamp = Utc::now().naive_utc();
     let usage = job_uses::ActiveModel {
-        id: ActiveValue::NotSet,
-        job_id: ActiveValue::Set(job_id),
-        time: ActiveValue::Set(timestamp),
+        id: NotSet,
+        job_id: Set(job_id),
+        time: Set(timestamp),
     };
     let _ = usage.insert(conn.as_ref()).await;
 }
@@ -37,7 +37,7 @@ pub async fn read_job(
                     .one(txn)
                     .await?
                 else {
-                  return Ok((0, ReadJobResponse::NoMatch));
+                    return Ok((0, ReadJobResponse::NoMatch));
                 };
 
                 let output_files = matching_job
