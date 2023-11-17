@@ -21,6 +21,7 @@ pub async fn add_job(
     let output_dirs = payload.output_dirs;
     let insert_job = job::ActiveModel {
         id: NotSet,
+        created_at: NotSet,
         hash: Set(hash.clone().into()),
         cmd: Set(payload.cmd),
         env: Set(payload.env.as_bytes().into()),
@@ -48,6 +49,7 @@ pub async fn add_job(
 
                 let visible_files = vis.into_iter().map(|vis_file| visible_file::ActiveModel {
                     id: NotSet,
+                    created_at: NotSet,
                     path: Set(vis_file.path),
                     hash: Set(vis_file.hash.into()),
                     job_id: Set(job_id),
@@ -62,6 +64,7 @@ pub async fn add_job(
                     .into_iter()
                     .map(|out_file| output_file::ActiveModel {
                         id: NotSet,
+                        created_at: NotSet,
                         path: Set(out_file.path),
                         hash: Set(out_file.hash.into()),
                         mode: Set(out_file.mode),
@@ -78,6 +81,7 @@ pub async fn add_job(
                         .into_iter()
                         .map(|out_symlink| output_symlink::ActiveModel {
                             id: NotSet,
+                            created_at: NotSet,
                             path: Set(out_symlink.path),
                             content: Set(out_symlink.content),
                             job_id: Set(job_id),
@@ -90,6 +94,7 @@ pub async fn add_job(
 
                 let dirs = output_dirs.into_iter().map(|dir| output_dir::ActiveModel {
                     id: NotSet,
+                    created_at: NotSet,
                     path: Set(dir.path),
                     mode: Set(dir.mode),
                     job_id: Set(job_id),

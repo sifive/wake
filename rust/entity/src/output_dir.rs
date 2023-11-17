@@ -10,6 +10,7 @@ pub struct Model {
     pub path: String,
     pub mode: i32,
     pub job_id: i32,
+    pub created_at: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

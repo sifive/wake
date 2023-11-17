@@ -35,6 +35,7 @@ async fn add_api_key(
     // Go ahead and insert the key
     let insert_key = api_key::ActiveModel {
         id: NotSet,
+        created_at: NotSet,
         key: Set(key.clone()),
         desc: Set(opts.desc.clone()),
     };

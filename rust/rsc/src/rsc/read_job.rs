@@ -14,6 +14,7 @@ async fn record_use(job_id: i32, conn: Arc<DatabaseConnection>) {
     let timestamp = Utc::now().naive_utc();
     let usage = job_uses::ActiveModel {
         id: NotSet,
+        created_at: NotSet,
         job_id: Set(job_id),
         time: Set(timestamp),
     };
