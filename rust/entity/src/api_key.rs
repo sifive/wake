@@ -10,6 +10,7 @@ pub struct Model {
     #[sea_orm(unique)]
     pub key: String,
     pub desc: String,
+    pub created_at: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

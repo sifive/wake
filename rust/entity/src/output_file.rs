@@ -12,6 +12,7 @@ pub struct Model {
     pub hash: Vec<u8>,
     pub mode: i32,
     pub job_id: i32,
+    pub created_at: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

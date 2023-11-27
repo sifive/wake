@@ -29,6 +29,7 @@ pub struct Model {
     pub memory: i64,
     pub i_bytes: i64,
     pub o_bytes: i64,
+    pub created_at: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
