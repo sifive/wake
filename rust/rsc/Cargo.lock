@@ -2202,6 +2202,7 @@ dependencies = [
  "config",
  "data-encoding",
  "entity",
+ "hyper",
  "inquire",
  "is-terminal",
  "migration",
@@ -2213,6 +2214,7 @@ dependencies = [
  "serde_json",
  "textwrap",
  "tokio",
+ "tower",
  "tracing",
  "tracing-subscriber",
 ]
