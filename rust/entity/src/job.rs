@@ -34,8 +34,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::job_uses::Entity")]
-    JobUses,
+    #[sea_orm(has_many = "super::job_use::Entity")]
+    JobUse,
     #[sea_orm(has_many = "super::output_dir::Entity")]
     OutputDir,
     #[sea_orm(has_many = "super::output_file::Entity")]
@@ -46,9 +46,9 @@ pub enum Relation {
     VisibleFile,
 }
 
-impl Related<super::job_uses::Entity> for Entity {
+impl Related<super::job_use::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::JobUses.def()
+        Relation::JobUse.def()
     }
 }
 

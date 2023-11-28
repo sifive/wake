@@ -1,7 +1,6 @@
 use crate::types::{Dir, File, ReadJobPayload, ReadJobResponse, Symlink};
 use axum::Json;
-use chrono::Utc;
-use entity::{job, job_uses, output_dir, output_file, output_symlink};
+use entity::{job, job_use, output_dir, output_file, output_symlink};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::*, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
     ModelTrait, QueryFilter, TransactionTrait,
@@ -11,12 +10,10 @@ use tracing;
 
 #[tracing::instrument]
 async fn record_use(job_id: i32, conn: Arc<DatabaseConnection>) {
-    let timestamp = Utc::now().naive_utc();
-    let usage = job_uses::ActiveModel {
+    let usage = job_use::ActiveModel {
         id: NotSet,
         created_at: NotSet,
         job_id: Set(job_id),
-        time: Set(timestamp),
     };
     let _ = usage.insert(conn.as_ref()).await;
 }

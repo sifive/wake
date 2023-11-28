@@ -4,7 +4,7 @@ pub mod prelude;
 
 pub mod api_key;
 pub mod job;
-pub mod job_uses;
+pub mod job_use;
 pub mod output_dir;
 pub mod output_file;
 pub mod output_symlink;
