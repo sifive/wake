@@ -68,6 +68,12 @@ struct TTLEvictionPolicyImpl {
 
     wcl::log::info("Performing a cleanup!")();
 
+    // We're about to assign to this thread but we don't want to
+    // wait for it to exit so we detach the thread before making a new one.
+    // The function being run is thread safe so many instances can be run at
+    // once safely.
+    if (cleaning_thread.joinable()) cleaning_thread.detach();
+
     transact.run([this, &jobs_to_remove, deadline]() {
       auto reset = wcl::make_defer([this]() { jobs_older_than.reset(); });
       jobs_older_than.bind_integer(1, deadline);
@@ -87,11 +93,6 @@ struct TTLEvictionPolicyImpl {
         remove_jobs_older_than.bind_integer(1, deadline);
         remove_jobs_older_than.step();
 
-        // Now we remove the jobs in the background.
-        // NOTE: We don't wait for this to finish
-        // There might be an already running thread finishing up some cleaning.
-        // Instead of killing it we should join it before starting a new one.
-        if (cleaning_thread.joinable()) cleaning_thread.join();
         // Launch the cleaning thread
         cleaning_thread = std::thread(remove_backing_files, cache_dir, std::move(jobs_to_remove),
                                       4 * std::thread::hardware_concurrency());
