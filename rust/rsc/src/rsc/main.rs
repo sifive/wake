@@ -5,6 +5,10 @@ use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use tracing;
 
+use sea_orm::{ColumnTrait, DeleteResult, EntityTrait, QueryFilter};
+
+use chrono::{Duration, Utc};
+
 mod add_job;
 mod api_key_check;
 mod read_job;
@@ -60,16 +64,35 @@ fn make_app(state: Arc<sea_orm::DatabaseConnection>) -> Router {
         )
 }
 
+fn launch_eviction(state: Arc<sea_orm::DatabaseConnection>) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60 * 10));
+        loop {
+            interval.tick().await;
+
+            let deadline = (Utc::now() - Duration::days(1)).naive_utc();
+
+            let res: DeleteResult = entity::job::Entity::delete_many()
+                .filter(entity::job::Column::CreatedAt.lte(deadline))
+                .exec(state.as_ref())
+                .await
+                .unwrap();
+
+            tracing::info!(%res.rows_affected, "Performed TTL eviction tick.");
+        }
+    });
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // setup a subscriber so that we always have logging
+    // setup a subscriber for logging
     let subscriber = tracing_subscriber::FmtSubscriber::new();
     tracing::subscriber::set_global_default(subscriber)?;
 
-    // Parse our arguments
+    // Parse the arguments
     let args = ServerOptions::parse();
 
-    // Get our configuration
+    // Get the configuration
     let config = config::GSCConfig::new(config::GSCConfigOverride {
         config_override: args.config_override,
         server_addr: args.server_addr,
@@ -81,7 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // connect to our db
+    // connect to the db
     let connection = sea_orm::Database::connect(&config.database_url).await?;
     let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
     if pending_migrations.len() != 0 {
@@ -95,10 +118,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::error! {%err, "unperformed migrations, please apply these migrations before starting gsc"};
         Err(err)?;
     }
+    let state = Arc::new(connection);
 
-    let app = make_app(Arc::new(connection));
+    // Launch the eviction thread
+    launch_eviction(state.clone());
 
-    // run it with hyper on localhost:3000
+    // Launch the server
+    let app = make_app(state.clone());
     axum::Server::bind(&config.server_addr.parse()?)
         .serve(app.into_make_service())
         .await?;
