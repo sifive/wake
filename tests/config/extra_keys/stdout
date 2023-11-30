@@ -11,6 +11,6 @@ Wake config:
   shared_cache_timeout_config = '{
     read_retries = 3,
     connect_retries = 14,
-    max_misses_from_failure = 300,
+    max_misses_from_failure = 20,
     message_timeout_seconds = 10,
   }' (Default)
