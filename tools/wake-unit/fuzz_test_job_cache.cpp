@@ -384,7 +384,8 @@ TEST_FUNC(void, fuzz_loop, const FuzzLoopConfig& config, bool lru, wcl::xoshiro_
   uint64_t seconds_to_live = 10;
   job_cache::EvictionConfig lru_config = job_cache::EvictionConfig::lru_config(low_size, max_size);
   job_cache::EvictionConfig ttl_config = job_cache::EvictionConfig::ttl_config(seconds_to_live);
-  job_cache::Cache cache(config.cache_dir, "", (lru ? lru_config : ttl_config), false);
+  job_cache::TimeoutConfig tconfig;
+  job_cache::Cache cache(config.cache_dir, "", (lru ? lru_config : ttl_config), tconfig, false);
 
   std::string out_dir = wcl::join_paths(config.dir, "outputs");
   for (size_t i = 0; i < config.number_of_steps; ++i) {

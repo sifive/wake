@@ -244,11 +244,13 @@ static void mkdir_all(std::string acc, Iter begin, Iter end) {
   }
 }
 
-Cache::Cache(std::string dir, std::string bulk_dir, EvictionConfig cfg, bool miss) {
+Cache::Cache(std::string dir, std::string bulk_dir, EvictionConfig cfg, TimeoutConfig tcfg,
+             bool miss) {
   cache_dir = dir;
   bulk_logging_dir = bulk_dir;
   miss_on_failure = miss;
   config = cfg;
+  timeout_config = tcfg;
 
   auto fp_range = wcl::make_filepath_range_ref(cache_dir);
   mkdir_all(wcl::is_relative(cache_dir) ? "" : "/", fp_range.begin(), fp_range.end());
@@ -261,22 +263,20 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
   request.add("method", "cache/read");
   request.add("params", find_request.to_json());
 
-  auto tconfig = WakeConfig::get()->timeout_config;
-
   // serialize the request, send it, deserialize the response, return it
-  auto socket_fd = backoff_try_connect(tconfig.connect_retries);
+  auto socket_fd = backoff_try_connect(timeout_config.connect_retries);
   if (!socket_fd) {
     return wcl::result_error<FindJobResponse>(FindJobError::CouldNotConnect);
   }
-  auto write_error = sync_send_json_message(socket_fd->get(), request, tconfig.message_timeout_seconds);
+  auto write_error =
+      sync_send_json_message(socket_fd->get(), request, timeout_config.message_timeout_seconds);
 
   if (write_error) {
     return wcl::result_error<FindJobResponse>(FindJobError::FailedRequest);
   }
-  //MessageParser parser(socket_fd->get(), tconfig.message_timeout_seconds);
 
   // Read the message with a 10 second timeout.
-  auto messages_res = sync_read_message(socket_fd->get(), tconfig.message_timeout_seconds);
+  auto messages_res = sync_read_message(socket_fd->get(), timeout_config.message_timeout_seconds);
 
   if (!messages_res) {
     if (messages_res.error() == SyncMessageReadError::Fail) {
@@ -328,10 +328,8 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
 
-  auto tconfig = WakeConfig::get()->timeout_config;
-
   bool failed_on_connect = false;
-  for (int i = 0; i < tconfig.read_retries; i++) {
+  for (int i = 0; i < timeout_config.read_retries; i++) {
     auto response = read_impl(find_request);
     if (response) {
       wcl::log::info("Returning job response: cache_hit = %d", int(bool(response->match)))();
@@ -340,7 +338,7 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
 
     failed_on_connect |= response.error() == FindJobError::CouldNotConnect;
 
-    if (miss_on_failure && misses_from_failure > tconfig.max_misses_from_failure) {
+    if (miss_on_failure && misses_from_failure > timeout_config.max_misses_from_failure) {
       wcl::log::warning(
           "Cache::read(): reached maximum cache misses for this invocation. Triggering early "
           "miss.")();

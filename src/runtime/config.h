@@ -265,27 +265,21 @@ struct EvictionConfigPolicy {
   static void set_env_var(EvictionConfigPolicy& p, const char* env_var) {}
 };
 
-struct TimeoutConfig {
-  int read_retries = 3;
-  int connect_retries = 14;
-  int max_misses_from_failure = 300;
-  int message_timeout_seconds = 10;
-};
-
 struct SharedCacheTimeoutConfig {
-  using type = TimeoutConfig;
+  using type = job_cache::TimeoutConfig;
   using input_type = type;
   static constexpr const char* key = "shared_cache_timeout_config";
   static constexpr bool allowed_in_wakeroot = true;
   static constexpr bool allowed_in_userconfig = true;
   type timeout_config;
-  static constexpr type SharedCacheTimeoutConfig::*value = &SharedCacheTimeoutConfig::timeout_config;
+  static constexpr type SharedCacheTimeoutConfig::*value =
+      &SharedCacheTimeoutConfig::timeout_config;
   static constexpr Override<input_type> override_value = nullptr;
   static constexpr const char* env_var = nullptr;
   SharedCacheTimeoutConfig() : timeout_config() {}
   static void set(SharedCacheTimeoutConfig& p, const JAST& json);
   static void set_input(SharedCacheTimeoutConfig& p, const input_type& v) { p.*value = v; }
-  static void emit(const SharedCacheTimeoutConfig &p, std::ostream& os) {
+  static void emit(const SharedCacheTimeoutConfig& p, std::ostream& os) {
     os << "{\n";
     os << "    read_retries = " << p.timeout_config.read_retries << ",\n";
     os << "    connect_retries = " << p.timeout_config.connect_retries << ",\n";

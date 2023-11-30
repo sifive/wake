@@ -8,3 +8,9 @@ Wake config:
   cache_miss_on_failure = 'false' (Default)
   log_header_align = 'false' (Default)
   bulk_logging_dir = '' (Default)
+  shared_cache_timeout_config = '{
+    read_retries = 3,
+    connect_retries = 14,
+    max_misses_from_failure = 300,
+    message_timeout_seconds = 10,
+  }' (Default)
