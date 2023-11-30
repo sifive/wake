@@ -87,7 +87,7 @@ struct EvictionConfig {
 struct TimeoutConfig {
   int read_retries = 3;
   int connect_retries = 14;
-  int max_misses_from_failure = 300;
+  int max_misses_from_failure = 20;
   int message_timeout_seconds = 10;
 };
 
