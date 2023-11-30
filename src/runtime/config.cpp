@@ -216,6 +216,7 @@ POLICY_STATIC_DEFINES(SharedCacheMissOnFailure)
 POLICY_STATIC_DEFINES(LogHeaderAlignPolicy)
 POLICY_STATIC_DEFINES(BulkLoggingDirPolicy)
 POLICY_STATIC_DEFINES(EvictionConfigPolicy)
+POLICY_STATIC_DEFINES(SharedCacheTimeoutConfig)
 
 /********************************************************************
  * Non-Trivial Defaults
@@ -301,6 +302,25 @@ void EvictionConfigPolicy::set(EvictionConfigPolicy& p, const JAST& json) {
       p.eviction_config.lru.max_size = *json_max;
       p.eviction_config.type = job_cache::EvictionPolicyType::LRU;
     }
+  }
+}
+
+void SharedCacheTimeoutConfig::set(SharedCacheTimeoutConfig& p, const JAST& json) {
+  auto json_read_retries = json.get("read_retries").expect_integer();
+  auto json_connect_retries = json.get("connect_retries").expect_integer();
+  auto json_max_misses = json.get("max_misses_from_failure").expect_integer();
+  auto json_message_timeout = json.get("message_timeout_seconds").expect_integer();
+  if (json_read_retries) {
+    p.timeout_config.read_retries = *json_read_retries;
+  }
+  if (json_connect_retries) {
+    p.timeout_config.connect_retries = *json_connect_retries;
+  }
+  if (json_max_misses) {
+    p.timeout_config.max_misses_from_failure = *json_max_misses;
+  }
+  if (json_message_timeout) {
+    p.timeout_config.message_timeout_seconds = *json_message_timeout;
   }
 }
 

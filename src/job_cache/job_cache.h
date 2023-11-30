@@ -84,6 +84,13 @@ struct EvictionConfig {
   }
 };
 
+struct TimeoutConfig {
+  int read_retries = 3;
+  int connect_retries = 14;
+  int max_misses_from_failure = 20;
+  int message_timeout_seconds = 10;
+};
+
 class Cache {
  private:
   bool miss_on_failure = false;
@@ -92,6 +99,7 @@ class Cache {
   std::string cache_dir;
   std::string bulk_logging_dir;
   EvictionConfig config;
+  TimeoutConfig timeout_config;
 
   void launch_daemon();
   wcl::result<wcl::unique_fd, ConnectError> backoff_try_connect(int attempts);
@@ -101,7 +109,8 @@ class Cache {
   Cache() = delete;
   Cache(const Cache &) = delete;
 
-  Cache(std::string dir, std::string bulk_logging_dir, EvictionConfig config, bool miss);
+  Cache(std::string dir, std::string bulk_logging_dir, EvictionConfig config, TimeoutConfig tconfig,
+        bool miss);
 
   FindJobResponse read(const FindJobRequest &find_request);
   void add(const AddJobRequest &add_request);

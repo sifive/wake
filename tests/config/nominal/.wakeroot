@@ -4,5 +4,11 @@
   "log_header_source_width": 13,
   "log_header_align": true,
   "cache_miss_on_failure": true,
-  "eviction_config": {"type": "lru", "low_cache_size": 512, "max_cache_size": 1024}
+  "eviction_config": {"type": "lru", "low_cache_size": 512, "max_cache_size": 1024},
+  "shared_cache_timeout_config": {
+    "read_retries": 20,
+    "connect_retries": 3,
+    "max_misses_from_failure": 20,
+    "message_timeout_seconds": 100
+  }
 }
