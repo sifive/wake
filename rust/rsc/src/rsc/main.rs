@@ -70,7 +70,7 @@ fn launch_eviction(state: Arc<sea_orm::DatabaseConnection>) {
         loop {
             interval.tick().await;
 
-            let deadline = (Utc::now() - Duration::days(1)).naive_utc();
+            let deadline = (Utc::now() - Duration::days(7)).naive_utc();
 
             let res: DeleteResult = entity::job::Entity::delete_many()
                 .filter(entity::job::Column::CreatedAt.lte(deadline))
