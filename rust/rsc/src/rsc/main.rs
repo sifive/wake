@@ -64,13 +64,13 @@ fn make_app(state: Arc<sea_orm::DatabaseConnection>) -> Router {
         )
 }
 
-fn launch_eviction(state: Arc<sea_orm::DatabaseConnection>) {
+fn launch_eviction(state: Arc<sea_orm::DatabaseConnection>, tick_interval: u64, deadline: i64) {
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60 * 10));
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(tick_interval));
         loop {
             interval.tick().await;
 
-            let deadline = (Utc::now() - Duration::days(7)).naive_utc();
+            let deadline = (Utc::now() - Duration::seconds(deadline)).naive_utc();
 
             let res: DeleteResult = entity::job::Entity::delete_many()
                 .filter(entity::job::Column::CreatedAt.lte(deadline))
@@ -121,7 +121,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(connection);
 
     // Launch the eviction thread
-    launch_eviction(state.clone());
+    launch_eviction(state.clone(), 60 * 10, 60 * 60 * 24 * 7);
 
     // Launch the server
     let app = make_app(state.clone());
@@ -137,7 +137,7 @@ mod tests {
     use super::*;
     use data_encoding::BASE64;
     use migration::{Migrator, MigratorTrait};
-    use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr};
+    use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr, PaginatorTrait};
     use std::sync::Arc;
 
     use axum::{
@@ -327,5 +327,83 @@ mod tests {
                 "obytes":1000
             })
         );
+    }
+
+    #[tokio::test]
+    async fn ttl_eviction() {
+        let db = make_db().await.unwrap();
+        let state = Arc::new(db);
+
+        let hash: [u8; 32] = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0,
+        ];
+
+        // Create a job that is 5 days old
+        let insert_job = entity::job::ActiveModel {
+            id: NotSet,
+            created_at: Set((Utc::now() - Duration::days(5)).naive_utc()),
+            hash: Set(hash.into()),
+            cmd: Set("blarg".into()),
+            env: Set("PATH=/usr/bin".as_bytes().into()),
+            cwd: Set("/workspace".into()),
+            stdin: Set("".into()),
+            is_atty: Set(false),
+            hidden_info: Set("".into()),
+            stdout: Set("This is a test".into()),
+            stderr: Set("This is a very long string for a test".into()),
+            status: Set(0),
+            runtime: Set(1.0),
+            cputime: Set(1.0),
+            memory: Set(1000),
+            i_bytes: Set(100000),
+            o_bytes: Set(1000),
+        };
+
+        insert_job.save(state.clone().as_ref()).await.unwrap();
+
+        let hash: [u8; 32] = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 1,
+        ];
+
+        // Create a job that is 1 day old
+        let insert_job = entity::job::ActiveModel {
+            id: NotSet,
+            created_at: Set((Utc::now() - Duration::days(1)).naive_utc()),
+            hash: Set(hash.into()),
+            cmd: Set("blarg2".into()),
+            env: Set("PATH=/usr/bin".as_bytes().into()),
+            cwd: Set("/workspace".into()),
+            stdin: Set("".into()),
+            is_atty: Set(false),
+            hidden_info: Set("".into()),
+            stdout: Set("This is a test".into()),
+            stderr: Set("This is a very long string for a test".into()),
+            status: Set(0),
+            runtime: Set(1.0),
+            cputime: Set(1.0),
+            memory: Set(1000),
+            i_bytes: Set(100000),
+            o_bytes: Set(1000),
+        };
+
+        insert_job.save(state.clone().as_ref()).await.unwrap();
+
+        let count = entity::job::Entity::find()
+            .count(state.clone().as_ref())
+            .await
+            .unwrap();
+        assert_eq!(count, 2);
+
+        // Setup eviction for jobs older than 3 days ticking every second
+        launch_eviction(state.clone(), 1, 60 * 60 * 24 * 3);
+        tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+
+        let count = entity::job::Entity::find()
+            .count(state.clone().as_ref())
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
     }
 }
