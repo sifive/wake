@@ -88,11 +88,11 @@ export def mode2bits (mode: Mode) =
 # The system Stat of a given Path
 export tuple Stat =
     # The Path's file type
-    Type: PathType
+    export Type: PathType
     # The Path's complete permissions
-    Mode: Mode
+    export Mode: Mode
     # The size in bytes of the Path's content
-    SizeBytes: Integer
+    export SizeBytes: Integer
 
 def statTypeNumberToPathType (inodeType: Integer): PathType = match inodeType
     0 -> PathTypeRegularFile
