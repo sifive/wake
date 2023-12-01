@@ -215,7 +215,7 @@ static PRIMFN(prim_stat) {
   size_t max_error = path->size() + 100;
 
   struct stat buf;
-  if (stat(path->c_str(), &buf) < 0) {
+  if (lstat(path->c_str(), &buf) < 0) {
     std::stringstream str;
     str << "stat " << path->c_str() << ": " << strerror(errno);
     std::string s = str.str();
