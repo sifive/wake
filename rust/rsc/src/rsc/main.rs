@@ -93,7 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = ServerOptions::parse();
 
     // Get the configuration
-    let config = config::GSCConfig::new(config::GSCConfigOverride {
+    let config = config::RSCConfig::new(config::RSCConfigOverride {
         config_override: args.config_override,
         server_addr: args.server_addr,
         database_url: args.database_url,
@@ -111,11 +111,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let err = Error::new(
             ErrorKind::Other,
             format!(
-                "This gsc version expects {:?} additional migrations to be applied",
+                "This rsc version expects {:?} additional migrations to be applied",
                 pending_migrations.len()
             ),
         );
-        tracing::error! {%err, "unperformed migrations, please apply these migrations before starting gsc"};
+        tracing::error! {%err, "unperformed migrations, please apply these migrations before starting rsc"};
         Err(err)?;
     }
     let state = Arc::new(connection);

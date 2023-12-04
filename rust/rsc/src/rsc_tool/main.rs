@@ -194,7 +194,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = TopLevel::parse();
 
     // Gather our config
-    let config = config::GSCConfig::new(config::GSCConfigOverride {
+    let config = config::RSCConfig::new(config::RSCConfigOverride {
         config_override: args.config_override,
         database_url: args.database_url,
         ..Default::default()
@@ -212,11 +212,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let err = Error::new(
             ErrorKind::Other,
             format!(
-                "This gsc-tool version expects {:?} additional migrations to be applied",
+                "This rsc-tool version expects {:?} additional migrations to be applied",
                 pending_migrations.len()
             ),
         );
-        tracing::error! {%err, "unperformed migrations, please apply these migrations before using gsc-tool"};
+        tracing::error! {%err, "unperformed migrations, please apply these migrations before using rsc-tool"};
         Err(err)?;
     }
 
