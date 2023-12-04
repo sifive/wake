@@ -2,24 +2,24 @@ use config::{Config, ConfigError, Environment, File};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Default)]
-pub struct GSCConfigOverride {
+pub struct RSCConfigOverride {
     pub config_override: Option<String>,
     pub database_url: Option<String>,
     pub server_addr: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct GSCConfig {
+pub struct RSCConfig {
     pub database_url: String,
     // TODO: We should allow setting a domain as well
     pub server_addr: String,
 }
 
-impl GSCConfig {
-    pub fn new(overrides: GSCConfigOverride) -> Result<GSCConfig, ConfigError> {
+impl RSCConfig {
+    pub fn new(overrides: RSCConfigOverride) -> Result<RSCConfig, ConfigError> {
         // Gather the config
         let config = Config::builder()
-            .add_source(Environment::with_prefix("WAKE_GSC"))
+            .add_source(Environment::with_prefix("WAKE_RSC"))
             .add_source(
                 File::with_name(
                     &overrides
