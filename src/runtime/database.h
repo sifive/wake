@@ -22,6 +22,8 @@
 #include <string>
 #include <vector>
 
+#include "json/json5.h"
+
 struct FileReflection {
   std::string path;
   std::string hash;
@@ -78,6 +80,8 @@ struct JobReflection {
   std::vector<FileReflection> inputs;
   std::vector<FileReflection> outputs;
   std::vector<JobTag> tags;
+
+  JAST to_json() const;
 };
 
 struct JobEdge {
@@ -86,9 +90,11 @@ struct JobEdge {
   JobEdge(long user_, long used_) : user(user_), used(used_) {}
 };
 
-struct FileAccess {
-  int type;  // file access type from wake.db; 0=visible, 1=input, 2=output
-  long job;  // id of the job which has the access
+struct FileDependency {
+  long writer;  // The job that writes a file
+  long reader;  // The job that reads said file
+
+  JAST to_json() const;
 };
 
 struct Database {
@@ -172,8 +178,7 @@ struct Database {
   std::vector<JobEdge> get_edges();
   std::vector<JobTag> get_tags();
 
-  std::vector<JobReflection> get_job_visualization() const;
-  std::vector<FileAccess> get_file_accesses() const;
+  std::vector<FileDependency> get_file_dependencies() const;
 
   std::vector<std::pair<std::string, int>> get_interleaved_output(long job_id) const;
 };

@@ -189,10 +189,14 @@ function fillOneDependency(access, dependency, jobMap) {
     return dependency;
 }
 
-function fillAllDependencies(accesses, jobMap) {
-    let dependency = -1;
-    for (let access of accesses) {
-        dependency = fillOneDependency(access, dependency, jobMap);
+function fillAllDependencies(dependencies, jobMap) {
+    for (let dep of dependencies) {
+        let writer = dep.writer;
+        let reader = dep.reader;
+
+        if (jobMap.has(writer) && jobMap.has(reader)) {
+            jobMap.get(reader).dependencies.add(writer);
+        }
     }
 }
 
@@ -353,18 +357,18 @@ timeline.on('click', function (properties) {
 window.addEventListener("message", event => {
     const message = event.data;
     const newJobReflections = message.jobReflections;
-    const newFileAccesses = message.fileAccesses;
-    processChanges(newJobReflections, newFileAccesses);
+    const newFileDependencies = message.fileDependencies;
+    processChanges(newJobReflections, newFileDependencies);
 });
 
-function processChanges(newJobReflections, newFileAccesses) {
+function processChanges(newJobReflections, newFileDependencies) {
     jobMap.clear();
 
     for (const job of newJobReflections) {
         jobMap.set(job.job, new JobNode(job));
     }
 
-    fillAllDependencies(newFileAccesses, jobMap);
+    fillAllDependencies(newFileDependencies, jobMap);
 
     let topSortedJobs = topSort(jobMap);
     assignParents(jobMap, topSortedJobs);
@@ -407,4 +411,4 @@ function jobsEqual(jobA, jobB) {
 
 // Process initial data
 processChanges(JSON.parse(document.getElementById("jobReflections").textContent),
-    JSON.parse(document.getElementById("fileAccesses").textContent));
+    JSON.parse(document.getElementById("fileDependencies").textContent));
