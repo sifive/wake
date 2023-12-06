@@ -258,17 +258,17 @@ void print_help(const char *argv0) {
     << std::endl
     << "  Database commands:" << std::endl
     << "    --init      DIR  Create or replace a wake.db in the specified directory"     << std::endl
-    << "    --timeline       Print the timeline of wake jobs as HTML"                    << std::endl
     << "    --list-outputs   List all job outputs"                                       << std::endl
     << "    --clean          Delete all job outputs"                                     << std::endl
     << "    --input  -i FILE Capture jobs which read FILE. (repeat for multiple files)"  << std::endl
     << "    --output -o FILE Capture jobs which wrote FILE. (repeat for multiple files)" << std::endl
     << "    --label     GLOB Capture jobs where label matches GLOB"                      << std::endl
-    << "    --job       JOB  Captre the job with the specified job id"                   << std::endl
+    << "    --job       JOB  Capture the job with the specified job id"                  << std::endl
     << "    --last     -l    See --last-used"                                            << std::endl
     << "    --last-used      Capture all jobs used by last build. Regardless of cache"   << std::endl
     << "    --last-executed  Capture all jobs executed by the last build. Skips cache"   << std::endl
     << "    --failed   -f    Capture jobs which failed last build"                       << std::endl
+    << "    --timeline       Report timeline of captured jobs as HTML"                   << std::endl
     << "    --verbose  -v    Report metadata, stdout and stderr of captured jobs"        << std::endl
     << "    --metadata       Report metadata of captured jobs"                           << std::endl
     << "    --debug    -d    Report stack frame of captured jobs"                        << std::endl

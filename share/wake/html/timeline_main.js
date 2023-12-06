@@ -178,17 +178,6 @@ class JobNode {
     }
 }
 
-function fillOneDependency(access, dependency, jobMap) {
-    const job = access.job;
-    if (access.type === 2) {
-        return job;
-    }
-    if (jobMap.has(job)) {
-        jobMap.get(job).dependencies.add(dependency);
-    }
-    return dependency;
-}
-
 function fillAllDependencies(dependencies, jobMap) {
     for (let dep of dependencies) {
         let writer = dep.writer;

@@ -104,34 +104,23 @@ function updatePanel(panel: vscode.WebviewPanel): void {
 
 function setTimeline(): void {
     timelinePanel.title = 'Timeline';
-    useWake("",
-        (stdout: string) => {
-            timelinePanel.webview.html = stdout;
-        });
-}
-
-function refreshTimeline(): void {
-    useWake("job-reflections", (jobReflections: string) => {
-        useWake( "file-accesses", (fileAccesses: string) => {
-            const message = {
-                jobReflections: JSON.parse(jobReflections),
-                fileAccesses: JSON.parse(fileAccesses)
-            };
-            // Send a message to the webview.
-            timelinePanel.webview.postMessage(message);
-        });
+    useWake((stdout: string) => {
+        timelinePanel.webview.html = stdout;
     });
 }
 
-function useWake(option: string, callback: (stdout: string) => void): void {
+function refreshTimeline(): void {
+    setTimeline();
+}
+
+function useWake(callback: (stdout: string) => void): void {
     if (wakeBinary == '') {
         vscode.window.showErrorMessage(`Timeline: the path to wake binary is empty. Please provide a valid path in the extension's settings.`);
         return;
     }
 
-    const extraArgs = option === "" ? [] : [option];
     // spawn process in directory where the wake executable is and run it with --timeline
-    const process = spawn(wakeBinary, [`--timeline`, ...extraArgs], { cwd: `${wakeBinary.substring(0, wakeBinary.lastIndexOf('/'))}` });
+    const process = spawn(wakeBinary, [`--timeline`, `--last`], { cwd: `${wakeBinary.substring(0, wakeBinary.lastIndexOf('/'))}` });
 
     let err = "";
     let stdout = "";
