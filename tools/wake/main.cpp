@@ -60,7 +60,6 @@
 #include "runtime/status.h"
 #include "runtime/tuple.h"
 #include "runtime/value.h"
-#include "timeline.h"
 #include "types/data.h"
 #include "types/sums.h"
 #include "util/diagnostic.h"
@@ -133,6 +132,10 @@ Set<long> apply_inspection_query(std::unordered_map<long, JobReflection> &captur
 }
 
 DescribePolicy get_describe_policy(const CommandLineOptions &clo) {
+  if (clo.timeline) {
+    return DescribePolicy::timeline();
+  }
+
   if (clo.debug) {
     return DescribePolicy::debug();
   }
@@ -221,7 +224,7 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
     exit(1);
   }
 
-  describe(intersected_jobs, get_describe_policy(clo));
+  describe(intersected_jobs, get_describe_policy(clo), db);
 }
 
 }  // namespace
@@ -255,17 +258,17 @@ void print_help(const char *argv0) {
     << std::endl
     << "  Database commands:" << std::endl
     << "    --init      DIR  Create or replace a wake.db in the specified directory"     << std::endl
-    << "    --timeline       Print the timeline of wake jobs as HTML"                    << std::endl
     << "    --list-outputs   List all job outputs"                                       << std::endl
     << "    --clean          Delete all job outputs"                                     << std::endl
     << "    --input  -i FILE Capture jobs which read FILE. (repeat for multiple files)"  << std::endl
     << "    --output -o FILE Capture jobs which wrote FILE. (repeat for multiple files)" << std::endl
     << "    --label     GLOB Capture jobs where label matches GLOB"                      << std::endl
-    << "    --job       JOB  Captre the job with the specified job id"                   << std::endl
+    << "    --job       JOB  Capture the job with the specified job id"                  << std::endl
     << "    --last     -l    See --last-used"                                            << std::endl
     << "    --last-used      Capture all jobs used by last build. Regardless of cache"   << std::endl
     << "    --last-executed  Capture all jobs executed by the last build. Skips cache"   << std::endl
     << "    --failed   -f    Capture jobs which failed last build"                       << std::endl
+    << "    --timeline       Report timeline of captured jobs as HTML"                   << std::endl
     << "    --verbose  -v    Report metadata, stdout and stderr of captured jobs"        << std::endl
     << "    --metadata       Report metadata of captured jobs"                           << std::endl
     << "    --debug    -d    Report stack frame of captured jobs"                        << std::endl
@@ -409,7 +412,7 @@ int main(int argc, char **argv) {
 
   bool is_db_inspection = !clo.job_ids.empty() || !clo.output_files.empty() ||
                           !clo.input_files.empty() || !clo.labels.empty() || !clo.tags.empty() ||
-                          clo.last_use || clo.last_exe || clo.failed || clo.tagdag;
+                          clo.last_use || clo.last_exe || clo.failed || clo.tagdag || clo.timeline;
   // Arguments are forbidden with these options
   bool noargs =
       is_db_inspection || clo.init || clo.html || clo.global || clo.exports || clo.api || clo.exec;
@@ -616,24 +619,6 @@ int main(int argc, char **argv) {
     sip_key[0] = dist(rd);
     sip_key[1] = dist(rd);
     db.entropy(&sip_key[0], 2);
-  }
-
-  if (clo.timeline) {
-    if (clo.argc == 1) {
-      get_and_write_timeline(std::cout, db);
-      return 0;
-    }
-    char *timeline_str = clo.argv[1];
-    if (strcmp(timeline_str, "job-reflections") == 0) {
-      get_and_write_job_reflections(std::cout, db);
-      return 0;
-    }
-    if (strcmp(timeline_str, "file-accesses") == 0) {
-      get_and_write_file_accesses(std::cout, db);
-      return 0;
-    }
-    std::cerr << "Unrecognized option after --timeline" << std::endl;
-    return 1;
   }
 
   if (is_db_inspection) {

@@ -24,7 +24,7 @@
 #include "runtime/database.h"
 
 struct DescribePolicy {
-  enum type { SCRIPT, HUMAN, METADATA, DEBUG, VERBOSE } type;
+  enum type { SCRIPT, HUMAN, METADATA, DEBUG, VERBOSE, TIMELINE } type;
   union {
     const char *tag_uri;
   };
@@ -58,9 +58,15 @@ struct DescribePolicy {
     policy.type = VERBOSE;
     return policy;
   }
+
+  static DescribePolicy timeline() {
+    DescribePolicy policy;
+    policy.type = TIMELINE;
+    return policy;
+  }
 };
 
-void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy);
+void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy, const Database &db);
 JAST create_tagdag(Database &db, const std::string &tag);
 
 #endif

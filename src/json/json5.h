@@ -90,6 +90,15 @@ struct JAST {
   static bool parse(const std::string &body, std::ostream &errs, JAST &out);
   static bool parse(const char *body, size_t len, std::ostream &errs, JAST &out);
 
+  template <class T>
+  static JAST from_vec(const std::vector<T> &items) {
+    JAST json(JSON_ARRAY);
+    for (const T &i : items) {
+      json.add("", i.to_json());
+    }
+    return json;
+  }
+
   const JAST &get(const std::string &key) const;
   JAST &get(const std::string &key);
   wcl::optional<const JAST *> get_opt(const std::string &key) const;

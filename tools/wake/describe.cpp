@@ -25,10 +25,12 @@
 #include <re2/re2.h>
 
 #include <deque>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "runtime/database.h"
 #include "util/execpath.h"
@@ -246,7 +248,37 @@ void describe_human(const std::vector<JobReflection> &jobs) {
   }
 }
 
-void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy) {
+void describe_timeline(const std::vector<JobReflection> &jobs,
+                       const std::vector<FileDependency> &dependencies) {
+  TermInfoBuf tbuf(std::cout.rdbuf(), true);
+  std::ostream out(&tbuf);
+
+  std::ifstream html_template(find_execpath() + "/../share/wake/html/timeline_template.html");
+  std::ifstream arrow_library(find_execpath() + "/../share/wake/html/timeline_arrow_lib.js");
+  std::ifstream main(find_execpath() + "/../share/wake/html/timeline_main.js");
+
+  out << html_template.rdbuf();
+
+  out << R"(<script type="application/json" id="jobReflections">)" << std::endl;
+  out << JAST::from_vec(jobs);
+  out << "</script>" << std::endl;
+
+  out << R"(<script type="application/json" id="fileDependencies">)" << std::endl;
+  out << JAST::from_vec(dependencies);
+  out << "</script>" << std::endl;
+
+  out << R"(<script type="text/javascript">)" << std::endl;
+  out << arrow_library.rdbuf();
+  out << "</script>" << std::endl;
+
+  out << R"(<script type="module">)" << std::endl;
+  out << main.rdbuf();
+  out << "</script>\n"
+         "</body>\n"
+         "</html>\n";
+}
+
+void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy, const Database &db) {
   switch (policy.type) {
     case DescribePolicy::SCRIPT: {
       describe_shell(jobs, true, true);
@@ -266,6 +298,26 @@ void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy) {
     }
     case DescribePolicy::VERBOSE: {
       describe_metadata(jobs, false, true);
+      break;
+    }
+    case DescribePolicy::TIMELINE: {
+      std::unordered_set<long> job_ids;
+      for (const JobReflection &job : jobs) {
+        job_ids.insert(job.job);
+      }
+
+      std::vector<FileDependency> all_deps = db.get_file_dependencies();
+      std::vector<FileDependency> filtered_deps;
+
+      while (!all_deps.empty()) {
+        FileDependency last = std::move(all_deps.back());
+        all_deps.pop_back();
+        if (job_ids.count(last.reader) && job_ids.count(last.writer)) {
+          filtered_deps.emplace_back(std::move(last));
+        }
+      }
+
+      describe_timeline(jobs, filtered_deps);
       break;
     }
   }

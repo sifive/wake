@@ -87,8 +87,7 @@ struct Database::detail {
   sqlite3_stmt *get_tags;
   sqlite3_stmt *get_all_tags;
   sqlite3_stmt *get_edges;
-  sqlite3_stmt *get_job_visualization;
-  sqlite3_stmt *get_file_access;
+  sqlite3_stmt *get_file_dependency;
   sqlite3_stmt *get_output_files;
   sqlite3_stmt *remove_output_files;
   sqlite3_stmt *remove_all_jobs;
@@ -140,8 +139,7 @@ struct Database::detail {
         get_tags(0),
         get_all_tags(0),
         get_edges(0),
-        get_job_visualization(0),
-        get_file_access(0),
+        get_file_dependency(0),
         get_interleaved_output(0) {}
 };
 
@@ -466,22 +464,12 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "select distinct user.job_id as user, used.job_id as used"
       "  from filetree user, filetree used"
       "   where user.access=1 and user.file_id=used.file_id and used.access=2";
-  const char *sql_get_job_visualization =
-      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
-      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
-      "s.membytes, s.ibytes, s.obytes"
-      " from  jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
-      " where substr(cast(j.commandline as varchar), 1, 8) != '<source>'"
-      " and substr(cast(j.commandline as varchar), 1, 7) != '<claim>'"
-      " and substr(cast(j.commandline as varchar), 1, 7) != '<mkdir>'"
-      " and substr(cast(j.commandline as varchar), 1, 7) != '<write>'"
-      " and substr(cast(j.commandline as varchar), 1, 6) != '<hash>'"
-      " and substr(cast(j.label       as varchar), 1, 6) != '<hash>'";
-  const char *sql_get_file_access =
-      "select access, job_id"
-      " from filetree"
-      " where access != 1"
-      " order by file_id, access desc, job_id";
+  const char *sql_get_file_dependency =
+      "SELECT l.job_id, r.job_id"
+      " FROM filetree l"
+      " INNER JOIN filetree r"
+      " ON l.file_id = r.file_id"
+      " WHERE l.access = 2 AND r.access = 0";
   const char *sql_get_output_files =
       "select f.path"
       " from filetree ft join files f on f.file_id=ft.file_id join jobs j on ft.job_id=j.job_id"
@@ -554,8 +542,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_get_tags, get_tags);
   PREPARE(sql_get_all_tags, get_all_tags);
   PREPARE(sql_get_edges, get_edges);
-  PREPARE(sql_get_job_visualization, get_job_visualization);
-  PREPARE(sql_get_file_access, get_file_access);
+  PREPARE(sql_get_file_dependency, get_file_dependency);
   PREPARE(sql_get_output_files, get_output_files);
   PREPARE(sql_remove_output_files, remove_output_files);
   PREPARE(sql_remove_all_jobs, remove_all_jobs);
@@ -620,8 +607,7 @@ void Database::close() {
   FINALIZE(get_tags);
   FINALIZE(get_all_tags);
   FINALIZE(get_edges);
-  FINALIZE(get_job_visualization);
-  FINALIZE(get_file_access);
+  FINALIZE(get_file_dependency);
   FINALIZE(get_output_files);
   FINALIZE(remove_output_files);
   FINALIZE(remove_all_jobs);
@@ -1191,6 +1177,95 @@ std::string Time::as_string() const {
   return buf;
 }
 
+JAST JobReflection::to_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("job", job);
+  json.add("label", label.c_str());
+  json.add("stale", stale);
+  json.add("directory", directory.c_str());
+
+  std::stringstream commandline_stream;
+  for (const std::string &line : commandline) {
+    commandline_stream << line << " ";
+  }
+  json.add("commandline", commandline_stream.str());
+
+  std::stringstream environment_stream;
+  for (const std::string &line : environment) {
+    environment_stream << line << " ";
+  }
+  json.add("environment", environment_stream.str());
+
+  json.add("stack", stack.c_str());
+
+  json.add("stdin_file", stdin_file.c_str());
+
+  json.add("starttime", starttime.as_int64());
+  json.add("endtime", endtime.as_int64());
+  json.add("wake_start", wake_start.as_int64());
+
+  json.add("wake_cmdline", wake_cmdline.c_str());
+
+  std::string out_stream;
+  std::string err_stream;
+  for (auto &write : std_writes) {
+    if (write.second == 1) {
+      out_stream += write.first;
+    }
+    if (write.second == 2) {
+      err_stream += write.first;
+    }
+  }
+
+  json.add("stdout_payload", out_stream.c_str());
+  json.add("stderr_payload", err_stream.c_str());
+
+  std::stringstream usage_stream;
+  usage_stream << "status: " << usage.status << "<br>"
+               << "runtime: " << usage.runtime << "<br>"
+               << "cputime: " << usage.cputime << "<br>"
+               << "membytes: " << std::to_string(usage.membytes) << "<br>"
+               << "ibytes: " << std::to_string(usage.ibytes) << "<br>"
+               << "obytes: " << std::to_string(usage.obytes);
+  json.add("usage", usage_stream.str());
+
+  std::stringstream visible_stream;
+  for (const auto &visible_file : visible) {
+    visible_stream << visible_file.path << "<br>";
+  }
+  json.add("visible", visible_stream.str());
+
+  std::stringstream inputs_stream;
+  for (const auto &input : inputs) {
+    inputs_stream << input.path << "<br>";
+  }
+  json.add("inputs", inputs_stream.str());
+
+  std::stringstream outputs_stream;
+  for (const auto &output : outputs) {
+    outputs_stream << output.path << "<br>";
+  }
+  json.add("outputs", outputs_stream.str());
+
+  std::stringstream tags_stream;
+  for (const auto &tag : tags) {
+    tags_stream << "{<br>"
+                << "  job: " << tag.job << ",<br>"
+                << "  uri: " << tag.uri << ",<br>"
+                << "  content: " << tag.content << "<br>},<br>";
+  }
+  json.add("tags", tags_stream.str());
+
+  return json;
+}
+
+JAST FileDependency::to_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("writer", writer);
+  json.add("reader", reader);
+  return json;
+}
+
 static JobReflection find_one(const Database *db, sqlite3_stmt *query) {
   const char *why = "Could not describe job";
   JobReflection desc;
@@ -1277,17 +1352,17 @@ std::vector<std::string> Database::get_outputs() const {
   return out;
 }
 
-static std::vector<FileAccess> get_all_file_accesses(const Database *db, sqlite3_stmt *query) {
-  const char *why = "Could not get file access";
-  std::vector<FileAccess> out;
+static std::vector<FileDependency> get_all_file_dependencies(const Database *db,
+                                                             sqlite3_stmt *query) {
+  const char *why = "Could not get file dependencies";
+  std::vector<FileDependency> out;
 
   db->begin_txn();
   while (sqlite3_step(query) == SQLITE_ROW) {
-    FileAccess access;
-    // grab flat values
-    access.type = sqlite3_column_int(query, 0);
-    access.job = sqlite3_column_int64(query, 1);
-    out.emplace_back(access);
+    FileDependency dep;
+    dep.writer = sqlite3_column_int64(query, 0);
+    dep.reader = sqlite3_column_int64(query, 1);
+    out.emplace_back(dep);
   }
   finish_stmt(why, query, db->imp->debugdb);
   db->end_txn();
@@ -1372,10 +1447,6 @@ std::vector<std::pair<std::string, int>> Database::get_interleaved_output(long j
   return out;
 }
 
-std::vector<JobReflection> Database::get_job_visualization() const {
-  return find_all(this, imp->get_job_visualization);
-}
-
-std::vector<FileAccess> Database::get_file_accesses() const {
-  return get_all_file_accesses(this, imp->get_file_access);
+std::vector<FileDependency> Database::get_file_dependencies() const {
+  return get_all_file_dependencies(this, imp->get_file_dependency);
 }
