@@ -6,6 +6,7 @@ pub struct RSCConfigOverride {
     pub config_override: Option<String>,
     pub database_url: Option<String>,
     pub server_addr: Option<String>,
+    pub standalone: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -13,6 +14,7 @@ pub struct RSCConfig {
     pub database_url: String,
     // TODO: We should allow setting a domain as well
     pub server_addr: String,
+    pub standalone: bool,
 }
 
 impl RSCConfig {
@@ -32,6 +34,7 @@ impl RSCConfig {
             )
             .set_override_option("database_url", overrides.database_url)?
             .set_override_option("server_addr", overrides.server_addr)?
+            .set_override_option("standalone", overrides.standalone)?
             .build()?;
 
         config.try_deserialize()

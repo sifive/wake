@@ -5,7 +5,7 @@ use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use tracing;
 
-use sea_orm::{ColumnTrait, DeleteResult, EntityTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, ActiveValue::*, ColumnTrait, Database, DatabaseConnection, DeleteResult, EntityTrait, QueryFilter};
 
 use chrono::{Duration, Utc};
 
@@ -22,7 +22,7 @@ struct ServerOptions {
     #[arg(help = "Specify a config override file", value_name = "CONFIG", long)]
     config_override: Option<String>,
 
-    #[arg(help = "Show's the config and then exits", long)]
+    #[arg(help = "Shows the config and then exits", long)]
     show_config: bool,
 
     #[arg(
@@ -38,9 +38,15 @@ struct ServerOptions {
         long
     )]
     database_url: Option<String>,
+
+    #[arg(
+        help = "Launches the cache without an external database",
+        long
+    )]
+    standalone: bool,
 }
 
-fn make_app(state: Arc<sea_orm::DatabaseConnection>) -> Router {
+fn create_router(state: Arc<DatabaseConnection>) -> Router {
     Router::new()
         .route(
             "/job",
@@ -64,7 +70,59 @@ fn make_app(state: Arc<sea_orm::DatabaseConnection>) -> Router {
         )
 }
 
-fn launch_eviction(state: Arc<sea_orm::DatabaseConnection>, tick_interval: u64, deadline: i64) {
+async fn create_standalone_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
+    let db = Database::connect("sqlite::memory:").await?;
+    Migrator::up(&db, None).await?;
+    Ok(db)
+}
+
+async fn create_remote_db(config: &config::RSCConfig) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
+    let connection = Database::connect(&config.database_url).await?;
+    let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
+    if pending_migrations.len() != 0 {
+        let err = Error::new(
+            ErrorKind::Other,
+            format!(
+                "This rsc version expects {:?} additional migrations to be applied",
+                pending_migrations.len()
+            ),
+        );
+        tracing::error! {%err, "unperformed migrations, please apply these migrations before starting rsc"};
+        Err(err)?
+    }
+
+    Ok(connection)
+}
+
+async fn create_insecure_api_key(db: &DatabaseConnection) -> Result<String, Box<dyn std::error::Error>> {
+    let key = data_encoding::BASE64.encode(b"Insecure Key");
+
+    let active_key = entity::api_key::ActiveModel {
+        id: NotSet,
+        created_at: NotSet,
+        key: Set(key.clone()),
+        desc: Set("Generated Insecure Key".into()),
+    };
+
+    let inserted_key = active_key.insert(db).await?;
+
+    Ok(inserted_key.key)
+}
+
+async fn connect_to_database(config: &config::RSCConfig) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
+    if config.standalone {
+        tracing::warn!("Launching rsc in standalone mode, data will not persist.");
+        let db = create_standalone_db().await?;
+        let key = create_insecure_api_key(&db).await?;
+        tracing::info!(key, "Created insecure api key.");
+
+        return Ok(db);
+    }
+
+    create_remote_db(config).await
+}
+
+fn launch_eviction(state: Arc<DatabaseConnection>, tick_interval: u64, deadline: i64) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(tick_interval));
         loop {
@@ -83,6 +141,7 @@ fn launch_eviction(state: Arc<sea_orm::DatabaseConnection>, tick_interval: u64, 
     });
 }
 
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // setup a subscriber for logging
@@ -97,6 +156,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config_override: args.config_override,
         server_addr: args.server_addr,
         database_url: args.database_url,
+        standalone: if args.standalone { Some(args.standalone) } else { None },
     })?;
 
     if args.show_config {
@@ -105,28 +165,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // connect to the db
-    let connection = sea_orm::Database::connect(&config.database_url).await?;
-    let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
-    if pending_migrations.len() != 0 {
-        let err = Error::new(
-            ErrorKind::Other,
-            format!(
-                "This rsc version expects {:?} additional migrations to be applied",
-                pending_migrations.len()
-            ),
-        );
-        tracing::error! {%err, "unperformed migrations, please apply these migrations before starting rsc"};
-        Err(err)?;
-    }
+    let connection = connect_to_database(&config).await?;
     let state = Arc::new(connection);
 
     // Launch the eviction thread
     launch_eviction(state.clone(), 60 * 10, 60 * 60 * 24 * 7);
 
     // Launch the server
-    let app = make_app(state.clone());
+    let router = create_router(state.clone());
     axum::Server::bind(&config.server_addr.parse()?)
-        .serve(app.into_make_service())
+        .serve(router.into_make_service())
         .await?;
 
     Ok(())
@@ -135,9 +183,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use data_encoding::BASE64;
-    use migration::{Migrator, MigratorTrait};
-    use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr, PaginatorTrait};
+    use sea_orm::{ActiveModelTrait, PaginatorTrait};
     use std::sync::Arc;
 
     use axum::{
@@ -147,44 +193,21 @@ mod tests {
     use serde_json::{json, Value};
     use tower::Service;
 
-    async fn make_db() -> Result<DatabaseConnection, DbErr> {
-        let db = sea_orm::Database::connect("sqlite::memory:").await?;
-        Migrator::up(&db, None).await?;
-        let pending_migrations = Migrator::get_pending_migrations(&db).await?;
-        assert_eq!(0, pending_migrations.len());
-        Ok(db)
-    }
-
-    async fn create_api_key(db: &DatabaseConnection) -> Result<String, Box<dyn std::error::Error>> {
-        let key = BASE64.encode(b"Test Api Key");
-
-        let active_key = entity::api_key::ActiveModel {
-            id: NotSet,
-            created_at: NotSet,
-            key: Set(key.clone()),
-            desc: Set("Generated Test Key".into()),
-        };
-
-        let inserted_key = active_key.insert(db).await?;
-
-        Ok(inserted_key.key)
-    }
-
     #[tokio::test]
     async fn nominal() {
-        let db = make_db().await.unwrap();
-        let api_key = create_api_key(&db).await.unwrap();
-        let mut app = make_app(Arc::new(db));
+        let db = create_standalone_db().await.unwrap();
+        let api_key = create_insecure_api_key(&db).await.unwrap();
+        let mut router = create_router(Arc::new(db));
 
         // Non-existant route should 404
-        let res = app
+        let res = router
             .call(Request::builder().uri("/").body(Body::empty()).unwrap())
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
 
         // Protected route without auth should 401
-        let res = app
+        let res = router
             .call(
                 Request::builder()
                     .uri("/job")
@@ -199,7 +222,7 @@ mod tests {
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 
         // Missing/malformed body should 400
-        let res = app
+        let res = router
             .call(
                 Request::builder()
                     .uri("/job")
@@ -215,7 +238,7 @@ mod tests {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 
         // Correctly inserting a job should 200
-        let res = app
+        let res = router
             .call(
                 Request::builder()
                     .uri("/job")
@@ -253,7 +276,7 @@ mod tests {
         assert_eq!(res.status(), StatusCode::OK);
 
         // Non-matching job should 200 with expected body
-        let res = app
+        let res = router
             .call(
                 Request::builder()
                     .uri("/job/matching")
@@ -283,7 +306,7 @@ mod tests {
         assert_eq!(body, json!({ "type": "NoMatch" }));
 
         // Matching job should 200 with expected body
-        let res = app
+        let res = router
             .call(
                 Request::builder()
                     .uri("/job/matching")
@@ -331,7 +354,7 @@ mod tests {
 
     #[tokio::test]
     async fn ttl_eviction() {
-        let db = make_db().await.unwrap();
+        let db = create_standalone_db().await.unwrap();
         let state = Arc::new(db);
 
         let hash: [u8; 32] = [
