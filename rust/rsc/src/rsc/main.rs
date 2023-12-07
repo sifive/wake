@@ -5,7 +5,10 @@ use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use tracing;
 
-use sea_orm::{ActiveModelTrait, ActiveValue::*, ColumnTrait, Database, DatabaseConnection, DeleteResult, EntityTrait, QueryFilter};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::*, ColumnTrait, Database, DatabaseConnection, DeleteResult,
+    EntityTrait, QueryFilter,
+};
 
 use chrono::{Duration, Utc};
 
@@ -39,10 +42,7 @@ struct ServerOptions {
     )]
     database_url: Option<String>,
 
-    #[arg(
-        help = "Launches the cache without an external database",
-        long
-    )]
+    #[arg(help = "Launches the cache without an external database", long)]
     standalone: bool,
 }
 
@@ -76,7 +76,9 @@ async fn create_standalone_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
     Ok(db)
 }
 
-async fn create_remote_db(config: &config::RSCConfig) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
+async fn create_remote_db(
+    config: &config::RSCConfig,
+) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
     let connection = Database::connect(&config.database_url).await?;
     let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
     if pending_migrations.len() != 0 {
@@ -94,13 +96,13 @@ async fn create_remote_db(config: &config::RSCConfig) -> Result<DatabaseConnecti
     Ok(connection)
 }
 
-async fn create_insecure_api_key(db: &DatabaseConnection) -> Result<String, Box<dyn std::error::Error>> {
-    let key = data_encoding::BASE64.encode(b"Insecure Key");
-
+async fn create_insecure_api_key(
+    db: &DatabaseConnection,
+) -> Result<String, Box<dyn std::error::Error>> {
     let active_key = entity::api_key::ActiveModel {
         id: NotSet,
         created_at: NotSet,
-        key: Set(key.clone()),
+        key: Set("InsecureKey".into()),
         desc: Set("Generated Insecure Key".into()),
     };
 
@@ -109,7 +111,9 @@ async fn create_insecure_api_key(db: &DatabaseConnection) -> Result<String, Box<
     Ok(inserted_key.key)
 }
 
-async fn connect_to_database(config: &config::RSCConfig) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
+async fn connect_to_database(
+    config: &config::RSCConfig,
+) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
     if config.standalone {
         tracing::warn!("Launching rsc in standalone mode, data will not persist.");
         let db = create_standalone_db().await?;
@@ -141,7 +145,6 @@ fn launch_eviction(state: Arc<DatabaseConnection>, tick_interval: u64, deadline:
     });
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // setup a subscriber for logging
@@ -156,7 +159,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config_override: args.config_override,
         server_addr: args.server_addr,
         database_url: args.database_url,
-        standalone: if args.standalone { Some(args.standalone) } else { None },
+        standalone: if args.standalone {
+            Some(args.standalone)
+        } else {
+            None
+        },
     })?;
 
     if args.show_config {
