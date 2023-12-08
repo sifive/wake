@@ -1,4 +1,8 @@
-use axum::{routing::post, Router};
+use axum::{
+    extract::{DefaultBodyLimit, Multipart},
+    routing::{get, post},
+    Router,
+};
 use clap::Parser;
 use migration::{Migrator, MigratorTrait};
 use std::io::{Error, ErrorKind};
@@ -14,6 +18,7 @@ use chrono::{Duration, Utc};
 
 mod add_job;
 mod api_key_check;
+mod blob;
 mod read_job;
 mod types;
 
@@ -44,29 +49,50 @@ struct ServerOptions {
 
     #[arg(help = "Launches the cache without an external database", long)]
     standalone: bool,
+
+    #[arg(
+        help = "Specify an absolute path for a local directory based store",
+        value_name = "LOCAL_STORE",
+        long
+    )]
+    local_store: Option<String>,
 }
 
-fn create_router(state: Arc<DatabaseConnection>) -> Router {
+fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) -> Router {
     Router::new()
         .route(
             "/job",
             post({
-                let shared_state = state.clone();
-                move |body| add_job::add_job(body, shared_state)
+                let conn = conn.clone();
+                move |body| add_job::add_job(body, conn)
             })
             .layer(axum::middleware::from_fn({
-                let shared_state = state.clone();
-                move |req, next| {
-                    api_key_check::api_key_check_middleware(req, next, shared_state.clone())
-                }
+                let conn = conn.clone();
+                move |req, next| api_key_check::api_key_check_middleware(req, next, conn.clone())
             })),
         )
         .route(
             "/job/matching",
             post({
-                let shared_state = state.clone();
-                move |body| read_job::read_job(body, shared_state)
+                let conn = conn.clone();
+                move |body| read_job::read_job(body, conn)
             }),
+        )
+        .route(
+            "/blob",
+            get({
+                let conn = conn.clone();
+                let config = config.clone();
+                move || blob::get_upload_url(conn, config)
+            }),
+        )
+        .route(
+            "/blob",
+            post({
+                let config = config.clone();
+                move |multipart: Multipart| blob::create_blob(multipart, config)
+            })
+            .layer(DefaultBodyLimit::disable()),
         )
 }
 
@@ -126,7 +152,7 @@ async fn connect_to_database(
     create_remote_db(config).await
 }
 
-fn launch_eviction(state: Arc<DatabaseConnection>, tick_interval: u64, deadline: i64) {
+fn launch_eviction(conn: Arc<DatabaseConnection>, tick_interval: u64, deadline: i64) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(tick_interval));
         loop {
@@ -136,7 +162,7 @@ fn launch_eviction(state: Arc<DatabaseConnection>, tick_interval: u64, deadline:
 
             let res: DeleteResult = entity::job::Entity::delete_many()
                 .filter(entity::job::Column::CreatedAt.lte(deadline))
-                .exec(state.as_ref())
+                .exec(conn.as_ref())
                 .await
                 .unwrap();
 
@@ -164,7 +190,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             None
         },
+        local_store: args.local_store,
     })?;
+    let config = Arc::new(config);
 
     if args.show_config {
         println!("{}", serde_json::to_string(&config).unwrap());
@@ -173,13 +201,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // connect to the db
     let connection = connect_to_database(&config).await?;
-    let state = Arc::new(connection);
+    let connection = Arc::new(connection);
 
     // Launch the eviction thread
-    launch_eviction(state.clone(), 60 * 10, 60 * 60 * 24 * 7);
+    launch_eviction(connection.clone(), 60 * 10, 60 * 60 * 24 * 7);
 
     // Launch the server
-    let router = create_router(state.clone());
+    let router = create_router(connection.clone(), config.clone());
     axum::Server::bind(&config.server_addr.parse()?)
         .serve(router.into_make_service())
         .await?;
@@ -200,11 +228,21 @@ mod tests {
     use serde_json::{json, Value};
     use tower::Service;
 
+    fn create_config() -> Result<config::RSCConfig, Box<dyn std::error::Error>> {
+        Ok(config::RSCConfig::new(config::RSCConfigOverride {
+            config_override: Some("".into()),
+            server_addr: Some("test:0000".into()),
+            database_url: Some("".into()),
+            standalone: Some(true),
+        })?)
+    }
+
     #[tokio::test]
     async fn nominal() {
         let db = create_standalone_db().await.unwrap();
         let api_key = create_insecure_api_key(&db).await.unwrap();
-        let mut router = create_router(Arc::new(db));
+        let config = create_config().unwrap();
+        let mut router = create_router(Arc::new(db), Arc::new(config));
 
         // Non-existant route should 404
         let res = router
@@ -362,7 +400,7 @@ mod tests {
     #[tokio::test]
     async fn ttl_eviction() {
         let db = create_standalone_db().await.unwrap();
-        let state = Arc::new(db);
+        let conn = Arc::new(db);
 
         let hash: [u8; 32] = [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -390,7 +428,7 @@ mod tests {
             o_bytes: Set(1000),
         };
 
-        insert_job.save(state.clone().as_ref()).await.unwrap();
+        insert_job.save(conn.clone().as_ref()).await.unwrap();
 
         let hash: [u8; 32] = [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -418,20 +456,20 @@ mod tests {
             o_bytes: Set(1000),
         };
 
-        insert_job.save(state.clone().as_ref()).await.unwrap();
+        insert_job.save(conn.clone().as_ref()).await.unwrap();
 
         let count = entity::job::Entity::find()
-            .count(state.clone().as_ref())
+            .count(conn.clone().as_ref())
             .await
             .unwrap();
         assert_eq!(count, 2);
 
         // Setup eviction for jobs older than 3 days ticking every second
-        launch_eviction(state.clone(), 1, 60 * 60 * 24 * 3);
+        launch_eviction(conn.clone(), 1, 60 * 60 * 24 * 3);
         tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
 
         let count = entity::job::Entity::find()
-            .count(state.clone().as_ref())
+            .count(conn.clone().as_ref())
             .await
             .unwrap();
         assert_eq!(count, 1);

@@ -136,3 +136,8 @@ pub enum ReadJobResponse {
         obytes: u64,
     },
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetUploadUrlResponse {
+    pub url: String,
+}
