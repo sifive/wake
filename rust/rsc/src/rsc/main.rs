@@ -81,16 +81,16 @@ fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) 
         .route(
             "/blob",
             get({
-                let conn = conn.clone();
                 let config = config.clone();
-                move || blob::get_upload_url(conn, config)
+                move || blob::get_upload_url(config.server_addr.clone())
             }),
         )
         .route(
             "/blob",
             post({
+                let conn = conn.clone();
                 let config = config.clone();
-                move |multipart: Multipart| blob::create_blob(multipart, config)
+                move |multipart: Multipart| blob::create_blob(multipart, conn, config)
             })
             .layer(DefaultBodyLimit::disable()),
         )
@@ -234,6 +234,7 @@ mod tests {
             server_addr: Some("test:0000".into()),
             database_url: Some("".into()),
             standalone: Some(true),
+            local_store: None,
         })?)
     }
 

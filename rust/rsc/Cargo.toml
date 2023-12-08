@@ -16,7 +16,9 @@ entity = { path = "../entity" }
 migration = { path = "../migration" }
 sea-orm = { version = "0.12.6", features = ["sqlx-postgres", "runtime-tokio-native-tls"]}
 serde = "1.0.164"
+futures = "0.3.29"
 tokio = { version = "1.28.2", features = ["full"] }
+tokio-util = { version = "0.7.1", features = ["io"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 axum = { version = "0.6.18", features = ["multipart"] }
