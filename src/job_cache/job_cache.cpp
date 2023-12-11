@@ -134,7 +134,7 @@ static bool daemonize(std::string dir) {
   return true;
 }
 
-wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
+wcl::optional<wcl::unique_fd> try_connect(std::string dir, bool& addr_bound) {
   wcl::unique_fd socket_fd;
   {
     int local_socket_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
@@ -167,9 +167,15 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir) {
   addr.sun_family = AF_UNIX;
   addr.sun_path[0] = '\0';
 
+  // Among the failures that can occur here, we could get EAGAIN. We can't use
+  // epoll to avoid this however if we get EAGAIN it means that we don't have
+  // to launch another process because the address is already bound.
   wcl::log::info("key = %s, sizeof(key) = %lu", key, sizeof(key))();
   memcpy(addr.sun_path + 1, key, sizeof(key));
   if (connect(socket_fd.get(), reinterpret_cast<const sockaddr *>(&addr), sizeof(key)) == -1) {
+    if (errno == EAGAIN) {
+      addr_bound = true;
+    }
     wcl::log::info("connect(%s): %s", key, strerror(errno))();
     return {};
   }
@@ -209,15 +215,21 @@ wcl::result<wcl::unique_fd, ConnectError> Cache::backoff_try_connect(int attempt
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
   wcl::unique_fd socket_fd;
+  bool addr_bound = false;
   for (int i = 0; i < attempts; i++) {
     // We normally connect in about 3 tries, sometimes 4 on fresh
     // connect so if we haven't connected at this point its a good
     // spot to start start trying.
-    if (i > 4) {
+    // Additionally if on the previous connection attempt we gained evidence
+    // that the connection is already bound, we'll avoid relaunching for at
+    // most 1 round. This halves the number of extranious daemon launches
+    // when the daemon is under load.
+    if (i > 4 && !addr_bound) {
       launch_daemon();
     }
 
-    auto fd_opt = try_connect(cache_dir);
+    socket_bound = false;
+    auto fd_opt = try_connect(cache_dir, socket_bound);
     if (!fd_opt) {
       std::uniform_int_distribution<useconds_t> variance(0, backoff);
       usleep(backoff + variance(rng));
