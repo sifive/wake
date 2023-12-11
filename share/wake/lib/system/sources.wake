@@ -38,8 +38,9 @@ export def files (dir: String) (regexp: RegExp): List String =
 
     p dir regexp
 
+def get_modtime file = prim "get_modtime"
+
 def raw_source file =
-    def get_modtime file = prim "get_modtime"
     def time = get_modtime file
 
     if time == -1 then
@@ -53,6 +54,80 @@ def raw_source file =
         | setPlanFnOutputs (file, _)
         | runJobWith virtualRunner
         | getJobOutput
+
+# Outputs if a given lfs file 
+target get_lfs_status Unit: Map String Boolean =
+    # Returns a json with a "files" key that is itself
+    # a map from files to file information
+    require Pass body =
+        makeExecPlan ("git", "lfs", "status", "--json", Nil) Nil
+        | setPlanPersistance ReRun
+        | setPlanEcho logDebug
+        | setPlanEnvrionment Nil
+        | runJobWith localRunner
+        | getJobStdout
+    else
+      mnew scmp
+
+    require Pass jvalue = parseJSONBody body
+    else mnew scmp
+
+    # This yields a mapping from files to
+    # file info where the file info has a "status"
+    # field that may or may not be "M" if it has been modified
+    require Pass (JObject files) =
+        jField jvalue "files"
+    else
+      mnew scmp
+
+    # This checks for the aforementioned "M" value
+    # NOTE: the status of a file will be "M" if the
+    #       file is staged or unstaged as long as it
+    #       has not  
+    def isModified (Pair file fileInfo) =
+        require Pass status =
+            jField fileInfo "status"
+            | jString
+        else
+            Pair file False
+
+        Pair file (status ==* "M")
+
+    files
+    | map (_.isModified)
+    | listToMap scmp
+
+def raw_lfs_file file =
+    # We lookup the status of the lfs file.
+    # This is done lazily but at most once per wake invocation.
+    # It is however done on every wake invocation that uses lfs.
+    require Some isModified =
+        get_lfs_status Unit
+        | mlookup file
+    else
+        raw_source file
+
+    # If the file is modified then it suffices
+    # then we do not want to check it out. Luckily this
+    # also means that the file has been materialized locally
+    # so we can just source it.
+    require True = isModified
+    else
+        raw_source file
+
+    # Now we need to check the file out but we want the job
+    # that does this to appear to be the same no matter what
+    # we just need to run an extra virtual job to wrap this one.
+    require Pass _ =
+        makeExecPlan ("git", "lfs", "checkout", file, Nil) Nil
+        | setPlanPersistance ReRun
+        | setPlanEcho logDebug
+        | setPlanEnvrionment Nil
+        | runJobWith localRunner
+        | getJobOutput
+
+    raw_source file
+
 
 export def source (file: String): Result Path Error =
     def base = basename file
