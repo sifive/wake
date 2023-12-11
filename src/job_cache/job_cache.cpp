@@ -228,8 +228,8 @@ wcl::result<wcl::unique_fd, ConnectError> Cache::backoff_try_connect(int attempt
       launch_daemon();
     }
 
-    socket_bound = false;
-    auto fd_opt = try_connect(cache_dir, socket_bound);
+    addr_bound = false;
+    auto fd_opt = try_connect(cache_dir, addr_bound);
     if (!fd_opt) {
       std::uniform_int_distribution<useconds_t> variance(0, backoff);
       usleep(backoff + variance(rng));
