@@ -675,11 +675,11 @@ DaemonCache::DaemonCache(std::string dir, std::string bulk_dir, EvictionConfig c
 
   wcl::log::info("Launching DaemonCache. dir = %s", dir.c_str())();
 
-  impl = std::make_unique<CacheDbImpl>(".");
-
   // Get some random bits to name our domain socket with
   key = rng.unique_name();
   listen_socket_fd = create_cache_socket(".", key);
+
+  impl = std::make_unique<CacheDbImpl>(".");
 
   launch_evict_loop();
 }
