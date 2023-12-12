@@ -37,3 +37,4 @@ config = "0.13.3"
 serde_json = "1.0.100"
 clap = { version = "4.3.23", features = ["derive"] }
 is-terminal = "0.4.9"
+async-trait = "0.1.74"
