@@ -1,43 +1,28 @@
 use crate::config::RSCConfig;
 use crate::types::GetUploadUrlResponse;
 use axum::{body::Bytes, extract::Multipart, http::StatusCode, BoxError, Json};
+use data_encoding::BASE64URL;
+use futures::{Stream, TryStreamExt};
+use rand_core::{OsRng, RngCore};
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
-use tracing;
-
-use futures::{Stream, TryStreamExt};
 use tokio::fs::File;
 use tokio::io::BufWriter;
 use tokio_util::io::StreamReader;
+use tracing;
 
-// to prevent directory traversal attacks we ensure the path consists of exactly one normal
-// component
-fn path_is_valid(path: &str) -> bool {
-    let path = std::path::Path::new(path);
-    let mut components = path.components().peekable();
-
-    if let Some(first) = components.peek() {
-        if !matches!(first, std::path::Component::Normal(_)) {
-            return false;
-        }
-    }
-
-    components.count() == 1
+fn create_temp_filename() -> String {
+    let mut key = [0u8; 16];
+    OsRng.fill_bytes(&mut key);
+    // URL must be used as files can't contain /
+    BASE64URL.encode(&key)
 }
 
-async fn stream_to_file<S, E>(
-    parent: &str,
-    path: &str,
-    stream: S,
-) -> Result<(), (StatusCode, String)>
+async fn stream_to_file<S, E>(parent: &str, stream: S) -> Result<String, (StatusCode, String)>
 where
     S: Stream<Item = Result<Bytes, E>>,
     E: Into<BoxError>,
 {
-    if !path_is_valid(path) {
-        return Err((StatusCode::BAD_REQUEST, "Invalid path".to_owned()));
-    }
-
     async {
         // Convert the stream into an `AsyncRead`.
         let body_with_io_error =
@@ -46,13 +31,14 @@ where
         futures::pin_mut!(body_reader);
 
         // Create the file. `File` implements `AsyncWrite`.
-        let path = std::path::Path::new(parent).join(path);
+        let name = create_temp_filename();
+        let path = std::path::Path::new(parent).join(name.clone());
         let mut file = BufWriter::new(File::create(path).await?);
 
         // Copy the body into the file.
         tokio::io::copy(&mut body_reader, &mut file).await?;
 
-        Ok::<_, std::io::Error>(())
+        Ok::<String, std::io::Error>(name)
     }
     .await
     .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
@@ -71,13 +57,6 @@ pub async fn create_blob(
     config: Arc<RSCConfig>,
 ) -> (StatusCode, String) {
     while let Ok(Some(field)) = multipart.next_field().await {
-        let file_name = if let Some(file_name) = field.name() {
-            file_name.to_owned()
-        } else {
-            tracing::warn!("Skipping part upload due to missing key.");
-            continue;
-        };
-
         let Some(ref local_store) = config.local_store else {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -85,9 +64,7 @@ pub async fn create_blob(
             );
         };
 
-        // TODO: instead of writing the user provided field name to disk we should
-        // generate a random temporary name.
-        if let Err(inner) = stream_to_file(local_store, &file_name, field).await {
+        if let Err(inner) = stream_to_file(local_store, field).await {
             return inner;
         }
     }
