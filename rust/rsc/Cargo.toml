@@ -16,10 +16,12 @@ entity = { path = "../entity" }
 migration = { path = "../migration" }
 sea-orm = { version = "0.12.6", features = ["sqlx-postgres", "runtime-tokio-native-tls"]}
 serde = "1.0.164"
+futures = "0.3.29"
 tokio = { version = "1.28.2", features = ["full"] }
+tokio-util = { version = "0.7.1", features = ["io"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
-axum = "0.6.18"
+axum = { version = "0.6.18", features = ["multipart"] }
 tower = "0.4.12"
 hyper = "0.14.27"
 serde_bytes = "0.11.9"
@@ -35,3 +37,4 @@ config = "0.13.3"
 serde_json = "1.0.100"
 clap = { version = "4.3.23", features = ["derive"] }
 is-terminal = "0.4.9"
+async-trait = "0.1.74"
