@@ -7,6 +7,7 @@ pub struct RSCConfigOverride {
     pub database_url: Option<String>,
     pub server_addr: Option<String>,
     pub standalone: Option<bool>,
+    // TODO: the backing store should be configurable via URI
     pub local_store: Option<String>,
 }
 

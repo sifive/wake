@@ -1,4 +1,3 @@
-use crate::config::RSCConfig;
 use crate::types::GetUploadUrlResponse;
 use async_trait::async_trait;
 use axum::{extract::Multipart, http::StatusCode, Json};
@@ -12,6 +11,7 @@ use tokio::io::BufWriter;
 use tokio_util::io::StreamReader;
 use tracing;
 
+// TODO: Update this trait to return the url for a given key
 #[async_trait]
 pub trait BlobStore {
     async fn stream<A, B>(&self, reader: StreamReader<A, B>) -> Result<String, std::io::Error>
@@ -19,6 +19,9 @@ pub trait BlobStore {
         StreamReader<A, B>: tokio::io::AsyncRead + std::marker::Send;
 }
 
+pub trait DebugBlobStore: BlobStore + std::fmt::Debug {}
+
+#[derive(Debug, Clone)]
 pub struct LocalBlobStore {
     pub root: String,
 }
@@ -41,6 +44,8 @@ impl BlobStore for LocalBlobStore {
     }
 }
 
+impl DebugBlobStore for LocalBlobStore {}
+
 fn create_temp_filename() -> String {
     let mut key = [0u8; 16];
     OsRng.fill_bytes(&mut key);
@@ -58,20 +63,12 @@ pub async fn get_upload_url(server_addr: String) -> Json<GetUploadUrlResponse> {
 pub async fn create_blob(
     mut multipart: Multipart,
     _conn: Arc<DatabaseConnection>,
-    config: Arc<RSCConfig>,
+    store: impl DebugBlobStore,
 ) -> (StatusCode, String) {
-    let Some(local_store) = config.local_store.clone() else {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Invalid configuration".into(),
-        );
-    };
-
-    let store = LocalBlobStore { root: local_store };
-
     while let Ok(Some(field)) = multipart.next_field().await {
         let body = field.map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
         match store.stream(StreamReader::new(body)).await {
+            // TODO: The blob should be inserted into the db instead of just printing the key
             Ok(key) => println!("{:?}", key),
             Err(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, msg.to_string()),
         }

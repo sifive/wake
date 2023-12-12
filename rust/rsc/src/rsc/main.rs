@@ -59,6 +59,9 @@ struct ServerOptions {
 }
 
 fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) -> Router {
+    // If we can't create a store, just exit. The config is wrong and must be rectified.
+    let root = config.local_store.clone().unwrap();
+    let store = blob::LocalBlobStore { root };
     Router::new()
         .route(
             "/job",
@@ -89,8 +92,8 @@ fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) 
             "/blob",
             post({
                 let conn = conn.clone();
-                let config = config.clone();
-                move |multipart: Multipart| blob::create_blob(multipart, conn, config)
+                let store = store.clone();
+                move |multipart: Multipart| blob::create_blob(multipart, conn, store)
             })
             .layer(DefaultBodyLimit::disable()),
         )
