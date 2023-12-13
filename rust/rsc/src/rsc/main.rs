@@ -237,7 +237,7 @@ mod tests {
             server_addr: Some("test:0000".into()),
             database_url: Some("".into()),
             standalone: Some(true),
-            local_store: None,
+            local_store: Some("".into()),
         })?)
     }
 

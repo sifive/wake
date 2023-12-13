@@ -34,6 +34,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::job_blob::Entity")]
+    JobBlob,
     #[sea_orm(has_many = "super::job_use::Entity")]
     JobUse,
     #[sea_orm(has_many = "super::output_dir::Entity")]
@@ -44,6 +46,12 @@ pub enum Relation {
     OutputSymlink,
     #[sea_orm(has_many = "super::visible_file::Entity")]
     VisibleFile,
+}
+
+impl Related<super::job_blob::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::JobBlob.def()
+    }
 }
 
 impl Related<super::job_use::Entity> for Entity {
@@ -73,6 +81,15 @@ impl Related<super::output_symlink::Entity> for Entity {
 impl Related<super::visible_file::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::VisibleFile.def()
+    }
+}
+
+impl Related<super::blob::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::job_blob::Relation::Blob.def()
+    }
+    fn via() -> Option<RelationDef> {
+        Some(super::job_blob::Relation::Job.def().rev())
     }
 }
 
