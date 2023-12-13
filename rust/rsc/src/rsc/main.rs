@@ -61,7 +61,9 @@ struct ServerOptions {
 fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) -> Router {
     // If we can't create a store, just exit. The config is wrong and must be rectified.
     let root = config.local_store.clone().unwrap();
-    let store = blob::LocalBlobStore { root };
+    //let store = blob::LocalBlobStore { root };
+    let store: Arc<dyn blob::DebugBlobStore + Send + Sync> =
+        Arc::new(blob::LocalBlobStore { root });
     Router::new()
         .route(
             "/job",
