@@ -39,12 +39,7 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(Blob::Table)
-                    .col(
-                        ColumnDef::new(Blob::Id)
-                            .string()
-                            .not_null()
-                            .primary_key(),
-                    )
+                    .col(ColumnDef::new(Blob::Id).string().not_null().primary_key())
                     .col(ColumnDef::new(Blob::Store).integer().not_null())
                     .col(ColumnDef::new(Blob::WorkspacePath).string().not_null())
                     .foreign_key(
@@ -66,16 +61,8 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(JobBlob::Table)
-                    .col(
-                        ColumnDef::new(JobBlob::JobId)
-                            .integer()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(JobBlob::BlobId)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(JobBlob::JobId).integer().not_null())
+                    .col(ColumnDef::new(JobBlob::BlobId).string().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-job_id-job")
