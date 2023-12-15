@@ -102,6 +102,7 @@ pub async fn create_blob(
         }
 
         let active_blob = blob::ActiveModel {
+            // TODO: these ids should be migrated to UUIDs
             id: NotSet,
             created_at: NotSet,
             key: Set(result.unwrap()),
