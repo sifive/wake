@@ -17,8 +17,8 @@ pub struct Model {
     pub is_atty: bool,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
     pub hidden_info: Vec<u8>,
-    pub stdout_id: i32,
-    pub stderr_id: i32,
+    pub stdout_blob_id: i32,
+    pub stderr_blob_id: i32,
     pub status: i32,
     #[sea_orm(column_type = "Double")]
     pub runtime: f64,
@@ -34,7 +34,7 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::blob::Entity",
-        from = "Column::StderrId",
+        from = "Column::StderrBlobId",
         to = "super::blob::Column::Id",
         on_update = "NoAction",
         on_delete = "Restrict"
@@ -42,7 +42,7 @@ pub enum Relation {
     Blob2,
     #[sea_orm(
         belongs_to = "super::blob::Entity",
-        from = "Column::StdoutId",
+        from = "Column::StdoutBlobId",
         to = "super::blob::Column::Id",
         on_update = "NoAction",
         on_delete = "Restrict"

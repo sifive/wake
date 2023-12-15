@@ -36,8 +36,8 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Job::Stdin).string().not_null())
                     .col(ColumnDef::new(Job::IsAtty).boolean().not_null())
                     .col(ColumnDef::new(Job::HiddenInfo).ezblob())
-                    .col(ColumnDef::new(Job::StdoutId).integer().not_null())
-                    .col(ColumnDef::new(Job::StderrId).integer().not_null())
+                    .col(ColumnDef::new(Job::StdoutBlobId).integer().not_null())
+                    .col(ColumnDef::new(Job::StderrBlobId).integer().not_null())
                     .col(ColumnDef::new(Job::Status).integer().not_null())
                     .col(ColumnDef::new(Job::Runtime).double().not_null())
                     .col(ColumnDef::new(Job::Cputime).double().not_null())
@@ -46,9 +46,9 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Job::OBytes).big_unsigned().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
-                            .name("fk-stdout_id-blob")
+                            .name("fk-stdout_blob_id-blob")
                             .from_tbl(Job::Table)
-                            .from_col(Job::StdoutId)
+                            .from_col(Job::StdoutBlobId)
                             .to_tbl(Blob::Table)
                             .to_col(Blob::Id)
                             // A blob may not be deleted if there exists a
@@ -57,9 +57,9 @@ impl MigrationTrait for Migration {
                     )
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
-                            .name("fk-stderr_id-blob")
+                            .name("fk-stderr_blob_id-blob")
                             .from_tbl(Job::Table)
-                            .from_col(Job::StderrId)
+                            .from_col(Job::StderrBlobId)
                             .to_tbl(Blob::Table)
                             .to_col(Blob::Id)
                             // A blob may not be deleted if there exists a
@@ -277,8 +277,8 @@ pub enum Job {
     Stdin,
     IsAtty,
     HiddenInfo,
-    StdoutId,
-    StderrId,
+    StdoutBlobId,
+    StderrBlobId,
     Status,
     Runtime,
     Cputime,
