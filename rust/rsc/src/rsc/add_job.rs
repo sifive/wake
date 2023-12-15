@@ -29,8 +29,8 @@ pub async fn add_job(
         stdin: Set(payload.stdin),
         is_atty: Set(payload.is_atty),
         hidden_info: Set(payload.hidden_info),
-        stdout: Set(payload.stdout),
-        stderr: Set(payload.stderr),
+        stdout_id: Set(payload.stdout_id),
+        stderr_id: Set(payload.stderr_id),
         status: Set(payload.status),
         runtime: Set(payload.runtime),
         cputime: Set(payload.cputime),
@@ -66,9 +66,9 @@ pub async fn add_job(
                         id: NotSet,
                         created_at: NotSet,
                         path: Set(out_file.path),
-                        hash: Set(out_file.hash.into()),
                         mode: Set(out_file.mode),
                         job_id: Set(job_id),
+                        blob_id: Set(out_file.blob_id),
                     });
 
                 OutputFile::insert_many(out_files)

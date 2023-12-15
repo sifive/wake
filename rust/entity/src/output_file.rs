@@ -8,15 +8,22 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub path: String,
-    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
-    pub hash: Vec<u8>,
     pub mode: i32,
     pub job_id: i32,
+    pub blob_id: i32,
     pub created_at: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::blob::Entity",
+        from = "Column::BlobId",
+        to = "super::blob::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Restrict"
+    )]
+    Blob,
     #[sea_orm(
         belongs_to = "super::job::Entity",
         from = "Column::JobId",
@@ -25,6 +32,12 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Job,
+}
+
+impl Related<super::blob::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Blob.def()
+    }
 }
 
 impl Related<super::job::Entity> for Entity {

@@ -1,6 +1,6 @@
 use sea_orm_migration::prelude::*;
 
-use crate::m20220101_000001_create_table::Job;
+use crate::m20220101_000002_create_table::Job;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;

@@ -17,10 +17,8 @@ pub struct Model {
     pub is_atty: bool,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
     pub hidden_info: Vec<u8>,
-    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
-    pub stdout: Vec<u8>,
-    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
-    pub stderr: Vec<u8>,
+    pub stdout_id: i32,
+    pub stderr_id: i32,
     pub status: i32,
     #[sea_orm(column_type = "Double")]
     pub runtime: f64,
@@ -34,8 +32,22 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::job_blob::Entity")]
-    JobBlob,
+    #[sea_orm(
+        belongs_to = "super::blob::Entity",
+        from = "Column::StderrId",
+        to = "super::blob::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Restrict"
+    )]
+    Blob2,
+    #[sea_orm(
+        belongs_to = "super::blob::Entity",
+        from = "Column::StdoutId",
+        to = "super::blob::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Restrict"
+    )]
+    Blob1,
     #[sea_orm(has_many = "super::job_use::Entity")]
     JobUse,
     #[sea_orm(has_many = "super::output_dir::Entity")]
@@ -46,12 +58,6 @@ pub enum Relation {
     OutputSymlink,
     #[sea_orm(has_many = "super::visible_file::Entity")]
     VisibleFile,
-}
-
-impl Related<super::job_blob::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::JobBlob.def()
-    }
 }
 
 impl Related<super::job_use::Entity> for Entity {
@@ -81,15 +87,6 @@ impl Related<super::output_symlink::Entity> for Entity {
 impl Related<super::visible_file::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::VisibleFile.def()
-    }
-}
-
-impl Related<super::blob::Entity> for Entity {
-    fn to() -> RelationDef {
-        super::job_blob::Relation::Blob.def()
-    }
-    fn via() -> Option<RelationDef> {
-        Some(super::job_blob::Relation::Job.def().rev())
     }
 }
 

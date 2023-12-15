@@ -45,8 +45,8 @@ pub async fn read_job(
                     .into_iter()
                     .map(|m| File {
                         path: m.path,
-                        hash: m.hash,
                         mode: m.mode,
+                        blob_id: m.blob_id,
                     })
                     .collect();
 
@@ -78,8 +78,8 @@ pub async fn read_job(
                         output_symlinks,
                         output_dirs,
                         output_files,
-                        stdout: matching_job.stdout,
-                        stderr: matching_job.stderr,
+                        stdout_id: matching_job.stdout_id,
+                        stderr_id: matching_job.stderr_id,
                         status: matching_job.status,
                         runtime: matching_job.runtime,
                         cputime: matching_job.cputime,
