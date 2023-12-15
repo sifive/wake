@@ -1,6 +1,7 @@
 use crate::types::{Dir, File, ReadJobPayload, ReadJobResponse, Symlink};
 use axum::Json;
 use entity::{job, job_use, output_dir, output_file, output_symlink};
+use hyper::StatusCode;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::*, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
     ModelTrait, QueryFilter, TransactionTrait,
@@ -22,7 +23,7 @@ async fn record_use(job_id: i32, conn: Arc<DatabaseConnection>) {
 pub async fn read_job(
     Json(payload): Json<ReadJobPayload>,
     conn: Arc<DatabaseConnection>,
-) -> Json<ReadJobResponse> {
+) -> (StatusCode, Json<ReadJobResponse>) {
     // First find the hash so we can look up the exact job
     let hash: Vec<u8> = payload.hash().into();
 
@@ -97,20 +98,22 @@ pub async fn read_job(
             // If we get a match we want to record the use but we don't
             // want to block sending the response on it so we spawn a task
             // to go do that.
+            let mut status = StatusCode::NOT_FOUND;
             if let ReadJobResponse::Match { .. } = response {
+                status = StatusCode::OK;
                 let shared_conn = conn.clone();
                 tokio::spawn(async move {
                     record_use(job_id, shared_conn).await;
                 });
             }
-            Json(response)
+            (status, Json(response))
         }
         Err(cause) => {
             tracing::error! {
               %cause,
               "failed to add job"
             };
-            Json(ReadJobResponse::NoMatch)
+            (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch))
         }
     }
 }

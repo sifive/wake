@@ -114,6 +114,19 @@ impl ReadJobPayload {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct PostBlobResponsePart {
+    pub id: i32,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum PostBlobResponse {
+    Error { message: String },
+    Ok { blobs: Vec<PostBlobResponsePart> },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ReadJobResponse {
     NoMatch,
