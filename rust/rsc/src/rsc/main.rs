@@ -238,14 +238,28 @@ mod tests {
             server_addr: Some("test:0000".into()),
             database_url: Some("".into()),
             standalone: Some(true),
-            local_store: None,
+            local_store: Some("".into()),
         })?)
+    }
+
+    async fn create_fake_blob(db: &DatabaseConnection) -> Result<i32, Box<dyn std::error::Error>> {
+        let active_key = entity::blob::ActiveModel {
+            id: NotSet,
+            created_at: Set((Utc::now() - Duration::days(5)).naive_utc()),
+            key: Set("InsecureKey".into()),
+            store_id: Set(1),
+        };
+
+        let inserted_key = active_key.insert(db).await?;
+
+        Ok(inserted_key.id)
     }
 
     #[tokio::test]
     async fn nominal() {
         let db = create_standalone_db().await.unwrap();
         let api_key = create_insecure_api_key(&db).await.unwrap();
+        let blob_id = create_fake_blob(&db).await.unwrap();
         let config = create_config().unwrap();
         let mut router = create_router(Arc::new(db), Arc::new(config));
 
@@ -307,8 +321,8 @@ mod tests {
                             "output_dirs": [],
                             "output_symlinks": [],
                             "output_files":[],
-                            "stdout":"this is a test",
-                            "stderr":"this is a very long string for a test",
+                            "stdout_blob_id": blob_id,
+                            "stderr_blob_id": blob_id,
                             "status": 0,
                             "runtime":1.0,
                             "cputime":1.0,
@@ -390,8 +404,8 @@ mod tests {
                 "output_dirs": [],
                 "output_symlinks": [],
                 "output_files":[],
-                "stdout":[116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116],
-                "stderr":[116, 104, 105, 115, 32, 105, 115, 32, 97, 32, 118, 101, 114, 121, 32, 108, 111, 110, 103, 32, 115, 116, 114, 105, 110, 103, 32, 102, 111, 114, 32, 97, 32, 116, 101, 115, 116],
+                "stdout_blob_id": blob_id,
+                "stderr_blob_id": blob_id,
                 "status": 0,
                 "runtime":1.0,
                 "cputime":1.0,
@@ -405,6 +419,7 @@ mod tests {
     #[tokio::test]
     async fn ttl_eviction() {
         let db = create_standalone_db().await.unwrap();
+        let blob_id = create_fake_blob(&db).await.unwrap();
         let conn = Arc::new(db);
 
         let hash: [u8; 32] = [
@@ -423,8 +438,8 @@ mod tests {
             stdin: Set("".into()),
             is_atty: Set(false),
             hidden_info: Set("".into()),
-            stdout: Set("This is a test".into()),
-            stderr: Set("This is a very long string for a test".into()),
+            stdout_blob_id: Set(blob_id),
+            stderr_blob_id: Set(blob_id),
             status: Set(0),
             runtime: Set(1.0),
             cputime: Set(1.0),
@@ -451,8 +466,8 @@ mod tests {
             stdin: Set("".into()),
             is_atty: Set(false),
             hidden_info: Set("".into()),
-            stdout: Set("This is a test".into()),
-            stderr: Set("This is a very long string for a test".into()),
+            stdout_blob_id: Set(blob_id),
+            stderr_blob_id: Set(blob_id),
             status: Set(0),
             runtime: Set(1.0),
             cputime: Set(1.0),

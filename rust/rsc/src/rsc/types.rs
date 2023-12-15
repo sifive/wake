@@ -11,8 +11,7 @@ pub struct VisibleFile {
 pub struct File {
     pub path: String,
     pub mode: i32,
-    #[serde(with = "serde_bytes")]
-    pub hash: Vec<u8>,
+    pub blob_id: i32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -41,10 +40,8 @@ pub struct AddJobPayload {
     pub output_dirs: Vec<Dir>,
     pub output_symlinks: Vec<Symlink>,
     pub output_files: Vec<File>,
-    #[serde(with = "serde_bytes")]
-    pub stdout: Vec<u8>,
-    #[serde(with = "serde_bytes")]
-    pub stderr: Vec<u8>,
+    pub stdout_blob_id: i32,
+    pub stderr_blob_id: i32,
     pub status: i32,
     pub runtime: f64,
     pub cputime: f64,
@@ -124,10 +121,8 @@ pub enum ReadJobResponse {
         output_symlinks: Vec<Symlink>,
         output_dirs: Vec<Dir>,
         output_files: Vec<File>,
-        #[serde(with = "serde_bytes")]
-        stdout: Vec<u8>,
-        #[serde(with = "serde_bytes")]
-        stderr: Vec<u8>,
+        stdout_blob_id: i32,
+        stderr_blob_id: i32,
         status: i32,
         runtime: f64,
         cputime: f64,

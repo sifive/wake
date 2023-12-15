@@ -36,14 +36,36 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Job::Stdin).string().not_null())
                     .col(ColumnDef::new(Job::IsAtty).boolean().not_null())
                     .col(ColumnDef::new(Job::HiddenInfo).ezblob())
-                    .col(ColumnDef::new(Job::Stdout).ezblob())
-                    .col(ColumnDef::new(Job::Stderr).ezblob())
+                    .col(ColumnDef::new(Job::StdoutBlobId).integer().not_null())
+                    .col(ColumnDef::new(Job::StderrBlobId).integer().not_null())
                     .col(ColumnDef::new(Job::Status).integer().not_null())
                     .col(ColumnDef::new(Job::Runtime).double().not_null())
                     .col(ColumnDef::new(Job::Cputime).double().not_null())
                     .col(ColumnDef::new(Job::Memory).big_unsigned().not_null())
                     .col(ColumnDef::new(Job::IBytes).big_unsigned().not_null())
                     .col(ColumnDef::new(Job::OBytes).big_unsigned().not_null())
+                    .foreign_key(
+                        ForeignKeyCreateStatement::new()
+                            .name("fk-stdout_blob_id-blob")
+                            .from_tbl(Job::Table)
+                            .from_col(Job::StdoutBlobId)
+                            .to_tbl(Blob::Table)
+                            .to_col(Blob::Id)
+                            // A blob may not be deleted if there exists a
+                            // job that depends on it.
+                            .on_delete(ForeignKeyAction::Restrict),
+                    )
+                    .foreign_key(
+                        ForeignKeyCreateStatement::new()
+                            .name("fk-stderr_blob_id-blob")
+                            .from_tbl(Job::Table)
+                            .from_col(Job::StderrBlobId)
+                            .to_tbl(Blob::Table)
+                            .to_col(Blob::Id)
+                            // A blob may not be deleted if there exists a
+                            // job that depends on it.
+                            .on_delete(ForeignKeyAction::Restrict),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -89,9 +111,9 @@ impl MigrationTrait for Migration {
                             .auto_increment(),
                     )
                     .col(ColumnDef::new(OutputFile::Path).string().not_null())
-                    .col(ColumnDef::new(OutputFile::Hash).string().ezblob())
                     .col(ColumnDef::new(OutputFile::Mode).integer().not_null())
                     .col(ColumnDef::new(OutputFile::JobId).integer().not_null())
+                    .col(ColumnDef::new(OutputFile::BlobId).integer().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-output_file-job")
@@ -100,6 +122,17 @@ impl MigrationTrait for Migration {
                             .to_tbl(Job::Table)
                             .to_col(Job::Id)
                             .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKeyCreateStatement::new()
+                            .name("fk-blob_id-blob")
+                            .from_tbl(OutputFile::Table)
+                            .from_col(OutputFile::BlobId)
+                            .to_tbl(Blob::Table)
+                            .to_col(Blob::Id)
+                            // A blob may not be deleted if there exists an
+                            // output file that depends on it.
+                            .on_delete(ForeignKeyAction::Restrict),
                     )
                     .to_owned(),
             )
@@ -213,9 +246,9 @@ enum OutputFile {
     Table,
     Id,
     Path,
-    Hash,
     Mode,
     JobId,
+    BlobId,
 }
 
 #[derive(DeriveIden)]
@@ -244,12 +277,18 @@ pub enum Job {
     Stdin,
     IsAtty,
     HiddenInfo,
-    Stdout,
-    Stderr,
+    StdoutBlobId,
+    StderrBlobId,
     Status,
     Runtime,
     Cputime,
     Memory,
     IBytes,
     OBytes,
+}
+
+#[derive(DeriveIden)]
+enum Blob {
+    Table,
+    Id,
 }

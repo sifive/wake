@@ -27,7 +27,9 @@ impl MigrationTrait for Migration {
           (OutputFile::Table, OutputFile::CreatedAt),
           (VisibleFile::Table, VisibleFile::CreatedAt),
           (ApiKey::Table, ApiKey::CreatedAt),
-          (JobUses::Table, JobUses::CreatedAt)
+          (JobUses::Table, JobUses::CreatedAt),
+          (Blob::Table, Blob::CreatedAt),
+          (LocalBlobStore::Table, LocalBlobStore::CreatedAt)
         } as (t, c) in {
             manager
                 .alter_table(
@@ -107,6 +109,18 @@ enum ApiKey {
 
 #[derive(DeriveIden)]
 enum JobUses {
+    Table,
+    CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum Blob {
+    Table,
+    CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum LocalBlobStore {
     Table,
     CreatedAt,
 }

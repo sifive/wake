@@ -3,8 +3,11 @@
 pub mod prelude;
 
 pub mod api_key;
+pub mod blob;
+pub mod blob_store;
 pub mod job;
 pub mod job_use;
+pub mod local_blob_store;
 pub mod output_dir;
 pub mod output_file;
 pub mod output_symlink;
