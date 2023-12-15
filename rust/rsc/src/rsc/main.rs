@@ -94,7 +94,8 @@ fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) 
             post({
                 let conn = conn.clone();
                 let store = store.clone();
-                move |multipart: Multipart| blob::create_blob(multipart, conn, store)
+                // TODO: Don't hardcode store type here
+                move |multipart: Multipart| blob::create_blob(multipart, conn, store, 1)
             })
             .layer(DefaultBodyLimit::disable()),
         )
@@ -339,7 +340,7 @@ mod tests {
 
         assert_eq!(res.status(), StatusCode::OK);
 
-        // Non-matching job should 200 with expected body
+        // Non-matching job should 404 with expected body
         let res = router
             .call(
                 Request::builder()
@@ -363,7 +364,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
 
         let body = hyper::body::to_bytes(res).await.unwrap();
         let body: Value = serde_json::from_slice(&body).unwrap();

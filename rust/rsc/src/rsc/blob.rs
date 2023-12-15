@@ -1,11 +1,12 @@
-use crate::types::GetUploadUrlResponse;
+use crate::types::{GetUploadUrlResponse, PostBlobResponse, PostBlobResponsePart};
 use async_trait::async_trait;
 use axum::{extract::Multipart, http::StatusCode, Json};
 use data_encoding::BASE64URL;
+use entity::blob;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use rand_core::{OsRng, RngCore};
-use sea_orm::DatabaseConnection;
+use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection};
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::BufWriter;
@@ -66,21 +67,59 @@ pub async fn get_upload_url(server_addr: String) -> Json<GetUploadUrlResponse> {
 #[tracing::instrument]
 pub async fn create_blob(
     mut multipart: Multipart,
-    _conn: Arc<DatabaseConnection>,
+    db: Arc<DatabaseConnection>,
     store: Arc<dyn DebugBlobStore + Send + Sync>,
-) -> (StatusCode, String) {
+    store_id: i32,
+) -> (StatusCode, Json<PostBlobResponse>) {
+    let mut parts: Vec<PostBlobResponsePart> = Vec::new();
+
     while let Ok(Some(field)) = multipart.next_field().await {
-        match store
+        let name = match field.name() {
+            Some(x) => x.to_string(),
+            None => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(PostBlobResponse::Error {
+                        message: "Multipart field must be named".into(),
+                    }),
+                )
+            }
+        };
+
+        let result = store
             .stream(Box::pin(field.map_err(|err| {
                 std::io::Error::new(std::io::ErrorKind::Other, err)
             })))
-            .await
-        {
-            // TODO: The blob should be inserted into the db instead of just printing the key
-            Ok(key) => println!("{:?}", key),
-            Err(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, msg.to_string()),
+            .await;
+
+        if let Err(msg) = result {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(PostBlobResponse::Error {
+                    message: msg.to_string(),
+                }),
+            );
+        }
+
+        let active_blob = blob::ActiveModel {
+            id: NotSet,
+            created_at: NotSet,
+            key: Set(result.unwrap()),
+            store_id: Set(store_id),
+        };
+
+        match active_blob.insert(db.as_ref()).await {
+            Err(msg) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(PostBlobResponse::Error {
+                        message: msg.to_string(),
+                    }),
+                )
+            }
+            Ok(blob) => parts.push(PostBlobResponsePart { id: blob.id, name }),
         }
     }
 
-    (StatusCode::OK, "ok".into())
+    (StatusCode::OK, Json(PostBlobResponse::Ok { blobs: parts }))
 }
