@@ -12,10 +12,10 @@ impl MigrationTrait for Migration {
                     .table(BlobStore::Table)
                     .col(
                         ColumnDef::new(BlobStore::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                            .primary_key()
+                            .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(BlobStore::Type).string().not_null())
                     .to_owned(),
@@ -25,8 +25,8 @@ impl MigrationTrait for Migration {
         // Insert basic backing store since it must always exist.
         let insert = Query::insert()
             .into_table(BlobStore::Table)
-            .columns([BlobStore::Id, BlobStore::Type])
-            .values_panic([1.into(), "LocalBlobStore".into()])
+            .columns([BlobStore::Type])
+            .values_panic(["LocalBlobStore".into()])
             .to_owned();
 
         manager.exec_stmt(insert).await?;
@@ -37,13 +37,13 @@ impl MigrationTrait for Migration {
                     .table(Blob::Table)
                     .col(
                         ColumnDef::new(Blob::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                            .primary_key()
+                            .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(Blob::Key).string().not_null())
-                    .col(ColumnDef::new(Blob::StoreId).integer().not_null())
+                    .col(ColumnDef::new(Blob::StoreId).uuid().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-store_id-blob_store")
@@ -65,7 +65,7 @@ impl MigrationTrait for Migration {
                     .table(LocalBlobStore::Table)
                     .col(
                         ColumnDef::new(LocalBlobStore::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
                             .primary_key(),
                     )

@@ -24,10 +24,10 @@ impl MigrationTrait for Migration {
                     .table(Job::Table)
                     .col(
                         ColumnDef::new(Job::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                            .primary_key()
+                            .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(Job::Hash).ezblob().unique_key())
                     .col(ColumnDef::new(Job::Cmd).string().not_null())
@@ -36,8 +36,8 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Job::Stdin).string().not_null())
                     .col(ColumnDef::new(Job::IsAtty).boolean().not_null())
                     .col(ColumnDef::new(Job::HiddenInfo).ezblob())
-                    .col(ColumnDef::new(Job::StdoutBlobId).integer().not_null())
-                    .col(ColumnDef::new(Job::StderrBlobId).integer().not_null())
+                    .col(ColumnDef::new(Job::StdoutBlobId).uuid().not_null())
+                    .col(ColumnDef::new(Job::StderrBlobId).uuid().not_null())
                     .col(ColumnDef::new(Job::Status).integer().not_null())
                     .col(ColumnDef::new(Job::Runtime).double().not_null())
                     .col(ColumnDef::new(Job::Cputime).double().not_null())
@@ -78,14 +78,14 @@ impl MigrationTrait for Migration {
                     .table(VisibleFile::Table)
                     .col(
                         ColumnDef::new(VisibleFile::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                            .primary_key()
+                            .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(VisibleFile::Path).string().not_null())
                     .col(ColumnDef::new(VisibleFile::Hash).ezblob())
-                    .col(ColumnDef::new(VisibleFile::JobId).integer().not_null())
+                    .col(ColumnDef::new(VisibleFile::JobId).uuid().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-visible_file-job")
@@ -105,15 +105,15 @@ impl MigrationTrait for Migration {
                     .table(OutputFile::Table)
                     .col(
                         ColumnDef::new(OutputFile::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
                             .primary_key()
-                            .auto_increment(),
+                            .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(OutputFile::Path).string().not_null())
                     .col(ColumnDef::new(OutputFile::Mode).integer().not_null())
-                    .col(ColumnDef::new(OutputFile::JobId).integer().not_null())
-                    .col(ColumnDef::new(OutputFile::BlobId).integer().not_null())
+                    .col(ColumnDef::new(OutputFile::JobId).uuid().not_null())
+                    .col(ColumnDef::new(OutputFile::BlobId).uuid().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-output_file-job")
@@ -144,14 +144,14 @@ impl MigrationTrait for Migration {
                     .table(OutputSymlink::Table)
                     .col(
                         ColumnDef::new(OutputSymlink::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
                             .primary_key()
-                            .auto_increment(),
+                            .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(OutputSymlink::Path).string().not_null())
                     .col(ColumnDef::new(OutputSymlink::Content).ezblob())
-                    .col(ColumnDef::new(OutputSymlink::JobId).integer().not_null())
+                    .col(ColumnDef::new(OutputSymlink::JobId).uuid().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-output_file-job")
@@ -171,14 +171,14 @@ impl MigrationTrait for Migration {
                     .table(OutputDir::Table)
                     .col(
                         ColumnDef::new(OutputDir::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
                             .primary_key()
-                            .auto_increment(),
+                            .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(OutputDir::Path).string().not_null())
                     .col(ColumnDef::new(OutputDir::Mode).integer().not_null())
-                    .col(ColumnDef::new(OutputDir::JobId).integer().not_null())
+                    .col(ColumnDef::new(OutputDir::JobId).uuid().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-output_file-job")

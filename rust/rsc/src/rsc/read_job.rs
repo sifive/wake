@@ -3,14 +3,14 @@ use axum::Json;
 use entity::{job, job_use, output_dir, output_file, output_symlink};
 use hyper::StatusCode;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::*, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
-    ModelTrait, QueryFilter, TransactionTrait,
+    prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, DatabaseConnection, DbErr,
+    EntityTrait, ModelTrait, QueryFilter, TransactionTrait,
 };
 use std::sync::Arc;
 use tracing;
 
 #[tracing::instrument]
-async fn record_use(job_id: i32, conn: Arc<DatabaseConnection>) {
+async fn record_use(job_id: Uuid, conn: Arc<DatabaseConnection>) {
     let usage = job_use::ActiveModel {
         id: NotSet,
         created_at: NotSet,
@@ -29,14 +29,14 @@ pub async fn read_job(
 
     let result = conn
         .as_ref()
-        .transaction::<_, (i32, ReadJobResponse), DbErr>(|txn| {
+        .transaction::<_, (Option<Uuid>, ReadJobResponse), DbErr>(|txn| {
             Box::pin(async move {
                 let Some(matching_job) = job::Entity::find()
                     .filter(job::Column::Hash.eq(hash))
                     .one(txn)
                     .await?
                 else {
-                    return Ok((0, ReadJobResponse::NoMatch));
+                    return Ok((None, ReadJobResponse::NoMatch));
                 };
 
                 let output_files = matching_job
@@ -74,7 +74,7 @@ pub async fn read_job(
                     .collect();
 
                 Ok((
-                    matching_job.id,
+                    Some(matching_job.id),
                     ReadJobResponse::Match {
                         output_symlinks,
                         output_dirs,
@@ -94,7 +94,7 @@ pub async fn read_job(
         .await;
 
     match result {
-        Ok((job_id, response)) => {
+        Ok((Some(job_id), response)) => {
             // If we get a match we want to record the use but we don't
             // want to block sending the response on it so we spawn a task
             // to go do that.
@@ -108,6 +108,7 @@ pub async fn read_job(
             }
             (status, Json(response))
         }
+        Ok((None, _)) => (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch)),
         Err(cause) => {
             tracing::error! {
               %cause,

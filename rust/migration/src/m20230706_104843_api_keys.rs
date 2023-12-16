@@ -12,10 +12,10 @@ impl MigrationTrait for Migration {
                     .table(ApiKey::Table)
                     .col(
                         ColumnDef::new(ApiKey::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                            .primary_key()
+                            .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(ApiKey::Key).string().not_null().unique_key())
                     .col(ColumnDef::new(ApiKey::Desc).string().not_null())

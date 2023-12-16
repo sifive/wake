@@ -97,7 +97,7 @@ fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) 
                 let conn = conn.clone();
                 let store = store.clone();
                 // TODO: Don't hardcode store type here
-                move |multipart: Multipart| blob::create_blob(multipart, conn, store, 1)
+                move |multipart: Multipart| blob::create_blob(multipart, conn, store)
             })
             .layer(DefaultBodyLimit::disable()),
         )

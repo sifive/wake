@@ -6,7 +6,7 @@ use entity::blob;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use rand_core::{OsRng, RngCore};
-use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection};
+use sea_orm::{prelude::Uuid, ActiveModelTrait, ActiveValue::*, DatabaseConnection};
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::BufWriter;
@@ -69,9 +69,9 @@ pub async fn create_blob(
     mut multipart: Multipart,
     db: Arc<DatabaseConnection>,
     store: Arc<dyn DebugBlobStore + Send + Sync>,
-    store_id: i32,
 ) -> (StatusCode, Json<PostBlobResponse>) {
     let mut parts: Vec<PostBlobResponsePart> = Vec::new();
+    let store_id = Uuid::parse_str("07686ebe-96b6-42f5-a211-c40000533794").unwrap();
 
     while let Ok(Some(field)) = multipart.next_field().await {
         let name = match field.name() {
@@ -102,7 +102,6 @@ pub async fn create_blob(
         }
 
         let active_blob = blob::ActiveModel {
-            // TODO: these ids should be migrated to UUIDs
             id: NotSet,
             created_at: NotSet,
             key: Set(result.unwrap()),
