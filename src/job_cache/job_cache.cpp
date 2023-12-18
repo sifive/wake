@@ -324,7 +324,7 @@ static int misses_from_failure = 0;
 
 FindJobResponse Cache::read(const FindJobRequest &find_request) {
   if (misses_from_failure > timeout_config.max_misses_from_failure) {
-    return FindJobResponse(wcl::optional<MatchingJob>{});  
+    return FindJobResponse(wcl::optional<MatchingJob>{});
   }
 
   wcl::log::info("Cache::read enter")();
@@ -375,7 +375,7 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
 
 void Cache::add(const AddJobRequest &add_request) {
   if (misses_from_failure > timeout_config.max_misses_from_failure) {
-    return;  
+    return;
   }
   wcl::log::info("Cache::add enter")();
   auto defer = wcl::make_defer([]() { wcl::log::info("Cache::add exit")(); });
