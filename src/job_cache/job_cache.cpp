@@ -134,7 +134,9 @@ static bool daemonize(std::string dir) {
   return true;
 }
 
-wcl::optional<wcl::unique_fd> try_connect(std::string dir, bool& addr_bound) {
+enum class TryConnectError { Generic, AddrBound };
+
+wcl::result<wcl::unique_fd, TryConnectError> try_connect(std::string dir) {
   wcl::unique_fd socket_fd;
   {
     int local_socket_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
@@ -151,7 +153,7 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir, bool& addr_bound) {
   auto fd = wcl::unique_fd::open(key_path.c_str(), O_RDONLY);
   if (!fd) {
     wcl::log::info("open(%s): %s", key_path.c_str(), strerror(fd.error()))();
-    return {};
+    return wcl::result_error<wcl::unique_fd>(TryConnectError::Generic);
   }
 
   // TODO: We should make this read more robust. It's mostly fine if
@@ -174,13 +176,13 @@ wcl::optional<wcl::unique_fd> try_connect(std::string dir, bool& addr_bound) {
   memcpy(addr.sun_path + 1, key, sizeof(key));
   if (connect(socket_fd.get(), reinterpret_cast<const sockaddr *>(&addr), sizeof(key)) == -1) {
     if (errno == EAGAIN) {
-      addr_bound = true;
+      return wcl::result_error<wcl::unique_fd>(TryConnectError::AddrBound);
     }
     wcl::log::info("connect(%s): %s", key, strerror(errno))();
-    return {};
+    return wcl::result_error<wcl::unique_fd>(TryConnectError::Generic);
   }
 
-  return wcl::make_some<wcl::unique_fd>(std::move(socket_fd));
+  return wcl::result_value<TryConnectError>(std::move(socket_fd));
 }
 
 // Launch the job cache daemon
@@ -229,8 +231,13 @@ wcl::result<wcl::unique_fd, ConnectError> Cache::backoff_try_connect(int attempt
     }
 
     addr_bound = false;
-    auto fd_opt = try_connect(cache_dir, addr_bound);
+    auto fd_opt = try_connect(cache_dir);
     if (!fd_opt) {
+      // If we receive this specific error then we know that a daemon exists,
+      // its just busy
+      if (fd_opt.error() == TryConnectError::AddrBound) {
+        addr_bound = true;
+      }
       std::uniform_int_distribution<useconds_t> variance(0, backoff);
       usleep(backoff + variance(rng));
       backoff *= 2;
