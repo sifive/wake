@@ -695,8 +695,6 @@ DaemonCache::DaemonCache(std::string dir, std::string bulk_dir, EvictionConfig c
   listen_socket_fd = create_cache_socket(".", key);
 
   impl = std::make_unique<CacheDbImpl>(config, ".");
-
-  launch_evict_loop();
 }
 
 int DaemonCache::run() {
@@ -1086,7 +1084,7 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   impl->policy->write(job_id);
 }
 
-DaemonCache::~DaemonCache() { reap_evict_loop(); }
+DaemonCache::~DaemonCache() {}
 
 void DaemonCache::handle_new_client() {
   // Accept the new client socket. We accept as non-blocking so that we can

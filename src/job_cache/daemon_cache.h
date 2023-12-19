@@ -52,9 +52,6 @@ class DaemonCache {
   std::unordered_map<int, MessageSender> message_senders;
   bool exit_now = false;
 
-  void launch_evict_loop();
-  void reap_evict_loop();
-
   FindJobResponse read(const FindJobRequest &find_request);
   void add(const AddJobRequest &add_request);
   void remove_corrupt_job(int64_t job_id);
