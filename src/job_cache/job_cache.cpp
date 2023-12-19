@@ -339,10 +339,15 @@ wcl::result<FindJobResponse, FindJobError> Cache::read_impl(const FindJobRequest
   return wcl::result_value<FindJobError>(FindJobResponse(json));
 }
 
+static int misses_from_failure = 0;
+
 FindJobResponse Cache::read(const FindJobRequest &find_request) {
+  if (misses_from_failure > timeout_config.max_misses_from_failure) {
+    return FindJobResponse(wcl::optional<MatchingJob>{});
+  }
+
   wcl::log::info("Cache::read enter")();
   auto defer = wcl::make_defer([]() { wcl::log::info("Cache::read exit")(); });
-  static int misses_from_failure = 0;
 
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
   useconds_t backoff = 1000;
@@ -388,6 +393,9 @@ FindJobResponse Cache::read(const FindJobRequest &find_request) {
 }
 
 void Cache::add(const AddJobRequest &add_request) {
+  if (misses_from_failure > timeout_config.max_misses_from_failure) {
+    return;
+  }
   wcl::log::info("Cache::add enter")();
   auto defer = wcl::make_defer([]() { wcl::log::info("Cache::add exit")(); });
   // serialize the request, send it, deserialize the response, return it
@@ -397,12 +405,12 @@ void Cache::add(const AddJobRequest &add_request) {
 
   // serialize the request and send it, we ignore an error
   // if it occurs here and we keep moving.
-  auto socket_fd = backoff_try_connect(10);
+  auto socket_fd = backoff_try_connect(timeout_config.connect_retries);
   if (!socket_fd) {
     wcl::log::error("Cache::add(): Failed to connect")();
     return;
   }
-  sync_send_json_message(socket_fd->get(), request, 10);
+  sync_send_json_message(socket_fd->get(), request, timeout_config.message_timeout_seconds);
 }
 
 }  // namespace job_cache
