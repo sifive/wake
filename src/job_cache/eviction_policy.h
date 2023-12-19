@@ -24,19 +24,21 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include <thread>
+
+#include "job_cache/db_helpers.h"
 
 namespace job_cache {
 
 struct EvictionPolicy {
-  virtual void init(const std::string& cache_dir) = 0;
+  virtual void init(std::shared_ptr<job_cache::Database> db, const std::string& cache_dir) = 0;
   virtual void read(int id) = 0;
   virtual void write(int id) = 0;
   virtual ~EvictionPolicy() {}
 };
 
 struct NilEvictionPolicy : EvictionPolicy {
-  virtual void init(const std::string& cache_dir) override {
+  virtual void init(std::shared_ptr<job_cache::Database> db,
+                    const std::string& cache_dir) override {
     std::cerr << "NilEvictionPolicy::init()" << std::endl;
   }
 
@@ -56,7 +58,6 @@ class LRUEvictionPolicy : public EvictionPolicy {
   std::unique_ptr<LRUEvictionPolicyImpl> impl;
   uint64_t max_cache_size;
   uint64_t low_cache_size;
-  std::thread gc_thread;
 
  public:
   explicit LRUEvictionPolicy(uint64_t low_cache_size, uint64_t max_cache_size);
@@ -65,7 +66,7 @@ class LRUEvictionPolicy : public EvictionPolicy {
   LRUEvictionPolicy(LRUEvictionPolicy&&) = delete;
   virtual ~LRUEvictionPolicy();
 
-  virtual void init(const std::string& cache_dir) override;
+  virtual void init(std::shared_ptr<job_cache::Database> db, const std::string& cache_dir) override;
 
   virtual void read(int id) override;
 
@@ -78,7 +79,6 @@ class TTLEvictionPolicy : public EvictionPolicy {
   // We need to touch the database so we use pimpl to hide the implementation
   std::unique_ptr<TTLEvictionPolicyImpl> impl;
   uint64_t seconds_to_live;
-  std::thread gc_thread;
 
  public:
   explicit TTLEvictionPolicy(uint64_t seconds_to_live);
@@ -87,13 +87,11 @@ class TTLEvictionPolicy : public EvictionPolicy {
   TTLEvictionPolicy(TTLEvictionPolicy&&) = delete;
   virtual ~TTLEvictionPolicy();
 
-  virtual void init(const std::string& cache_dir) override;
+  virtual void init(std::shared_ptr<job_cache::Database> db, const std::string& cache_dir) override;
 
   virtual void read(int id) override;
 
   virtual void write(int id) override;
 };
-
-int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> policy);
 
 }  // namespace job_cache
