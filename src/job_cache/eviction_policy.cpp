@@ -398,13 +398,10 @@ static void garbage_collect_orphan_folders(std::shared_ptr<job_cache::Database> 
   }
 }
 
-void LRUEvictionPolicy::init(const std::string& cache_dir) {
-  std::shared_ptr<job_cache::Database> db = std::make_unique<job_cache::Database>(cache_dir);
+void LRUEvictionPolicy::init(std::shared_ptr<job_cache::Database> db,
+                             const std::string& cache_dir) {
   impl = std::make_unique<LRUEvictionPolicyImpl>(cache_dir, db);
-
-  // To keep this thread alive, we assign it to a static thread object.
-  // This starts the collection but if the programs ends so too will this thread.
-  gc_thread = std::thread(garbage_collect_orphan_folders, db);
+  garbage_collect_orphan_folders(db);
 }
 
 void LRUEvictionPolicy::read(int job_id) { impl->mark_new_use(job_id); }
@@ -427,14 +424,11 @@ LRUEvictionPolicy::LRUEvictionPolicy(uint64_t low, uint64_t max)
 
 LRUEvictionPolicy::~LRUEvictionPolicy() {}
 
-void TTLEvictionPolicy::init(const std::string& cache_dir) {
-  std::shared_ptr<job_cache::Database> db = std::make_unique<job_cache::Database>(cache_dir);
+void TTLEvictionPolicy::init(std::shared_ptr<job_cache::Database> db,
+                             const std::string& cache_dir) {
   impl = std::make_unique<TTLEvictionPolicyImpl>(cache_dir, db);
   impl->cleanup(seconds_to_live);
-
-  // To keep this thread alive, we assign it to a static thread object.
-  // This starts the collection but if the programs ends so too will this thread.
-  gc_thread = std::thread(garbage_collect_orphan_folders, db);
+  garbage_collect_orphan_folders(db);
 }
 
 void TTLEvictionPolicy::read(int job_id) {}
@@ -452,37 +446,5 @@ void TTLEvictionPolicy::write(int job_id) {
 TTLEvictionPolicy::TTLEvictionPolicy(uint64_t seconds_to_live) : seconds_to_live(seconds_to_live) {}
 
 TTLEvictionPolicy::~TTLEvictionPolicy() {}
-
-int eviction_loop(const std::string& cache_dir, std::unique_ptr<EvictionPolicy> policy) {
-  policy->init(cache_dir);
-
-  // Famous last words "a timeout of a year is plenty"
-  MessageParser msg_parser(STDIN_FILENO, 60 * 60 * 24 * 30 * 12);
-  MessageParserState state;
-  do {
-    std::vector<std::string> msgs;
-    state = msg_parser.read_messages(msgs);
-
-    for (const auto& m : msgs) {
-      auto cmd = EvictionCommand::parse(m);
-      if (!cmd) {
-        exit(EXIT_FAILURE);
-      }
-
-      switch (cmd->type) {
-        case EvictionCommandType::Read:
-          policy->read(cmd->job_id);
-          break;
-        case EvictionCommandType::Write:
-          policy->write(cmd->job_id);
-          break;
-        default:
-          exit(EXIT_FAILURE);
-      }
-    }
-  } while (state == MessageParserState::Continue);
-
-  exit(state == MessageParserState::StopSuccess ? EXIT_SUCCESS : EXIT_FAILURE);
-}
 
 }  // namespace job_cache

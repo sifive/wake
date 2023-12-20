@@ -653,8 +653,9 @@ struct CacheDbImpl {
   OutputSymlinks output_symlinks;
   Transaction transact;
   SelectMatchingJobs matching_jobs;
+  std::unique_ptr<EvictionPolicy> policy;
 
-  CacheDbImpl(const std::string &_dir)
+  CacheDbImpl(EvictionConfig config, const std::string &_dir)
       : db(std::make_unique<job_cache::Database>(_dir)),
         jobs(db),
         input_files(db),
@@ -663,7 +664,21 @@ struct CacheDbImpl {
         output_dirs(db),
         output_symlinks(db),
         transact(db),
-        matching_jobs(db) {}
+        matching_jobs(db) {
+    switch (config.type) {
+      case EvictionPolicyType::TTL:
+        wcl::log::info("Using TTL eviction policy, seconds_to_live = %lu",
+                       config.ttl.seconds_to_live)();
+        policy = std::make_unique<TTLEvictionPolicy>(config.ttl.seconds_to_live);
+        break;
+      case EvictionPolicyType::LRU:
+        wcl::log::info("Using LRU eviction policy, low = %lu, max = %lu", config.lru.low_size,
+                       config.lru.max_size)();
+        policy = std::make_unique<LRUEvictionPolicy>(config.lru.low_size, config.lru.max_size);
+        break;
+    }
+    policy->init(db, _dir);
+  }
 };
 
 DaemonCache::DaemonCache(std::string dir, std::string bulk_dir, EvictionConfig config)
@@ -679,9 +694,7 @@ DaemonCache::DaemonCache(std::string dir, std::string bulk_dir, EvictionConfig c
   key = rng.unique_name();
   listen_socket_fd = create_cache_socket(".", key);
 
-  impl = std::make_unique<CacheDbImpl>(".");
-
-  launch_evict_loop();
+  impl = std::make_unique<CacheDbImpl>(config, ".");
 }
 
 int DaemonCache::run() {
@@ -983,17 +996,7 @@ FindJobResponse DaemonCache::read(const FindJobRequest &find_request) {
     redirect_path(input_dir);
   }
 
-  EvictionCommand cmd(EvictionCommandType::Read, job_id);
-
-  std::string msg = cmd.serialize();
-  msg += '\0';
-
-  wcl::log::info("Sending Read command to eviction loop")();
-  if (write(evict_stdin, msg.data(), msg.size()) == -1) {
-    wcl::log::warning("Failed to send eviction update: %s", strerror(errno))();
-  } else {
-    wcl::log::info("Successfully sent eviction the job")();
-  }
+  impl->policy->read(job_id);
 
   return FindJobResponse(wcl::make_some<MatchingJob>(std::move(result)));
 }
@@ -1078,102 +1081,10 @@ void DaemonCache::add(const AddJobRequest &add_request) {
   std::string job_dir = wcl::join_paths(job_group_dir, std::to_string(job_id));
   rename_no_fail(tmp_job_dir.c_str(), job_dir.c_str());
 
-  EvictionCommand cmd(EvictionCommandType::Write, job_id);
-
-  std::string msg = cmd.serialize();
-  msg += '\0';
-
-  wcl::log::info("Sending Write command to eviction loop")();
-  if (write(evict_stdin, msg.data(), msg.size()) == -1) {
-    wcl::log::warning("Failed to send eviction update: %s", strerror(errno))();
-  } else {
-    wcl::log::info("Sucessfully sent eviction add update")();
-  }
+  impl->policy->write(job_id);
 }
 
-void DaemonCache::launch_evict_loop() {
-  const size_t read_side = 0;
-  const size_t write_side = 1;
-
-  int stdinPipe[2];
-  int stdoutPipe[2];
-
-  if (pipe(stdinPipe) < 0) {
-    wcl::log::error("Failed to allocate eviction pipe: %s", strerror(errno)).urgent()();
-    exit(1);
-  }
-
-  if (pipe(stdoutPipe) < 0) {
-    wcl::log::error("Failed to allocate eviction pipe: %s", strerror(errno)).urgent()();
-    exit(1);
-  }
-
-  int pid = fork();
-
-  // error forking
-  if (pid < 0) {
-    wcl::log::error("Failed to fork eviction process: %s", strerror(errno)).urgent()();
-    exit(1);
-  }
-
-  // child
-  if (pid == 0) {
-    if (dup2(stdinPipe[read_side], STDIN_FILENO) == -1) {
-      wcl::log::error("Failed to dup2 stdin pipe for eviction process: %s", strerror(errno))
-          .urgent()();
-      exit(1);
-    }
-
-    if (dup2(stdoutPipe[write_side], STDOUT_FILENO) == -1) {
-      wcl::log::error("Failed to dup2 stdin pipe for eviction process: %s", strerror(errno))
-          .urgent()();
-      exit(1);
-    }
-
-    close(stdinPipe[read_side]);
-    close(stdinPipe[write_side]);
-    close(stdoutPipe[read_side]);
-    close(stdoutPipe[write_side]);
-
-    wcl::log::info("Launching eviction loop")();
-
-    // Finally enter the eviction loop, if it exits cleanly
-    // go ahead and exit with its result.
-    std::unique_ptr<EvictionPolicy> policy;
-    switch (config.type) {
-      case EvictionPolicyType::TTL:
-        wcl::log::info("Using TTL eviction policy, seconds_to_live = %lu",
-                       config.ttl.seconds_to_live)();
-        policy = std::make_unique<TTLEvictionPolicy>(config.ttl.seconds_to_live);
-        break;
-      case EvictionPolicyType::LRU:
-        wcl::log::info("Using LRU eviction policy, low = %lu, max = %lu", config.lru.low_size,
-                       config.lru.max_size)();
-        policy = std::make_unique<LRUEvictionPolicy>(config.lru.low_size, config.lru.max_size);
-        break;
-    }
-    int result = eviction_loop(".", std::move(policy));
-    exit(result);
-  }
-
-  // parent
-  if (pid > 0) {
-    close(stdinPipe[read_side]);
-    close(stdoutPipe[write_side]);
-
-    evict_pid = pid;
-    evict_stdin = stdinPipe[write_side];
-    evict_stdout = stdoutPipe[read_side];
-  }
-}
-
-void DaemonCache::reap_evict_loop() {
-  close(evict_stdin);
-  close(evict_stdout);
-  waitpid(evict_pid, nullptr, 0);
-}
-
-DaemonCache::~DaemonCache() { reap_evict_loop(); }
+DaemonCache::~DaemonCache() {}
 
 void DaemonCache::handle_new_client() {
   // Accept the new client socket. We accept as non-blocking so that we can
