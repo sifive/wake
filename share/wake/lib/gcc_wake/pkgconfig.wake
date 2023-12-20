@@ -16,7 +16,7 @@
 package gcc_wake
 
 export tuple SysLib =
-    export Verison: String
+    export Version: String
     export Headers: List Path
     export Objects: List Path
     export CFlags: List String
