@@ -17,6 +17,38 @@ package build_wake
 
 from wake import _
 
+
+export def testPostgres postgresDir cmd =
+    def dataDir = "/tmp/pg_data"
+
+    # require Pass script = source "postgres-cmd.sh"
+    def script =
+      """
+      unshare -U bash postgres-cmd.sh
+      %{cmd}
+      killall postgres
+      """
+
+    def shellCmd = which "bash", "-c", script, Nil
+
+    require Pass pgJsonPath = source "postgres-cmd-spec.json"
+    require Pass pgJsonKV = parseJSONFile pgJsonPath
+    require JObject pgJsonKV = pgJsonKV
+    else
+      failWithError "postgres spec file was not an object"
+
+    def pgJsonContent = JObject ("command" :-> JArray (map JString shellCmd), pgJsonKV)
+    require Pass pgJson = write "test-spec.json" (prettyJSON pgJsonContent)
+
+    makeExecPlan ("{wakePath}/wakebox", "-I", "-p", pgJson.getPathName, "-o", "test-result.json", Nil) Nil
+    | editPlanEnvironment (addEnvironmentPath "/usr/sbin")
+    | editPlanEnvironment (addEnvironmentPath "/home/jakee/.cargo/bin")
+    | editPlanEnvironment ("DATA_DIR={dataDir}", "PG_DIR={postgresDir}", _)
+    | setPlanPersistence ReRun
+    | setPlanEcho logReport
+    | runJobWith localRunner
+    | getJobStdout
+
 # Useful build variants (arguments to all)
 def toVariant = match _
     "default" -> Pass (Pair "native-cpp14-release" "native-c11-release")

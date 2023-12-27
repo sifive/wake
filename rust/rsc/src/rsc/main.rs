@@ -101,8 +101,8 @@ fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) 
         )
 }
 
-async fn create_standalone_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
-    let db = Database::connect("sqlite::memory:").await?;
+async fn create_standalone_db(db: &str) -> Result<DatabaseConnection, sea_orm::DbErr> {
+    let db = Database::connect(format!("postgres://127.0.0.1/{}", db)).await?;
     Migrator::up(&db, None).await?;
     Ok(db)
 }
@@ -147,7 +147,7 @@ async fn connect_to_database(
 ) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
     if config.standalone {
         tracing::warn!("Launching rsc in standalone mode, data will not persist.");
-        let db = create_standalone_db().await?;
+        let db = create_standalone_db("connect_test").await?;
         let key = create_insecure_api_key(&db).await?;
         tracing::info!(key, "Created insecure api key.");
 
@@ -258,7 +258,7 @@ mod tests {
 
     #[tokio::test]
     async fn nominal() {
-        let db = create_standalone_db().await.unwrap();
+        let db = create_standalone_db("nominal_test").await.unwrap();
         let api_key = create_insecure_api_key(&db).await.unwrap();
         let blob_id = create_fake_blob(&db).await.unwrap();
         let config = create_config().unwrap();
@@ -419,7 +419,7 @@ mod tests {
 
     #[tokio::test]
     async fn ttl_eviction() {
-        let db = create_standalone_db().await.unwrap();
+        let db = create_standalone_db("ttl_eviction").await.unwrap();
         let blob_id = create_fake_blob(&db).await.unwrap();
         let conn = Arc::new(db);
 

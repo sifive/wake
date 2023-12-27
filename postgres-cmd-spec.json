@@ -1,0 +1,29 @@
+{
+  "label": "postgres command",
+  "environment": [
+    "PATH=/usr/lib64/ccache:/usr/bin:/usr/sbin:/bin:/sifive/tools/rust/stable/1.72.0/bin",
+    "TERM=xterm-256color",
+    "DATA_DIR=/tmp/pg_data",
+    "PG_DIR=/scratch/jakee/pg-server2"
+  ],
+  "user-id": 0,
+  "group-id": 0,
+  "visible": [],
+  "directory": ".",
+  "stdin": "",
+  "resources": [],
+  "isolate-network": true,
+  "isolate-pids": true,
+  "mount-ops": [
+    {"type": "tmpfs", "destination": "/tmp"},
+    {"type": "tmpfs", "destination": "/root"}
+  ],
+  "usage": {
+    "status": 0,
+    "runtime": 0,
+    "cputime": 0,
+    "membytes": 0,
+    "inbytes": 0,
+    "outbytes": 0
+  }
+}
