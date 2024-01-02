@@ -15,7 +15,7 @@
 
 package rust
 
-target findCargoPath Unit =
+export target findCargoPath Unit =
     require Some cargo_home = getenv "CARGO_HOME"
     else
         require Some path = getenv "PATH"

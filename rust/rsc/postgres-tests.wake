@@ -1,0 +1,75 @@
+# Copyright 2024 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package build_wake
+
+from wake import _
+from rust import findCargoPath
+
+export target testPostgres Unit =
+    def dataDir = "/tmp/pg_data"
+
+    require Pass postgresDir = match (getenv "POSTGRES_DIR")
+        Some dir -> Pass "{dir}/bin"
+        None ->
+            require Some osPath = getenv "PATH"
+            else failWithError "could not find postgres"
+
+            def postgresPath = whichIn osPath "postgres"
+
+            if postgresPath ==* "postgres" then
+                failWithError "could not find postgres on path"
+            else
+                Pass (dirname postgresPath)
+
+    require Pass cargoPath = findCargoPath Unit
+
+    # This script is piped in via stdin so that
+    # as shells are opened one after the other,
+    # the successive commands are run as intended
+    def script =
+        """
+                set -ex
+                echo HOME: $HOME
+                echo USER: $USER
+                unshare -U
+        		set -ex
+                export HOME=/root
+                echo HOME: $HOME
+                echo USER: $USER
+                mkdir %{dataDir}
+                %{postgresDir}/initdb -D %{dataDir}
+                %{postgresDir}/postgres -D %{dataDir} &
+                trap "kill $!" 0
+                sleep 2s
+                %{postgresDir}/createuser -h localhost root
+                %{postgresDir}/createdb -h localhost shim
+                cd rust/rsc
+                %{cargoPath} test
+        """
+
+    # Jobs require that we write stdin out to a file in order to
+    # pipe it in
+    require Pass scriptPath = write "postgres-cargo.sh" script
+    require Pass pgJsonPath = source "postgres-cmd-spec.json"
+
+    makeExecPlan ("{wakePath}/wakebox", "-p", pgJsonPath.getPathName, Nil) Nil
+    | editPlanEnvironment (addEnvironmentPath "/usr/sbin")
+    | setPlanStdin scriptPath.getPathName
+    | setPlanPersistence ReRun
+    | setPlanEcho logReport
+    | runJobWith localRunner
+    | getJobStatus
+    | Pass

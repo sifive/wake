@@ -16,7 +16,7 @@ if [[ ${1} == "all" ]]; then
 fi
 
 if [[ ${1} == "changed" ]]; then
-  CHANGED_FILES=$(git --git-dir ${WAKE_ROOT}.git diff --name-only | grep '\.wake' | grep -v 'tests/' | grep -v "manifest.wake")
+  CHANGED_FILES=$(git --git-dir ${WAKE_ROOT}.git diff --name-only | grep '\.wake$' | grep -v 'tests/' | grep -v "manifest.wake")
   STAGED_FILES=$(git --git-dir ${WAKE_ROOT}.git diff --name-only --cached | grep '\.wake' | grep -v 'tests/' | grep -v "manifest.wake")
   MERGED="${CHANGED_FILES} ${STAGED_FILES}"
 
