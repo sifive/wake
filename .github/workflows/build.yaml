@@ -28,7 +28,10 @@ jobs:
           run: make tarball
 
         - name: Run Tests
-          run: make test && make unittest && make remoteCacheTests
+          run: make test && make unittest
+        
+        - name: Run Remote Cache Tests
+          run: POSTGRES_DIR=/etc/postgresql/14/bin make remoteCacheTests
 
         - name: Check Wake Formatting
           run: ./bin/wake-format.native-cpp14-release --auto --dry-run
