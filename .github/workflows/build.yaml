@@ -29,6 +29,9 @@ jobs:
 
         - name: Run Tests
           run: make test && make unittest
+
+        - name: Vendor remote cache deps
+          run: cd rust/rsc && cargo vendor --locked
         
         - name: Run Remote Cache Tests
           run: POSTGRES_DIR=/etc/postgresql/14/bin make remoteCacheTests
