@@ -11,7 +11,7 @@
   "group-id": 0,
   "visible": [],
   "directory": ".",
-  "stdin": "postgres-cargo.sh",
+  "stdin": ".build/postgres-cargo.sh",
   "resources": [],
   "isolate-network": true,
   "isolate-pids": true,

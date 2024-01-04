@@ -19,6 +19,8 @@ from wake import _
 from rust import findCargoPath
 
 export target testPostgres Unit =
+    # First we define a few directories, using various
+    # environment variables
     def dataDir = "/tmp/pg_data"
 
     require Pass postgresDir = match (getenv "POSTGRES_DIR")
@@ -36,40 +38,53 @@ export target testPostgres Unit =
 
     require Pass cargoPath = findCargoPath Unit
 
+    # This is normally unsafe but we're just using it for
+    # a warning, you should never depend on the result here
+    require _, _ = files "{@here}/vendor" `.*`
+    else
+        failWithError "You forgot to run `cargo vendor --locked` inside {@here}"
+    
     # This script is piped in via stdin so that
     # as shells are opened one after the other,
     # the successive commands are run as intended
     def script =
         """
                 set -ex
-                echo HOME: $HOME
-                echo USER: $USER
+                trap 'exit $(/tmp/status)' 0
                 unshare -U
-        		set -ex
                 export HOME=/root
-                echo HOME: $HOME
-                echo USER: $USER
                 mkdir %{dataDir}
+                echo $? > /tmp/status
                 %{postgresDir}/initdb -D %{dataDir}
+                echo $? > /tmp/status
                 %{postgresDir}/postgres -D %{dataDir} &
                 trap "kill $!" 0
                 sleep 2s
                 %{postgresDir}/createuser -h localhost root
+                echo $? > /tmp/status
                 %{postgresDir}/createdb -h localhost shim
-                cd rust/rsc
+                echo $? > /tmp/status
+                cd %{@here}
                 %{cargoPath} test
+                echo $? > /tmp/status
+                exit $(cat /tmp/status) # exit the unshare shell
         """
 
     # Jobs require that we write stdin out to a file in order to
     # pipe it in
-    require Pass scriptPath = write "postgres-cargo.sh" script
-    require Pass pgJsonPath = source "postgres-cmd-spec.json"
+    require Pass scriptPath = write ".build/postgres-cargo.sh" script
+    require Pass pgJsonPath = source "{@here}/postgres-cmd-spec.json"
+
+    def emitVendorWarning status =
+        require (Exited 0) = status
+        else
+            failWithError "cargo tests failed: Consider running `cargo vendor --locked` in {@here}"
+        Pass status
 
     makeExecPlan ("{wakePath}/wakebox", "-p", pgJsonPath.getPathName, Nil) Nil
     | editPlanEnvironment (addEnvironmentPath "/usr/sbin")
-    | setPlanStdin scriptPath.getPathName
     | setPlanPersistence ReRun
     | setPlanEcho logReport
     | runJobWith localRunner
     | getJobStatus
-    | Pass
+    | emitVendorWarning
