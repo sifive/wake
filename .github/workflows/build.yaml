@@ -19,16 +19,16 @@ jobs:
             fetch-depth: 0
 
         - name: Checkout postgres
-          run: cd /var/tmp/ && git clone https://github.com/postgres/postgres.git && cd postgres && git checkout c372fbbd8e911f2412b80a8c39d7079366565d67
+          run: pushd /var/tmp/ && git clone https://github.com/postgres/postgres.git && cd postgres && git checkout c372fbbd8e911f2412b80a8c39d7079366565d67 && popd
 
         - name: Build postgres
-          run: cd /var/tmp/postgres && ./configure --prefix /var/tmp/pg-server && make install
+          run: pushd /var/tmp/postgres && ./configure --prefix /var/tmp/pg-server && make install && popd
 
         - name: Install Deps
           run: sudo apt-get update && sudo apt-get install -y build-essential fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx clang-format-12 postgresql
 
         - name: Vendor remote cache deps
-          run: cd ~ && cd rust/rsc && cargo vendor --locked
+          run: cd rust/rsc && cargo vendor --locked
 
         - name: Run Remote Cache Tests
           run: POSTGRES_DIR=/var/tmp/pg-server make remoteCacheTests
