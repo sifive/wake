@@ -48,6 +48,9 @@ jobs:
         - name: Build postgres
           run: pushd /var/tmp/postgres && ./configure --prefix /var/tmp/pg-server && make install && popd
 
+        - name: Vendor remote cache deps
+          run: cd rust/rsc && cargo vendor --locked && cd ..
+
         - name: Run Remote Cache Tests
           run: POSTGRES_DIR=/var/tmp/pg-server CARGO_HOME=/var/tmp/rust-install make remoteCacheTests
 
