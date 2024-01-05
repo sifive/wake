@@ -18,6 +18,21 @@ jobs:
           with:
             fetch-depth: 0
 
+        - name: Install Deps
+          run: sudo apt-get update && sudo apt-get install -y build-essential fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx clang-format-12 postgresql
+
+        - name: Check C/C++ Formatting
+          run: clang-format-12 --style=file --Werror -n $(./scripts/which_clang_files all)
+
+        - name: Build Tarball
+          run: make tarball
+
+        - name: Run Tests
+          run: make test && make unittest
+
+        - name: Check Wake Formatting
+          run: ./bin/wake-format.native-cpp14-release --auto --dry-run
+
         - name: Download rust
           run: pushd /var/tmp && wget https://static.rust-lang.org/dist/rust-1.72.0-x86_64-unknown-linux-gnu.tar.gz && popd
 
@@ -33,26 +48,8 @@ jobs:
         - name: Build postgres
           run: pushd /var/tmp/postgres && ./configure --prefix /var/tmp/pg-server && make install && popd
 
-        - name: Install Deps
-          run: sudo apt-get update && sudo apt-get install -y build-essential fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx clang-format-12 postgresql
-
-        - name: Vendor remote cache deps
-          run: cd rust/rsc && cargo vendor --locked
-
         - name: Run Remote Cache Tests
           run: POSTGRES_DIR=/var/tmp/pg-server CARGO_HOME=/var/tmp/rust-install make remoteCacheTests
-
-        - name: Check C/C++ Formatting
-          run: clang-format-12 --style=file --Werror -n $(./scripts/which_clang_files all)
-
-        - name: Build Tarball
-          run: make tarball
-
-        - name: Run Tests
-          run: make test && make unittest
-        
-        - name: Check Wake Formatting
-          run: ./bin/wake-format.native-cpp14-release --auto --dry-run
 
         - name: Generate Docs
           run: mkdir www && ./bin/wake --no-workspace --html > www/index.html
