@@ -28,7 +28,7 @@ jobs:
           run: pushd /var/tmp && mkdir rust-install && ./rust-1.72.0-x86_64-unknown-linux-gnu/install.sh --prefix=/var/tmp/rust-install --verbose && popd
 
         - name: Checkout postgres
-          run: pushd /var/tmp/ && git clone --depth 1 https://github.com/postgres/postgres.git && cd postgres && git fetch c372fbbd8e911f2412b80a8c39d7079366565d67 && git checkout c372fbbd8e911f2412b80a8c39d7079366565d67 && popd
+          run: pushd /var/tmp/ && git clone --depth 1 https://github.com/postgres/postgres.git && cd postgres && git fetch origin c372fbbd8e911f2412b80a8c39d7079366565d67 && git checkout c372fbbd8e911f2412b80a8c39d7079366565d67 && popd
 
         - name: Build postgres
           run: pushd /var/tmp/postgres && ./configure --prefix /var/tmp/pg-server && make install && popd
