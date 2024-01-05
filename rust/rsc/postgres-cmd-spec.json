@@ -1,7 +1,6 @@
 {
   "label": "postgres command",
   "environment": [
-    "PATH=/usr/lib64/ccache:/usr/bin:/usr/sbin:/bin:/sifive/tools/rust/stable/1.72.0/bin",
     "TERM=xterm-256color",
     "DATA_DIR=/tmp/pg_data",
     "PG_DIR=/scratch/jakee/pg-server2"
@@ -24,7 +23,7 @@
     },
     {
       "type": "create-file",
-      "destination": "rust/rsc/.cargo/config.toml"
+      "destination": "rust/rsc/.cargo/config.tomlrust/rsc/.cargo/config.toml"
     },
 
     {

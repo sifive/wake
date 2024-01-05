@@ -18,6 +18,50 @@ package build_wake
 from wake import _
 from rust import findCargoPath
 
+def createFileOp dst =
+    JObject ("type" :-> JString "create-file", "destination" :-> JString dst,)
+
+def createDirOp dst =
+    JObject ("type" :-> JString "create-dir", "destination" :-> JString dst,)
+
+def tmpMountOp dst =
+    JObject ("type" :-> JString "tmpfs", "destination" :-> JString dst,)
+
+def bindMountOp src dst =
+    JObject ("type" :-> JString "bind", "source" :-> JString src, "destination" :-> JString dst,)
+
+def postgresSpecJson stdinFile cargoPath =
+    JObject (
+      "label" :-> JString "postgres cargo test",
+      "environment" :-> JArray (
+        JString "PATH=/usr/lib64/ccache:/usr/bin:/usr/sbin:/bin:{dirname cargoPath}",
+      ),
+      "command" :-> JArray (JString "bash", Nil),
+      "user-id" :-> JInteger 0,
+      "group-id" :-> JInteger 0,
+      "visible" :-> JArray Nil,
+      "directory" :-> JString ".",
+      "stdin" :-> JString "{stdinFile}",
+      "resources" :-> JArray Nil,
+      "isolate-pids" :-> JBoolean True,
+      "isolate-network" :-> JBoolean True,
+      "usage" :-> JObject (
+         "status" :-> JInteger 0,
+         "runtime" :-> JInteger 0,
+         "cputime" :-> JInteger 0,
+         "membytes" :-> JInteger 0,
+         "inbytes" :-> JInteger 0,
+         "outputs" :-> JInteger 0, 
+      ),
+      "mount-ops" :-> JArray (
+        tmpMountOp "/tmp",
+        tmpMountOp "/root",
+        createDirOp "rust/rsc/.cargo",
+        createFileOp "rust/rsc/.cargo/config.toml",
+        bindMountOp "rust/rsc/vendor-config.toml" "rust/rsc/.cargo/config.toml",
+      ),
+    )
+
 export target testPostgres Unit =
     # First we define a few directories, using various
     # environment variables
@@ -66,8 +110,13 @@ export target testPostgres Unit =
 
     # Jobs require that we write stdin out to a file in order to
     # pipe it in
-    require Pass _scriptPath = write ".build/postgres-cargo.sh" script
-    require Pass pgJsonPath = source "{@here}/postgres-cmd-spec.json"
+     
+    require Pass scriptPath = write ".build/postgres-cargo.sh" script
+
+    def _ = println "Cargo Path: {cargoPath}"
+    def pgJson = postgresSpecJson scriptPath.getPathName cargoPath
+    require Pass pgJsonPath = write ".build/postgres-cmd-spec.json" (prettyJSON pgJson)
+    
 
     def emitVendorWarning status =
         require (Exited 0) = status
