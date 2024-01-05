@@ -22,13 +22,16 @@ jobs:
           run: git clone https://github.com/postgres/postgres.git && cd postgres && git checkout c372fbbd8e911f2412b80a8c39d7079366565d67
 
         - name: Build postgres
-          run: cd postgres && ./configure && make install
+          run: cd postgres && ./configure --prefix ~/postgres && make install
 
         - name: Install Deps
           run: sudo apt-get update && sudo apt-get install -y build-essential fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx clang-format-12 postgresql
 
         - name: Check C/C++ Formatting
           run: clang-format-12 --style=file --Werror -n $(./scripts/which_clang_files all)
+
+        - name: Run Remote Cache Tests
+          run: POSTGRES_DIR=~/postgres make remoteCacheTests
 
         - name: Build Tarball
           run: make tarball
@@ -39,9 +42,6 @@ jobs:
         - name: Vendor remote cache deps
           run: cd rust/rsc && cargo vendor --locked
         
-        - name: Run Remote Cache Tests
-          run: POSTGRES_DIR=/usr/local/pgsql make remoteCacheTests
-
         - name: Check Wake Formatting
           run: ./bin/wake-format.native-cpp14-release --auto --dry-run
 
