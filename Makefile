@@ -80,6 +80,9 @@ test:		wake.db
 unittest:	all
 	$(WAKE_ENV) ./bin/wake --in test_wake runUnitTests
 
+remoteCacheTests:	all
+	$(WAKE_ENV) ./bin/wake -d -x 'testPostgres Unit'
+
 tarball:	wake.db
 	$(WAKE_ENV) ./bin/wake build tarball
 

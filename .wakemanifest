@@ -14,6 +14,7 @@ build.wake
 extensions/vscode/vscode.wake
 tests/tests.wake
 rust/log_viewer/build.wake
+rust/rsc/postgres-tests.wake
 share/wake/lib/gcc_wake/gcc.wake
 share/wake/lib/gcc_wake/pkgconfig.wake
 share/wake/lib/rust_wake/cargo.wake

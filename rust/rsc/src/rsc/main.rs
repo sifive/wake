@@ -4,14 +4,16 @@ use axum::{
     Router,
 };
 use clap::Parser;
+use data_encoding::HEXLOWER;
 use migration::{Migrator, MigratorTrait};
+use rand_core::{OsRng, RngCore};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use tracing;
 
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::*, ColumnTrait, Database, DatabaseConnection, DeleteResult,
-    EntityTrait, QueryFilter,
+    ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, Database, DatabaseConnection,
+    DeleteResult, EntityTrait, QueryFilter,
 };
 
 use chrono::{Duration, Utc};
@@ -102,7 +104,16 @@ fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) 
 }
 
 async fn create_standalone_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
-    let db = Database::connect("sqlite::memory:").await?;
+    let shim_db = Database::connect("postgres://127.0.0.1/shim").await?;
+    let mut buf = [0u8; 24];
+    OsRng.fill_bytes(&mut buf);
+    let rng_str = HEXLOWER.encode(&buf);
+    let db = format!("db_{}", rng_str);
+    shim_db
+        .execute_unprepared(&format!("CREATE DATABASE {}", db))
+        .await?;
+    drop(shim_db);
+    let db = Database::connect(format!("postgres://127.0.0.1/{}", db)).await?;
     Migrator::up(&db, None).await?;
     Ok(db)
 }
