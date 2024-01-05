@@ -26,15 +26,10 @@ export target testPostgres Unit =
     require Pass postgresDir = match (getenv "POSTGRES_DIR")
         Some dir -> Pass "{dir}/bin"
         None ->
-            require Some osPath = getenv "PATH"
-            else failWithError "could not find postgres"
+            require Some postgresPath = whichInEnvPath "postgres"
+            else failWithError "could not find postges on path"
 
-            def postgresPath = whichIn osPath "postgres"
-
-            if postgresPath ==* "postgres" then
-                failWithError "could not find postgres on path"
-            else
-                Pass (dirname postgresPath)
+            Pass (dirname postgresPath)
 
     require Pass cargoPath = findCargoPath Unit
 
@@ -71,7 +66,7 @@ export target testPostgres Unit =
 
     # Jobs require that we write stdin out to a file in order to
     # pipe it in
-    require Pass scriptPath = write ".build/postgres-cargo.sh" script
+    require Pass _scriptPath = write ".build/postgres-cargo.sh" script
     require Pass pgJsonPath = source "{@here}/postgres-cmd-spec.json"
 
     def emitVendorWarning status =

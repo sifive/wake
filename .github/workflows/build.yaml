@@ -32,9 +32,15 @@ jobs:
 
         - name: Vendor remote cache deps
           run: cd rust/rsc && cargo vendor --locked
+
+        - name: Checkout postgres
+          run: git clone https://github.com/postgres/postgres.git && git checkout origin/REL_16_1
+
+        - name: Build postgres
+          run: ./configure && make install
         
         - name: Run Remote Cache Tests
-          run: POSTGRES_DIR=/etc/postgresql/14 make remoteCacheTests
+          run: POSTGRES_DIR=/usr/local/pgsql make remoteCacheTests
 
         - name: Check Wake Formatting
           run: ./bin/wake-format.native-cpp14-release --auto --dry-run
