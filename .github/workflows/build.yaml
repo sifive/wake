@@ -37,7 +37,7 @@ jobs:
           run: git clone https://github.com/postgres/postgres.git && git checkout c372fbbd8e911f2412b80a8c39d7079366565d67
 
         - name: Build postgres
-          run: ./configure && make install
+          run: cd postgres && ./configure && make install
         
         - name: Run Remote Cache Tests
           run: POSTGRES_DIR=/usr/local/pgsql make remoteCacheTests

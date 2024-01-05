@@ -27,7 +27,7 @@ export target testPostgres Unit =
         Some dir -> Pass "{dir}/bin"
         None ->
             require Some postgresPath = whichInEnvPath "postgres"
-            else failWithError "could not find postges on path"
+            else failWithError "could not find postgres on path"
 
             Pass (dirname postgresPath)
 
