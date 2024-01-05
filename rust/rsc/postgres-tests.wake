@@ -99,7 +99,7 @@ export target testPostgres Unit =
     def script =
         """
         set -ex
-        trap 'exit $(/tmp/status)' 0
+        trap 'exit $(cat /tmp/status)' 0
         unshare -U
         export HOME=/root
         mkdir %{dataDir}
