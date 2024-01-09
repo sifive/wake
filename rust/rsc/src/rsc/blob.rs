@@ -1,3 +1,4 @@
+use crate::blob_store_service::fetch_local_blob_store;
 use crate::types::{GetUploadUrlResponse, PostBlobResponse, PostBlobResponsePart};
 use async_trait::async_trait;
 use axum::{extract::Multipart, http::StatusCode, Json};
@@ -6,7 +7,7 @@ use entity::blob;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use rand_core::{OsRng, RngCore};
-use sea_orm::{prelude::Uuid, ActiveModelTrait, ActiveValue::*, DatabaseConnection};
+use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection};
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::BufWriter;
@@ -71,7 +72,15 @@ pub async fn create_blob(
     store: Arc<dyn DebugBlobStore + Send + Sync>,
 ) -> (StatusCode, Json<PostBlobResponse>) {
     let mut parts: Vec<PostBlobResponsePart> = Vec::new();
-    let store_id = Uuid::parse_str("07686ebe-96b6-42f5-a211-c40000533794").unwrap();
+    // let store_id = Uuid::parse_str("07686ebe-96b6-42f5-a211-c40000533794").unwrap();
+    let Ok(store_id) = fetch_local_blob_store(&db).await else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(PostBlobResponse::Error {
+                message: "boop".into(),
+            }),
+        );
+    };
 
     while let Ok(Some(field)) = multipart.next_field().await {
         let name = match field.name() {
