@@ -72,14 +72,17 @@ pub async fn create_blob(
     store: Arc<dyn DebugBlobStore + Send + Sync>,
 ) -> (StatusCode, Json<PostBlobResponse>) {
     let mut parts: Vec<PostBlobResponsePart> = Vec::new();
-    // let store_id = Uuid::parse_str("07686ebe-96b6-42f5-a211-c40000533794").unwrap();
-    let Ok(store_id) = fetch_local_blob_store(&db).await else {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(PostBlobResponse::Error {
-                message: "boop".into(),
-            }),
-        );
+
+    let store_id = match fetch_local_blob_store(&db).await {
+        Ok(id) => id,
+        Err(msg) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(PostBlobResponse::Error {
+                    message: msg.to_string(),
+                }),
+            )
+        }
     };
 
     while let Ok(Some(field)) = multipart.next_field().await {
