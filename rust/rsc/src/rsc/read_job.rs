@@ -1,11 +1,16 @@
-use crate::types::{Dir, File, ReadJobPayload, ReadJobResponse, Symlink};
+use crate::blob;
+use crate::types::{
+    Dir, File, ReadJobPayload, ReadJobResponse, ResolvedBlob, ResolvedBlobFile, Symlink,
+};
 use axum::Json;
-use entity::{job, job_use, output_dir, output_file, output_symlink};
+use entity::{blob_store, job, job_use, output_dir, output_file, output_symlink};
 use hyper::StatusCode;
+use sea_orm::DatabaseTransaction;
 use sea_orm::{
     prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, DatabaseConnection, DbErr,
     EntityTrait, ModelTrait, QueryFilter, TransactionTrait,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing;
 
@@ -19,14 +24,42 @@ async fn record_use(job_id: Uuid, conn: Arc<DatabaseConnection>) {
     let _ = usage.insert(conn.as_ref()).await;
 }
 
+async fn resolve_blob(
+    id: Uuid,
+    db: &DatabaseTransaction,
+    stores: &HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
+) -> Result<ResolvedBlob, String> {
+    let Ok(Some(blob)) = entity::prelude::Blob::find_by_id(id).one(db).await else {
+        return Err("Unable to find blob by id".into());
+    };
+
+    let Some(store) = stores.get(&blob.store_id) else {
+        return Err("Unable to find backing store for blob".into());
+    };
+
+    return Ok(ResolvedBlob {
+        id: blob.id,
+        url: store.download_url(blob.key).await,
+    });
+}
+
 #[tracing::instrument]
 pub async fn read_job(
     Json(payload): Json<ReadJobPayload>,
     conn: Arc<DatabaseConnection>,
+    blob_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) -> (StatusCode, Json<ReadJobResponse>) {
     // First find the hash so we can look up the exact job
     let hash: Vec<u8> = payload.hash().into();
 
+    // TODO: This transaction is quite large
+    // with a bunch of "serialized" queries.
+    // If read_job becomes a bottleneck it should
+    // be rewritten such that joining on promises
+    // is delayed for as long as possible.
+    // Another option would be to collect all blob ids 
+    // ahead of time and make a single db query to list 
+    // them all out instead of a query per blob id.
     let result = conn
         .as_ref()
         .transaction::<_, (Option<Uuid>, ReadJobResponse), DbErr>(|txn| {
@@ -44,12 +77,29 @@ pub async fn read_job(
                     .all(txn)
                     .await?
                     .into_iter()
-                    .map(|m| File {
-                        path: m.path,
-                        mode: m.mode,
-                        blob_id: m.blob_id,
-                    })
-                    .collect();
+                    .map(|m| {
+                        let blob_copy = blob_stores.clone();
+                        async move {
+                            let blob = resolve_blob(m.blob_id, txn, &blob_copy).await?;
+
+                            Ok(ResolvedBlobFile {
+                                path: m.path.clone(),
+                                mode: m.mode.clone(),
+                                blob,
+                            })
+                        }
+                    });
+
+                let output_files: Result<Vec<ResolvedBlobFile>, String> =
+                    futures::future::join_all(output_files)
+                        .await
+                        .into_iter()
+                        .collect();
+
+                let output_files = match output_files {
+                    Err(_) => return Ok((None, ReadJobResponse::NoMatch)),
+                    Ok(files) => files,
+                };
 
                 let output_symlinks = matching_job
                     .find_related(output_symlink::Entity)
@@ -79,8 +129,12 @@ pub async fn read_job(
                         output_symlinks,
                         output_dirs,
                         output_files,
-                        stdout_blob_id: matching_job.stdout_blob_id,
-                        stderr_blob_id: matching_job.stderr_blob_id,
+                        stdout_blob: resolve_blob(matching_job.stdout_blob_id, txn, &blob_stores)
+                            .await
+                            .unwrap(),
+                        stderr_blob: resolve_blob(matching_job.stderr_blob_id, txn, &blob_stores)
+                            .await
+                            .unwrap(),
                         status: matching_job.status,
                         runtime: matching_job.runtime,
                         cputime: matching_job.cputime,
