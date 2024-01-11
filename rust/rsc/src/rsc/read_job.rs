@@ -1,9 +1,7 @@
 use crate::blob;
-use crate::types::{
-    Dir, File, ReadJobPayload, ReadJobResponse, ResolvedBlob, ResolvedBlobFile, Symlink,
-};
+use crate::types::{Dir, ReadJobPayload, ReadJobResponse, ResolvedBlob, ResolvedBlobFile, Symlink};
 use axum::Json;
-use entity::{blob_store, job, job_use, output_dir, output_file, output_symlink};
+use entity::{job, job_use, output_dir, output_file, output_symlink};
 use hyper::StatusCode;
 use sea_orm::DatabaseTransaction;
 use sea_orm::{
@@ -57,8 +55,8 @@ pub async fn read_job(
     // If read_job becomes a bottleneck it should
     // be rewritten such that joining on promises
     // is delayed for as long as possible.
-    // Another option would be to collect all blob ids 
-    // ahead of time and make a single db query to list 
+    // Another option would be to collect all blob ids
+    // ahead of time and make a single db query to list
     // them all out instead of a query per blob id.
     let result = conn
         .as_ref()
@@ -83,8 +81,8 @@ pub async fn read_job(
                             let blob = resolve_blob(m.blob_id, txn, &blob_copy).await?;
 
                             Ok(ResolvedBlobFile {
-                                path: m.path.clone(),
-                                mode: m.mode.clone(),
+                                path: m.path,
+                                mode: m.mode,
                                 blob,
                             })
                         }
