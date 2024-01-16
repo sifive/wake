@@ -14,13 +14,13 @@ impl MigrationTrait for Migration {
                     .table(JobUses::Table)
                     .col(
                         ColumnDef::new(JobUses::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                            .primary_key()
+                            .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(JobUses::Time).timestamp().not_null())
-                    .col(ColumnDef::new(JobUses::JobId).integer().not_null())
+                    .col(ColumnDef::new(JobUses::JobId).uuid().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-job-use-job")

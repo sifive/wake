@@ -1,3 +1,4 @@
+use crate::blob_store_service::fetch_local_blob_store;
 use crate::types::{GetUploadUrlResponse, PostBlobResponse, PostBlobResponsePart};
 use async_trait::async_trait;
 use axum::{extract::Multipart, http::StatusCode, Json};
@@ -69,9 +70,20 @@ pub async fn create_blob(
     mut multipart: Multipart,
     db: Arc<DatabaseConnection>,
     store: Arc<dyn DebugBlobStore + Send + Sync>,
-    store_id: i32,
 ) -> (StatusCode, Json<PostBlobResponse>) {
     let mut parts: Vec<PostBlobResponsePart> = Vec::new();
+
+    let store_id = match fetch_local_blob_store(&db).await {
+        Ok(id) => id,
+        Err(msg) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(PostBlobResponse::Error {
+                    message: msg.to_string(),
+                }),
+            )
+        }
+    };
 
     while let Ok(Some(field)) = multipart.next_field().await {
         let name = match field.name() {
@@ -102,7 +114,6 @@ pub async fn create_blob(
         }
 
         let active_blob = blob::ActiveModel {
-            // TODO: these ids should be migrated to UUIDs
             id: NotSet,
             created_at: NotSet,
             key: Set(result.unwrap()),

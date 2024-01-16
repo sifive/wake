@@ -1,4 +1,5 @@
 use blake3;
+use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -11,7 +12,7 @@ pub struct VisibleFile {
 pub struct File {
     pub path: String,
     pub mode: i32,
-    pub blob_id: i32,
+    pub blob_id: Uuid,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -40,8 +41,8 @@ pub struct AddJobPayload {
     pub output_dirs: Vec<Dir>,
     pub output_symlinks: Vec<Symlink>,
     pub output_files: Vec<File>,
-    pub stdout_blob_id: i32,
-    pub stderr_blob_id: i32,
+    pub stdout_blob_id: Uuid,
+    pub stderr_blob_id: Uuid,
     pub status: i32,
     pub runtime: f64,
     pub cputime: f64,
@@ -115,7 +116,7 @@ impl ReadJobPayload {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PostBlobResponsePart {
-    pub id: i32,
+    pub id: Uuid,
     pub name: String,
 }
 
@@ -134,8 +135,8 @@ pub enum ReadJobResponse {
         output_symlinks: Vec<Symlink>,
         output_dirs: Vec<Dir>,
         output_files: Vec<File>,
-        stdout_blob_id: i32,
-        stderr_blob_id: i32,
+        stdout_blob_id: Uuid,
+        stderr_blob_id: Uuid,
         status: i32,
         runtime: f64,
         cputime: f64,

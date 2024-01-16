@@ -21,6 +21,7 @@ use chrono::{Duration, Utc};
 mod add_job;
 mod api_key_check;
 mod blob;
+mod blob_store_service;
 mod read_job;
 mod types;
 
@@ -96,8 +97,7 @@ fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) 
             post({
                 let conn = conn.clone();
                 let store = store.clone();
-                // TODO: Don't hardcode store type here
-                move |multipart: Multipart| blob::create_blob(multipart, conn, store, 1)
+                move |multipart: Multipart| blob::create_blob(multipart, conn, store)
             })
             .layer(DefaultBodyLimit::disable()),
         )
@@ -234,7 +234,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ActiveModelTrait, PaginatorTrait};
+    use sea_orm::{prelude::Uuid, ActiveModelTrait, PaginatorTrait};
     use std::sync::Arc;
 
     use axum::{
@@ -254,12 +254,14 @@ mod tests {
         })?)
     }
 
-    async fn create_fake_blob(db: &DatabaseConnection) -> Result<i32, Box<dyn std::error::Error>> {
+    async fn create_fake_blob(db: &DatabaseConnection) -> Result<Uuid, Box<dyn std::error::Error>> {
+        let store_uuid = blob_store_service::fetch_local_blob_store(db).await?;
+
         let active_key = entity::blob::ActiveModel {
             id: NotSet,
             created_at: Set((Utc::now() - Duration::days(5)).naive_utc()),
             key: Set("InsecureKey".into()),
-            store_id: Set(1),
+            store_id: Set(store_uuid),
         };
 
         let inserted_key = active_key.insert(db).await?;

@@ -5,8 +5,8 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "job")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: Uuid,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))", unique)]
     pub hash: Vec<u8>,
     pub cmd: String,
@@ -17,8 +17,8 @@ pub struct Model {
     pub is_atty: bool,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
     pub hidden_info: Vec<u8>,
-    pub stdout_blob_id: i32,
-    pub stderr_blob_id: i32,
+    pub stdout_blob_id: Uuid,
+    pub stderr_blob_id: Uuid,
     pub status: i32,
     #[sea_orm(column_type = "Double")]
     pub runtime: f64,

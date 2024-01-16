@@ -6,7 +6,7 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "local_blob_store")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id: i32,
+    pub id: Uuid,
     pub root: String,
     pub created_at: DateTime,
 }
