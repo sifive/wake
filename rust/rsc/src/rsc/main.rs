@@ -131,7 +131,9 @@ fn create_router(
             post({
                 let conn = conn.clone();
                 let store = active_store.clone();
-                move |multipart: Multipart| blob::create_blob(multipart, conn, store)
+                move |multipart: Multipart| {
+                    blob::create_blob(multipart, conn, active_store_uuid, store)
+                }
             })
             .layer(DefaultBodyLimit::disable()),
         )
@@ -202,9 +204,11 @@ async fn connect_to_database(
     create_remote_db(config).await
 }
 
-fn launch_eviction(conn: Arc<DatabaseConnection>, tick_interval: u64, deadline: i64) {
+fn launch_eviction(conn: Arc<DatabaseConnection>, tick_interval: i64, deadline: i64) {
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(tick_interval));
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+            tick_interval.try_into().unwrap(),
+        ));
         loop {
             interval.tick().await;
 
@@ -216,7 +220,55 @@ fn launch_eviction(conn: Arc<DatabaseConnection>, tick_interval: u64, deadline: 
                 .await
                 .unwrap();
 
-            tracing::info!(%res.rows_affected, "Performed TTL eviction tick.");
+            tracing::info!(%res.rows_affected, "Performed Job TTL eviction tick.");
+        }
+    });
+}
+
+fn launch_blob_eviction(
+    conn: Arc<DatabaseConnection>,
+    tick_interval: i64,
+    deadline: i64,
+    blob_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
+) {
+    // TODO: This should probably be a transaction so that a job can't add a new reference to a
+    // blob as we are deleting it.
+
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+            tick_interval.try_into().unwrap(),
+        ));
+        loop {
+            interval.tick().await;
+
+            // Blobs must be at least this old to be considered for eviction.
+            // This gives clients time to reference a blob before it gets evicted.
+            let deadline = (Utc::now() - Duration::seconds(deadline)).naive_utc();
+
+            let blobs = blob_store_service::fetch_unreferenced_blobs(conn.as_ref(), deadline)
+                .await
+                .unwrap();
+            let blob_ids: Vec<Uuid> = blobs.iter().map(|blob| blob.id).collect();
+            let mut affected: u64 = blob_ids.len().try_into().unwrap();
+
+            if affected == 0 {
+                tracing::info!(%affected, "Performed Blob TTL eviction tick.");
+                continue;
+            }
+
+            // Delete blobs from database
+            let res = blob_store_service::delete_blobs_by_ids(conn.as_ref(), blob_ids)
+                .await
+                .unwrap();
+            affected = res.rows_affected;
+
+            // Delete blobs from blob store
+            for blob in blobs {
+                let store = blob_stores.get(&blob.store_id).unwrap();
+                store.delete_key(blob.key).await.unwrap();
+            }
+
+            tracing::info!(%affected, "Performed Blob TTL eviction tick.");
         }
     });
 }
@@ -249,15 +301,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // connect to the db
+    // Connect to the db
     let connection = connect_to_database(&config).await?;
     let connection = Arc::new(connection);
 
-    // Launch the eviction thread
-    launch_eviction(connection.clone(), 60 * 10, 60 * 60 * 24 * 7);
+    // Activate blob stores
+    let stores = activate_stores(connection.clone()).await;
+
+    // Launch evictions threads
+    let one_min_in_seconds = 60 * 1;
+    let ten_mins_in_seconds = one_min_in_seconds * 10;
+    let one_hour_in_seconds = one_min_in_seconds * 60;
+    let one_week_in_seconds = one_hour_in_seconds * 24 * 7;
+    launch_eviction(connection.clone(), ten_mins_in_seconds, one_week_in_seconds);
+    launch_blob_eviction(connection.clone(), 10, 1, stores.clone());
 
     // Launch the server
-    let stores = activate_stores(connection.clone()).await;
     let router = create_router(connection.clone(), config.clone(), &stores);
     axum::Server::bind(&config.server_addr.parse()?)
         .serve(router.into_make_service())

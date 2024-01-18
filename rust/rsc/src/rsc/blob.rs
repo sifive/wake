@@ -7,6 +7,7 @@ use entity::blob;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use rand_core::{OsRng, RngCore};
+use sea_orm::prelude::Uuid;
 use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection};
 use std::sync::Arc;
 use tokio::fs::File;
@@ -24,6 +25,7 @@ pub trait BlobStore {
     ) -> Result<String, std::io::Error>;
 
     async fn download_url(&self, key: String) -> String;
+    async fn delete_key(&self, key: String) -> Result<(), std::io::Error>;
 }
 
 pub trait DebugBlobStore: BlobStore + std::fmt::Debug {}
@@ -42,17 +44,22 @@ impl BlobStore for LocalBlobStore {
         let reader = StreamReader::new(stream);
         futures::pin_mut!(reader);
 
-        let name = create_temp_filename();
-        let path = std::path::Path::new(&self.root).join(name.clone());
+        let key = create_temp_filename();
+        let path = std::path::Path::new(&self.root).join(key.clone());
         let mut file = BufWriter::new(File::create(path).await?);
 
         tokio::io::copy(&mut reader, &mut file).await?;
 
-        Ok(name)
+        Ok(key)
     }
 
     async fn download_url(&self, key: String) -> String {
         return format!("file://{0}/{key}", self.root);
+    }
+
+    async fn delete_key(&self, key: String) -> Result<(), std::io::Error> {
+        let path = std::path::Path::new(&self.root).join(key);
+        tokio::fs::remove_file(path).await
     }
 }
 
@@ -75,21 +82,10 @@ pub async fn get_upload_url(server_addr: String) -> Json<GetUploadUrlResponse> {
 pub async fn create_blob(
     mut multipart: Multipart,
     db: Arc<DatabaseConnection>,
+    store_id: Uuid,
     store: Arc<dyn DebugBlobStore + Send + Sync>,
 ) -> (StatusCode, Json<PostBlobResponse>) {
     let mut parts: Vec<PostBlobResponsePart> = Vec::new();
-
-    let store_id = match fetch_local_blob_store(&db).await {
-        Ok(id) => id,
-        Err(msg) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(PostBlobResponse::Error {
-                    message: msg.to_string(),
-                }),
-            )
-        }
-    };
 
     while let Ok(Some(field)) = multipart.next_field().await {
         let name = match field.name() {
