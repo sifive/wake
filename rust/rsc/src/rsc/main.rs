@@ -65,7 +65,7 @@ async fn activate_stores(
         Err(err) => {
             tracing::warn!(%err, "No local stores available in database");
             Vec::new()
-        },
+        }
     };
 
     let mut active_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>> =
@@ -314,7 +314,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let one_hour_in_seconds = one_min_in_seconds * 60;
     let one_week_in_seconds = one_hour_in_seconds * 24 * 7;
     launch_eviction(connection.clone(), ten_mins_in_seconds, one_week_in_seconds);
-    launch_blob_eviction(connection.clone(), 10, 1, stores.clone());
+    launch_blob_eviction(
+        connection.clone(),
+        one_min_in_seconds,
+        one_hour_in_seconds,
+        stores.clone(),
+    );
 
     // Launch the server
     let router = create_router(connection.clone(), config.clone(), &stores);

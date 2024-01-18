@@ -26,9 +26,15 @@ pub async fn fetch_unreferenced_blobs(
     db: &DatabaseConnection,
     ttl: NaiveDateTime,
 ) -> Result<Vec<blob::Model>, DbErr> {
-    // TODO: this can probably be written ala
+    // TODO: this can probably be refactored as a ORM query with something like
     // Blob::find()
-    //     .filter(blob::Column::Id.not_in_subquery(sea_orm::query::Query::select().columns([OutputFile::BlobId]).from(OutputFile::Table));
+    //     .filter(
+    //         blob::Column::Id.not_in_subquery(
+    //             sea_orm::query::Query::select()
+    //                 .column(OutputFile::BlobId)
+    //                 .from(OutputFile::Table
+    //                 .union( *OTHER STUFF* ));
+    //                 .take().
 
     Blob::find()
         .from_raw_sql(Statement::from_sql_and_values(
@@ -36,9 +42,9 @@ pub async fn fetch_unreferenced_blobs(
             r#"
             SELECT * FROM blob
             WHERE created_at <= $1
-            AND id NOT IN 
+            AND id NOT IN
             (
-                SELECT blob_id FROM output_file 
+                SELECT blob_id FROM output_file
                 UNION SELECT stdout_blob_id FROM job
                 UNION SELECT stderr_blob_id FROM job
             )
