@@ -62,7 +62,10 @@ async fn activate_stores(
 ) -> HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>> {
     let stores = match blob_store_service::fetch_local_blob_stores(&conn).await {
         Ok(stores) => stores,
-        Err(_) => Vec::new(),
+        Err(err) => {
+            tracing::warn!(%err, "No local stores available in database");
+            Vec::new()
+        },
     };
 
     let mut active_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>> =

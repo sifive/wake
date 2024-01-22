@@ -94,8 +94,8 @@ pub async fn read_job(
                         .collect();
 
                 let output_files = match output_files {
-                    Err(msg) => {
-                        tracing::error! {%msg, "Failed to resolve all output files. Resoving job as a cache miss."};
+                    Err(err) => {
+                        tracing::error! {%err, "Failed to resolve all output files. Resoving job as a cache miss."};
                         return Ok((None, ReadJobResponse::NoMatch))
                     },
                     Ok(files) => files,
@@ -124,16 +124,16 @@ pub async fn read_job(
                     .collect();
 
                 let stdout_blob = match resolve_blob(matching_job.stdout_blob_id, txn, &blob_stores).await {
-                    Err(msg) => {
-                        tracing::error! {%msg, "Failed to resolve stdout blob. Resoving job as a cache miss."};
+                    Err(err) => {
+                        tracing::error! {%err, "Failed to resolve stdout blob. Resoving job as a cache miss."};
                         return Ok((None, ReadJobResponse::NoMatch))
                     },
                     Ok(blob) => blob,
                 };
 
                 let stderr_blob = match resolve_blob(matching_job.stderr_blob_id, txn, &blob_stores).await {
-                    Err(msg) => {
-                        tracing::error! {%msg, "Failed to resolve stderr blob. Resoving job as a cache miss."};
+                    Err(err) => {
+                        tracing::error! {%err, "Failed to resolve stderr blob. Resoving job as a cache miss."};
                         return Ok((None, ReadJobResponse::NoMatch))
                     },
                     Ok(blob) => blob,
