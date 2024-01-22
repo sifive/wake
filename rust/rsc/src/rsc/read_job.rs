@@ -28,11 +28,14 @@ async fn resolve_blob(
     stores: &HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) -> Result<ResolvedBlob, String> {
     let Ok(Some(blob)) = entity::prelude::Blob::find_by_id(id).one(db).await else {
-        return Err("Unable to find blob by id".into());
+        return Err(format!("Unable to find blob {} by id", id));
     };
 
     let Some(store) = stores.get(&blob.store_id) else {
-        return Err("Unable to find backing store for blob".into());
+        return Err(format!(
+            "Unable to find backing store {} for blob {}",
+            blob.store_id, id
+        ));
     };
 
     return Ok(ResolvedBlob {
@@ -50,14 +53,10 @@ pub async fn read_job(
     // First find the hash so we can look up the exact job
     let hash: Vec<u8> = payload.hash().into();
 
-    // TODO: This transaction is quite large
-    // with a bunch of "serialized" queries.
-    // If read_job becomes a bottleneck it should
-    // be rewritten such that joining on promises
-    // is delayed for as long as possible.
-    // Another option would be to collect all blob ids
-    // ahead of time and make a single db query to list
-    // them all out instead of a query per blob id.
+    // TODO: This transaction is quite large with a bunch of "serialized" queries. If read_job
+    // becomes a bottleneck it should be rewritten such that joining on promises is delayed for as
+    // long as possible. Another option would be to collect all blob ids ahead of time and make a
+    // single db query to list them all out instead of a query per blob id.
     let result = conn
         .as_ref()
         .transaction::<_, (Option<Uuid>, ReadJobResponse), DbErr>(|txn| {
@@ -76,9 +75,9 @@ pub async fn read_job(
                     .await?
                     .into_iter()
                     .map(|m| {
-                        let blob_copy = blob_stores.clone();
+                        let stores_copy = blob_stores.clone();
                         async move {
-                            let blob = resolve_blob(m.blob_id, txn, &blob_copy).await?;
+                            let blob = resolve_blob(m.blob_id, txn, &stores_copy).await?;
 
                             Ok(ResolvedBlobFile {
                                 path: m.path,
@@ -95,7 +94,10 @@ pub async fn read_job(
                         .collect();
 
                 let output_files = match output_files {
-                    Err(_) => return Ok((None, ReadJobResponse::NoMatch)),
+                    Err(msg) => {
+                        tracing::error! {%msg, "Failed to resolve all output files. Resoving job as a cache miss."};
+                        return Ok((None, ReadJobResponse::NoMatch))
+                    },
                     Ok(files) => files,
                 };
 
@@ -121,18 +123,30 @@ pub async fn read_job(
                     })
                     .collect();
 
+                let stdout_blob = match resolve_blob(matching_job.stdout_blob_id, txn, &blob_stores).await {
+                    Err(msg) => {
+                        tracing::error! {%msg, "Failed to resolve stdout blob. Resoving job as a cache miss."};
+                        return Ok((None, ReadJobResponse::NoMatch))
+                    },
+                    Ok(blob) => blob,
+                };
+
+                let stderr_blob = match resolve_blob(matching_job.stderr_blob_id, txn, &blob_stores).await {
+                    Err(msg) => {
+                        tracing::error! {%msg, "Failed to resolve stderr blob. Resoving job as a cache miss."};
+                        return Ok((None, ReadJobResponse::NoMatch))
+                    },
+                    Ok(blob) => blob,
+                };
+
                 Ok((
                     Some(matching_job.id),
                     ReadJobResponse::Match {
                         output_symlinks,
                         output_dirs,
                         output_files,
-                        stdout_blob: resolve_blob(matching_job.stdout_blob_id, txn, &blob_stores)
-                            .await
-                            .unwrap(),
-                        stderr_blob: resolve_blob(matching_job.stderr_blob_id, txn, &blob_stores)
-                            .await
-                            .unwrap(),
+                        stdout_blob,
+                        stderr_blob,
                         status: matching_job.status,
                         runtime: matching_job.runtime,
                         cputime: matching_job.cputime,
