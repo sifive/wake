@@ -1,0 +1,199 @@
+package http
+
+from http export type HttpRequest
+
+# The http methods that may be called against a web server.
+export data HttpMethod =
+    HttpMethodGet
+    HttpMethodHead
+    HttpMethodPost
+    HttpMethodPut
+    HttpMethodDelete
+    HttpMethodConnect
+    HttpMethodOptions
+    HttpMethodTrace
+    HttpMethodPatch
+
+# The headers that may be assocated with an http request.
+#
+# These are often used to specify how to interpret the body or to provide authorization.
+tuple HttpHeader =
+    Name: String
+    Value: String
+
+# The description of a http request to send to a web server.
+tuple HttpRequest =
+    # The url of the function to be called
+    Url: String
+    # The method to be called on the destination
+    Method: HttpMethod
+    # The headers to be set on the request
+    Headers: List HttpHeader
+    # The body of the request
+    Body: String
+
+export tuple HttpResponse =
+    # The status code returned from the web server
+    StatusCode: Integer
+    # The headers returned from the web server
+    Headers: List HttpHeader
+    # The body returned from the web server
+    Body: String
+
+# Creates a basic HttpRequest to be used as part of a builder.
+#
+# This function should be used to start the builder chain of a desired http web request.
+# Ex:
+# def foo =
+#     buildHttpRequest "localhost"
+#     | addMethod HttpMethodGet
+#     | addHeader "Content-Type" "application/json"
+#     | addBody "{}"
+#     | makeRequest
+#
+# buildHttpRequest defaults the method to GET and leave the headers and body empty.
+#
+# NOTE: Relying on the internet for your build is inherently unreproducible and should be avoided.
+export def buildHttpRequest (url: String): HttpRequest =
+    HttpRequest url HttpMethodGet Nil ""
+
+# Adds an http method to the http request.
+export def addMethod (method: HttpMethod): HttpRequest => HttpRequest =
+    setHttpRequestMethod method
+
+# Adds an arbitary header to the http request.
+#
+# This function is normally used for custom or uncommon headers. Common headers should use
+# a dedicated function.
+export def addHeader (name: String) (value: String): HttpRequest => HttpRequest =
+    editHttpRequestHeaders ((HttpHeader name value), _)
+
+# Adds the Content-Type header to the http request.
+export def addContentTypeHeader (value: String): HttpRequest => HttpRequest =
+    addHeader "Content-Type" value
+
+# Adds the Content-Type header to the http request and sets it to application/json
+export def addContentTypeJsonHeader: HttpRequest => HttpRequest =
+    addHeader "Content-Type" "application/json"
+
+# Adds the Authorization header to the http request.
+export def addAuthorizationHeader (value: String): HttpRequest => HttpRequest =
+    addHeader "Authorization" value
+
+# Adds the body to the http request.
+export def addBody (body: String): HttpRequest => HttpRequest =
+    setHttpRequestBody body
+
+# Helper tuple for parsing a curl response
+tuple CurlResponseParts =
+    StatusCode: String
+    Headers: List String
+    Body: String
+
+# Helper for chunking a curl response stream into parts
+def parseCurlResponse (str: String): Result HttpResponse Error =
+    # Response format:
+    #
+    # HTTP/1.1 415 Unsupported Media Type
+    # content-length: 54
+    # other: header
+    # other: header
+    #
+    # Expected request with `Content-Type: application/json`
+    require Pass (CurlResponseParts codeline headers body) =
+        def parts = tokenize `\n` str 
+
+        require code, rest = parts
+        else failWithError "Unexpected empty curl response"
+
+        # Check if only the header line was provided
+        require False = rest.len == 0
+        else (Pass (CurlResponseParts code Nil ""))
+
+        # each header is on its own line, headers stop when we reach an empty line
+        def loop = match _
+            Nil -> Nil
+            "", _ -> Nil
+            x, xs -> x, loop xs
+
+        def headers = loop rest
+
+        # The body is just the remaining lines minus the header lines and empty line
+        def body = 
+            rest
+            | drop (headers.len + 1)
+            | catWith "\n"
+
+        Pass (CurlResponseParts code headers body)
+
+
+    require Pass status =
+        require (code, Nil) = extract `^HTTP\/[\d\.]+ (\d+) .*$` codeline 
+        else failWithError "unable to extract status code from '{codeline}'"
+
+        require (Some x) = code | (intbase 10)  
+        else failWithError "unable to parse {code} as a base 10 integer"
+
+        Pass x
+
+    require Pass headers = 
+        def loop header = 
+            require (name, value, Nil) = extract `^([-_A-Za-z0-9]+):\s*(.+)$` header 
+            else failWithError "Unable to extract header from '{header}'"
+
+            Pass (HttpHeader name value)
+
+        headers
+        | map loop
+        | findFail
+
+
+    Pass (HttpResponse status headers body)
+
+
+# Makes the request specified by request and parses into a HttpResponse
+#
+# WARNING: This function will likely break the sandbox and make your build unreliable
+export def makeRequest (request: HttpRequest): Result HttpResponse Error =
+    def methodToString = match _
+        HttpMethodGet -> "GET"
+        HttpMethodHead -> "HEAD"
+        HttpMethodPost -> "POST"
+        HttpMethodPut -> "PUT"
+        HttpMethodDelete -> "DELETE"
+        HttpMethodConnect -> "CONNECT"
+        HttpMethodOptions -> "OPTIONS"
+        HttpMethodTrace -> "TRACE"
+        HttpMethodPatch -> "PATCH"
+
+    def headerToCurlFlag (HttpHeader name value) = 
+        "--header", "{name}:{value}", Nil
+
+    def headers =
+        request.getHttpRequestHeaders
+        | map headerToCurlFlag
+        | flatten
+
+    def method = request.getHttpRequestMethod.methodToString
+
+    # wake-format off
+    def cmd =
+        "curl",
+        "-i",
+        "--request", method,
+        "--data", request.getHttpRequestBody,
+        "--url", request.getHttpRequestUrl,
+        headers
+
+    require Pass stdout =
+        makeExecPlan cmd Nil
+        | setPlanLabel "http: {method} {request.getHttpRequestUrl}"
+        # Curl dumps download stats to stderr
+        | setPlanStderr logNever
+        # Web is unreliable and should never be reused
+        | setPlanPersistence ReRun
+        | runJobWith localRunner
+        | getJobStdout
+
+    parseCurlResponse stdout
+
