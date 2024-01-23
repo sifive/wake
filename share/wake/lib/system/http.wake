@@ -21,6 +21,14 @@ tuple HttpHeader =
     Name: String
     Value: String
 
+data HttpFormDataValue =
+    HttpFormDataString String
+    HttpFormDataFile Path
+
+tuple HttpFormData =
+    Name: String
+    Value: HttpFormDataValue
+
 # The description of a http request to send to a web server.
 tuple HttpRequest =
     # The url of the function to be called
@@ -29,16 +37,20 @@ tuple HttpRequest =
     Method: HttpMethod
     # The headers to be set on the request
     Headers: List HttpHeader
-    # The body of the request
-    Body: String
+    # A string of the contents of the request. Mutually exclusive with form data
+    Body: Option String
+    # Multipart form data. May be a list of strings or files. Mutually exclusive with body
+    FormData: Option (List HttpFormData)
 
 export tuple HttpResponse =
-    # The status code returned from the web server
-    StatusCode: Integer
+    # The status code returned from the web server. 
+    #
+    # Not all response have a status code so its not guarenteed to be set.
+    export StatusCode: Option Integer
     # The headers returned from the web server
-    Headers: List HttpHeader
+    export Headers: List HttpHeader
     # The body returned from the web server
-    Body: String
+    export Body: String
 
 # Creates a basic HttpRequest to be used as part of a builder.
 #
@@ -55,7 +67,7 @@ export tuple HttpResponse =
 #
 # NOTE: Relying on the internet for your build is inherently unreproducible and should be avoided.
 export def buildHttpRequest (url: String): HttpRequest =
-    HttpRequest url HttpMethodGet Nil ""
+    HttpRequest url HttpMethodGet Nil None None
 
 # Adds an http method to the http request.
 export def addMethod (method: HttpMethod): HttpRequest => HttpRequest =
@@ -82,7 +94,27 @@ export def addAuthorizationHeader (value: String): HttpRequest => HttpRequest =
 
 # Adds the body to the http request.
 export def addBody (body: String): HttpRequest => HttpRequest =
-    setHttpRequestBody body
+    setHttpRequestBody (Some body)
+
+export def addFormDataString (name: String) (value: String): HttpRequest => HttpRequest =
+    def setOrAppend field =
+        def entry = HttpFormData name (HttpFormDataString value)
+
+        match field
+            Some formDatas -> Some (entry, formDatas)
+            None -> Some (entry, Nil)
+
+    editHttpRequestFormData setOrAppend
+
+export def addFormDataFile (name: String) (value: Path): HttpRequest => HttpRequest =
+    def setOrAppend field =
+        def entry = HttpFormData name (HttpFormDataFile value)
+
+        match field
+            Some formDatas -> Some (entry, formDatas)
+            None -> Some (entry, Nil)
+
+    editHttpRequestFormData setOrAppend
 
 # Helper tuple for parsing a curl response
 tuple CurlResponseParts =
@@ -101,7 +133,7 @@ def parseCurlResponse (str: String): Result HttpResponse Error =
     #
     # Expected request with `Content-Type: application/json`
     require Pass (CurlResponseParts codeline headers body) =
-        def parts = tokenize `\n` str 
+        def parts = tokenize `\n` str
 
         require code, rest = parts
         else failWithError "Unexpected empty curl response"
@@ -119,26 +151,27 @@ def parseCurlResponse (str: String): Result HttpResponse Error =
         def headers = loop rest
 
         # The body is just the remaining lines minus the header lines and empty line
-        def body = 
+        def body =
             rest
             | drop (headers.len + 1)
             | catWith "\n"
 
         Pass (CurlResponseParts code headers body)
 
-
     require Pass status =
-        require (code, Nil) = extract `^HTTP\/[\d\.]+ (\d+) .*$` codeline 
-        else failWithError "unable to extract status code from '{codeline}'"
+        require (code, Nil) = extract `^HTTP\/[\d\.]+ (\d+) .*$` codeline
+        else Pass None
 
-        require (Some x) = code | (intbase 10)  
+        require (Some x) =
+            code
+            | (intbase 10)
         else failWithError "unable to parse {code} as a base 10 integer"
 
-        Pass x
+        Pass (Some x)
 
-    require Pass headers = 
-        def loop header = 
-            require (name, value, Nil) = extract `^([-_A-Za-z0-9]+):\s*(.+)$` header 
+    require Pass headers =
+        def loop header =
+            require (name, value, Nil) = extract `^([-_A-Za-z0-9]+):\s*(.+)$` header
             else failWithError "Unable to extract header from '{header}'"
 
             Pass (HttpHeader name value)
@@ -147,14 +180,12 @@ def parseCurlResponse (str: String): Result HttpResponse Error =
         | map loop
         | findFail
 
-
     Pass (HttpResponse status headers body)
-
 
 # Makes the request specified by request and parses into a HttpResponse
 #
 # WARNING: This function will likely break the sandbox and make your build unreliable
-export def makeRequest (request: HttpRequest): Result HttpResponse Error =
+export def makeRequest ((HttpRequest url method headers body formData): HttpRequest): Result HttpResponse Error =
     def methodToString = match _
         HttpMethodGet -> "GET"
         HttpMethodHead -> "HEAD"
@@ -166,34 +197,38 @@ export def makeRequest (request: HttpRequest): Result HttpResponse Error =
         HttpMethodTrace -> "TRACE"
         HttpMethodPatch -> "PATCH"
 
-    def headerToCurlFlag (HttpHeader name value) = 
-        "--header", "{name}:{value}", Nil
+    def headerToCurlFlag (HttpHeader name value) = "--header", "{name}:{value}", Nil
+    def bodyToCurlFlag body = "--data", body, Nil
 
-    def headers =
-        request.getHttpRequestHeaders
-        | map headerToCurlFlag
-        | flatten
+    def formDataToCurlFlag (HttpFormData name value) = match value
+        HttpFormDataString str -> "--form", "{name}={str}", Nil
+        HttpFormDataFile file -> "--form", "{name}=@{file.getPathName}", Nil
 
-    def method = request.getHttpRequestMethod.methodToString
+    require False = body.isSome && formData.isSome
+    else failWithError "Request Body and FormData are both set. This is not allowed."
 
-    # wake-format off
     def cmd =
-        "curl",
-        "-i",
-        "--request", method,
-        "--data", request.getHttpRequestBody,
-        "--url", request.getHttpRequestUrl,
-        headers
+        (
+            Some ("curl", Nil),
+            Some ("-i", Nil),
+            Some ("--request", method | methodToString, Nil),
+            Some ("--url", url, Nil),
+            Some (headers | mapFlat headerToCurlFlag),
+            (body | omap bodyToCurlFlag),
+            (formData | omap (mapFlat formDataToCurlFlag)),
+        )
+        | mapPartial (_)
+        | flatten
 
     require Pass stdout =
         makeExecPlan cmd Nil
-        | setPlanLabel "http: {method} {request.getHttpRequestUrl}"
+        | setPlanLabel "http: {method | methodToString} {url}"
+        | setPlanStdout logInfo
         # Curl dumps download stats to stderr
-        | setPlanStderr logNever
+        | setPlanStderr logInfo
         # Web is unreliable and should never be reused
         | setPlanPersistence ReRun
         | runJobWith localRunner
         | getJobStdout
 
     parseCurlResponse stdout
-
