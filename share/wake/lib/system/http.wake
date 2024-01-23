@@ -58,9 +58,9 @@ export tuple HttpResponse =
 # Ex:
 # def foo =
 #     buildHttpRequest "localhost"
-#     | addMethod HttpMethodGet
+#     | setMethod HttpMethodGet
 #     | addHeader "Content-Type" "application/json"
-#     | addBody "{}"
+#     | setBody "{}"
 #     | makeRequest
 #
 # buildHttpRequest defaults the method to GET and leave the headers and body empty.
@@ -69,8 +69,8 @@ export tuple HttpResponse =
 export def buildHttpRequest (url: String): HttpRequest =
     HttpRequest url HttpMethodGet Nil None None
 
-# Adds an http method to the http request.
-export def addMethod (method: HttpMethod): HttpRequest => HttpRequest =
+# Sets an http method to the http request.
+export def setMethod (method: HttpMethod): HttpRequest => HttpRequest =
     setHttpRequestMethod method
 
 # Adds an arbitary header to the http request.
@@ -86,16 +86,17 @@ export def addContentTypeHeader (value: String): HttpRequest => HttpRequest =
 
 # Adds the Content-Type header to the http request and sets it to application/json
 export def addContentTypeJsonHeader: HttpRequest => HttpRequest =
-    addHeader "Content-Type" "application/json"
+    addContentTypeHeader "application/json"
 
 # Adds the Authorization header to the http request.
 export def addAuthorizationHeader (value: String): HttpRequest => HttpRequest =
     addHeader "Authorization" value
 
-# Adds the body to the http request.
-export def addBody (body: String): HttpRequest => HttpRequest =
+# Sets the body to the http request.
+export def setBody (body: String): HttpRequest => HttpRequest =
     setHttpRequestBody (Some body)
 
+# Adds a named string value to the requests form data
 export def addFormDataString (name: String) (value: String): HttpRequest => HttpRequest =
     def setOrAppend field =
         def entry = HttpFormData name (HttpFormDataString value)
@@ -106,6 +107,7 @@ export def addFormDataString (name: String) (value: String): HttpRequest => Http
 
     editHttpRequestFormData setOrAppend
 
+# Adds a named file to the requests form data
 export def addFormDataFile (name: String) (value: Path): HttpRequest => HttpRequest =
     def setOrAppend field =
         def entry = HttpFormData name (HttpFormDataFile value)
@@ -133,22 +135,13 @@ def parseCurlResponse (str: String): Result HttpResponse Error =
     #
     # Expected request with `Content-Type: application/json`
     require Pass (CurlResponseParts codeline headers body) =
-        def parts = tokenize `\n` str
+        def parts = tokenize `\r?\n` str
 
         require code, rest = parts
         else failWithError "Unexpected empty curl response"
 
-        # Check if only the header line was provided
-        require False = rest.len == 0
-        else (Pass (CurlResponseParts code Nil ""))
-
         # each header is on its own line, headers stop when we reach an empty line
-        def loop = match _
-            Nil -> Nil
-            "", _ -> Nil
-            x, xs -> x, loop xs
-
-        def headers = loop rest
+        def headers = takeUntil (_ ==* "") rest
 
         # The body is just the remaining lines minus the header lines and empty line
         def body =
@@ -210,7 +203,7 @@ export def makeRequest ((HttpRequest url method headers body formData): HttpRequ
     def cmd =
         (
             Some ("curl", Nil),
-            Some ("-i", Nil),
+            Some ("-i", Nil), # Include response headers
             Some ("--request", method | methodToString, Nil),
             Some ("--url", url, Nil),
             Some (headers | mapFlat headerToCurlFlag),
