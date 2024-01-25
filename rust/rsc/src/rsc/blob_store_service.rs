@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use entity::prelude::{Blob, LocalBlobStore};
 use entity::{blob, local_blob_store};
 use sea_orm::{prelude::Uuid, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
-use sea_orm::{DbBackend, DbErr, DeleteResult, Statement};
+use sea_orm::{DbBackend, DbErr, Statement};
 
 pub async fn fetch_local_blob_store(
     db: &DatabaseConnection,
@@ -22,6 +22,12 @@ pub async fn fetch_local_blob_stores(
     LocalBlobStore::find().all(db).await
 }
 
+// Fetches blobs from the database that are unreferenced and have surpaced the alllotated grace
+// period to be referenced.
+//
+// For new blobs this allows the client to create several blobs and then reference them all at
+// once. Existing blobs whose job was just evicted will likely be well past the grace period and
+// thus quickly evicted themselves.
 pub async fn fetch_unreferenced_blobs(
     db: &DatabaseConnection,
     ttl: NaiveDateTime,
@@ -55,10 +61,11 @@ pub async fn fetch_unreferenced_blobs(
         .await
 }
 
-pub async fn delete_blobs_by_ids(
-    db: &DatabaseConnection,
-    ids: Vec<Uuid>,
-) -> Result<DeleteResult, DbErr> {
+pub async fn delete_blobs_by_ids(db: &DatabaseConnection, ids: Vec<Uuid>) -> Result<u64, DbErr> {
+    if ids.len() == 0 {
+        return Ok(0);
+    }
+
     entity::blob::Entity::delete_many()
         .filter(
             entity::blob::Column::Id.in_subquery(
@@ -70,4 +77,5 @@ pub async fn delete_blobs_by_ids(
         )
         .exec(db)
         .await
+        .map(|i| i.rows_affected)
 }

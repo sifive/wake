@@ -14,7 +14,7 @@ use tracing;
 
 use sea_orm::{
     prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, Database,
-    DatabaseConnection, DeleteResult, EntityTrait, QueryFilter,
+    DatabaseConnection, EntityTrait, QueryFilter,
 };
 
 use chrono::{Duration, Utc};
@@ -204,23 +204,27 @@ async fn connect_to_database(
     create_remote_db(config).await
 }
 
-fn launch_eviction(conn: Arc<DatabaseConnection>, tick_interval: i64, deadline: i64) {
+fn launch_job_eviction(conn: Arc<DatabaseConnection>, tick_interval: i64, ttl: i64) {
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(
-            tick_interval.try_into().unwrap(),
-        ));
+        let tick_interval: u64 = tick_interval.try_into().unwrap_or_else(|err| {
+            tracing::error!(%err, "Failed to convert i64 to u64");
+            panic!("Tick inteveral has incorrect value and must be corrected.");
+        });
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(tick_interval));
         loop {
             interval.tick().await;
+            tracing::info!("Job TTL eviction tick");
 
-            let deadline = (Utc::now() - Duration::seconds(deadline)).naive_utc();
+            let ttl = (Utc::now() - Duration::seconds(ttl)).naive_utc();
 
-            let res: DeleteResult = entity::job::Entity::delete_many()
-                .filter(entity::job::Column::CreatedAt.lte(deadline))
+            match entity::job::Entity::delete_many()
+                .filter(entity::job::Column::CreatedAt.lte(ttl))
                 .exec(conn.as_ref())
                 .await
-                .unwrap();
-
-            tracing::info!(%res.rows_affected, "Performed Job TTL eviction tick.");
+            {
+                Ok(res) => tracing::info!(%res.rows_affected, "Deleted jobs from database"),
+                Err(err) => tracing::error!(%err, "Failed to delete jobs for eviction"),
+            };
         }
     });
 }
@@ -228,47 +232,74 @@ fn launch_eviction(conn: Arc<DatabaseConnection>, tick_interval: i64, deadline: 
 fn launch_blob_eviction(
     conn: Arc<DatabaseConnection>,
     tick_interval: i64,
-    deadline: i64,
+    setup_ttl: i64,
     blob_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) {
     // TODO: This should probably be a transaction so that a job can't add a new reference to a
     // blob as we are deleting it.
 
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(
-            tick_interval.try_into().unwrap(),
-        ));
+        let tick_interval: u64 = tick_interval.try_into().unwrap_or_else(|err| {
+            tracing::error!(%err, "Failed to convert i64 to u64");
+            panic!("Tick inteveral has incorrect value and must be corrected.");
+        });
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(tick_interval));
+
         loop {
             interval.tick().await;
+            tracing::info!("Blob TTL eviction tick");
 
             // Blobs must be at least this old to be considered for eviction.
             // This gives clients time to reference a blob before it gets evicted.
-            let deadline = (Utc::now() - Duration::seconds(deadline)).naive_utc();
+            let setup_ttl = (Utc::now() - Duration::seconds(setup_ttl)).naive_utc();
 
-            let blobs = blob_store_service::fetch_unreferenced_blobs(conn.as_ref(), deadline)
+            let blobs = match blob_store_service::fetch_unreferenced_blobs(conn.as_ref(), setup_ttl)
                 .await
-                .unwrap();
-            let blob_ids: Vec<Uuid> = blobs.iter().map(|blob| blob.id).collect();
-            let mut affected: u64 = blob_ids.len().try_into().unwrap();
+            {
+                Ok(b) => b,
+                Err(err) => {
+                    tracing::error!(%err, "Failed to fetch blobs for eviction");
+                    continue; // Try again on the next tick
+                }
+            };
 
-            if affected == 0 {
-                tracing::info!(%affected, "Performed Blob TTL eviction tick.");
-                continue;
-            }
+            let blob_ids: Vec<Uuid> = blobs.iter().map(|blob| blob.id).collect();
+            let eligible = blob_ids.len();
+
+            tracing::info!(%eligible, "Blobs eligible for eviction");
 
             // Delete blobs from database
-            let res = blob_store_service::delete_blobs_by_ids(conn.as_ref(), blob_ids)
-                .await
-                .unwrap();
-            affected = res.rows_affected;
+            let deleted =
+                match blob_store_service::delete_blobs_by_ids(conn.as_ref(), blob_ids).await {
+                    Ok(r) => r,
+                    Err(err) => {
+                        tracing::error!(%err, "Failed to delete blobs from db for eviction");
+                        continue; // Try again on the next tick
+                    }
+                };
+
+            tracing::info!(%deleted, "Deleted blobs from database");
 
             // Delete blobs from blob store
             for blob in blobs {
-                let store = blob_stores.get(&blob.store_id).unwrap();
-                store.delete_key(blob.key).await.unwrap();
-            }
+                let store = match blob_stores.get(&blob.store_id) {
+                    Some(s) => s.clone(),
+                    None => {
+                        let blob = blob.clone();
+                        tracing::info!(%blob.id, %blob.store_id, %blob.key, "Blob has been orphaned!");
+                        tracing::error!(%blob.store_id, "Blob's store id missing from activated stores");
+                        continue;
+                    }
+                };
 
-            tracing::info!(%affected, "Performed Blob TTL eviction tick.");
+                tokio::spawn(async move {
+                    store.delete_key(blob.key.clone()).await.unwrap_or_else(|err| {
+                        let blob = blob.clone();
+                        tracing::info!(%blob.id, %blob.store_id, %blob.key, "Blob has been orphaned!");
+                        tracing::error!(%err, "Failed to delete blob from store for eviction. See above for blob info");
+                    });
+                });
+            }
         }
     });
 }
@@ -313,7 +344,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ten_mins_in_seconds = one_min_in_seconds * 10;
     let one_hour_in_seconds = one_min_in_seconds * 60;
     let one_week_in_seconds = one_hour_in_seconds * 24 * 7;
-    launch_eviction(connection.clone(), ten_mins_in_seconds, one_week_in_seconds);
+    launch_job_eviction(connection.clone(), ten_mins_in_seconds, one_week_in_seconds);
     launch_blob_eviction(
         connection.clone(),
         one_min_in_seconds,
@@ -598,7 +629,7 @@ mod tests {
         assert_eq!(count, 2);
 
         // Setup eviction for jobs older than 3 days ticking every second
-        launch_eviction(conn.clone(), 1, 60 * 60 * 24 * 3);
+        launch_job_eviction(conn.clone(), 1, 60 * 60 * 24 * 3);
         tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
 
         let count = entity::job::Entity::find()
