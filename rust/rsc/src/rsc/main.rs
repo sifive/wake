@@ -7,13 +7,14 @@ use clap::Parser;
 use data_encoding::HEXLOWER;
 use migration::{Migrator, MigratorTrait};
 use rand_core::{OsRng, RngCore};
+use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use tracing;
 
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, Database, DatabaseConnection,
-    DeleteResult, EntityTrait, QueryFilter,
+    prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, Database,
+    DatabaseConnection, DeleteResult, EntityTrait, QueryFilter,
 };
 
 use chrono::{Duration, Utc};
@@ -52,20 +53,52 @@ struct ServerOptions {
 
     #[arg(help = "Launches the cache without an external database", long)]
     standalone: bool,
-
-    #[arg(
-        help = "Specify an absolute path for a local directory based store",
-        value_name = "LOCAL_STORE",
-        long
-    )]
-    local_store: Option<String>,
 }
 
-fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) -> Router {
+// Maps databse store uuid -> dyn blob::DebugBlobStore
+// that represent said store.
+async fn activate_stores(
+    conn: Arc<DatabaseConnection>,
+) -> HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>> {
+    let stores = match blob_store_service::fetch_local_blob_stores(&conn).await {
+        Ok(stores) => stores,
+        Err(err) => {
+            tracing::warn!(%err, "No local stores available in database");
+            Vec::new()
+        },
+    };
+
+    let mut active_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>> =
+        HashMap::new();
+
+    for store in stores.into_iter() {
+        active_stores.insert(
+            store.id,
+            Arc::new(blob::LocalBlobStore { root: store.root }),
+        );
+    }
+
+    return active_stores;
+}
+
+fn create_router(
+    conn: Arc<DatabaseConnection>,
+    config: Arc<config::RSCConfig>,
+    blob_stores: &HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
+) -> Router {
     // If we can't create a store, just exit. The config is wrong and must be rectified.
-    let root = config.local_store.clone().unwrap();
-    let store: Arc<dyn blob::DebugBlobStore + Send + Sync> =
-        Arc::new(blob::LocalBlobStore { root });
+    let Some(active_store_uuid) = config.active_store.clone() else {
+        panic!("Active store uuid not set in configuration");
+    };
+
+    let Ok(active_store_uuid) = Uuid::parse_str(&active_store_uuid) else {
+        panic!("Failed to parse provided active store into uuid");
+    };
+
+    let Some(active_store) = blob_stores.get(&active_store_uuid).clone() else {
+        panic!("UUID for active store not in database");
+    };
+
     Router::new()
         .route(
             "/job",
@@ -82,7 +115,8 @@ fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) 
             "/job/matching",
             post({
                 let conn = conn.clone();
-                move |body| read_job::read_job(body, conn)
+                let blob_stores = blob_stores.clone();
+                move |body| read_job::read_job(body, conn, blob_stores)
             }),
         )
         .route(
@@ -96,7 +130,7 @@ fn create_router(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) 
             "/blob",
             post({
                 let conn = conn.clone();
-                let store = store.clone();
+                let store = active_store.clone();
                 move |multipart: Multipart| blob::create_blob(multipart, conn, store)
             })
             .layer(DefaultBodyLimit::disable()),
@@ -206,7 +240,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             None
         },
-        local_store: args.local_store,
+        active_store: None,
     })?;
     let config = Arc::new(config);
 
@@ -223,7 +257,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     launch_eviction(connection.clone(), 60 * 10, 60 * 60 * 24 * 7);
 
     // Launch the server
-    let router = create_router(connection.clone(), config.clone());
+    let stores = activate_stores(connection.clone()).await;
+    let router = create_router(connection.clone(), config.clone(), &stores);
     axum::Server::bind(&config.server_addr.parse()?)
         .serve(router.into_make_service())
         .await?;

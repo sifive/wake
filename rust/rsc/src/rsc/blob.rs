@@ -22,6 +22,8 @@ pub trait BlobStore {
         &self,
         stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
     ) -> Result<String, std::io::Error>;
+
+    async fn download_url(&self, key: String) -> String;
 }
 
 pub trait DebugBlobStore: BlobStore + std::fmt::Debug {}
@@ -47,6 +49,10 @@ impl BlobStore for LocalBlobStore {
         tokio::io::copy(&mut reader, &mut file).await?;
 
         Ok(name)
+    }
+
+    async fn download_url(&self, key: String) -> String {
+        return format!("file://{0}/{key}", self.root);
     }
 }
 

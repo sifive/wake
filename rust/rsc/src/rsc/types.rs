@@ -128,15 +128,28 @@ pub enum PostBlobResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ResolvedBlob {
+    pub id: Uuid,
+    pub url: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ResolvedBlobFile {
+    pub path: String,
+    pub mode: i32,
+    pub blob: ResolvedBlob,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ReadJobResponse {
     NoMatch,
     Match {
         output_symlinks: Vec<Symlink>,
         output_dirs: Vec<Dir>,
-        output_files: Vec<File>,
-        stdout_blob_id: Uuid,
-        stderr_blob_id: Uuid,
+        output_files: Vec<ResolvedBlobFile>,
+        stdout_blob: ResolvedBlob,
+        stderr_blob: ResolvedBlob,
         status: i32,
         runtime: f64,
         cputime: f64,
