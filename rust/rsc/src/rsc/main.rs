@@ -10,6 +10,7 @@ use rand_core::{OsRng, RngCore};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
+use std::time::Duration;
 use tracing;
 
 use sea_orm::{
@@ -17,7 +18,7 @@ use sea_orm::{
     DatabaseConnection, EntityTrait, QueryFilter,
 };
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
 
 mod add_job;
 mod api_key_check;
@@ -204,18 +205,14 @@ async fn connect_to_database(
     create_remote_db(config).await
 }
 
-fn launch_job_eviction(conn: Arc<DatabaseConnection>, tick_interval: i64, ttl: i64) {
+fn launch_job_eviction(conn: Arc<DatabaseConnection>, tick_interval: u64, ttl: u64) {
     tokio::spawn(async move {
-        let tick_interval: u64 = tick_interval.try_into().unwrap_or_else(|err| {
-            tracing::error!(%err, "Failed to convert i64 to u64");
-            panic!("Tick inteveral has incorrect value and must be corrected.");
-        });
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(tick_interval));
+        let mut interval = tokio::time::interval(Duration::from_secs(tick_interval));
         loop {
             interval.tick().await;
             tracing::info!("Job TTL eviction tick");
 
-            let ttl = (Utc::now() - Duration::seconds(ttl)).naive_utc();
+            let ttl = (Utc::now() - Duration::from_secs(ttl)).naive_utc();
 
             match entity::job::Entity::delete_many()
                 .filter(entity::job::Column::CreatedAt.lte(ttl))
@@ -231,19 +228,19 @@ fn launch_job_eviction(conn: Arc<DatabaseConnection>, tick_interval: i64, ttl: i
 
 fn launch_blob_eviction(
     conn: Arc<DatabaseConnection>,
-    tick_interval: i64,
-    setup_ttl: i64,
+    tick_interval: u64,
+    setup_ttl: u64,
     blob_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) {
     // TODO: This should probably be a transaction so that a job can't add a new reference to a
     // blob as we are deleting it.
 
     tokio::spawn(async move {
-        let tick_interval: u64 = tick_interval.try_into().unwrap_or_else(|err| {
-            tracing::error!(%err, "Failed to convert i64 to u64");
-            panic!("Tick inteveral has incorrect value and must be corrected.");
-        });
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(tick_interval));
+        // let tick_interval: u64 = tick_interval.try_into().unwrap_or_else(|err| {
+        //     tracing::error!(%err, "Failed to convert i64 to u64");
+        //     panic!("Tick inteveral has incorrect value and must be corrected.");
+        // });
+        let mut interval = tokio::time::interval(Duration::from_secs(tick_interval));
 
         loop {
             interval.tick().await;
@@ -251,7 +248,7 @@ fn launch_blob_eviction(
 
             // Blobs must be at least this old to be considered for eviction.
             // This gives clients time to reference a blob before it gets evicted.
-            let setup_ttl = (Utc::now() - Duration::seconds(setup_ttl)).naive_utc();
+            let setup_ttl = (Utc::now() - Duration::from_secs(setup_ttl)).naive_utc();
 
             let blobs = match blob_store_service::fetch_unreferenced_blobs(conn.as_ref(), setup_ttl)
                 .await
@@ -269,16 +266,15 @@ fn launch_blob_eviction(
             tracing::info!(%eligible, "Blobs eligible for eviction");
 
             // Delete blobs from database
-            let deleted =
-                match blob_store_service::delete_blobs_by_ids(conn.as_ref(), blob_ids).await {
-                    Ok(r) => r,
-                    Err(err) => {
-                        tracing::error!(%err, "Failed to delete blobs from db for eviction");
-                        continue; // Try again on the next tick
-                    }
-                };
+            match blob_store_service::delete_blobs_by_ids(conn.as_ref(), blob_ids).await {
+                Ok(deleted) => tracing::info!(%deleted, "Deleted blobs from database"),
+                Err(err) => {
+                    tracing::error!(%err, "Failed to delete blobs from db for eviction");
+                    continue; // Try again on the next tick
+                }
+            };
 
-            tracing::info!(%deleted, "Deleted blobs from database");
+            tracing::info!("Spawning blob deletion from stores");
 
             // Delete blobs from blob store
             for blob in blobs {
@@ -371,6 +367,7 @@ mod tests {
         body::Body,
         http::{self, Request, StatusCode},
     };
+    use chrono::Duration;
     use serde_json::{json, Value};
     use tower::Service;
 

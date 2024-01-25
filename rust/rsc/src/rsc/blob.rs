@@ -1,4 +1,3 @@
-use crate::blob_store_service::fetch_local_blob_store;
 use crate::types::{GetUploadUrlResponse, PostBlobResponse, PostBlobResponsePart};
 use async_trait::async_trait;
 use axum::{extract::Multipart, http::StatusCode, Json};
