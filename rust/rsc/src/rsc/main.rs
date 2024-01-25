@@ -236,12 +236,7 @@ fn launch_blob_eviction(
     // blob as we are deleting it.
 
     tokio::spawn(async move {
-        // let tick_interval: u64 = tick_interval.try_into().unwrap_or_else(|err| {
-        //     tracing::error!(%err, "Failed to convert i64 to u64");
-        //     panic!("Tick inteveral has incorrect value and must be corrected.");
-        // });
         let mut interval = tokio::time::interval(Duration::from_secs(tick_interval));
-
         loop {
             interval.tick().await;
             tracing::info!("Blob TTL eviction tick");
