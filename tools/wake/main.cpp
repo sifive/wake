@@ -224,6 +224,10 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
     exit(1);
   }
 
+  std::sort(intersected_jobs.begin(), intersected_jobs.end(), [](JobReflection const& lhs, JobReflection const& rhs) {
+    return lhs.job < rhs.job;
+  });
+
   describe(intersected_jobs, get_describe_policy(clo), db);
 }
 
