@@ -108,6 +108,10 @@ def doInstall dest kind =
     require Pass datfiles = sources "{@here}/share" `.*`
     require Pass log_viewer = buildWakeLogViewer Unit
     require Pass log_viewer = installAs "{dest}/bin/wake-log-viewer" log_viewer
+    require Pass rsc = buildRSC Unit
+    require Pass rsc = installAs "{dest}/bin/wake-remote-cache" rsc
+    require Pass rsc_tool = buildRSCTool Unit
+    require Pass rsc_tool = installAs "{dest}/bin/wake-remote-cache-tool" rsc_tool
 
     def binfilesResult = all variant
     def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
@@ -118,7 +122,7 @@ def doInstall dest kind =
     require Pass binfiles = binfilesResult
     require Pass bininstall = findFailFn releaseBin binfiles
 
-    def outputs = readme, log_viewer, bininstall ++ datinstall
+    def outputs = readme, log_viewer, rsc, rsc_tool, bininstall ++ datinstall
 
     Pass outputs
 

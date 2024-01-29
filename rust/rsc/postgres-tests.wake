@@ -16,7 +16,6 @@
 package build_wake
 
 from wake import _
-from rust import findCargoPath
 
 def createFileOp dst =
     JObject (
@@ -36,21 +35,14 @@ def tmpMountOp dst =
         "destination" :-> JString dst,
     )
 
-def bindMountOp src dst =
-    JObject (
-        "type" :-> JString "bind",
-        "source" :-> JString src,
-        "destination" :-> JString dst,
-    )
-
-def postgresSpecJson stdinFile cargoPath =
+def postgresSpecJson stdinFile testBinary =
     JObject (
         "label" :-> JString "postgres cargo test",
-        "environment" :-> JArray (JString "PATH=/usr/lib64/ccache:/usr/bin:/usr/sbin:/bin:{dirname cargoPath}",),
+        "environment" :-> JArray (JString "PATH=/usr/lib64/ccache:/usr/bin:/usr/sbin:/bin",),
         "command" :-> JArray (JString "bash", Nil),
         "user-id" :-> JInteger 0,
         "group-id" :-> JInteger 0,
-        "visible" :-> JArray Nil,
+        "visible" :-> JArray (JString testBinary, Nil),
         "directory" :-> JString ".",
         "stdin" :-> JString "{stdinFile}",
         "resources" :-> JArray Nil,
@@ -69,11 +61,10 @@ def postgresSpecJson stdinFile cargoPath =
             tmpMountOp "/root",
             createDirOp "rust/rsc/.cargo",
             createFileOp "rust/rsc/.cargo/config.toml",
-            bindMountOp "rust/rsc/vendor-config.toml" "rust/rsc/.cargo/config.toml",
         ),
     )
 
-export target testPostgres Unit =
+export def testPostgres _ =
     # First we define a few directories, using various
     # environment variables
     def dataDir = "/tmp/pg_data"
@@ -86,12 +77,7 @@ export target testPostgres Unit =
 
             Pass (dirname postgresPath)
 
-    require Pass cargoPath = findCargoPath Unit
-
-    # This is normally unsafe but we're just using it for
-    # a warning, you should never depend on the result here
-    require _, _ = files "{@here}/vendor" `.*`
-    else failWithError "You forgot to run `cargo vendor --locked` inside {@here}"
+    require Pass testBinary = buildRSCTest Unit
 
     # This script is piped in via stdin so that
     # as shells are opened one after the other,
@@ -99,46 +85,39 @@ export target testPostgres Unit =
     def script =
         """
         set -ex
-        trap 'exit $(cat /tmp/status)' 0
         unshare -U
+        set -ex
         export HOME=/root
         mkdir %{dataDir}
-        echo $? > /tmp/status
         %{postgresDir}/initdb -D %{dataDir}
-        echo $? > /tmp/status
         %{postgresDir}/postgres -D %{dataDir} &
-        trap "kill $!" 0
+        trap "kill $! && sleep 2s" EXIT
         sleep 2s
         %{postgresDir}/createuser -h localhost root
-        echo $? > /tmp/status
         %{postgresDir}/createdb -h localhost shim
-        echo $? > /tmp/status
-        cd %{@here}
-        %{cargoPath} test
-        echo $? > /tmp/status
-        exit $(cat /tmp/status) # exit the unshare shell
+        %{testBinary.getPathName}
         """
 
     # Jobs require that we write stdin out to a file in order to
     # pipe it in
-
     require Pass scriptPath = write ".build/postgres-cargo.sh" script
 
-    def _ = println "Cargo Path: {cargoPath}"
-    def pgJson = postgresSpecJson scriptPath.getPathName cargoPath
+    def pgJson = postgresSpecJson scriptPath.getPathName testBinary.getPathName
 
     require Pass pgJsonPath = write ".build/postgres-cmd-spec.json" (prettyJSON pgJson)
 
-    def emitVendorWarning status =
+    def inspectStatus status =
         require (Exited 0) = status
-        else failWithError "cargo tests failed: Consider running `cargo vendor --locked` in {@here}"
+        else failWithError "cargo tests failed"
 
         Pass status
 
-    makeExecPlan ("{wakePath}/wakebox", "-p", pgJsonPath.getPathName, Nil) Nil
+    makeExecPlan
+    ("{wakePath}/wakebox", "-p", pgJsonPath.getPathName, Nil)
+    (testBinary, scriptPath, pgJsonPath, Nil)
     | editPlanEnvironment (addEnvironmentPath "/usr/sbin")
-    | setPlanPersistence ReRun
     | setPlanEcho logReport
+    | setPlanFnOutputs (\_ Nil)
     | runJobWith localRunner
     | getJobStatus
-    | emitVendorWarning
+    | inspectStatus

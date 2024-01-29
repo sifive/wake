@@ -366,13 +366,24 @@ mod tests {
     use serde_json::{json, Value};
     use tower::Service;
 
+    async fn seed_db(db: &DatabaseConnection) -> Result<(), Box<dyn std::error::Error>> {
+        // Create a blob store
+        // Create a memory blob store
+        // Activate the memory blob store
+        // Return the memory blob store UUID and set in the config
+        // (use api to create a blob??)
+
+        // OTHER: remove CI stuff for weirdly installed cargo/rust
+        Ok(())
+    }
+
     fn create_config() -> Result<config::RSCConfig, Box<dyn std::error::Error>> {
         Ok(config::RSCConfig::new(config::RSCConfigOverride {
             config_override: Some("".into()),
             server_addr: Some("test:0000".into()),
             database_url: Some("".into()),
             standalone: Some(true),
-            local_store: Some("".into()),
+            active_store: Some("".into()),
         })?)
     }
 
@@ -397,7 +408,9 @@ mod tests {
         let api_key = create_insecure_api_key(&db).await.unwrap();
         let blob_id = create_fake_blob(&db).await.unwrap();
         let config = create_config().unwrap();
-        let mut router = create_router(Arc::new(db), Arc::new(config));
+        let db = Arc::new(db);
+        let stores = activate_stores(db.clone()).await;
+        let mut router = create_router(db.clone(), Arc::new(config), &stores);
 
         // Non-existant route should 404
         let res = router

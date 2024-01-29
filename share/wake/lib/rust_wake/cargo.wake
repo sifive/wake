@@ -15,6 +15,10 @@
 
 package rust
 
+# Finds the cargo binary by searching env var CARGO_HOME then falling back to env var PATH
+#
+# The returned binary depends on the system and thus is not guarenteed to be consistent
+# nor reproducable. Use with caution.
 export target findCargoPath Unit =
     require Some cargo_home = getenv "CARGO_HOME"
     else
@@ -25,21 +29,194 @@ export target findCargoPath Unit =
 
     Pass "{cargo_home}/bin/cargo"
 
-# Builds a cargo project, the Cargo.toml file must be listed as well as the outputs of interest.
-# All source files must be listed as well. Cargo will not reuse work because the sandbox
-# will not contain its extra info, inside of target.
-# TODO: Add an environment variable to opt-in to localRunner cargo builds if we detect
-#       existing outputs in {pathToCrate}/target/release
-export def cargoBuild (sources: List Path) (pathToCrate: String) (outputs: List String) =
-    require Pass cargoPath = findCargoPath Unit
+# The configuration for a given build
+#
+# Debug has less optimizations and debug info
+# Release is optimized with debug info stripped
+export data CargoToolchainBuildConfig =
+    CargoToolchainBuildConfigDebug
+    CargoToolchainBuildConfigRelease
+
+# An on-disk cargo crate
+#
+# Used to specify the root/main crate for the build and any other on-disk crate deps
+export tuple CargoCrate =
+    # Root directory of the crate 
+    export Root: Path
+    # Name of the binary to be build
+    export BinaryName: String
+
+# The cargo build toolchain
+#
+# Describes a specific rust binary to be built using cargo
+export tuple CargoToolchain =
+    # Path to cargo binary
+    export Cargo: String
+    # Build target to use
+    export BuildConfig: CargoToolchainBuildConfig
+    # Root level crate to build
+    export RootCrate: CargoCrate
+    # List of dependancies to crates on disk
+    export LocalCrates: List CargoCrate
+    # Locked Flag
+    export Locked: Boolean
+    # Extra cargo flags defined by caller
+    export Flags: List String
+
+# Makes a simple default cargo toolchain for locked release builds.
+#
+# Relies on the system install of cargo so it is not reproducable across machines. For a more reproducable
+# option, use makeCargoToolchain
+export def makeReleaseCargoToolchain (root: Path) (binaryName: String): Result CargoToolchain Error =
+    require Pass cargo = findCargoPath Unit
+
+    makeCargoToolchain cargo root binaryName CargoToolchainBuildConfigRelease True
+    | Pass
+
+# Makes a cargo toolchain without assuming any defaults. Local crates and extra flags must be manually set later
+export def makeCargoToolchain (cargo: String) (root: Path) (binaryName: String) (config: CargoToolchainBuildConfig) (locked: Boolean): CargoToolchain =
+    CargoToolchain cargo config (CargoCrate root binaryName) Nil locked Nil
+
+# Adds a crate to the toolchains list of local crates. Chain calls together to build up a binary
+# with local crate deps.
+#
+# Ex:
+# ```
+# require Pass foo = mkdir "foo"
+# require Pass crate1 = mkdir "foo"
+# require Pass crate2 = mkdir "foo"
+# require Pass toolchain = makeReleaseCargoToolchain foo "bar" 
+# toolchain
+# | addCargoCrate crate1 "one"
+# | addCargoCrate crate2 "two"
+# ```
+export def addCargoCrate (root: Path) (binaryName: String): CargoToolchain => CargoToolchain =
+    editCargoToolchainLocalCrates ((CargoCrate root binaryName), _)
+
+# Adds a flag to the list of flags. Will be forwared to cargo in order after all other flags
+#
+# Ex:
+# ```
+# require Pass foo = mkdir "foo"
+# require Pass toolchain = makeReleaseCargoToolchain foo "bar" 
+# toolchain
+# | addCargoFlag "--foo"
+# | addCargoFlag "bar"
+# | addCargoFlag "--bat"
+# ```
+export def addCargoFlag (flag: String): CargoToolchain => CargoToolchain =
+    editCargoToolchainFlags (flag, _)
+
+# helper function to map build config to a human name
+def buildConfigToString = match _
+    CargoToolchainBuildConfigRelease -> "release"
+    CargoToolchainBuildConfigDebug -> "debug"
+
+# helper function for common code between building a cargo binary and a cargo test binary
+def cargoBuildCommon (subcommand: String) (fnOutputsFilter: RegExp) (toolchain: CargoToolchain): Result Path Error =
+    def buildConfigToFlag = match _
+        CargoToolchainBuildConfigRelease -> Some ("--release", Nil)
+        # Debug is the default, and cargo doesn't have a flag to explictly set it
+        CargoToolchainBuildConfigDebug -> None
+
+    def lockedToFlag = match _
+        True -> Some ("--locked", Nil)
+        False -> None
+
+    # Locates all the sources needed to build a CargoCrate
+    def findSources (crate: CargoCrate): Result (List Path) Error =
+        def root =
+            crate.getCargoCrateRoot.getPathName
+            | simplify
+
+        require Pass toml = source "{root}/Cargo.toml"
+        require Pass lock = source "{root}/Cargo.lock"
+        require Pass srcs = sources "{root}/src" `.*`
+
+        Pass (toml, lock, srcs)
+
+    def (CargoToolchain cargo config rootCrate localCrates locked flags) = toolchain
+    def (CargoCrate rootPath binaryName) = rootCrate
+
+    def root =
+        rootPath.getPathName
+        | simplify
+
+    # wake-format off
+    def cmd =
+        cargo,
+        subcommand,
+        "--quiet",
+        "--bin", binaryName,
+        ((buildConfigToFlag config) | getOrElse Nil) ++
+        ((lockedToFlag locked) | getOrElse Nil) ++
+        # To not incur a O(n^2) cost, flags are appended in reverse of the callers expectations.
+        # Reverse here to correct them.
+        (flags | reverse)
+
+    require Pass sources =
+        (rootCrate, localCrates)
+        | map findSources
+        | findFail
+        | rmap flatten
+
+    def job =
+        makeExecPlan cmd (sources)
+        | setPlanLabel "cargo {subcommand}: {binaryName} [{buildConfigToString config}]"
+        | setPlanDirectory root
+        | setPlanFilterOutputs (matches fnOutputsFilter)
+        | setPlanIsAtty True
+        # Adds cargo and rustc to the environment
+        | prependPlanPath (dirname cargo)
+        | runJobWith defaultRunner
+
+    require True = job.isJobOk
+    else failWithError "Failed to build with cargo"
 
     require Pass outputs =
-        makeExecPlan (cargoPath, "build", "--release", "--locked", Nil) sources
-        | setPlanLabel "cargo: {pathToCrate}"
-        | setPlanDirectory pathToCrate
-        | setPlanFnOutputs (\_ map ("{pathToCrate}/target/release/{_}") outputs)
-        | prependPlanPath (dirname cargoPath)
-        | runJobWith defaultRunner
+        job
         | getJobOutputs
 
-    Pass outputs
+    require (bin, Nil) = outputs
+    else failWithError "More than one output returned when building with cargo"
+
+    Pass bin
+
+# Builds a cargo project from the CargoToolchain
+# 
+# Cargo will not reuse work because the sandbox will not contain its extra info, inside of target.
+# TODO: Add an environment variable to opt-in to localRunner cargo builds if we detect
+#       existing outputs in {root}/target/release
+export def cargoBuild (toolchain: CargoToolchain): Result Path Error =
+    def (CargoToolchain _ config rootCrate _ _ _) = toolchain
+    def (CargoCrate rootPath binaryName) = rootCrate
+
+    def root =
+        rootPath.getPathName
+        | simplify
+
+    require Pass regex = stringToRegExp "{root}/target/{buildConfigToString config}/{binaryName}"
+
+    toolchain
+    | cargoBuildCommon "build" regex
+
+# Builds a cargo test binary from the CargoToolchain
+# 
+# Cargo will not reuse work because the sandbox will not contain its extra info, inside of target.
+# TODO: Add an environment variable to opt-in to localRunner cargo builds if we detect
+#       existing outputs in {root}/target/release
+export def cargoTestBuild (toolchain: CargoToolchain): Result Path Error =
+    def (CargoToolchain _ config rootCrate _ _ _) = toolchain
+    def (CargoCrate rootPath binaryName) = rootCrate
+
+    def root =
+        rootPath.getPathName
+        | simplify
+
+    require Pass regex =
+        stringToRegExp "{root}/target/{buildConfigToString config}/deps/{binaryName}-[a-z0-9]\{16\}"
+
+    toolchain
+    | addCargoFlag "--no-run"
+    | cargoBuildCommon "test" regex
+
