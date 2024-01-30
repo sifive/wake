@@ -23,6 +23,7 @@ use chrono::Utc;
 mod add_job;
 mod api_key_check;
 mod blob;
+mod blob_store_impls;
 mod blob_store_service;
 mod read_job;
 mod types;
@@ -61,21 +62,37 @@ struct ServerOptions {
 async fn activate_stores(
     conn: Arc<DatabaseConnection>,
 ) -> HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>> {
-    let stores = match blob_store_service::fetch_local_blob_stores(&conn).await {
+    let mut active_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>> =
+        HashMap::new();
+    // --- Activate Test Blob Stores  ---
+    let test_stores = match blob_store_service::fetch_test_blob_stores(&conn).await {
         Ok(stores) => stores,
         Err(err) => {
-            tracing::warn!(%err, "No local stores available in database");
+            tracing::warn!(%err, "Failed to read test stores from database");
             Vec::new()
         }
     };
 
-    let mut active_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>> =
-        HashMap::new();
+    for store in test_stores.into_iter() {
+        active_stores.insert(
+            store.id,
+            Arc::new(blob_store_impls::TestBlobStore { id: store.id }),
+        );
+    }
+
+    // --- Activate Local Blob Stores ---
+    let stores = match blob_store_service::fetch_local_blob_stores(&conn).await {
+        Ok(stores) => stores,
+        Err(err) => {
+            tracing::warn!(%err, "Failed to read local stores from database");
+            Vec::new()
+        }
+    };
 
     for store in stores.into_iter() {
         active_stores.insert(
             store.id,
-            Arc::new(blob::LocalBlobStore { root: store.root }),
+            Arc::new(blob_store_impls::LocalBlobStore { root: store.root }),
         );
     }
 
@@ -355,6 +372,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use entity::blob_store;
     use sea_orm::{prelude::Uuid, ActiveModelTrait, PaginatorTrait};
     use std::sync::Arc;
 
@@ -366,35 +384,38 @@ mod tests {
     use serde_json::{json, Value};
     use tower::Service;
 
-    async fn seed_db(db: &DatabaseConnection) -> Result<(), Box<dyn std::error::Error>> {
-        // Create a blob store
-        // Create a memory blob store
-        // Activate the memory blob store
-        // Return the memory blob store UUID and set in the config
-        // (use api to create a blob??)
+    async fn create_test_store(
+        db: &DatabaseConnection,
+    ) -> Result<Uuid, Box<dyn std::error::Error>> {
+        let test_store = blob_store::ActiveModel {
+            id: NotSet,
+            r#type: Set("TestBlobStore".into()),
+        };
+        let inserted = test_store.insert(db).await?;
 
         // OTHER: remove CI stuff for weirdly installed cargo/rust
-        Ok(())
+        Ok(inserted.id)
     }
 
-    fn create_config() -> Result<config::RSCConfig, Box<dyn std::error::Error>> {
+    fn create_config(store_id: Uuid) -> Result<config::RSCConfig, Box<dyn std::error::Error>> {
         Ok(config::RSCConfig::new(config::RSCConfigOverride {
             config_override: Some("".into()),
             server_addr: Some("test:0000".into()),
             database_url: Some("".into()),
             standalone: Some(true),
-            active_store: Some("".into()),
+            active_store: Some(store_id.to_string()),
         })?)
     }
 
-    async fn create_fake_blob(db: &DatabaseConnection) -> Result<Uuid, Box<dyn std::error::Error>> {
-        let store_uuid = blob_store_service::fetch_local_blob_store(db).await?;
-
+    async fn create_fake_blob(
+        db: &DatabaseConnection,
+        store_id: Uuid,
+    ) -> Result<Uuid, Box<dyn std::error::Error>> {
         let active_key = entity::blob::ActiveModel {
             id: NotSet,
             created_at: Set((Utc::now() - Duration::days(5)).naive_utc()),
             key: Set("InsecureKey".into()),
-            store_id: Set(store_uuid),
+            store_id: Set(store_id),
         };
 
         let inserted_key = active_key.insert(db).await?;
@@ -405,9 +426,10 @@ mod tests {
     #[tokio::test]
     async fn nominal() {
         let db = create_standalone_db().await.unwrap();
+        let store_id = create_test_store(&db).await.unwrap();
         let api_key = create_insecure_api_key(&db).await.unwrap();
-        let blob_id = create_fake_blob(&db).await.unwrap();
-        let config = create_config().unwrap();
+        let blob_id = create_fake_blob(&db, store_id.clone()).await.unwrap();
+        let config = create_config(store_id.clone()).unwrap();
         let db = Arc::new(db);
         let stores = activate_stores(db.clone()).await;
         let mut router = create_router(db.clone(), Arc::new(config), &stores);
@@ -553,8 +575,14 @@ mod tests {
                 "output_dirs": [],
                 "output_symlinks": [],
                 "output_files":[],
-                "stdout_blob_id": blob_id,
-                "stderr_blob_id": blob_id,
+                "stdout_blob": {
+                    "id": blob_id,
+                    "url": format!("test://{0}/InsecureKey", store_id),
+                },
+                "stderr_blob": {
+                    "id": blob_id,
+                    "url": format!("test://{0}/InsecureKey", store_id),
+                },
                 "status": 0,
                 "runtime":1.0,
                 "cputime":1.0,
@@ -568,7 +596,8 @@ mod tests {
     #[tokio::test]
     async fn ttl_eviction() {
         let db = create_standalone_db().await.unwrap();
-        let blob_id = create_fake_blob(&db).await.unwrap();
+        let store_id = create_test_store(&db).await.unwrap();
+        let blob_id = create_fake_blob(&db, store_id).await.unwrap();
         let conn = Arc::new(db);
 
         let hash: [u8; 32] = [
