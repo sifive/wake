@@ -64,6 +64,7 @@ async fn activate_stores(
 ) -> HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>> {
     let mut active_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>> =
         HashMap::new();
+
     // --- Activate Test Blob Stores  ---
     let test_stores = match blob_store_service::fetch_test_blob_stores(&conn).await {
         Ok(stores) => stores,
@@ -393,7 +394,6 @@ mod tests {
         };
         let inserted = test_store.insert(db).await?;
 
-        // OTHER: remove CI stuff for weirdly installed cargo/rust
         Ok(inserted.id)
     }
 
