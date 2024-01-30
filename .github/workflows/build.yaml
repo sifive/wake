@@ -19,7 +19,7 @@ jobs:
             fetch-depth: 0
 
         - name: Install Deps
-          run: sudo apt-get update && sudo apt-get install -y build-essential fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx clang-format-12 postgresql
+          run: sudo apt-get update && sudo apt-get install -y build-essential fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx clang-format-12
 
         - name: Check C/C++ Formatting
           run: clang-format-12 --style=file --Werror -n $(./scripts/which_clang_files all)
@@ -33,26 +33,14 @@ jobs:
         - name: Check Wake Formatting
           run: ./bin/wake-format.native-cpp14-release --auto --dry-run
 
-        - name: Download rust
-          run: pushd /var/tmp && wget https://static.rust-lang.org/dist/rust-1.72.0-x86_64-unknown-linux-gnu.tar.gz && popd
-
-        - name: Unpack rust
-          run: pushd /var/tmp && tar -xf rust-1.72.0-x86_64-unknown-linux-gnu.tar.gz && popd
-
-        - name: Install rust
-          run: pushd /var/tmp && mkdir rust-install && ./rust-1.72.0-x86_64-unknown-linux-gnu/install.sh --prefix=/var/tmp/rust-install --verbose && popd
-
         - name: Checkout postgres
           run: pushd /var/tmp/ && git clone --depth 1 https://github.com/postgres/postgres.git && cd postgres && git fetch origin c372fbbd8e911f2412b80a8c39d7079366565d67 && git checkout c372fbbd8e911f2412b80a8c39d7079366565d67 && popd
 
         - name: Build postgres
           run: pushd /var/tmp/postgres && ./configure --prefix /var/tmp/pg-server && make install && popd
 
-        - name: Vendor remote cache deps
-          run: cd rust/rsc && cargo vendor --locked && cd ..
-
         - name: Run Remote Cache Tests
-          run: POSTGRES_DIR=/var/tmp/pg-server CARGO_HOME=/var/tmp/rust-install make remoteCacheTests
+          run: POSTGRES_DIR=/var/tmp/pg-server make remoteCacheTests
 
         - name: Generate Docs
           run: mkdir www && ./bin/wake --no-workspace --html > www/index.html
