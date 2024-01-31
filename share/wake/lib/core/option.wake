@@ -231,7 +231,7 @@ export def getOrPassFn (passFn: Unit => pass): Option fail => Result pass fail =
     None -> Pass (passFn Unit)
     Some f -> Fail f
 
-# optiontToList: Converts an `Option` to a list consisting of either the inner value of `Some`
+# optionToList: Converts an `Option` to a list consisting of either the inner value of `Some`
 # or the empty list in the case of `None`.
 #
 # Examples:
