@@ -227,7 +227,7 @@ export def makeRequest (request: HttpRequest): Result HttpResponse Error =
         | setPlanFnOutputs (\_ Nil)
         | runJobWith localRunner
         | setJobTag "http.method" "{method | methodToString}"
-        | setJobTag "http.url" "{url}"
+        | setJobTag "http.url" url
         | getJobStdout
 
     parseCurlResponse stdout
@@ -261,7 +261,7 @@ export target makeBinaryRequest (request: HttpRequest): Result Path Error =
         | setPlanFnOutputs (\_ destination, Nil)
         | runJobWith localRunner
         | setJobTag "http.method" "{method | methodToString}"
-        | setJobTag "http.url" "{url}"
+        | setJobTag "http.url" url
 
     require True = job.isJobOk
     else failWithError "Failed attempting to write binary file to {destination}"
