@@ -30,11 +30,10 @@ export target findCargoPath Unit =
     Pass "{cargo_home}/bin/cargo"
 
 # The configuration for a given build
-#
-# Debug has less optimizations and debug info
-# Release is optimized with debug info stripped
 export data CargoToolchainBuildConfig =
+    # Debug has less optimizations and debug info
     CargoToolchainBuildConfigDebug
+    # Release is optimized with debug info stripped
     CargoToolchainBuildConfigRelease
 
 # An on-disk cargo crate
@@ -58,7 +57,7 @@ export tuple CargoToolchain =
     export RootCrate: CargoCrate
     # List of dependancies to crates on disk
     export LocalCrates: List CargoCrate
-    # Locked Flag
+    # Force cargo to use the Cargo.lock file for reproducible builds
     export Locked: Boolean
     # Extra cargo flags defined by caller
     export Flags: List String
