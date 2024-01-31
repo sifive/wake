@@ -21,13 +21,13 @@ tuple HttpHeader =
     Name: String
     Value: String
 
-data HttpFormDataValue =
-    HttpFormDataString String
-    HttpFormDataFile Path
-
+# A form data entry. It consists of a user defined named and a file on disk to upload.
+#
+# Note: while raw strings are generally accepted as http form data the actual encoding of the
+# string restults in shell escape headaches. Strings should be written to a file before upload.
 tuple HttpFormData =
     Name: String
-    Value: HttpFormDataValue
+    File: String
 
 # The description of a http request to send to a web server.
 tuple HttpRequest =
@@ -42,6 +42,7 @@ tuple HttpRequest =
     # Multipart form data. May be a list of strings or files. Mutually exclusive with body
     FormData: Option (List HttpFormData)
 
+# The default response type to a http web request.
 export tuple HttpResponse =
     # The status code returned from the web server. 
     #
@@ -96,21 +97,10 @@ export def addAuthorizationHeader (value: String): HttpRequest => HttpRequest =
 export def setBody (body: String): HttpRequest => HttpRequest =
     setHttpRequestBody (Some body)
 
-# Adds a named string value to the requests form data
-export def addFormDataString (name: String) (value: String): HttpRequest => HttpRequest =
-    def setOrAppend field =
-        def entry = HttpFormData name (HttpFormDataString value)
-
-        match field
-            Some formDatas -> Some (entry, formDatas)
-            None -> Some (entry, Nil)
-
-    editHttpRequestFormData setOrAppend
-
 # Adds a named file to the requests form data
-export def addFormDataFile (name: String) (value: Path): HttpRequest => HttpRequest =
+export def addFormData (name: String) (value: String): HttpRequest => HttpRequest =
     def setOrAppend field =
-        def entry = HttpFormData name (HttpFormDataFile value)
+        def entry = HttpFormData name value
 
         match field
             Some formDatas -> Some (entry, formDatas)
@@ -175,53 +165,104 @@ def parseCurlResponse (str: String): Result HttpResponse Error =
 
     Pass (HttpResponse status headers body)
 
-# Makes the request specified by request and parses into a HttpResponse
-#
-# WARNING: This function will likely break the sandbox and make your build unreliable
-export def makeRequest ((HttpRequest url method headers body formData): HttpRequest): Result HttpResponse Error =
-    def methodToString = match _
-        HttpMethodGet -> "GET"
-        HttpMethodHead -> "HEAD"
-        HttpMethodPost -> "POST"
-        HttpMethodPut -> "PUT"
-        HttpMethodDelete -> "DELETE"
-        HttpMethodConnect -> "CONNECT"
-        HttpMethodOptions -> "OPTIONS"
-        HttpMethodTrace -> "TRACE"
-        HttpMethodPatch -> "PATCH"
+# helper function for converting a HttpMethod to the string representation
+def methodToString = match _
+    HttpMethodGet -> "GET"
+    HttpMethodHead -> "HEAD"
+    HttpMethodPost -> "POST"
+    HttpMethodPut -> "PUT"
+    HttpMethodDelete -> "DELETE"
+    HttpMethodConnect -> "CONNECT"
+    HttpMethodOptions -> "OPTIONS"
+    HttpMethodTrace -> "TRACE"
+    HttpMethodPatch -> "PATCH"
 
+# helper function for building up the curl cmd representing a request
+def makeCurlCmd ((HttpRequest url method headers body formData): HttpRequest) (extraFlags: List String): Result (List String) Error =
     def headerToCurlFlag (HttpHeader name value) = "--header", "{name}:{value}", Nil
     def bodyToCurlFlag body = "--data", body, Nil
-
-    def formDataToCurlFlag (HttpFormData name value) = match value
-        HttpFormDataString str -> "--form", "{name}={str}", Nil
-        HttpFormDataFile file -> "--form", "{name}=@{file.getPathName}", Nil
+    def formDataToCurlFlag (HttpFormData name file) = "--form", "{name}=@{file}", Nil
 
     require False = body.isSome && formData.isSome
     else failWithError "Request Body and FormData are both set. This is not allowed."
 
-    def cmd =
-        (
-            Some ("curl", Nil),
-            Some ("-i", Nil), # Include response headers
-            Some ("--request", method | methodToString, Nil),
-            Some ("--url", url, Nil),
-            Some (headers | mapFlat headerToCurlFlag),
-            (body | omap bodyToCurlFlag),
-            (formData | omap (mapFlat formDataToCurlFlag)),
-        )
-        | mapPartial (_)
-        | flatten
+    # Curl does a preflight check bofore sending the request if it is large. In core use cases
+    # this requres a clunky retry of the request. For now we accpt the tradeoff of wasting time
+    # uploading a reject file to not muddy the api. Setting 'Expect' to empty disables the check.
+    # See https://everything.curl.dev/http/post/expect100 for more details.
+    def heads = (HttpHeader "Expect" ""), headers
+
+    (
+        "curl",
+        "--request",
+        (method | methodToString),
+        "--url",
+        url,
+        (heads | mapFlat headerToCurlFlag) ++
+        (body | omap bodyToCurlFlag | optionToList | flatten) ++
+        (formData | omap (mapFlat formDataToCurlFlag) | optionToList | flatten) ++
+        extraFlags
+    )
+    | Pass
+
+# Makes the request specified by request and parses into a HttpResponse.
+#
+# The default method to make a request. It should be used when the response is string encodable.
+# WARNING: This function will likely break the sandbox and make your build unreliable
+export def makeRequest (request: HttpRequest): Result HttpResponse Error =
+    # -i -> Include response headers
+    require Pass cmd = makeCurlCmd request ("-i", Nil)
+
+    def method = request.getHttpRequestMethod
+    def url = request.getHttpRequestUrl
 
     require Pass stdout =
         makeExecPlan cmd Nil
         | setPlanLabel "http: {method | methodToString} {url}"
-        | setPlanStdout logInfo
+        | setPlanStdout logNever
         # Curl dumps download stats to stderr
         | setPlanStderr logInfo
         # Web is unreliable and should never be reused
         | setPlanPersistence ReRun
+        | setPlanFnOutputs (\_ Nil)
         | runJobWith localRunner
         | getJobStdout
 
     parseCurlResponse stdout
+
+# Makes the request specified by request and writes body to a file.
+#
+# The backup method to make a request. It must be used when the response is not string encodable.
+# WARNING: This function will likely break the sandbox and make your build unreliable
+export target makeBinaryRequest (request: HttpRequest): Result Path Error =
+    # We can't create a unique file name ahead of time by hashing the contents so we hash the
+    # request instead. This won't create 'file output by many jobs' in a single invocation since
+    # the function is a target, and across multiple invocations its fine as the job is set to
+    # always rerun and we'd want to replace the file incase it changed on the remote.
+    require Pass _ = mkdir ".build/wake/stdlib/http"
+
+    def destination = ".build/wake/stdlib/http/binary.{request | format | hashString}"
+
+    require Pass cmd = makeCurlCmd request ("--output", destination, Nil)
+
+    def method = request.getHttpRequestMethod
+    def url = request.getHttpRequestUrl
+
+    def job =
+        makeExecPlan cmd Nil
+        | setPlanLabel "http: {method | methodToString} {url}"
+        | setPlanStdout logNever
+        # Curl dumps download stats to stderr
+        | setPlanStderr logInfo
+        # Web is unreliable and should never be reused
+        | setPlanPersistence ReRun
+        | setPlanFnOutputs (\_ destination, Nil)
+        | runJobWith localRunner
+
+    require True = job.isJobOk
+    else failWithError "Failed attempting to write binary file to {destination}"
+
+    require Pass (path, Nil) = job.getJobOutputs
+    else failWithError "Job resolved with the incorrect number of outputs. This should not be possible."
+
+    Pass path
