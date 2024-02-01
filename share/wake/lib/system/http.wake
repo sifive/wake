@@ -24,9 +24,12 @@ tuple HttpHeader =
 # A form data entry. It consists of a user defined named and a file on disk to upload.
 #
 # Note: while raw strings are generally accepted as http form data the actual encoding of the
-# string restults in shell escape headaches. Strings should be written to a file before upload.
+# string results in shell escape headaches. Strings should be written to a file before upload.
 tuple HttpFormData =
     Name: String
+    # This file is deliberately left unhashed to avoid multiple jobs outputting the same file
+    # in the fullness of time it should be converted to a Path. This library is careful to not
+    # claim or otherwise convert it to a Path as it should be done by the caller when possible
     File: String
 
 # The description of a http request to send to a web server.
@@ -207,7 +210,9 @@ def makeCurlCmd ((HttpRequest url method headers body formData): HttpRequest) (e
 
 # Makes the request specified by request and parses into a HttpResponse.
 #
-# The default method to make a request. It should be used when the response is string encodable.
+# The standard method to make a request. When the response is string encodabled it must be used.
+# Alternative request functions should be used with caution.
+#
 # WARNING: This function will likely break the sandbox and make your build unreliable
 export def makeRequest (request: HttpRequest): Result HttpResponse Error =
     # -i -> Include response headers
@@ -232,11 +237,14 @@ export def makeRequest (request: HttpRequest): Result HttpResponse Error =
 
     parseCurlResponse stdout
 
-# Makes the request specified by request and writes body to a file.
+# Makes the request specified by request and writes body to a file. Avoid when possible.
 #
 # The backup method to make a request. It must be used when the response is not string encodable.
+# This function likely doesn't have the caller's expected semantics. It can only run once per
+# wake invocation meaning non-idempotent request such as POST will not work as expected.
+#
 # WARNING: This function will likely break the sandbox and make your build unreliable
-export target makeBinaryRequest (request: HttpRequest): Result Path Error =
+export def makeBinaryRequest (request: HttpRequest): Result Path Error =
     # We can't create a unique file name ahead of time by hashing the contents so we hash the
     # request instead. This won't create 'file output by many jobs' in a single invocation since
     # the function is a target, and across multiple invocations its fine as the job is set to
@@ -248,19 +256,33 @@ export target makeBinaryRequest (request: HttpRequest): Result Path Error =
     require Pass cmd = makeCurlCmd request ("--output", destination, Nil)
 
     def method = request.getHttpRequestMethod
+
+    def methodStr =
+        method
+        | methodToString
+
     def url = request.getHttpRequestUrl
+
+    def _ = match method
+        HttpMethodGet -> Unit
+        _ ->
+            printlnLevel
+            logWarning
+            "makeBinaryRequest doesn't replay requests. Sending a {methodStr} request may not work as expected"
 
     def job =
         makeExecPlan cmd Nil
-        | setPlanLabel "http: {method | methodToString} {url}"
+        | setPlanLabel "http: {methodStr} {url}"
         | setPlanStdout logNever
         # Curl dumps download stats to stderr
         | setPlanStderr logInfo
-        # Web is unreliable and should never be reused
-        | setPlanPersistence ReRun
+        # Ideally we'd rerun on every invocation of the request. Unfortunately the desintation
+        # location is a function of the request which would cause 'file output by multiple jobs' if
+        # the same request is made twice in the same invocation
+        | setPlanPersistence Once
         | setPlanFnOutputs (\_ destination, Nil)
         | runJobWith localRunner
-        | setJobTag "http.method" "{method | methodToString}"
+        | setJobTag "http.method" methodStr
         | setJobTag "http.url" url
 
     require True = job.isJobOk
