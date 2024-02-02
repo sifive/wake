@@ -88,7 +88,7 @@ export def addHeader (name: String) (value: String): HttpRequest => HttpRequest 
 export def addContentTypeHeader (value: String): HttpRequest => HttpRequest =
     addHeader "Content-Type" value
 
-# Adds the Content-Type header to the http request and sets it to application/json
+# Adds the Content-Type header to the http request and sets it to application/json.
 export def addContentTypeJsonHeader: HttpRequest => HttpRequest =
     addContentTypeHeader "application/json"
 
@@ -100,8 +100,14 @@ export def addAuthorizationHeader (value: String): HttpRequest => HttpRequest =
 export def setBody (body: String): HttpRequest => HttpRequest =
     setHttpRequestBody (Some body)
 
-# Adds a named file to the requests form data
-export def addFormData (name: String) (value: String): HttpRequest => HttpRequest =
+# Adds a named file to the requests form data.
+export def addFormData (name: String) (value: Path): HttpRequest => HttpRequest =
+    unsafe_addFormData name value.getPathName
+
+# Adds a named file to the requests form data from an unhashed file.
+#
+# This is a restricted function and should be reserved for advanced use only
+export def unsafe_addFormData (name: String) (value: String): HttpRequest => HttpRequest =
     def setOrAppend field =
         def entry = HttpFormData name value
 
