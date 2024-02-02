@@ -98,6 +98,15 @@ export def omapPartial (f: a => Option b): Option a => Option b = match _
     Some a -> f a
     None -> None
 
+# omapFailable: A variant of omap that calls a function on a non-empty option that returns a Result
+# type. The Result-type-ness is then hoist outside the resulting option, making it easier to write
+# `require Pass` statements on code that maps over `Option` types.
+export def omapFailable (fn: a => Result b fail): Option a => Result (Option b) fail = match _
+    Some a ->
+        fn a
+        | rmap Some
+    None -> Pass None
+
 # ofilter: remove the contents of an option when `f` returns False.
 #
 #   def isEven x =
@@ -221,3 +230,46 @@ export def getOrPass (passVal: pass): Option fail => Result pass fail =
 export def getOrPassFn (passFn: Unit => pass): Option fail => Result pass fail = match _
     None -> Pass (passFn Unit)
     Some f -> Fail f
+
+# optionToList: Converts an `Option` to a list consisting of either the inner value of `Some`
+# or the empty list in the case of `None`.
+#
+# Examples:
+# ```
+# optionToList (Some 2) = 2, Nil
+# optionToList None = Nil
+# ```
+export def optionToList: Option a => List a =
+    optionToListFn (_, Nil)
+
+# optionToListFn: Converts an `Option` to a list consisting of either the inner value of `Some`
+# with the given `fn` applied to it or the empty list in the case of `None`.
+#
+# Examples:
+# ```
+# optionToListFn (_ * 2, Nil) (Some 2) = 4, Nil
+# optionToListFn (_ * 2 | str, Nil) (Some 2) = "4", Nil
+# optionToListFn (_, Nil) None = Nil
+# ```
+export def optionToListFn (fn: a => List b) (option: Option a): List b = match option
+    Some x -> fn x
+    None -> Nil
+
+# optionEqual: Using the given equality testing function, determines whether two option values are
+# equal or not. The equality testing function is only used when both values are a `Some` and allows
+# for the two underlying types to be different.
+#
+# Examples:
+# ```
+# optionEqual (_==_) (Some 1) (Some 1) = True
+# optionEqual (_==_) (Some 1) (Some 2) = False
+# optionEqual (str _ ==* _) (Some 0) (Some "0") = True
+# optionEqual (_==_) None None = True
+# optionEqual (_==*_) (Some "test") None = False
+# ```
+export def optionEqual (equalityFn: a => b => Boolean) (option1: Option a) (option2: Option b): Boolean =
+    match option1 option2
+        None None -> True
+        None _ -> False
+        _ None -> False
+        (Some x) (Some y) -> equalityFn x y

@@ -1,0 +1,303 @@
+package http
+
+from http export type HttpRequest
+
+# The http methods that may be called against a web server.
+export data HttpMethod =
+    HttpMethodGet
+    HttpMethodHead
+    HttpMethodPost
+    HttpMethodPut
+    HttpMethodDelete
+    HttpMethodConnect
+    HttpMethodOptions
+    HttpMethodTrace
+    HttpMethodPatch
+
+# The headers that may be assocated with an http request.
+#
+# These are often used to specify how to interpret the body or to provide authorization.
+tuple HttpHeader =
+    Name: String
+    Value: String
+
+# A form data entry. It consists of a user defined name and a file on disk to upload.
+#
+# Note: while raw strings are generally accepted as http form data the actual encoding of the
+# string results in shell escape headaches. Strings should be written to a file before upload.
+tuple HttpFormData =
+    Name: String
+    # This file is deliberately left unhashed to avoid multiple jobs outputting the same file
+    # in the fullness of time it should be converted to a Path. This library is careful to not
+    # claim or otherwise convert it to a Path as it should be done by the caller when possible
+    File: String
+
+# The description of a http request to send to a web server.
+tuple HttpRequest =
+    # The url of the function to be called
+    Url: String
+    # The method to be called on the destination
+    Method: HttpMethod
+    # The headers to be set on the request
+    Headers: List HttpHeader
+    # A string of the contents of the request. Mutually exclusive with form data
+    Body: Option String
+    # Multipart form data. May be a list of strings or files. Mutually exclusive with body
+    FormData: Option (List HttpFormData)
+
+# The default response type to a http web request.
+export tuple HttpResponse =
+    # The status code returned from the web server. 
+    #
+    # Not all response have a status code so its not guarenteed to be set.
+    export StatusCode: Option Integer
+    # The headers returned from the web server
+    export Headers: List HttpHeader
+    # The body returned from the web server
+    export Body: String
+
+# Creates a basic HttpRequest to be used as part of a builder.
+#
+# This function should be used to start the builder chain of a desired http web request.
+#
+# Ex:
+# ```
+# def foo =
+#     buildHttpRequest "localhost"
+#     | setMethod HttpMethodGet
+#     | addHeader "Content-Type" "application/json"
+#     | setBody "{}"
+#     | makeRequest
+# ```
+#
+# buildHttpRequest defaults the method to GET and leaves the headers and body empty.
+#
+# NOTE: Relying on the internet for your build is inherently unreproducible and should be avoided.
+export def buildHttpRequest (url: String): HttpRequest =
+    HttpRequest url HttpMethodGet Nil None None
+
+# Sets an http method to the http request.
+export def setMethod (method: HttpMethod): HttpRequest => HttpRequest =
+    setHttpRequestMethod method
+
+# Adds an arbitary header to the http request.
+#
+# This function is normally used for custom or uncommon headers. Common headers should use
+# a dedicated function.
+export def addHeader (name: String) (value: String): HttpRequest => HttpRequest =
+    editHttpRequestHeaders ((HttpHeader name value), _)
+
+# Adds the Content-Type header to the http request.
+export def addContentTypeHeader (value: String): HttpRequest => HttpRequest =
+    addHeader "Content-Type" value
+
+# Adds the Content-Type header to the http request and sets it to application/json.
+export def addContentTypeJsonHeader: HttpRequest => HttpRequest =
+    addContentTypeHeader "application/json"
+
+# Adds the Authorization header to the http request.
+export def addAuthorizationHeader (value: String): HttpRequest => HttpRequest =
+    addHeader "Authorization" value
+
+# Sets the body to the http request.
+export def setBody (body: String): HttpRequest => HttpRequest =
+    setHttpRequestBody (Some body)
+
+# Adds a named file to the requests form data.
+export def addFormData (name: String) (value: Path): HttpRequest => HttpRequest =
+    unsafe_addFormData name value.getPathName
+
+# Adds a named file to the request's form data from an unhashed file.
+#
+# This is a restricted function and should be reserved for advanced use only
+export def unsafe_addFormData (name: String) (value: String): HttpRequest => HttpRequest =
+    def setOrAppend field =
+        def entry = HttpFormData name value
+
+        match field
+            Some formDatas -> Some (entry, formDatas)
+            None -> Some (entry, Nil)
+
+    editHttpRequestFormData setOrAppend
+
+# Helper tuple for parsing a curl response
+tuple CurlResponseParts =
+    StatusCode: String
+    Headers: List String
+    Body: String
+
+# Helper for chunking a curl response stream into parts
+def parseCurlResponse (str: String): Result HttpResponse Error =
+    # Response format:
+    #
+    # HTTP/1.1 415 Unsupported Media Type
+    # content-length: 54
+    # other: header
+    # other: header
+    #
+    # Expected request with `Content-Type: application/json`
+    require Pass (CurlResponseParts codeline headers body) =
+        def parts = tokenize `\r?\n` str
+
+        require code, rest = parts
+        else failWithError "Unexpected empty curl response"
+
+        # each header is on its own line, headers stop when we reach an empty line
+        def headers = takeUntil (_ ==* "") rest
+
+        # The body is just the remaining lines minus the header lines and empty line
+        def body =
+            rest
+            | drop (headers.len + 1)
+            | catWith "\n"
+
+        Pass (CurlResponseParts code headers body)
+
+    require Pass status =
+        require (code, Nil) = extract `^HTTP\/[\d\.]+ (\d+) .*$` codeline
+        else Pass None
+
+        require (Some x) =
+            code
+            | (intbase 10)
+        else failWithError "unable to parse {code} as a base 10 integer"
+
+        Pass (Some x)
+
+    require Pass headers =
+        def loop header =
+            require (name, value, Nil) = extract `^([-_A-Za-z0-9]+):\s*(.+)$` header
+            else failWithError "Unable to extract header from '{header}'"
+
+            Pass (HttpHeader name value)
+
+        headers
+        | map loop
+        | findFail
+
+    Pass (HttpResponse status headers body)
+
+# helper function for converting a HttpMethod to the string representation
+def methodToString = match _
+    HttpMethodGet -> "GET"
+    HttpMethodHead -> "HEAD"
+    HttpMethodPost -> "POST"
+    HttpMethodPut -> "PUT"
+    HttpMethodDelete -> "DELETE"
+    HttpMethodConnect -> "CONNECT"
+    HttpMethodOptions -> "OPTIONS"
+    HttpMethodTrace -> "TRACE"
+    HttpMethodPatch -> "PATCH"
+
+# helper function for building up the curl cmd representing a request
+def makeCurlCmd ((HttpRequest url method headers body formData): HttpRequest) (extraFlags: List String): Result (List String) Error =
+    def headerToCurlFlag (HttpHeader name value) = "--header", "{name}:{value}", Nil
+    def bodyToCurlFlag body = "--data", body, Nil
+    def formDataToCurlFlag (HttpFormData name file) = "--form", "{name}=@{file}", Nil
+
+    require False = body.isSome && formData.isSome
+    else failWithError "Request Body and FormData are both set. This is not allowed."
+
+    # Curl does a preflight check before sending the request if it is large. In core use cases
+    # this requres a clunky retry of the request. For now we accpt the tradeoff of wasting time
+    # uploading a reject file to not muddy the api. Setting 'Expect' to empty disables the check.
+    # See https://everything.curl.dev/http/post/expect100 for more details.
+    def heads = (HttpHeader "Expect" ""), headers
+
+    (
+        "curl",
+        "--request",
+        (method | methodToString),
+        "--url",
+        url,
+        (heads | mapFlat headerToCurlFlag) ++
+        (body | omap bodyToCurlFlag | optionToList | flatten) ++
+        (formData | omap (mapFlat formDataToCurlFlag) | optionToList | flatten) ++
+        extraFlags
+    )
+    | Pass
+
+# Makes the request specified by request and parses into a HttpResponse.
+#
+# The standard method to make a request. This function must be used when the response is string encodeable.
+# Alternative request functions should be used with caution.
+#
+# WARNING: This function will likely break the sandbox and make your build unreliable
+export def makeRequest (request: HttpRequest): Result HttpResponse Error =
+    # -i -> Include response headers
+    require Pass cmd = makeCurlCmd request ("-i", Nil)
+
+    def method = request.getHttpRequestMethod
+    def url = request.getHttpRequestUrl
+
+    require Pass stdout =
+        makeExecPlan cmd Nil
+        | setPlanLabel "http: {method | methodToString} {url}"
+        | setPlanStdout logNever
+        # Curl dumps download stats to stderr
+        | setPlanStderr logInfo
+        # Web is unreliable and should never be reused
+        | setPlanPersistence ReRun
+        | setPlanFnOutputs (\_ Nil)
+        | runJobWith localRunner
+        | setJobTag "http.method" "{method | methodToString}"
+        | setJobTag "http.url" url
+        | getJobStdout
+
+    parseCurlResponse stdout
+
+# Makes the request specified by request and writes body to a file. Avoid when possible.
+#
+# The backup method to make a request. It must be used when the response is not string encodable.
+# This function likely doesn't have the caller's expected semantics. It can only run once per
+# wake invocation meaning non-idempotent request such as POST will not work as expected.
+#
+# WARNING: This function will likely break the sandbox and make your build unreliable
+export def makeBinaryRequest (request: HttpRequest): Result Path Error =
+    # We can't create a unique file name ahead of time by hashing the contents so we hash the
+    # request instead. This won't create 'file output by many jobs' in a single invocation since
+    # the function is a target, and across multiple invocations its fine as the job is set to
+    # always rerun and we'd want to replace the file incase it changed on the remote.
+    require Pass _ = mkdir ".build/wake/stdlib/http"
+
+    def destination = ".build/wake/stdlib/http/binary.{request | format | hashString}"
+
+    require Pass cmd = makeCurlCmd request ("--output", destination, Nil)
+
+    def method = request.getHttpRequestMethod
+
+    def methodStr =
+        method
+        | methodToString
+
+    def url = request.getHttpRequestUrl
+
+    def _ = match method
+        HttpMethodGet -> Unit
+        _ ->
+            printlnLevel
+            logWarning
+            "makeBinaryRequest doesn't replay requests. Sending a {methodStr} request may not work as expected"
+
+    def job =
+        makeExecPlan cmd Nil
+        | setPlanLabel "http: {methodStr} {url}"
+        | setPlanStdout logNever
+        # Curl dumps download stats to stderr
+        | setPlanStderr logInfo
+        # Ideally we'd rerun on every invocation of the request. Unfortunately the destination
+        # location is a function of the request which would cause 'file output by multiple jobs' if
+        # the same request is made twice in the same invocation
+        | setPlanPersistence Once
+        | setPlanFnOutputs (\_ destination, Nil)
+        | runJobWith localRunner
+        | setJobTag "http.method" methodStr
+        | setJobTag "http.url" url
+
+    require True = job.isJobOk
+    else failWithError "Failed attempting to write binary file to {destination}"
+
+    require Pass (path, Nil) = job.getJobOutputs
+    else failWithError "Job resolved with the incorrect number of outputs. This should not be possible."
+
+    Pass path
