@@ -21,7 +21,7 @@ tuple HttpHeader =
     Name: String
     Value: String
 
-# A form data entry. It consists of a user defined named and a file on disk to upload.
+# A form data entry. It consists of a user defined name and a file on disk to upload.
 #
 # Note: while raw strings are generally accepted as http form data the actual encoding of the
 # string results in shell escape headaches. Strings should be written to a file before upload.
@@ -59,15 +59,18 @@ export tuple HttpResponse =
 # Creates a basic HttpRequest to be used as part of a builder.
 #
 # This function should be used to start the builder chain of a desired http web request.
+#
 # Ex:
+# ```
 # def foo =
 #     buildHttpRequest "localhost"
 #     | setMethod HttpMethodGet
 #     | addHeader "Content-Type" "application/json"
 #     | setBody "{}"
 #     | makeRequest
+# ```
 #
-# buildHttpRequest defaults the method to GET and leave the headers and body empty.
+# buildHttpRequest defaults the method to GET and leaves the headers and body empty.
 #
 # NOTE: Relying on the internet for your build is inherently unreproducible and should be avoided.
 export def buildHttpRequest (url: String): HttpRequest =
@@ -104,7 +107,7 @@ export def setBody (body: String): HttpRequest => HttpRequest =
 export def addFormData (name: String) (value: Path): HttpRequest => HttpRequest =
     unsafe_addFormData name value.getPathName
 
-# Adds a named file to the requests form data from an unhashed file.
+# Adds a named file to the request's form data from an unhashed file.
 #
 # This is a restricted function and should be reserved for advanced use only
 export def unsafe_addFormData (name: String) (value: String): HttpRequest => HttpRequest =
@@ -195,7 +198,7 @@ def makeCurlCmd ((HttpRequest url method headers body formData): HttpRequest) (e
     require False = body.isSome && formData.isSome
     else failWithError "Request Body and FormData are both set. This is not allowed."
 
-    # Curl does a preflight check bofore sending the request if it is large. In core use cases
+    # Curl does a preflight check before sending the request if it is large. In core use cases
     # this requres a clunky retry of the request. For now we accpt the tradeoff of wasting time
     # uploading a reject file to not muddy the api. Setting 'Expect' to empty disables the check.
     # See https://everything.curl.dev/http/post/expect100 for more details.
@@ -282,7 +285,7 @@ export def makeBinaryRequest (request: HttpRequest): Result Path Error =
         | setPlanStdout logNever
         # Curl dumps download stats to stderr
         | setPlanStderr logInfo
-        # Ideally we'd rerun on every invocation of the request. Unfortunately the desintation
+        # Ideally we'd rerun on every invocation of the request. Unfortunately the destination
         # location is a function of the request which would cause 'file output by multiple jobs' if
         # the same request is made twice in the same invocation
         | setPlanPersistence Once
