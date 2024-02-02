@@ -114,12 +114,12 @@ def buildConfigToString = match _
 # helper function for common code between building a cargo binary and a cargo test binary
 def cargoBuildCommon (subcommand: String) (fnOutputsFilter: RegExp) (toolchain: CargoToolchain): Result Path Error =
     def buildConfigToFlag = match _
-        CargoToolchainBuildConfigRelease -> Some ("--release", Nil)
+        CargoToolchainBuildConfigRelease -> Some "--release"
         # Debug is the default, and cargo doesn't have a flag to explictly set it
         CargoToolchainBuildConfigDebug -> None
 
     def lockedToFlag = match _
-        True -> Some ("--locked", Nil)
+        True -> Some "--locked"
         False -> None
 
     # Locates all the sources needed to build a CargoCrate
@@ -147,8 +147,8 @@ def cargoBuildCommon (subcommand: String) (fnOutputsFilter: RegExp) (toolchain: 
         subcommand,
         "--quiet",
         "--bin", binaryName,
-        ((buildConfigToFlag config) | getOrElse Nil) ++
-        ((lockedToFlag locked) | getOrElse Nil) ++
+        ((buildConfigToFlag config) | optionToList) ++
+        ((lockedToFlag locked) | optionToList) ++
         # To not incur a O(n^2) cost, flags are appended in reverse of the callers expectations.
         # Reverse here to correct them.
         (flags | reverse)
