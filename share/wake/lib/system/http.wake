@@ -219,7 +219,7 @@ def makeCurlCmd ((HttpRequest url method headers body formData): HttpRequest) (e
 
 # Makes the request specified by request and parses into a HttpResponse.
 #
-# The standard method to make a request. When the response is string encodabled it must be used.
+# The standard method to make a request. This function must be used when the response is string encodeable.
 # Alternative request functions should be used with caution.
 #
 # WARNING: This function will likely break the sandbox and make your build unreliable
