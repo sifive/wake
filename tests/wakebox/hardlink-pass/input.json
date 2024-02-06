@@ -1,0 +1,24 @@
+{
+  "command": [
+    "/usr/bin/dash",
+    "-c",
+    "touch link_file_src.txt\nln link_file_src.txt link_file_dst.txt\necho \"pass\" > link_file_src.txt\ncat link_file_dst.txt"
+  ],
+  "environment": [
+    "USER=root",
+    "HOME=/root",
+    "PATH=/usr/bin:/bin:/usr/sbin:/sbin"
+  ],
+  "directory": ".",
+  "stdin": "",
+  "user-id": 0,
+  "group-id": 0,
+  "mount-ops": [
+    {
+      "type": "workspace",
+      "destination": "."
+    }
+  ],
+  "visible": [],
+  "disable-fuse-cache": true
+}

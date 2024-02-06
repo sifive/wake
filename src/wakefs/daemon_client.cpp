@@ -52,7 +52,8 @@ daemon_client::daemon_client(const std::string &base_dir)
       visibles_path(mount_path + "/.i." + std::to_string(getpid())) {}
 
 // The arg 'visible' is destroyed/moved in the interest of performance with large visible lists.
-bool daemon_client::connect(std::vector<std::string> &visible, bool close_live_file) {
+bool daemon_client::connect(std::vector<std::string> &visible, bool close_live_file,
+                            bool disable_fuse_cache) {
   int err = mkdir_with_parents(mount_path, 0775);
   if (0 != err) {
     std::cerr << "mkdir_with_parents ('" << mount_path << "'):" << strerror(err) << std::endl;
@@ -73,9 +74,11 @@ bool daemon_client::connect(std::vector<std::string> &visible, bool close_live_f
       int exit_delay = 4 * delay.tv_sec;
       if (exit_delay < 2) exit_delay = 2;
       std::string delayStr = std::to_string(exit_delay);
+      std::string disableCacheString = disable_fuse_cache ? "true" : "false";
       const char *env[3] = {"PATH=/usr/bin:/bin:/usr/sbin:/sbin", 0, 0};
       if (getenv("DEBUG_FUSE_WAKE")) env[1] = "DEBUG_FUSE_WAKE=1";
-      execle(executable.c_str(), "fuse-waked", mount_path.c_str(), delayStr.c_str(), nullptr, env);
+      execle(executable.c_str(), "fuse-waked", mount_path.c_str(), delayStr.c_str(),
+             disableCacheString.c_str(), nullptr, env);
       std::cerr << "execl " << executable << ": " << strerror(errno) << std::endl;
       exit(1);
     }
