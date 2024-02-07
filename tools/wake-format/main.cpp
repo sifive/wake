@@ -21,7 +21,6 @@
 
 #include <stdio.h>
 #include <wcl/doc.h>
-#include <wcl/filepath.h>
 
 #include <fstream>
 #include <iostream>
@@ -36,7 +35,6 @@
 #include "parser/syntax.h"
 #include "parser/wakefiles.h"
 #include "util/diagnostic.h"
-#include "util/execpath.h"
 #include "util/file.h"
 #include "wcl/diff.h"
 #include "wcl/xoshiro_256.h"
@@ -201,9 +199,7 @@ int main(int argc, char **argv) {
   user_warn = fopen("/dev/null", "w");
   if (auto_find_files) {
     bool ok = true;
-    // Use the standard libdir to more closely match wake discovery
-    std::string libdir = wcl::make_canonical(find_execpath() + "/../share/wake/lib");
-    wakefiles = find_all_wakefiles(ok, true, false, libdir, ".", user_warn);
+    wakefiles = find_all_wakefiles(ok, true, false, ".", ".", user_warn);
     if (!ok) {
       std::cerr << "Failed to automatically discover wake files" << std::endl;
       exit(EXIT_FAILURE);
