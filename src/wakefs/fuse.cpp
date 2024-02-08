@@ -80,7 +80,6 @@ bool json_as_struct(const std::string &json, json_args &result) {
 
   result.isolate_network = jast.get("isolate-network").kind == JSON_TRUE;
   result.isolate_pids = jast.get("isolate-pids").kind == JSON_TRUE;
-  result.disable_fuse_cache = jast.get("disable-fuse-cache").kind == JSON_TRUE;
 
   result.hostname = jast.get("hostname").value;
   result.domainname = jast.get("domainname").value;
@@ -155,7 +154,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
     return false;
   }
 
-  if (!args.daemon.connect(args.visible, args.isolate_pids, args.disable_fuse_cache)) return false;
+  if (!args.daemon.connect(args.visible, args.isolate_pids)) return false;
 
   struct timeval start;
   gettimeofday(&start, 0);

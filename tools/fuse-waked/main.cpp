@@ -55,7 +55,7 @@
 
 // How long to wait for a new client to connect before the daemon exits
 static int linger_timeout;
-static bool disable_fuse_cache;
+static std::set<std::string> hardlinks = {};
 
 // How to retry umount while quitting
 // (2^8-1)*100ms = 25.5s worst-case quit time
@@ -812,6 +812,8 @@ static int wakefuse_link(const char *from, const char *to) {
   int res = linkat(context.rootfd, keyf.second.c_str(), context.rootfd, keyt.second.c_str(), 0);
   if (res == -1) return -errno;
 
+  hardlinks.insert(std::string(to));
+
   it->second.files_wrote.insert(std::move(keyt.second));
   return 0;
 }
@@ -999,6 +1001,10 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi) {
 
   if (!it->second.is_readable(key.second)) return -ENOENT;
 
+  if (hardlinks.count(std::string(path))) {
+    fi->direct_io = true;
+  }
+
   int fd = openat(context.rootfd, key.second.c_str(), fi->flags, 0);
   if (fd == -1) return -errno;
 
@@ -1008,7 +1014,7 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi) {
 
 static int wakefuse_open_trace(const char *path, struct fuse_file_info *fi) {
   int out = wakefuse_open(path, fi);
-  fprintf(stderr, "open(%s) = %s\n", path, trace_out(out));
+  fprintf(stderr, "open(%s) = %s, direct_io = %d\n", path, trace_out(out), fi->direct_io);
   return out;
 }
 
@@ -1403,9 +1409,8 @@ int main(int argc, char *argv[]) {
   bool madedir;
   struct rlimit rlim;
 
-  if (argc != 4) {
-    fprintf(stderr,
-            "Syntax: fuse-waked <mount-point> <min-timeout-seconds> <disable-fuse-cache>\n");
+  if (argc != 3) {
+    fprintf(stderr, "Syntax: fuse-waked <mount-point> <min-timeout-seconds>\n");
     goto term;
   }
   path = argv[1];
@@ -1413,8 +1418,6 @@ int main(int argc, char *argv[]) {
   linger_timeout = atol(argv[2]);
   if (linger_timeout < 1) linger_timeout = 1;
   if (linger_timeout > 240) linger_timeout = 240;
-
-  disable_fuse_cache = argv[3][0] == 't';
 
   null = open("/dev/null", O_RDONLY);
   if (null == -1) {
@@ -1546,11 +1549,6 @@ int main(int argc, char *argv[]) {
   if (fuse_opt_add_arg(&args, "wake") != 0) {
 #endif
     fprintf(stderr, "fuse_opt_add_arg failed\n");
-    goto rmroot;
-  }
-
-  if (disable_fuse_cache && (fuse_opt_add_arg(&args, "-odirect_io") != 0)) {
-    fprintf(stderr, "fuse_opt_add_arg direct_io failed\n");
     goto rmroot;
   }
 
