@@ -48,6 +48,8 @@
 #include "util/execpath.h"
 #include "util/unlink.h"
 
+static std::set<std::string> hardlinks = {};
+
 #define MAX_JSON (128 * 1024 * 1024)
 
 // We ensure STDIN is /dev/null, so this is a safe sentinel value for open files
@@ -811,6 +813,8 @@ static int wakefuse_link(const char *from, const char *to) {
   int res = linkat(context.rootfd, keyf.second.c_str(), context.rootfd, keyt.second.c_str(), 0);
   if (res == -1) return -errno;
 
+  hardlinks.insert(std::string(to));
+
   it->second.files_wrote.insert(std::move(keyt.second));
   return 0;
 }
@@ -998,6 +1002,10 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi) {
 
   if (!it->second.is_readable(key.second)) return -ENOENT;
 
+  if (hardlinks.count(std::string(path))) {
+    fi->direct_io = true;
+  }
+
   int fd = openat(context.rootfd, key.second.c_str(), fi->flags, 0);
   if (fd == -1) return -errno;
 
@@ -1008,6 +1016,7 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi) {
 static int wakefuse_open_trace(const char *path, struct fuse_file_info *fi) {
   int out = wakefuse_open(path, fi);
   fprintf(stderr, "open(%s) = %s\n", path, trace_out(out));
+  fprintf(stderr, "open(%s): direct_io = %d\n", path, fi->direct_io);
   return out;
 }
 
