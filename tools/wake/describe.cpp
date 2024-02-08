@@ -300,6 +300,12 @@ void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy, con
       describe_metadata(jobs, false, true);
       break;
     }
+    case DescribePolicy::TAG_URI: {
+      for (auto &job : jobs)
+        for (auto &tag : job.tags)
+          if (tag.uri == policy.tag) std::cout << tag.content << std::endl;
+      break;
+    }
     case DescribePolicy::TIMELINE: {
       std::unordered_set<long> job_ids;
       for (const JobReflection &job : jobs) {

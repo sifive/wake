@@ -152,6 +152,10 @@ DescribePolicy get_describe_policy(const CommandLineOptions &clo) {
     return DescribePolicy::script();
   }
 
+  if (clo.taguri) {
+    return DescribePolicy::tag_uri(clo.taguri);
+  }
+
   return DescribePolicy::human();
 }
 
@@ -415,7 +419,8 @@ int main(int argc, char **argv) {
 
   bool is_db_inspection = !clo.job_ids.empty() || !clo.output_files.empty() ||
                           !clo.input_files.empty() || !clo.labels.empty() || !clo.tags.empty() ||
-                          clo.last_use || clo.last_exe || clo.failed || clo.tagdag || clo.timeline;
+                          clo.last_use || clo.last_exe || clo.failed || clo.tagdag ||
+                          clo.timeline || clo.taguri;
   // Arguments are forbidden with these options
   bool noargs =
       is_db_inspection || clo.init || clo.html || clo.global || clo.exports || clo.api || clo.exec;

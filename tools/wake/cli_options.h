@@ -71,6 +71,7 @@ struct CommandLineOptions {
   const char *exec;
   char *shebang;
   const char *tagdag;
+  const char *taguri;
   const char *api;
   const char *fd1;
   const char *fd2;
@@ -145,6 +146,7 @@ struct CommandLineOptions {
       {0, "stop-after-ssa", GOPT_ARGUMENT_FORBIDDEN},
       {0, "no-optimize", GOPT_ARGUMENT_FORBIDDEN},
       {0, "tag-dag", GOPT_ARGUMENT_REQUIRED},
+      {0, "tag-uri", GOPT_ARGUMENT_REQUIRED},
       {0, "export-api", GOPT_ARGUMENT_REQUIRED},
       {0, "stdout", GOPT_ARGUMENT_REQUIRED},
       {0, "stderr", GOPT_ARGUMENT_REQUIRED},
@@ -210,6 +212,7 @@ struct CommandLineOptions {
     exec = arg(options, "exec")->argument;
     shebang = arg(options, "shebang")->argument;
     tagdag = arg(options, "tag-dag")->argument;
+    taguri = arg(options, "tag-uri")->argument;
     api = arg(options, "export-api")->argument;
     fd1 = arg(options, "stdout")->argument;
     fd2 = arg(options, "stderr")->argument;
