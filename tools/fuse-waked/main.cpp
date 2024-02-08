@@ -48,8 +48,6 @@
 #include "util/execpath.h"
 #include "util/unlink.h"
 
-static std::set<std::string> hardlinks = {};
-
 #define MAX_JSON (128 * 1024 * 1024)
 
 // We ensure STDIN is /dev/null, so this is a safe sentinel value for open files
@@ -57,6 +55,7 @@ static std::set<std::string> hardlinks = {};
 
 // How long to wait for a new client to connect before the daemon exits
 static int linger_timeout;
+static std::set<std::string> hardlinks = {};
 
 // How to retry umount while quitting
 // (2^8-1)*100ms = 25.5s worst-case quit time
