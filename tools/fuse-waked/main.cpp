@@ -1369,31 +1369,31 @@ static void handle_exit(int sig) {
 }
 
 int main(int argc, char *argv[]) {
-  bool enable_trace = getenv("DEBUG_FUSE_WAKE");
+  bool debug = getenv("DEBUG_FUSE_WAKE");
 
   wakefuse_ops.init = wakefuse_init;
-  wakefuse_ops.getattr = enable_trace ? wakefuse_getattr_trace : wakefuse_getattr;
-  wakefuse_ops.access = enable_trace ? wakefuse_access_trace : wakefuse_access;
-  wakefuse_ops.readlink = enable_trace ? wakefuse_readlink_trace : wakefuse_readlink;
-  wakefuse_ops.readdir = enable_trace ? wakefuse_readdir_trace : wakefuse_readdir;
-  wakefuse_ops.mknod = enable_trace ? wakefuse_mknod_trace : wakefuse_mknod;
-  wakefuse_ops.create = enable_trace ? wakefuse_create_trace : wakefuse_create;
-  wakefuse_ops.mkdir = enable_trace ? wakefuse_mkdir_trace : wakefuse_mkdir;
-  wakefuse_ops.symlink = enable_trace ? wakefuse_symlink_trace : wakefuse_symlink;
-  wakefuse_ops.unlink = enable_trace ? wakefuse_unlink_trace : wakefuse_unlink;
-  wakefuse_ops.rmdir = enable_trace ? wakefuse_rmdir_trace : wakefuse_rmdir;
-  wakefuse_ops.rename = enable_trace ? wakefuse_rename_trace : wakefuse_rename;
-  wakefuse_ops.link = enable_trace ? wakefuse_link_trace : wakefuse_link;
-  wakefuse_ops.chmod = enable_trace ? wakefuse_chmod_trace : wakefuse_chmod;
-  wakefuse_ops.chown = enable_trace ? wakefuse_chown_trace : wakefuse_chown;
-  wakefuse_ops.truncate = enable_trace ? wakefuse_truncate_trace : wakefuse_truncate;
-  wakefuse_ops.utimens = enable_trace ? wakefuse_utimens_trace : wakefuse_utimens;
-  wakefuse_ops.open = enable_trace ? wakefuse_open_trace : wakefuse_open;
-  wakefuse_ops.read = enable_trace ? wakefuse_read_trace : wakefuse_read;
-  wakefuse_ops.write = enable_trace ? wakefuse_write_trace : wakefuse_write;
-  wakefuse_ops.statfs = enable_trace ? wakefuse_statfs_trace : wakefuse_statfs;
-  wakefuse_ops.release = enable_trace ? wakefuse_release_trace : wakefuse_release;
-  wakefuse_ops.fsync = enable_trace ? wakefuse_fsync_trace : wakefuse_fsync;
+  wakefuse_ops.getattr = debug ? wakefuse_getattr_trace : wakefuse_getattr;
+  wakefuse_ops.access = debug ? wakefuse_access_trace : wakefuse_access;
+  wakefuse_ops.readlink = debug ? wakefuse_readlink_trace : wakefuse_readlink;
+  wakefuse_ops.readdir = debug ? wakefuse_readdir_trace : wakefuse_readdir;
+  wakefuse_ops.mknod = debug ? wakefuse_mknod_trace : wakefuse_mknod;
+  wakefuse_ops.create = debug ? wakefuse_create_trace : wakefuse_create;
+  wakefuse_ops.mkdir = debug ? wakefuse_mkdir_trace : wakefuse_mkdir;
+  wakefuse_ops.symlink = debug ? wakefuse_symlink_trace : wakefuse_symlink;
+  wakefuse_ops.unlink = debug ? wakefuse_unlink_trace : wakefuse_unlink;
+  wakefuse_ops.rmdir = debug ? wakefuse_rmdir_trace : wakefuse_rmdir;
+  wakefuse_ops.rename = debug ? wakefuse_rename_trace : wakefuse_rename;
+  wakefuse_ops.link = debug ? wakefuse_link_trace : wakefuse_link;
+  wakefuse_ops.chmod = debug ? wakefuse_chmod_trace : wakefuse_chmod;
+  wakefuse_ops.chown = debug ? wakefuse_chown_trace : wakefuse_chown;
+  wakefuse_ops.truncate = debug ? wakefuse_truncate_trace : wakefuse_truncate;
+  wakefuse_ops.utimens = debug ? wakefuse_utimens_trace : wakefuse_utimens;
+  wakefuse_ops.open = debug ? wakefuse_open_trace : wakefuse_open;
+  wakefuse_ops.read = debug ? wakefuse_read_trace : wakefuse_read;
+  wakefuse_ops.write = debug ? wakefuse_write_trace : wakefuse_write;
+  wakefuse_ops.statfs = debug ? wakefuse_statfs_trace : wakefuse_statfs;
+  wakefuse_ops.release = debug ? wakefuse_release_trace : wakefuse_release;
+  wakefuse_ops.fsync = debug ? wakefuse_fsync_trace : wakefuse_fsync;
 
   // xattr were removed because they are not hashed!
 #ifdef HAVE_FALLOCATE
@@ -1502,7 +1502,7 @@ int main(int argc, char *argv[]) {
   fl.l_len = 0;  // 0=largest possible
   if (fcntl(log, F_SETLK, &fl) != 0) {
     if (errno == EAGAIN || errno == EACCES) {
-      if (enable_trace) {
+      if (debug) {
         fprintf(stderr, "fcntl(%s.log): %s -- assuming another daemon exists\n", path.c_str(),
                 strerror(errno));
       }
@@ -1550,6 +1550,11 @@ int main(int argc, char *argv[]) {
   if (fuse_opt_add_arg(&args, "wake") != 0) {
 #endif
     fprintf(stderr, "fuse_opt_add_arg failed\n");
+    goto rmroot;
+  }
+
+  if (debug && fuse_opt_add_arg(&args, "-odebug") != 0) {
+    fprintf(stderr, "fuse_opt_add_arg debug failed\n");
     goto rmroot;
   }
 
