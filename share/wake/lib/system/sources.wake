@@ -168,10 +168,16 @@ export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (des
     else
         def desiredWorkspacePath = simplify "{outputDirectory.getPathName}/{desiredName}"
         def visible = outputDirectory, Nil
-        def cmdline = which "cp", existingFile, desiredWorkspacePath, Nil
 
-        makeExecPlan cmdline visible
-        | setPlanLabel "claim: {existingFile} -> {desiredWorkspacePath}"
+        # Very specifically target `u+rw` as the minimum change required to ensure functionality;
+        # `cp --no-preserve=mode` would also avoid issues when re-claiming read-only files in a
+        # subsequent invocation, but it might drop an expected executable permission as well.
+        """
+        set -e
+        cp %{existingFile} %{desiredWorkspacePath}
+        chmod u+rw %{desiredWorkspacePath}
+        """
+        | makePlan "claim: {existingFile} -> {desiredWorkspacePath}" visible
         | setPlanPersistence Once
         | setPlanFnOutputs (\_ desiredWorkspacePath, Nil)
         | runJobWith localRunner
