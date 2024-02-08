@@ -1014,8 +1014,7 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi) {
 
 static int wakefuse_open_trace(const char *path, struct fuse_file_info *fi) {
   int out = wakefuse_open(path, fi);
-  fprintf(stderr, "open(%s) = %s\n", path, trace_out(out));
-  fprintf(stderr, "open(%s): direct_io = %d\n", path, fi->direct_io);
+  fprintf(stderr, "open(%s) = %s, direct_io = %d\n", path, trace_out(out), fi->direct_io);
   return out;
 }
 
