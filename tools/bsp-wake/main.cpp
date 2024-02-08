@@ -416,16 +416,19 @@ struct ExtractBSPDocument : public ExecuteWakeProcess {
 
 ExtractBSPDocument::ExtractBSPDocument(const std::string &method, const JAST &params)
     : items(result.add("items", JSON_ARRAY)) {
-  cmdline.push_back("--last");
   cmdline.push_back("--tag-uri");
   cmdline.push_back("bsp." + method);
+
+  std::string outputs;
   for (auto &x : params.get("targets").children) {
     const std::string &uri = x.second.get("uri").value;
     if (uri.compare(0, sizeof(bsp) - 1, &bsp[0]) != 0) continue;
 
-    cmdline.push_back("-o");
-    cmdline.emplace_back(uri.substr(sizeof(bsp) - 1));
+    outputs += uri.substr(sizeof(bsp) - 1) + ",";
   }
+
+  cmdline.push_back("-o");
+  cmdline.push_back(outputs);
 }
 
 void ExtractBSPDocument::gotLine(JAST &row) {
