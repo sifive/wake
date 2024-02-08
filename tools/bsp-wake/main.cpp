@@ -416,7 +416,8 @@ struct ExtractBSPDocument : public ExecuteWakeProcess {
 
 ExtractBSPDocument::ExtractBSPDocument(const std::string &method, const JAST &params)
     : items(result.add("items", JSON_ARRAY)) {
-  cmdline.push_back("--tag");
+  cmdline.push_back("--last");
+  cmdline.push_back("--tag-uri");
   cmdline.push_back("bsp." + method);
   for (auto &x : params.get("targets").children) {
     const std::string &uri = x.second.get("uri").value;
