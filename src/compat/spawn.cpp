@@ -21,13 +21,24 @@
 
 #include "spawn.h"
 
+#include <iostream>
 #include <sys/types.h>
 #include <unistd.h>
 
-pid_t wake_spawn(const char *cmd, char **cmdline, char **environ) {
+pid_t wake_spawn(const std::string cmd, std::vector<std::string> cmdline, std::vector<std::string> environ) {
   pid_t pid = vfork();
   if (pid == 0) {
-    execve(cmdline[0], cmdline, environ);
+    std::vector<char*> cmdline_c = std::vector<char*>();
+    for (auto str : cmdline) {
+      cmdline_c.push_back(&str.front());
+    }
+    cmdline_c.push_back(nullptr);
+    std::vector<char*> environ_c = std::vector<char*>();
+    for (auto str : environ) {
+      environ_c.push_back(&str.front());
+    }
+    environ_c.push_back(nullptr);
+    execve(cmd.c_str(), cmdline_c.data(), environ_c.data());
     _exit(127);
   }
   return pid;

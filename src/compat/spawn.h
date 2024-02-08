@@ -18,16 +18,10 @@
 #ifndef SPAWN_H
 #define SPAWN_H
 
+#include <string>
 #include <sys/types.h>
+#include <vector>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-pid_t wake_spawn(const char *cmd, char **cmdline, char **environ);
-
-#ifdef __cplusplus
-};
-#endif
+pid_t wake_spawn(const std::string cmd, std::vector<std::string> cmdline, std::vector<std::string> environ);
 
 #endif
