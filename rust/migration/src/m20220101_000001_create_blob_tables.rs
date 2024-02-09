@@ -22,15 +22,6 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Insert basic backing store since it must always exist.
-        let insert = Query::insert()
-            .into_table(BlobStore::Table)
-            .columns([BlobStore::Type])
-            .values_panic(["LocalBlobStore".into()])
-            .to_owned();
-
-        manager.exec_stmt(insert).await?;
-
         manager
             .create_table(
                 Table::create()

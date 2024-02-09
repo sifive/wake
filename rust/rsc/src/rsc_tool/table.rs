@@ -49,5 +49,5 @@ pub fn print_table(data: Vec<Vec<String>>) {
     let mut dims = SpannedGridDimension::default();
     dims.estimate(&records, &cfg);
     let grid = PeekableGrid::new(&records, &cfg, &dims, NoColors).to_string();
-    print!("{grid}");
+    println!("{grid}");
 }
