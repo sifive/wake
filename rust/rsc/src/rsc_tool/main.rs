@@ -135,26 +135,28 @@ async fn remove_local_blob_store(
 }
 
 async fn remove_all_jobs(db: &DatabaseConnection) -> Result<(), Box<dyn std::error::Error>> {
-    // We only want to prompt the user if the user can type into the terminal
-    if std::io::stdin().is_terminal() {
-        let mut should_delete = Confirm::new("Are you REALLY sure you want to delete ALL jobs?")
-            .with_default(false)
-            .prompt()?;
+    // Only let a human perform this action
+    if !std::io::stdin().is_terminal() {
+        println!("Remove all jobs may only be triggered manually by a human.");
+        std::process::exit(2);
+    }
 
-        if !should_delete {
-            println!("Aborting removal");
-            return Ok(());
-        }
+    let mut should_delete = Confirm::new("Are you REALLY sure you want to delete ALL jobs?")
+        .with_default(false)
+        .prompt()?;
 
-        should_delete =
-            Confirm::new("Last chance: Are you REALLY sure you want to delete ALL jobs?")
-                .with_default(false)
-                .prompt()?;
+    if !should_delete {
+        println!("Aborting removal");
+        return Ok(());
+    }
 
-        if !should_delete {
-            println!("Aborting removal");
-            return Ok(());
-        }
+    should_delete = Confirm::new("Last chance: Are you REALLY sure you want to delete ALL jobs?")
+        .with_default(false)
+        .prompt()?;
+
+    if !should_delete {
+        println!("Aborting removal");
+        return Ok(());
     }
 
     // Ok now that we're really sure we want to delete this key
