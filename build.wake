@@ -104,9 +104,8 @@ def all variant =
 
 # Install wake into a target location
 def doInstall dest kind =
-    # kick off in parallel, but rsc and rsc tool can't run at smae time
-    # rsc and rsc_tool cannot be built the same time right now. Force them to be
-    # serial relative to each other.
+    # kick off in parallel, but rsc and rsc_tool cannot be built at the same time right now.
+    # Force them to be serial relative to each other.
     def install_rsc_bins =
         require Pass rsc = buildRSC Unit
         require Pass rsc = installAs "{dest}/bin/wake-remote-cache" rsc

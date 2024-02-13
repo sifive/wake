@@ -19,8 +19,5 @@ from wake import _
 from rust import _
 
 def buildWakeLogViewer Unit =
-    require Pass root = mkdir "rust/log_viewer"
-    require Pass toolchain = makeReleaseCargoToolchain root "log_viewer"
-
-    toolchain
-    | cargoBuild
+    makeCargoExecutable "log_viewer" "rust/log_viewer"
+    |> cargoBuildWith (defaultCargoToolchain Unit)

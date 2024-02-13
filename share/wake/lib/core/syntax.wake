@@ -27,6 +27,16 @@ export def (argument: a).(memberFn: a => b): b =
 export def (argument: a) | (pipeFn: a => b): b =
     pipeFn argument
 
+# Like '|' above but rmapPass the pipeFn to enter a "Result pipeline"
+# rmapPass (catWith " " _) (Pass (seq 10)) = Pass (seq 10) |> catWith " "
+export def (argument: Result a b) |> (pipeFn: a => Result c b): Result c b =
+    rmapPass (\a pipeFn a) argument
+
+# Like '|' above but rmapPass the pipeFn to enter a "Result pipeline"
+# rmapPass (catWith " " _) (Pass (seq 10)) = Pass (seq 10) |> catWith " "
+export def (argument: Result a b) |< (pipeFn: a => c): Result c b =
+    rmap (\a pipeFn a) argument
+
 # Avoid ()s without changing order.
 # catWith " " $ map str $ seq 10 = catWith " " (map str (seq 10))
 export def (dollarFn: a => b) $ (argument: a): b =

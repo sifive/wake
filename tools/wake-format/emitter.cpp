@@ -176,7 +176,8 @@ static bool is_op_suffix(const CSTElement& op) {
     case TOKEN_OP_DOLLAR:
       return !is_binop_matching_str(op, TOKEN_OP_DOLLAR, "$");
     case TOKEN_OP_OR:
-      return !is_binop_matching_str(op, TOKEN_OP_OR, "|");
+      return !is_binop_matching_str(op, TOKEN_OP_OR, "|") &&
+             !is_binop_matching_str(op, TOKEN_OP_OR, "|>");
     case TOKEN_OP_DOT:
       return false;
 
@@ -1388,8 +1389,10 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
     }
   }
 
+  // Binops of '$', '|', and '|>' should always pipeline unless they are already nested
   if (!ctx.nested_binop && (is_binop_matching_str(op_token, TOKEN_OP_DOLLAR, "$") ||
-                            is_binop_matching_str(op_token, TOKEN_OP_OR, "|"))) {
+                            is_binop_matching_str(op_token, TOKEN_OP_OR, "|") ||
+                            is_binop_matching_str(op_token, TOKEN_OP_OR, "|>"))) {
     MEMO_RET(select_best_choice({
         combine_explode_first(ctx.binop(), parts),
         combine_explode_last(ctx.binop(), parts),

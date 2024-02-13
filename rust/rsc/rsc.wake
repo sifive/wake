@@ -19,47 +19,25 @@ from wake import _
 from rust import _
 
 export def buildRSC _ =
-    require Pass root = mkdir "rust/rsc"
-    require Pass toolchain = makeReleaseCargoToolchain root "rsc"
-    require Pass entityRoot = mkdir "rust/entity"
-    require Pass migrationRoot = mkdir "rust/migration"
-
-    toolchain
-    | addCargoCrate entityRoot "entity"
-    | addCargoCrate migrationRoot "migration"
-    | cargoBuild
+    makeCargoExecutable "rsc" "rust/rsc"
+    |> addCargoCrate "entity" "rust/entity"
+    |> addCargoCrate "migration" "rust/migration"
+    |> cargoBuildWith (defaultCargoToolchain Unit)
 
 export def buildRSCTool _ =
-    require Pass root = mkdir "rust/rsc"
-    require Pass toolchain = makeReleaseCargoToolchain root "rsc_tool"
-    require Pass entityRoot = mkdir "rust/entity"
-    require Pass migrationRoot = mkdir "rust/migration"
-
-    toolchain
-    | addCargoCrate entityRoot "entity"
-    | addCargoCrate migrationRoot "migration"
-    | cargoBuild
+    makeCargoExecutable "rsc_tool" "rust/rsc"
+    |> addCargoCrate "entity" "rust/entity"
+    |> addCargoCrate "migration" "rust/migration"
+    |> cargoBuildWith (defaultCargoToolchain Unit)
 
 export def buildRSCTest _ =
-    require Pass root = mkdir "rust/rsc"
-    require Pass toolchain = makeReleaseCargoToolchain root "rsc"
-    require Pass entityRoot = mkdir "rust/entity"
-    require Pass migrationRoot = mkdir "rust/migration"
-
-    toolchain
-    | setCargoToolchainBuildConfig CargoToolchainBuildConfigDebug
-    | addCargoCrate entityRoot "entity"
-    | addCargoCrate migrationRoot "migration"
-    | cargoTestBuild
+    makeCargoTestExecutable "rsc" "rust/rsc"
+    |> addCargoCrate "entity" "rust/entity"
+    |> addCargoCrate "migration" "rust/migration"
+    |> cargoBuildWith (defaultCargoToolchain Unit)
 
 export def buildRSCToolTest _ =
-    require Pass root = mkdir "rust/rsc"
-    require Pass toolchain = makeReleaseCargoToolchain root "rsc_tool"
-    require Pass entityRoot = mkdir "rust/entity"
-    require Pass migrationRoot = mkdir "rust/migration"
-
-    toolchain
-    | setCargoToolchainBuildConfig CargoToolchainBuildConfigDebug
-    | addCargoCrate entityRoot "entity"
-    | addCargoCrate migrationRoot "migration"
-    | cargoTestBuild
+    makeCargoTestExecutable "rsc_tool" "rust/rsc"
+    |> addCargoCrate "entity" "rust/entity"
+    |> addCargoCrate "migration" "rust/migration"
+    |> cargoBuildWith (defaultCargoToolchain Unit)

@@ -86,6 +86,7 @@ export def testPostgres _ =
         """
         set -ex
         unshare -U
+        # Set set -ex inside of the unshare shell
         set -ex
         export HOME=/root
         mkdir %{dataDir}
