@@ -42,7 +42,7 @@ export data CargoBuildConfig =
 export tuple CargoCrate =
     # Name of the binary to be build
     export Name: String
-    # Root directory of the crate 
+    # Root directory of the crate
     export Root: Path
 
 # The cargo build toolchain
@@ -72,16 +72,12 @@ export tuple CargoExecutable =
 # Makes a simple default cargo toolchain for locked release builds.
 #
 # Relies on the system install of cargo so it is not reproducable across machines. For a more reproducable
-# option, use makeCargoToolchain
+# option manually construct a CargoToolchain with a reproducibly sourced cargo.
 export target defaultCargoToolchain _: Result CargoToolchain Error =
     require Pass cargo = findCargoPath Unit
 
-    makeCargoToolchain cargo CargoBuildConfigRelease True
+    CargoToolchain cargo CargoBuildConfigRelease True
     | Pass
-
-# Makes a cargo toolchain without assuming any defaults. Local crates and extra flags must be manually set later
-export def makeCargoToolchain (cargo: String) (config: CargoBuildConfig) (locked: Boolean): CargoToolchain =
-    CargoToolchain cargo config locked
 
 # Makes a simple cargo executable
 export def makeCargoExecutable (name: String) (root: String): Result CargoExecutable Error =
@@ -103,9 +99,9 @@ export def makeCargoTestExecutable (name: String) (root: String): Result CargoEx
 # Ex:
 # ```
 # makeCargoExecutable "foo" "rust/foo"
-# |> addCargoCrate "one" "rust/bar"
-# |> addCargoCrate "two" "rust/bat"
-# |> buildWith (defaultCargoToolchain Unit)
+# | rmapPass addCargoCrate "one" "rust/bar"
+# | rmapPass addCargoCrate "two" "rust/bat"
+# | rmapPass buildWith (defaultCargoToolchain Unit)
 # ```
 export def addCargoCrate (name: String) (root: String): CargoExecutable => Result CargoExecutable Error =
     def do (in: CargoExecutable): Result CargoExecutable Error =
@@ -121,10 +117,10 @@ export def addCargoCrate (name: String) (root: String): CargoExecutable => Resul
 # Ex:
 # ```
 # makeCargoExecutable "foo" "rust/foo"
-# |> addCargoFlag "--foo"
-# |> addCargoFlag "bar"
-# |> addCargoFlag "--bat"
-# |> buildWith (defaultCargoToolchain Unit)
+# | rmapPass addCargoFlag "--foo"
+# | rmapPass addCargoFlag "bar"
+# | rmapPass addCargoFlag "--bat"
+# | rmapPass buildWith (defaultCargoToolchain Unit)
 # ```
 export def addCargoFlag (flag: String): CargoExecutable => Result CargoExecutable Error =
     def do (in: CargoExecutable): Result CargoExecutable Error =
@@ -218,7 +214,7 @@ def cargoBuildCommon (subcommand: String) (fnOutputsFilter: RegExp) (toolchain: 
     Pass bin
 
 # Builds a cargo project from the CargoToolchain
-# 
+#
 # Cargo will not reuse work because the sandbox will not contain its extra info, inside of target.
 # TODO: Add an environment variable to opt-in to localRunner cargo builds if we detect
 #       existing outputs in {root}/target/release
@@ -238,8 +234,8 @@ export def cargoBuildWith (toolchain: Result CargoToolchain Error) (executable: 
             stringToRegExp "{root}/target/{buildConfigToString config}/deps/{binaryName}-[a-z0-9]\{16\}"
 
         Pass executable
-        |> addCargoFlag "--no-run"
-        |> cargoBuildCommon "test" regex toolchain
+        | rmapPass (addCargoFlag "--no-run")
+        | rmapPass (cargoBuildCommon "test" regex toolchain)
     else
         require Pass regex =
             stringToRegExp "{root}/target/{buildConfigToString config}/{binaryName}"
