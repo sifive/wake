@@ -104,23 +104,47 @@ def all variant =
 
 # Install wake into a target location
 def doInstall dest kind =
-    require Pass variant = toVariant kind
-    require Pass datfiles = sources "{@here}/share" `.*`
-    require Pass log_viewer = buildWakeLogViewer Unit
-    require Pass log_viewer = installAs "{dest}/bin/wake-log-viewer" log_viewer
+    # kick off in parallel, but rsc and rsc_tool cannot be built at the same time right now.
+    # Force them to be serial relative to each other.
+    def install_rsc_bins =
+        require Pass rsc = buildRSC Unit
+        require Pass rsc = installAs "{dest}/bin/wake-remote-cache" rsc
+        require Pass rsc_tool = buildRSCTool Unit
+        require Pass rsc_tool = installAs "{dest}/bin/wake-remote-cache-tool" rsc_tool
 
-    def binfilesResult = all variant
+        Pass (Pair rsc rsc_tool)
+
+    def install_log_viewer =
+        buildWakeLogViewer Unit
+        | rmapPass (installAs "{dest}/bin/wake-log-viewer")
+
+    def install_datfiles =
+        sources "{@here}/share" `.*`
+        | rmapPass (\files findFailFn (installIn dest ".") files)
+
+    def install_readme =
+        source "README.md"
+        | rmapPass (\file installIn "{dest}/share/doc/wake" "." file)
+
+    require Pass variant = toVariant kind
+
     def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
 
-    require Pass datinstall = findFailFn (installIn dest ".") datfiles
-    require Pass readmeSource = source "README.md"
-    require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
-    require Pass binfiles = binfilesResult
-    require Pass bininstall = findFailFn releaseBin binfiles
+    def install_binfiles =
+        all variant
+        | rmapPass (\files findFailFn releaseBin files)
 
-    def outputs = readme, log_viewer, bininstall ++ datinstall
+    # Join on the installs now that everything has been kicked off
+    require Pass readme = install_readme
+    require Pass datfiles = install_datfiles
+    require Pass binfiles = install_binfiles
 
-    Pass outputs
+    # Rust builds are slow, delay blocking on them for as long as possible
+    require Pass (Pair rsc rsc_tool) = install_rsc_bins
+    require Pass log_viewer = install_log_viewer
+
+    (readme, log_viewer, rsc, rsc_tool, binfiles ++ datfiles)
+    | Pass
 
 # Replace @VERSION@ with 'release'
 def setVersion release file =

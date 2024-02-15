@@ -19,14 +19,5 @@ from wake import _
 from rust import _
 
 def buildWakeLogViewer Unit =
-    require Pass cargoToml = source "rust/log_viewer/Cargo.toml"
-    require Pass cargoLock = source "rust/log_viewer/Cargo.lock"
-    require Pass main = source "rust/log_viewer/src/main.rs"
-
-    require Pass outputs =
-        cargoBuild (cargoToml, cargoLock, main, Nil) "rust/log_viewer" ("log_viewer", Nil)
-
-    require (logViewer, Nil) = outputs
-    else failWithError "More than one output returned when building log_viewer"
-
-    Pass logViewer
+    makeCargoExecutable "log_viewer" "rust/log_viewer"
+    | rmapPass (cargoBuildWith (defaultCargoToolchain Unit))

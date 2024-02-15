@@ -1,25 +1,22 @@
 use chrono::NaiveDateTime;
-use entity::prelude::{Blob, LocalBlobStore};
-use entity::{blob, local_blob_store};
+use entity::prelude::{Blob, BlobStore, LocalBlobStore};
+use entity::{blob, blob_store, local_blob_store};
 use sea_orm::{prelude::Uuid, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 use sea_orm::{DbBackend, DbErr, Statement};
-
-pub async fn fetch_local_blob_store(
-    db: &DatabaseConnection,
-) -> Result<Uuid, Box<dyn std::error::Error>> {
-    let active_store = LocalBlobStore::find().one(db).await?;
-
-    let Some(active_store) = active_store else {
-        return Err("Could not find active store".into());
-    };
-
-    Ok(active_store.id)
-}
 
 pub async fn fetch_local_blob_stores(
     db: &DatabaseConnection,
 ) -> Result<Vec<local_blob_store::Model>, DbErr> {
     LocalBlobStore::find().all(db).await
+}
+
+pub async fn fetch_test_blob_stores(
+    db: &DatabaseConnection,
+) -> Result<Vec<blob_store::Model>, DbErr> {
+    BlobStore::find()
+        .filter(blob_store::Column::Type.eq("TestBlobStore"))
+        .all(db)
+        .await
 }
 
 // Fetches blobs from the database that are unreferenced and have surpaced the alllotated grace
