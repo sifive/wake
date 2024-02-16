@@ -1,0 +1,214 @@
+# Copyright 2024 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package wake
+
+export data Persistence =
+    # Job should be re-executed on every runJob call.
+    #
+    # In this case, no job deduplication is performed and so it must
+    # *not* write any files (stdout/stderr are fine) or be guaranteed to only be
+    # encountered once in any wake execution anyway.
+    ReRun
+    # Job should only be run once in a given wake execution.
+    Once
+    # Job should output be reusable between wake invocations.
+    Keep
+    # Job should output be shared between workspaces.
+    Share
+
+# A Plan describes a not-yet-executed Job
+export tuple Plan =
+    # The label used when showing the command during execution. This is recommended for efficient
+    # debugging and locating job information. For example, the label will show up in the terminal during
+    # job execution, in a job's progress bar in the terminal, when running the `wake --last` command,
+    # and in the `spec-<jobid>.json` and `result-<jobid>.json` files in the `.build` directory.
+    export Label: String
+    # The command-line arguments (the first is the command to run)
+    export Command: List String
+    # Only these files and directories should be available to the command
+    export Visible: List Path
+    # KEY=VALUE environment variables fed to the command
+    export Environment: List String
+    # The working directory in which the command should be run
+    export Directory: String
+    # The file to which standard input should be connected.
+    # An empty string `""` is interpreted as there being no `stdin` file.
+    export Stdin: String
+    # How should standard output be displayed during a build
+    export Stdout: LogLevel
+    # How should standard error be displayed during a build
+    export Stderr: LogLevel
+    # Echo the command to this stream
+    export Echo: LogLevel
+    # See Persistence table above
+    export Persistence: Persistence
+    # The resources a runner must provide to the job (licenses/etc).
+    # These strings are uninterpreted and are only meaningful to the right runners.
+    export Resources: List String
+    # User-supplied usage prediction; overruled by database statistics (if any)
+    export Usage: Usage
+    # Modify the Runner's reported inputs (files read). For advanced use only.
+    export FnInputs: (List String => List String)
+    # Modify the Runner's reported outputs (files created). Use this to provide a function to filter out
+    # files that you do not require use of. For normal use, use `setPlanFilterOutputs` to set this field.
+    # Setting this field directly is for advanced use only.
+    export FnOutputs: (List String => List String)
+    # Determines if job should run in psuedoterminal
+    export IsAtty: Boolean
+
+def isOnce: Persistence => Boolean = match _
+    ReRun -> False
+    _ -> True
+
+def isKeep: Persistence => Boolean = match _
+    ReRun -> False
+    Once -> False
+    _ -> True
+
+def isShare: Persistence => Boolean = match _
+    Share -> True
+    _ -> False
+
+# Convenience accessor methods
+
+export def getPlanOnce p =
+    isOnce (getPlanPersistence p)
+
+export def getPlanKeep p =
+    isKeep (getPlanPersistence p)
+
+export def getPlanShare p =
+    isShare (getPlanPersistence p)
+
+# Convenience set methods
+
+# Sets the `FnOutputs` field in a `Plan` by using the given filter function to filter out unneeded files created
+# during a job. This function is recommended over directly setting the `FnOutputs` field with `setPlanFnOutputs`.
+#
+# Parameters:
+#  - `filterFn`: Determines whether to keep a file that was created or not. True means keep the file.
+export def setPlanFilterOutputs (filterFn: (file: String) => Boolean): Plan => Plan =
+    # This implementation prevents any unintentional abuse of the FnOutputs field, which can be used to
+    # actually add files. This method here only supports filtering.
+    def fnOutputs (files: List String): List String = filter filterFn files
+
+    setPlanFnOutputs fnOutputs
+
+# If `Once` is set to `False`, no job deduplication is performed and so it must
+# *not* write any files (stdout/stderr are fine) or be guaranteed to only be
+# encountered once in any wake execution anyway.
+export def setPlanOnce v p =
+    editPlanOnce (\_ v) p
+
+export def setPlanKeep v p =
+    editPlanKeep (\_ v) p
+
+export def setPlanShare v p =
+    editPlanShare (\_ v) p
+
+# Prepend 'value' to the Plan's 'PATH' environment value
+export def prependPlanPath (value: String) (plan: Plan): Plan =
+    editPlanEnvironment (addEnvironmentPath value) plan
+
+# Set an environment variable in a Plan
+export def setPlanEnvVar (name: String) (value: String) (plan: Plan): Plan =
+    editPlanEnvironment ("{name}={value}", _) plan
+
+# Helper methods that maintain the invariant that: Share => Keep => Once
+
+# If `Once` is set to `False`, no job deduplication is performed and so it must
+# *not* write any files (stdout/stderr are fine) or be guaranteed to only be
+# encountered once in any wake execution anyway.
+export def editPlanOnce (f: Boolean => Boolean): Plan => Plan =
+    def helper = match _
+        ReRun if f False -> Once
+        Once if ! f True -> ReRun
+        Keep if ! f True -> ReRun
+        Share if ! f True -> ReRun
+        x -> x
+
+    editPlanPersistence helper
+
+export def editPlanKeep (f: Boolean => Boolean): Plan => Plan =
+    def helper = match _
+        ReRun if f False -> Keep
+        Once if f False -> Keep
+        Keep if ! f True -> Once
+        Share if ! f True -> Once
+        x -> x
+
+    editPlanPersistence helper
+
+export def editPlanShare (f: Boolean => Boolean): Plan => Plan =
+    def helper = match _
+        ReRun if f False -> Share
+        Once if f False -> Share
+        Keep if f False -> Share
+        Share if ! f True -> Keep
+        x -> x
+
+    editPlanPersistence helper
+
+# Get a unique hash-code for the job
+export def getPlanHash (plan: Plan): Integer =
+    def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ isAtty = plan
+    def isAttyStr = if isAtty then "true" else "false"
+
+    def sig =
+        (
+            isAttyStr,
+            "\0\0",
+            cmd.implodeNull,
+            "\0\0",
+            env.implodeNull,
+            "\0\0",
+            dir,
+            "\0\0",
+            stdin,
+        )
+        | cat
+
+    require Some out = intbase 16 (hashString sig)
+    else unreachable "hash_str returned a non-hex string!!!"
+
+    out
+
+# The criteria which determine if Job execution can be skipped:
+#   Once  is True and a matching job was run by this wake invocation
+#   Keep  is True and there is matching output in the workspace
+#   Share is True and there is matching output in a shared cache
+# A Job is considered matching if:
+#   The Command, Environment, Directory, and Stdin are exact matches
+#   FnInputs, FnOutputs have the same hashcode
+# Output is considered matching if:
+#   The prior Outputs exist as the output of a matching Job
+#   The prior Input files have the same hashes as files in the workspace
+#   The prior Input dirs observe the same set of Visible files
+
+# Create a labeled shell plan.
+export def makePlan (label: String) (visible: List Path) (command: String): Plan =
+    makeShellPlan command visible
+    | setPlanLabel label
+
+# Set reasonable defaults for all Plan arguments
+export def makeExecPlan (cmd: List String) (visible: List Path): Plan =
+    Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share Nil defaultUsage identity identity False
+
+export def makeShellPlan (script: String) (visible: List Path): Plan =
+    makeExecPlan (which "dash", "-c", script, Nil) visible
+
+def defaultUsage =
+    Usage 0 0.0 1.0 0 0 0

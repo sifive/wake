@@ -59,6 +59,16 @@ export def explode (string: String): List String =
 
     p string
 
+# implode: join a List String into a String with an optional
+# combining string between each one.
+#
+# ```
+# implode ", " ("hello", "world",) = "hello, world"
+# implode "" ("a", "b", "c",) = "abc"
+# ```
+def implode (combiner: String) (strings: List String) =
+    cat (foldr (_, combiner, _) Nil strings)
+
 # strbase: convert an Integer into a String using a given base.
 #
 # For 2 <= base <= 36, the characters used for the encoding are:
