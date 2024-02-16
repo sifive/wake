@@ -205,7 +205,22 @@ export def makePlan (label: String) (visible: List Path) (command: String): Plan
 
 # Set reasonable defaults for all Plan arguments
 export def makeExecPlan (cmd: List String) (visible: List Path): Plan =
-    Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share Nil defaultUsage identity identity False
+    Plan
+    ""
+    cmd
+    visible
+    environment
+    "."
+    ""
+    logInfo
+    logWarning
+    logEcho
+    Share
+    Nil
+    defaultUsage
+    identity
+    identity
+    False
 
 export def makeShellPlan (script: String) (visible: List Path): Plan =
     makeExecPlan (which "dash", "-c", script, Nil) visible

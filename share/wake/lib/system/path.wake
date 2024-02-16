@@ -179,7 +179,22 @@ def computeHashes (prefix: String) (files: List String): List String =
     def add f h = prim "add_hash"
 
     def hashPlan cmd vis =
-        Plan "<hash>" cmd vis Nil "." "" logNever logError logDebug ReRun Nil hashUsage identity identity False
+        Plan
+        "<hash>"
+        cmd
+        vis
+        Nil
+        "."
+        ""
+        logNever
+        logError
+        logDebug
+        ReRun
+        Nil
+        hashUsage
+        identity
+        identity
+        False
 
     def stdin_file_path = "to_hash.{prefix}.stdin"
 

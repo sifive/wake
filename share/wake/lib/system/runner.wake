@@ -95,7 +95,19 @@ export def localRunner: Runner =
             def Usage status runtime cputime mem in out = predict
 
             def _ =
-                launch job dir stdin env.implodeNull cmd.implodeNull status runtime cputime mem in out (booleanToInt isatty)
+                launch
+                job
+                dir
+                stdin
+                env.implodeNull
+                cmd.implodeNull
+                status
+                runtime
+                cputime
+                mem
+                in
+                out
+                (booleanToInt isatty)
 
             match (getJobReality job)
                 Pass reality -> Pass (RunnerOutput (map getPathName vis) Nil reality)
