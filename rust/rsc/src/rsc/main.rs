@@ -93,9 +93,19 @@ async fn activate_stores(
     for store in stores.into_iter() {
         active_stores.insert(
             store.id,
-            Arc::new(blob_store_impls::LocalBlobStore { root: store.root }),
+            Arc::new(blob_store_impls::LocalBlobStore {
+                id: store.id,
+                root: store.root,
+            }),
         );
     }
+
+    // ---    Activate DBOnly Store   ---
+    let dbonly_id = Uuid::parse_str("00000000-0000-0000-0000-000000000000").unwrap();
+    active_stores.insert(
+        dbonly_id,
+        Arc::new(blob_store_impls::DbOnlyBlobStore { id: dbonly_id }),
+    );
 
     return active_stores;
 }
@@ -116,6 +126,11 @@ fn create_router(
 
     let Some(active_store) = blob_stores.get(&active_store_uuid).clone() else {
         panic!("UUID for active store not in database");
+    };
+
+    let dbonly_uuid = Uuid::parse_str("00000000-0000-0000-0000-000000000000").unwrap();
+    let Some(dbonly_store) = blob_stores.get(&dbonly_uuid).clone() else {
+        panic!("UUID for db store not in database");
     };
 
     Router::new()
@@ -149,10 +164,10 @@ fn create_router(
             "/blob",
             post({
                 let conn = conn.clone();
-                let store = active_store.clone();
-                move |multipart: Multipart| {
-                    blob::create_blob(multipart, conn, active_store_uuid, store)
-                }
+                let active = active_store.clone();
+                let dbonly = dbonly_store.clone();
+
+                move |multipart: Multipart| blob::create_blob(multipart, conn, active, dbonly)
             })
             .layer(DefaultBodyLimit::disable()),
         )
