@@ -1,0 +1,44 @@
+# Copyright 2024 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package wake
+
+export target rscRunner (rscApi: RemoteCacheApi): Runner =
+    def _ =
+        format rscApi
+        | println
+
+    mkRemoteCacheRunner rscApi (\_ Pass "") "/workspace" fuseRunner
+
+export def mkRemoteCacheRunner (_rscApi: RemoteCacheApi) (_hashFn: Result RunnerInput Error => Result String Error) (_wakeroot: String) ((Runner name score baseDoIt): Runner): Runner =
+    def badlaunch job error = prim "job_fail_launch"
+
+    def doit job runnerInput = match runnerInput
+        Fail e ->
+            def _ = badlaunch job e
+
+            Fail e
+        Pass input ->
+            # TODO: Search the cache for the job
+
+            # Run the job to get the results
+            require Pass output = baseDoIt job (Pass input)
+
+            # TODO: Insert the job into the cache
+
+            Pass output
+
+    Runner "remote-cache: {name}" score doit
+

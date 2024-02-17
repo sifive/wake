@@ -34,6 +34,8 @@ share/wake/lib/system/path.wake
 share/wake/lib/system/plan_scorer.wake
 share/wake/lib/system/plan.wake
 share/wake/lib/system/runner.wake
+share/wake/lib/system/remote_cache_api.wake
+share/wake/lib/system/remote_cache.wake
 share/wake/lib/system/sources.wake
 src/compat/compat.wake
 src/dst/dst.wake

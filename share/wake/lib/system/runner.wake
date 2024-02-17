@@ -148,17 +148,34 @@ export def fuseRunner: Runner =
     | makeJSONRunner
 
 export def defaultRunner: Runner =
-    require Some _ = getenv "WAKE_LOCAL_JOB_CACHE"
-    else fuseRunner
+    require Some config = getenv "WAKE_REMOTE_CACHE"
+    else
+        require Some _ = getenv "WAKE_LOCAL_JOB_CACHE"
+        else fuseRunner
 
-    # The fuseRunner does not actully mount over / and instead uses the
-    # the host root as the sandbox root. This means that wakeroot will
-    # change from depending on where wake is being run from. As a hack
-    # to work around this we abuse the fact that the fuseRunner only
-    # works in relative paths to make different runs consistent. Ideally
-    # you'd have a more complex sandbox that kept the wakeroot at a
-    # consistent place across runs.
-    mkJobCacheRunner (\_ Pass "") "/workspace" fuseRunner
+        # The fuseRunner does not actully mount over / and instead uses the
+        # the host root as the sandbox root. This means that wakeroot will
+        # change from depending on where wake is being run from. As a hack
+        # to work around this we abuse the fact that the fuseRunner only
+        # works in relative paths to make different runs consistent. Ideally
+        # you'd have a more complex sandbox that kept the wakeroot at a
+        # consistent place across runs.
+        mkJobCacheRunner (\_ Pass "") "/workspace" fuseRunner
+
+    require (domain, portStr, authStr, Nil) =
+        config
+        | tokenize `:`
+    else
+        panic "Remote cache config was set with incorrect format. Saw: '{config}'. Expected 'domain:port:auth' (auth may be omitted)"
+
+    require Some (port) =
+        portStr
+        | int
+    else panic "Remote cache config was set with non-integer port. Saw: {portStr}"
+
+    def auth = if authStr ==* "" then None else Some authStr
+
+    rscRunner (RemoteCacheApi domain port auth)
 
 # A plan describing how to construct a JSONRunner
 # RawScript: the path to the script to run jobs with
