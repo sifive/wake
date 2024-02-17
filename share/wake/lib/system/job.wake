@@ -337,4 +337,3 @@ export def xOK: Integer =
 
 export def access (file: String) (mode: Integer): Boolean =
     (\f \m prim "access") file mode
-

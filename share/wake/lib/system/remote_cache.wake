@@ -16,10 +16,6 @@
 package wake
 
 export target rscRunner (rscApi: RemoteCacheApi): Runner =
-    def _ =
-        format rscApi
-        | println
-
     mkRemoteCacheRunner rscApi (\_ Pass "") "/workspace" fuseRunner
 
 export def mkRemoteCacheRunner (_rscApi: RemoteCacheApi) (_hashFn: Result RunnerInput Error => Result String Error) (_wakeroot: String) ((Runner name score baseDoIt): Runner): Runner =
