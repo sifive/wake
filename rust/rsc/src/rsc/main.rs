@@ -482,8 +482,8 @@ mod tests {
                     .header("Authorization", api_key)
                     .body(Body::from(
                         serde_json::to_vec(&json!({
-                            "cmd": "blarg",
-                            "env":"PATH=/usr/bin",
+                            "cmd": [98, 108, 97, 114, 103], // blarg
+                            "env": [65, 61, 98], // A=b
                             "cwd":"/workspace",
                             "stdin":"",
                             "is_atty": false,
@@ -519,8 +519,8 @@ mod tests {
                     .header("Content-Type", "application/json")
                     .body(Body::from(
                         serde_json::to_vec(&json!({
-                            "cmd": "blrg",
-                            "env":"PATH=/usr/bin",
+                            "cmd": [98, 108, 114, 103], // blrg
+                            "env": [65, 61, 98], // A=b
                             "cwd":"/workspace",
                             "stdin":"",
                             "is_atty": false,
@@ -549,8 +549,8 @@ mod tests {
                     .header("Content-Type", "application/json")
                     .body(Body::from(
                         serde_json::to_vec(&json!({
-                            "cmd": "blarg",
-                            "env":"PATH=/usr/bin",
+                            "cmd": [98, 108, 97, 114, 103], // blarg
+                            "env": [65, 61, 98], // A=b
                             "cwd":"/workspace",
                             "stdin":"",
                             "is_atty": false,
