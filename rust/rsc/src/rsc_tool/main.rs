@@ -1,13 +1,8 @@
 use clap::{Parser, Subcommand};
-use data_encoding::BASE64;
-use entity::api_key;
 use inquire::Confirm;
 use is_terminal::IsTerminal;
 use migration::{DbErr, Migrator, MigratorTrait};
-use rand_core::{OsRng, RngCore};
-use sea_orm::{
-    ActiveModelTrait, ActiveValue::*, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-};
+use sea_orm::{prelude::Uuid, DatabaseConnection};
 use std::io::{Error, ErrorKind};
 use tracing;
 
@@ -15,44 +10,20 @@ mod table;
 
 #[path = "../common/config.rs"]
 mod config;
+#[path = "../common/database.rs"]
+mod database;
 
-#[tracing::instrument]
 async fn add_api_key(
-    opts: AddKeyOpts,
-    conn: &DatabaseConnection,
+    opts: AddApiKeyOpts,
+    db: &DatabaseConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // If the user hasn't specified a key generate one. This is
-    // the expected way for this tool to be used.
-    let key = match &opts.key {
-        None => {
-            let mut buf = [0u8; 24];
-            OsRng.fill_bytes(&mut buf);
-            BASE64.encode(&buf)
-        }
-        Some(key) => key.clone(),
-    };
-
-    // Go ahead and insert the key
-    let insert_key = api_key::ActiveModel {
-        id: NotSet,
-        created_at: NotSet,
-        key: Set(key.clone()),
-        desc: Set(opts.desc.clone()),
-    };
-    tracing::info!("Adding key = {} as valid API key", &key);
-    insert_key.insert(conn).await?;
-
-    // If everything was a success go ahead and tell the user the
-    // API key.
-    tracing::info!("Key {} Added", &key);
-    println!("\nSuccessfully added {} as an API key", key);
+    let key = database::create_api_key(db, opts.key, opts.desc).await?;
+    println!("Created api key: {}", key.id);
     Ok(())
 }
 
-#[tracing::instrument]
-async fn list_api_keys(_: ListKeysOpts, conn: &DatabaseConnection) -> Result<(), DbErr> {
-    let mut keys: Vec<_> = api_key::Entity::find()
-        .all(conn)
+async fn list_api_keys(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let mut keys: Vec<_> = database::read_api_keys(db)
         .await?
         .into_iter()
         .map(|x| {
@@ -65,29 +36,20 @@ async fn list_api_keys(_: ListKeysOpts, conn: &DatabaseConnection) -> Result<(),
         .collect();
 
     let headers = vec!["Id".into(), "Key".into(), "Desc".into()];
-    keys.insert(0, headers.clone());
+    keys.insert(0, headers);
 
     table::print_table(keys);
 
     Ok(())
 }
 
-#[tracing::instrument]
 async fn remove_api_key(
-    key: String,
-    conn: &DatabaseConnection,
+    id: &String,
+    db: &DatabaseConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // First find the key, because its a very strange user expierence to see
-    // "key X was successfully removed" when it never existed in the first place.
-    // It means that you can never be quite sure you acomplished what you thought
-    // you did and have to use list-keys to check. This also lets us output
-    // the description before commiting.
-    let Some(result) = api_key::Entity::find()
-        .filter(api_key::Column::Key.eq(&key))
-        .one(conn)
-        .await?
-    else {
-        println!("{} is not a valid key", key);
+    let uuid = Uuid::parse_str(id)?;
+    let Some(key) = database::read_api_key(db, uuid).await? else {
+        println!("{} is not a valid key", id);
         std::process::exit(2);
     };
 
@@ -95,25 +57,112 @@ async fn remove_api_key(
     if std::io::stdin().is_terminal() {
         let should_delete = Confirm::new("Are you sure you want to delete this key?")
             .with_default(false)
-            .with_help_message(format!("key = {}, desc = {:?}", key, result.desc).as_str())
+            .with_help_message(format!("key = {}, desc = {:?}", key.key, key.desc).as_str())
             .prompt()?;
 
         if !should_delete {
-            println!("Aborting key removal");
+            println!("Aborting removal");
             return Ok(());
         }
     }
 
     // Ok now that we're really sure we want to delete this key
-    tracing::info!("Deleting key {}", &key);
-    api_key::Entity::delete_many()
-        .filter(api_key::Column::Key.eq(&key))
-        .exec(conn)
-        .await?;
+    database::delete_api_key(db, key).await?;
 
-    // If we haven't returned already then log it and tell the user
-    tracing::info!("Key {} deleted", &key);
-    println!("Key {} was successfully removed", key);
+    println!("Key {} was successfully removed", id);
+    Ok(())
+}
+
+async fn add_local_blob_store(
+    opts: AddLocalBlobStoreOpts,
+    db: &DatabaseConnection,
+) -> Result<(), Box<dyn std::error::Error>> {
+    tokio::fs::create_dir_all(opts.root.clone()).await?;
+    let store = database::create_local_blob_store(db, opts.root).await?;
+    println!("Created local blob store: {}", store.id);
+    Ok(())
+}
+
+async fn list_local_blob_stores(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let mut stores: Vec<_> = database::read_local_blob_stores(db)
+        .await?
+        .into_iter()
+        .map(|x| vec![format!("{}", x.id), x.root])
+        .collect();
+
+    let headers = vec!["Id".into(), "Root".into()];
+    stores.insert(0, headers);
+
+    table::print_table(stores);
+
+    Ok(())
+}
+
+async fn remove_local_blob_store(
+    id: &String,
+    db: &DatabaseConnection,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let uuid = Uuid::parse_str(id)?;
+    let Some(store) = database::read_local_blob_store(db, uuid).await? else {
+        println!("{} is not a valid local blob store", id);
+        std::process::exit(2);
+    };
+
+    // We only want to prompt the user if the user can type into the terminal
+    if std::io::stdin().is_terminal() {
+        let should_delete = Confirm::new("Are you sure you want to delete this local blob store?")
+            .with_default(false)
+            .with_help_message(format!("id = {}, root = {}", store.id, store.root).as_str())
+            .prompt()?;
+
+        if !should_delete {
+            println!("Aborting removal");
+            return Ok(());
+        }
+    }
+
+    // Try to delete the backing store and fail if it isn't empty
+    let Ok(()) = tokio::fs::remove_dir(store.root.clone()).await else {
+        println!("Local blob store contains blobs so it is not safe to delete it!");
+        std::process::exit(2);
+    };
+
+    // Ok now that we're really sure we want to delete this key
+    database::delete_local_blob_store(db, store).await?;
+
+    println!("Local Blob Store {} was successfully removed", id);
+    Ok(())
+}
+
+async fn remove_all_jobs(db: &DatabaseConnection) -> Result<(), Box<dyn std::error::Error>> {
+    // Only let a human perform this action
+    if !std::io::stdin().is_terminal() {
+        println!("Remove all jobs may only be triggered manually by a human.");
+        std::process::exit(2);
+    }
+
+    let mut should_delete = Confirm::new("Are you REALLY sure you want to delete ALL jobs?")
+        .with_default(false)
+        .prompt()?;
+
+    if !should_delete {
+        println!("Aborting removal");
+        return Ok(());
+    }
+
+    should_delete = Confirm::new("Last chance: Are you REALLY sure you want to delete ALL jobs?")
+        .with_default(false)
+        .prompt()?;
+
+    if !should_delete {
+        println!("Aborting removal");
+        return Ok(());
+    }
+
+    // Ok now that we're really sure we want to delete this key
+    database::delete_all_jobs(db).await?;
+
+    println!("All jobs successfully removed");
     Ok(())
 }
 
@@ -139,26 +188,85 @@ struct TopLevel {
     #[arg(help = "Show's the config and then exits", long)]
     show_config: bool,
 
-    // The `command` option will delegate option parsing to the command type,
-    // starting at the first free argument.
     #[command(subcommand)]
-    api_key_command: Option<ApiKey>,
+    db_command: Option<DBCommand>,
 }
 
 #[derive(Debug, Subcommand)]
-enum ApiKey {
-    //#[options(help = "list all api keys in the database")]
-    List(ListKeysOpts),
+enum DBCommand {
+    /// List all models in the database
+    List(ListOpts),
 
-    //#[options(help = "add an api key to the database")]
-    AddKey(AddKeyOpts),
+    /// Add a model to the database
+    Add(AddOpts),
 
-    //#[options(help = "remove an api key from the database")]
-    RemoveKey(RemoveKeyOpts),
+    /// Remove a model from the database
+    Remove(RemoveOpts),
 }
 
 #[derive(Debug, Parser)]
-struct AddKeyOpts {
+struct ListOpts {
+    #[command(subcommand)]
+    db_command: DBModelList,
+}
+
+#[derive(Debug, Parser)]
+struct AddOpts {
+    #[command(subcommand)]
+    db_command: DBModelAdd,
+}
+
+#[derive(Debug, Parser)]
+struct RemoveOpts {
+    #[command(subcommand)]
+    db_command: DBModelRemove,
+}
+
+#[derive(Debug, Subcommand)]
+enum DBModelList {
+    /// List all api keys
+    ApiKey(NullOpts),
+
+    /// List all local blob stores
+    LocalBlobStore(NullOpts),
+}
+
+#[derive(Debug, Subcommand)]
+enum DBModelAdd {
+    /// Add an api key
+    ApiKey(AddApiKeyOpts),
+
+    /// Add a local blob store
+    LocalBlobStore(AddLocalBlobStoreOpts),
+}
+
+#[derive(Debug, Subcommand)]
+enum DBModelRemove {
+    /// Remove an api key
+    ApiKey(RemoveByIdOpts),
+
+    /// Remove a local blob store
+    LocalBlobStore(RemoveByIdOpts),
+
+    /// DANGER Remove all cached jobs
+    DangerJobsAll(NullOpts),
+}
+
+#[derive(Debug, Parser)]
+struct NullOpts {}
+
+#[derive(Debug, Parser)]
+struct RemoveByIdOpts {
+    #[arg(
+        required = true,
+        help = "The id of the model you want to remove",
+        value_name = "ID"
+    )]
+    id: String,
+}
+
+#[derive(Debug, Parser)]
+struct AddApiKeyOpts {
     #[arg(
         help = "If specified this is the key that will be used, otherwise one will be generated",
         value_name = "KEY",
@@ -176,16 +284,14 @@ struct AddKeyOpts {
 }
 
 #[derive(Debug, Parser)]
-struct ListKeysOpts {}
-
-#[derive(Debug, Parser)]
-struct RemoveKeyOpts {
+struct AddLocalBlobStoreOpts {
     #[arg(
         required = true,
-        help = "The key you want to remove",
-        value_name = "KEY"
+        help = "The root directory for the store. Blobs will be saved to this location",
+        value_name = "ROOT",
+        long
     )]
-    key: String,
+    root: String,
 }
 
 #[tokio::main]
@@ -206,8 +312,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // connect to our db
-    let connection = sea_orm::Database::connect(config.database_url).await?;
-    let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
+    let db = sea_orm::Database::connect(config.database_url).await?;
+    let pending_migrations = Migrator::get_pending_migrations(&db).await?;
     if pending_migrations.len() != 0 {
         let err = Error::new(
             ErrorKind::Other,
@@ -220,14 +326,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(err)?;
     }
 
-    let Some(api_key_args) = args.api_key_command else {
+    let Some(db_command) = args.db_command else {
         return Ok(());
     };
 
-    match api_key_args {
-        ApiKey::List(args) => list_api_keys(args, &connection).await?,
-        ApiKey::AddKey(args) => add_api_key(args, &connection).await?,
-        ApiKey::RemoveKey(args) => remove_api_key(args.key, &connection).await?,
+    match db_command {
+        // List Commands
+        DBCommand::List(ListOpts {
+            db_command: DBModelList::ApiKey(_),
+        }) => list_api_keys(&db).await?,
+        DBCommand::List(ListOpts {
+            db_command: DBModelList::LocalBlobStore(_),
+        }) => list_local_blob_stores(&db).await?,
+
+        // Add Commands
+        DBCommand::Add(AddOpts {
+            db_command: DBModelAdd::ApiKey(args),
+        }) => add_api_key(args, &db).await?,
+        DBCommand::Add(AddOpts {
+            db_command: DBModelAdd::LocalBlobStore(args),
+        }) => add_local_blob_store(args, &db).await?,
+
+        // Remove Commands
+        DBCommand::Remove(RemoveOpts {
+            db_command: DBModelRemove::ApiKey(args),
+        }) => remove_api_key(&args.id, &db).await?,
+        DBCommand::Remove(RemoveOpts {
+            db_command: DBModelRemove::LocalBlobStore(args),
+        }) => remove_local_blob_store(&args.id, &db).await?,
+        DBCommand::Remove(RemoveOpts {
+            db_command: DBModelRemove::DangerJobsAll(_),
+        }) => remove_all_jobs(&db).await?,
     }
 
     Ok(())
