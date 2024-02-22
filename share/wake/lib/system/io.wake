@@ -195,11 +195,11 @@ export def write (path: String) (content: String): Result Path Error =
 
 # Writes a string to an intermediate file that will not conflict with other files.
 #
-# Idential prefix+files will be automatically deduplicated
+# Identical prefix+files will be automatically deduplicated
 export def writeTempFile (prefix: String) (content: String): Result Path Error =
     def name = "{prefix}.{hashString content}"
 
-    require Pass dir = mkdir "build/.temp"
+    require Pass dir = mkdir ".build/tmp/writes"
 
     writeIn dir 0644 name content
 
