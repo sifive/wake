@@ -17,7 +17,7 @@ pub async fn create_api_key(
     key: Option<String>,
     description: String,
 ) -> Result<api_key::Model, DbErr> {
-    // If a key hasn't specified a key generate one.
+    // If a key wasn't specified, generate one.
     let key = match key {
         None => {
             let mut buf = [0u8; 24];
