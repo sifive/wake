@@ -65,7 +65,7 @@ export tuple Runner =
 # param post: type Pair (Result RunnerOutput Error) a → Result RunnerOutput Error
 #   Similar to the pre function but called after the job has run. post is for editing the reported outputs/inputs/usage of the job.
 # param (Runner _ _ run): base runner that the current runner is built on top of
-#   i.e. localRISCVRunner is built on localRunner.
+#   i.e. JSONRunner is built on localRunner.
 
 export def makeRunner name score pre post (Runner _ _ run) =
     def doit job preInput = match (pre preInput)
