@@ -171,9 +171,9 @@ export def getPlanHash (plan: Plan): Integer =
         (
             isAttyStr,
             "\0\0",
-            cmd.implodeNull,
+            cmd.implode,
             "\0\0",
-            env.implodeNull,
+            env.implode,
             "\0\0",
             dir,
             "\0\0",

@@ -99,15 +99,15 @@ export def localRunner: Runner =
                 job
                 dir
                 stdin
-                env.implodeNull
-                cmd.implodeNull
+                env.implode
+                cmd.implode
                 status
                 runtime
                 cputime
                 mem
                 in
                 out
-                (booleanToInt isatty)
+                (booleanToInteger isatty)
 
             match (getJobReality job)
                 Pass reality -> Pass (RunnerOutput (map getPathName vis) Nil reality)

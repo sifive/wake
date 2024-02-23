@@ -82,8 +82,8 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
                 $ JObject (
                     "wakeroot" :-> JString wakeroot,
                     "cwd" :-> JString dir,
-                    "command_line" :-> JString cmd.implodeNull,
-                    "environment" :-> JString env.implodeNull,
+                    "command_line" :-> JString cmd.implode,
+                    "environment" :-> JString env.implode,
                     "stdin" :-> JString stdin,
                     "input_files" :-> jobCacheVisible,
                     "client_cwd" :-> JString workspace,
@@ -207,8 +207,8 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
                 $ JObject (
                     "wakeroot" :-> JString wakeroot,
                     "cwd" :-> JString dir,
-                    "command_line" :-> JString cmd.implodeNull,
-                    "environment" :-> JString env.implodeNull,
+                    "command_line" :-> JString cmd.implode,
+                    "environment" :-> JString env.implode,
                     "stdin" :-> JString stdin,
                     "runner_hash" :-> JString hashKey,
                     "input_files" :-> jobCacheReadFiles,

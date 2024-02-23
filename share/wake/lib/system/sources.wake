@@ -27,7 +27,7 @@ def add_sources str =
     prim "add_sources"
 
 def got_sources =
-    add_sources (subscribe source | map simplify | implodeNull)
+    add_sources (subscribe source | map simplify | implode)
 
 # Find files
 # WARNING! Use of this method can make a build unreproducible.

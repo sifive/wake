@@ -15,8 +15,10 @@
 
 package wake
 
-def implodeNull =
-    implode "\0"
+# Helper function similar to cat with that adds a null byte after each string then combines them.
+# Leaves a null byte as the last character of the string
+def implode strings =
+    cat (foldr (_, "\0", _) Nil strings)
 
 def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo stdout stderr label isatty: Job =
     def create label dir stdin env cmd signature visible keep echo stdout stderr isatty =
@@ -38,15 +40,15 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
             label
             dir
             stdin
-            env.implodeNull
-            cmd.implodeNull
+            env.implode
+            cmd.implode
             hash
-            visStrings.implodeNull
-            (booleanToInt keep)
+            visStrings.implode
+            (booleanToInteger keep)
             echo
             stdout
             stderr
-            (booleanToInt isatty)
+            (booleanToInteger isatty)
 
         def prefix = str (getJobId job)
 
@@ -63,14 +65,14 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
                 def input =
                     finputs inputs
                     | map simplify
-                    | implodeNull
+                    | implode
 
                 def output =
                     foutputs outputs
                     | computeHashes prefix
-                    | implodeNull
+                    | implode
 
-                finish job input output (implodeNull outputs) status runtime cputime mem in out
+                finish job input output (implode outputs) status runtime cputime mem in out
 
         # Make sure we don't hash files before the job has stopped running
         def _ = waitJobMerged final job
@@ -96,18 +98,10 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
 
     match keep
         False -> build Unit
-        True -> match (
-            cache
-            dir
-            stdin
-            env.implodeNull
-            cmd.implodeNull
-            hash
-            (map getPathName vis).implodeNull
-            (booleanToInt isatty)
-        )
-            Pair (job, _) last -> confirm True last job
-            Pair Nil last -> confirm False last (build Unit)
+        True ->
+            match (cache dir stdin env.implode cmd.implode hash (map getPathName vis).implode (booleanToInteger isatty))
+                Pair (job, _) last -> confirm True last job
+                Pair Nil last -> confirm False last (build Unit)
 
 # Only run if the first four arguments differ
 target runOnce cmd env dir stdin vis isatty run \ res usage finputs foutputs keep echo stdout stderr label =
