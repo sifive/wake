@@ -20,24 +20,24 @@ from rust import _
 
 export def buildRSC _ =
     makeCargoExecutable "rsc" "rust/rsc"
-    | rmapPass (addCargoCrate "entity" "rust/entity")
-    | rmapPass (addCargoCrate "migration" "rust/migration")
-    | rmapPass (cargoBuildWith (defaultCargoToolchain Unit))
+    |> addCargoCrate "entity" "rust/entity"
+    |> addCargoCrate "migration" "rust/migration"
+    |> cargoBuildWith (defaultCargoToolchain Unit)
 
 export def buildRSCTool _ =
     makeCargoExecutable "rsc_tool" "rust/rsc"
-    | rmapPass (addCargoCrate "entity" "rust/entity")
-    | rmapPass (addCargoCrate "migration" "rust/migration")
-    | rmapPass (cargoBuildWith (defaultCargoToolchain Unit))
+    |> addCargoCrate "entity" "rust/entity"
+    |> addCargoCrate "migration" "rust/migration"
+    |> cargoBuildWith (defaultCargoToolchain Unit)
 
 export def buildRSCTest _ =
     makeCargoTestExecutable "rsc" "rust/rsc"
-    | rmapPass (addCargoCrate "entity" "rust/entity")
-    | rmapPass (addCargoCrate "migration" "rust/migration")
-    | rmapPass (cargoBuildWith (defaultCargoToolchain Unit))
+    |> addCargoCrate "entity" "rust/entity"
+    |> addCargoCrate "migration" "rust/migration"
+    |> cargoBuildWith (defaultCargoToolchain Unit)
 
 export def buildRSCToolTest _ =
     makeCargoTestExecutable "rsc_tool" "rust/rsc"
-    | rmapPass (addCargoCrate "entity" "rust/entity")
-    | rmapPass (addCargoCrate "migration" "rust/migration")
-    | rmapPass (cargoBuildWith (defaultCargoToolchain Unit))
+    |> addCargoCrate "entity" "rust/entity"
+    |> addCargoCrate "migration" "rust/migration"
+    |> cargoBuildWith (defaultCargoToolchain Unit)

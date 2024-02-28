@@ -20,4 +20,4 @@ from rust import _
 
 def buildWakeLogViewer Unit =
     makeCargoExecutable "log_viewer" "rust/log_viewer"
-    | rmapPass (cargoBuildWith (defaultCargoToolchain Unit))
+    |> cargoBuildWith (defaultCargoToolchain Unit)

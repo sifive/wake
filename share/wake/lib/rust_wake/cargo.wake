@@ -99,9 +99,9 @@ export def makeCargoTestExecutable (name: String) (root: String): Result CargoEx
 # Ex:
 # ```
 # makeCargoExecutable "foo" "rust/foo"
-# | rmapPass addCargoCrate "one" "rust/bar"
-# | rmapPass addCargoCrate "two" "rust/bat"
-# | rmapPass buildWith (defaultCargoToolchain Unit)
+# |> addCargoCrate "one" "rust/bar"
+# |> addCargoCrate "two" "rust/bat"
+# |> buildWith (defaultCargoToolchain Unit)
 # ```
 export def addCargoCrate (name: String) (root: String): CargoExecutable => Result CargoExecutable Error =
     def do (in: CargoExecutable): Result CargoExecutable Error =
@@ -117,10 +117,10 @@ export def addCargoCrate (name: String) (root: String): CargoExecutable => Resul
 # Ex:
 # ```
 # makeCargoExecutable "foo" "rust/foo"
-# | rmapPass addCargoFlag "--foo"
-# | rmapPass addCargoFlag "bar"
-# | rmapPass addCargoFlag "--bat"
-# | rmapPass buildWith (defaultCargoToolchain Unit)
+# |> addCargoFlag "--foo"
+# |> addCargoFlag "bar"
+# |> addCargoFlag "--bat"
+# |> buildWith (defaultCargoToolchain Unit)
 # ```
 export def addCargoFlag (flag: String): CargoExecutable => Result CargoExecutable Error =
     def do (in: CargoExecutable): Result CargoExecutable Error =
@@ -234,8 +234,8 @@ export def cargoBuildWith (toolchain: Result CargoToolchain Error) (executable: 
             stringToRegExp "{root}/target/{buildConfigToString config}/deps/{binaryName}-[a-z0-9]\{16\}"
 
         Pass executable
-        | rmapPass (addCargoFlag "--no-run")
-        | rmapPass (cargoBuildCommon "test" regex toolchain)
+        |> addCargoFlag "--no-run"
+        |> cargoBuildCommon "test" regex toolchain
     else
         require Pass regex =
             stringToRegExp "{root}/target/{buildConfigToString config}/{binaryName}"

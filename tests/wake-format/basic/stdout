@@ -1783,3 +1783,20 @@ def a =
 
     5
 
+def a =
+    a
+    |> b
+    |> c
+
+def a =
+    a
+    |< b
+    |< c
+
+def a =
+    a |> b
+    |< c
+
+def a =
+    a |< b
+    |> c
