@@ -199,8 +199,8 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
 
                 JArray (map mkVisJson readPaths)
 
-            require Pass stdout = getJobFailedStdout job
-            require Pass stderr = getJobFailedStderr job
+            require Pass stdout = job.getJobFailedStdoutRaw
+            require Pass stderr = job.getJobFailedStderrRaw
 
             def jobCacheAddJson =
                 prettyJSON
