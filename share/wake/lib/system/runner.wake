@@ -1,0 +1,287 @@
+# Copyright 2024 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package wake
+
+export tuple Usage = # Unknown quantities are 0
+    export Status: Integer
+    export Runtime: Double
+    export CPUtime: Double
+    export MemBytes: Integer
+    export InBytes: Integer
+    export OutBytes: Integer
+
+export def getUsageThreads (Usage _ run cpu _ _ _: Usage): Double =
+    if run ==. 0.0 then
+        cpu
+    else
+        cpu /. run
+
+# RunnerInput is a subset of the fields supplied in the execution Plan
+export tuple RunnerInput =
+    export Label: String
+    export Command: List String
+    export Visible: List Path
+    export Environment: List String
+    export Directory: String
+    export Stdin: String
+    export Resources: List String
+    # A unique prefix for this job
+    export Prefix: String
+    # Previous resource usage
+    export Record: Usage
+    # Determines if job should run in psuedoterminal
+    export IsAtty: Boolean
+
+export tuple RunnerOutput =
+    export Inputs: List String
+    export Outputs: List String
+    export Usage: Usage
+
+# A Runner describes a way to invoke a Plan to get a Job
+export tuple Runner =
+    export Name: String
+    export Score: Plan => Result Double String
+    Fn: Job => Result RunnerInput Error => Result RunnerOutput Error
+
+# Create new Runner given pre- and post-hooks around an existing Runner
+# param name: String
+# param score: type Plan → Result Double String
+#   Called by runJob to produce a score representing the priority of a runner with respect to the given Plan.
+# param pre: type Result RunnerInput Error → Pair (Result RunnerInput Error) a
+#   Called before the job is run, allowing the runner to modify the input to provide the requested resources.
+# param post: type Pair (Result RunnerOutput Error) a → Result RunnerOutput Error
+#   Similar to the pre function but called after the job has run. post is for editing the reported outputs/inputs/usage of the job.
+# param (Runner _ _ run): base runner that the current runner is built on top of
+#   i.e. JSONRunner is built on localRunner.
+
+export def makeRunner name score pre post (Runner _ _ run) =
+    def doit job preInput = match (pre preInput)
+        Pair runInput state ->
+            def runOutput = run job runInput
+            def final _ = post (Pair runOutput state)
+
+            # Don't run any 'post' steps until the Job has stopped running
+            waitJobMerged final job
+
+    Runner name score doit
+
+# This runner does not detect inputs/outputs on it's own
+# You must use Fn{Inputs,Outputs} to fill in this information
+export def localRunner: Runner =
+    def launch job dir stdin env cmd status runtime cputime membytes ibytes obytes isatty =
+        prim "job_launch"
+
+    def badlaunch job error = prim "job_fail_launch"
+
+    def doit job = match _
+        Fail e ->
+            def _ = badlaunch job e
+
+            Fail e
+        Pass (RunnerInput _ cmd vis env dir stdin _ _ predict isatty) ->
+            def Usage status runtime cputime mem in out = predict
+
+            def _ =
+                launch
+                job
+                dir
+                stdin
+                env.implode
+                cmd.implode
+                status
+                runtime
+                cputime
+                mem
+                in
+                out
+                (booleanToInteger isatty)
+
+            match (getJobReality job)
+                Pass reality -> Pass (RunnerOutput (map getPathName vis) Nil reality)
+                Fail f -> Fail f
+
+    def score _ = Pass 1.0
+
+    Runner "local" score doit
+
+export def virtualRunner: Runner =
+    def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
+    def badlaunch job error = prim "job_fail_launch"
+
+    def doit job = match _
+        Fail e ->
+            def _ = badlaunch job e
+
+            Fail e
+        Pass (RunnerInput _ _ vis _ _ _ _ _ predict _) ->
+            def Usage status runtime cputime mem in out = predict
+
+            def _ =
+                virtual job "" "" status runtime cputime mem in out # sets predict+reality
+
+            match (getJobReality job)
+                Pass reality -> Pass (RunnerOutput (map getPathName vis) Nil reality)
+                Fail f -> Fail f
+
+    Runner "virtual" (\_ Pass 0.0) doit
+
+# Implement FUSE-based Runner
+export def fuseRunner: Runner =
+    def fuse = "{wakePath}/wakebox"
+    def score _ = Pass 2.0
+
+    makeJSONRunnerPlan fuse score
+    | editJSONRunnerPlanExtraEnv (editEnvironment "DEBUG_FUSE_WAKE" (\_ getenv "DEBUG_FUSE_WAKE"))
+    | makeJSONRunner
+
+export def defaultRunner: Runner =
+    require Some _ = getenv "WAKE_LOCAL_JOB_CACHE"
+    else fuseRunner
+
+    # The fuseRunner does not actully mount over / and instead uses the
+    # the host root as the sandbox root. This means that wakeroot will
+    # change from depending on where wake is being run from. As a hack
+    # to work around this we abuse the fact that the fuseRunner only
+    # works in relative paths to make different runs consistent. Ideally
+    # you'd have a more complex sandbox that kept the wakeroot at a
+    # consistent place across runs.
+    mkJobCacheRunner (\_ Pass "") "/workspace" fuseRunner
+
+# A plan describing how to construct a JSONRunner
+# RawScript: the path to the script to run jobs with
+# ExtraArgs: extra arguments to pass to ``RawScript``
+# ExtraEnv: environment variables to pass to the script
+# Score: runJob chooses the runner with the largest score for a Plan
+# Estimate: predict local usage based on prior recorded usage
+tuple JSONRunnerPlan =
+    export RawScript: String
+    export ExtraArgs: List String
+    export ExtraEnv: List String
+    export Score: Plan => Result Double String
+    export Estimate: Usage => Usage
+
+# make a ``JSONRunnerPlan`` with ``Nil`` and ``(_)`` as defaults for ``ExtraArgs`` and ``Estimate`` respectively
+# rawScript: String; the path to the script to run jobs with
+# score: runJob chooses the runner with the largest score for a Plan
+export def makeJSONRunnerPlan (rawScript: String) (score: Plan => Result Double String): JSONRunnerPlan =
+    JSONRunnerPlan rawScript Nil Nil score (_)
+
+# Make a Runner that runs a named script to run jobs
+# plan: JSONRunnerPlan; a tuple containing the arguments for this function
+export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
+    def rawScript = plan.getJSONRunnerPlanRawScript
+    def extraArgs = plan.getJSONRunnerPlanExtraArgs
+    def extraEnv = plan.getJSONRunnerPlanExtraEnv
+    def score = plan.getJSONRunnerPlanScore
+    def estimate = plan.getJSONRunnerPlanEstimate
+    def script = which (simplify rawScript)
+    def ok = access script xOK
+
+    def pre = match _
+        Fail f -> Pair (Fail f) ""
+        _ if !ok -> Pair (Fail (makeError "Runner {script} is not executable")) ""
+        Pass (RunnerInput label command visible environment directory stdin res prefix record isatty) ->
+            def Usage status runtime cputime membytes inbytes outbytes = record
+
+            def json =
+                JObject (
+                    "label" :-> JString label,
+                    "command" :-> command | map JString | JArray,
+                    "environment" :-> environment | map JString | JArray,
+                    "visible" :-> visible | map (_.getPathName.JString) | JArray,
+                    "directory" :-> JString directory,
+                    "stdin" :-> JString stdin,
+                    "resources" :-> res | map JString | JArray,
+                    "version" :-> JString version,
+                    "isolate-network" :-> JBoolean False,
+                    "isolate-pids" :-> JBoolean False,
+                    "mount-ops" :-> JArray (JObject ("type" :-> JString "workspace", "destination" :-> JString ".", Nil), Nil),
+                    "usage" :-> JObject (
+                        "status" :-> JInteger status,
+                        "runtime" :-> JDouble runtime,
+                        "cputime" :-> JDouble cputime,
+                        "membytes" :-> JInteger membytes,
+                        "inbytes" :-> JInteger inbytes,
+                        "outbytes" :-> JInteger outbytes,
+                        Nil
+                    ),
+                    Nil
+                )
+
+            require Pass build =
+                mkdir ".build"
+                | rmap getPathName
+            else Pair (Fail (makeError "Failed to 'mkdir .build'.")) ""
+
+            def specFilePath = "{build}/spec-{prefix}.json"
+
+            require Pair (Pass inFile) _ =
+                write specFilePath (prettyJSON json)
+                | rmap getPathName
+                | addErrorContext "Failed to 'write {specFilePath}: '"
+                | (Pair _ "")
+
+            def outFile = resultPath inFile
+            def cmd = script, "-I", "-p", inFile, "-o", outFile, extraArgs
+
+            def proxy =
+                RunnerInput label cmd Nil (extraEnv ++ environment) "." "" Nil prefix (estimate record) isatty
+
+            Pair (Pass proxy) inFile
+
+    def resultPath specPath = replace `spec-` "result-" specPath
+
+    def post = match _
+        Pair (Fail f) _ -> Fail f
+        Pair (Pass (RunnerOutput _ _ (Usage x _ _ _ _ _))) inFile if x != 0 ->
+            Fail (makeError "Non-zero exit status ({str x}) for JSON runner {script} on {inFile}")
+        Pair (Pass _) inFile ->
+            def outFile = resultPath inFile
+            def json = parseJSONFile (Path outFile "BadHash")
+
+            match json
+                Fail f -> Fail f
+                Pass content ->
+                    def _ = markFileCleanable outFile
+
+                    def field name = match _ _
+                        _ (Fail f) -> Fail f
+                        None (Pass fn) ->
+                            Fail "{script} produced {outFile}, which is missing usage/{name}"
+                        (Some x) (Pass fn) -> Pass (fn x)
+
+                    def usage = content // `usage`
+
+                    def usageResult =
+                        Pass (Usage _ _ _ _ _ _)
+                        | field "status" (usage // `status` | getJInteger)
+                        | field "runtime" (usage // `runtime` | getJDouble)
+                        | field "cputime" (usage // `cputime` | getJDouble)
+                        | field "membytes" (usage // `membytes` | getJInteger)
+                        | field "inbytes" (usage // `inbytes` | getJInteger)
+                        | field "outbytes" (usage // `outbytes` | getJInteger)
+
+                    def getK exp =
+                        content // exp
+                        | getJArray
+                        | getOrElse Nil
+                        | mapPartial getJString
+
+                    match usageResult
+                        Fail f -> Fail (makeError f)
+                        Pass usage -> Pass (RunnerOutput (getK `inputs`) (getK `outputs`) usage)
+
+    makeRunner "json-{script}" score pre post localRunner

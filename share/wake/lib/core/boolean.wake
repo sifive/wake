@@ -82,3 +82,12 @@ export def eor (x: Boolean) (y: Boolean): Boolean =
 # ```
 export def enor (x: Boolean) (y: Boolean): Boolean =
     if x then y else !y
+
+# booleanToInteger: Converts a Boolean to the C equivalent integer
+#
+# ```
+# booleanToInteger True = 1
+# booleanToInteger False = 0
+# ```
+export def booleanToInteger (b: Boolean): Integer =
+    if b then 1 else 0

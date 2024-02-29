@@ -102,7 +102,14 @@ export def unreachable (reason: String): a =
     f "REACHED UNREACHABLE CODE: {reason}"
 
 # Like unreachable but with a different error message
+# May not be optimized away
 export def panic (reason: String): a =
     def f x = prim "panic"
 
     f "PANIC: {reason}"
+
+# identity: Returns the input unmodified
+#
+# This function is useful when a adpater function is require but no adpation is needed.
+export def identity (x: a): a =
+    x
