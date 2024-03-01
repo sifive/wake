@@ -91,8 +91,9 @@ def targets =
     buildHash,
     buildBSP,
     (bootstrapTarget buildLSP),
-    buildWakeFormat,
+    (bootstrapTarget buildWakeFormat),
     (bootstrapTarget buildJobCache),
+    (bootstrapTarget buildWakeUnit),
     Nil
 
 def all variant =
@@ -309,13 +310,9 @@ export def static _: Result Path Error =
     | getJobOutput
 
 from test_wake import topic wakeTestBinary
-from test_wake import topic wakeUnitTestBinary
 
 publish wakeTestBinary =
     defaultWake, Nil
-
-publish wakeUnitTestBinary =
-    buildWakeUnit, Nil
 
 def defaultWake Unit =
     require Pass wakeVisible = doInstall "tmp" "default"
