@@ -2,7 +2,6 @@
 
 set -e
 
-# "${1}/wake-format" basic.wake > "$tmp"
 WAKE_UNIT="${1}/wake-unit"
 
 TERM=xterm-256color script --return --quiet -c "$WAKE_UNIT --no-color --tag threaded" /dev/null
