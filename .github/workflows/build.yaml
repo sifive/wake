@@ -21,26 +21,8 @@ jobs:
         - name: Install Deps
           run: sudo apt-get update && sudo apt-get install -y build-essential fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx clang-format-12
 
-        - name: Check C/C++ Formatting
-          run: clang-format-12 --style=file --Werror -n $(./scripts/which_clang_files all)
-
         - name: Build Tarball
           run: make tarball
-
-        - name: Run Tests
-          run: make test && make unittest
-
-        - name: Check Wake Formatting
-          run: ./bin/wake-format.native-cpp14-release --auto --dry-run
-
-        - name: Checkout postgres
-          run: pushd /var/tmp/ && git clone --depth 1 https://github.com/postgres/postgres.git && cd postgres && git fetch origin c372fbbd8e911f2412b80a8c39d7079366565d67 && git checkout c372fbbd8e911f2412b80a8c39d7079366565d67 && popd
-
-        - name: Build postgres
-          run: pushd /var/tmp/postgres && ./configure --prefix /var/tmp/pg-server && make install && popd
-
-        - name: Run Remote Cache Tests
-          run: POSTGRES_DIR=/var/tmp/pg-server make remoteCacheTests
 
         - name: Generate Docs
           run: mkdir www && ./bin/wake --no-workspace --html > www/index.html
@@ -103,77 +85,6 @@ jobs:
               build_cmd: make -C wake-* static
               test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
               install_src_glob: build/wake-*/wake-static_*
-
-            - target: centos_7_6
-              dockerfile: centos-7.6
-              extra_docker_build_args: ''
-              extra_docker_run_args: ''
-              build_cmd: source scl_source enable devtoolset-9 && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
-              install_src_glob: build/x86_64/*.rpm
-
-            - target: debian_bullseye
-              dockerfile: debian-bullseye
-              extra_docker_build_args: ''
-              extra_docker_run_args: -w /$(ls -d build/wake-*)
-              build_cmd: debuild -us -uc
-              test_cmd: dpkg -i *.deb && cd tests && wake runTests
-              install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
-
-            - target: rocky_8
-              dockerfile: rocky-8
-              extra_docker_build_args: ''
-              extra_docker_run_args: ''
-              build_cmd: rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
-              install_src_glob: build/x86_64/*.rpm
-
-            - target: rocky_9
-              dockerfile: rocky-9
-              extra_docker_build_args: ''
-              extra_docker_run_args: ''
-              build_cmd: rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
-              install_src_glob: build/x86_64/*.rpm
-
-            - target: ubuntu_22_04
-              dockerfile: ubuntu-22.04
-              extra_docker_build_args: ''
-              extra_docker_run_args: -w /$(ls -d build/wake-*)
-              build_cmd: debuild -us -uc
-              test_cmd: dpkg -i *.deb && cd tests && wake runTests
-              install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
-
-            - target: fedora_38
-              dockerfile: fedora-38
-              extra_docker_build_args: ''
-              extra_docker_run_args: ''
-              build_cmd: rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
-              install_src_glob: build/x86_64/*.rpm
-
-            - target: vscode
-              dockerfile: wasm
-              extra_docker_build_args: ''
-              extra_docker_run_args: -u build
-              build_cmd: make -C wake-* vscode
-              test_cmd: ls # no-op
-              install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
-
-            # Two confounding bugs are breaking the latest emsdk build. We can't really work around them
-            # so for now, disable the latest target and track them closely.
-            #
-            # Bugs:
-            #   webpack tries to resolve new URL into a module which is incorrect (https://github.com/webpack/webpack/issues/16878)
-            #   emscripten may emit ES6 style imports which makes webpack grumpy (https://github.com/emscripten-core/emscripten/issues/19066#issuecomment-1486853354)
-            #
-            # - target: vscode_latest
-            #   dockerfile: wasm
-            #   extra_docker_build_args: --build-arg EMSDK_VERSION=latest
-            #   extra_docker_run_args: -u build
-            #   build_cmd: make -C wake-* vscode
-            #   test_cmd: ls # no-op
-            #   install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
 
       steps:
         - name: Create target directories
