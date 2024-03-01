@@ -494,8 +494,8 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
 
                 JArray (map mkVisJson readPaths)
 
-            require Pass stdout = getJobFailedStdout job
-            require Pass stderr = getJobFailedStderr job
+            require Pass stdout = job.getJobFailedStdoutRaw
+            require Pass stderr = job.getJobFailedStderrRaw
 
             def jobCacheAddJson =
                 prettyJSON
@@ -898,9 +898,14 @@ export def xOK: Integer =
 export def access (file: String) (mode: Integer): Boolean =
     (\f \m prim "access") file mode
 
+export def rscRunner: Runner = 
+    # TODO: changing the hash function seems to break the rsc
+    mkRemoteCacheRunner (RemoteCacheApi "localhost" 3001 (Some "InsecureKey")) (\_ Pass "") "/workspace" fuseRunner
+
 export def defaultRunner: Runner =
-    require Some _ = getenv "WAKE_LOCAL_JOB_CACHE"
-    else fuseRunner
+    rscRunner
+    #require Some _ = getenv "WAKE_LOCAL_JOB_CACHE"
+    #else fuseRunner
 
     # The fuseRunner does not actully mount over / and instead uses the
     # the host root as the sandbox root. This means that wakeroot will
@@ -909,7 +914,7 @@ export def defaultRunner: Runner =
     # works in relative paths to make different runs consistent. Ideally
     # you'd have a more complex sandbox that kept the wakeroot at a
     # consistent place across runs.
-    mkJobCacheRunner (\_ Pass "") "/workspace" fuseRunner
+    #mkJobCacheRunner (\_ Pass "") "/workspace" fuseRunner
 
 # A plan describing how to construct a JSONRunner
 # RawScript: the path to the script to run jobs with

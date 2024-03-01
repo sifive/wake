@@ -45,6 +45,7 @@ pub async fn fetch_unreferenced_blobs(
             r#"
             SELECT * FROM blob
             WHERE created_at <= $1
+            AND store_id != '00000000-0000-0000-0000-000000000000'
             AND id NOT IN
             (
                 SELECT blob_id FROM output_file

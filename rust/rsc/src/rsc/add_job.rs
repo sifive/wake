@@ -24,7 +24,7 @@ pub async fn add_job(
         created_at: NotSet,
         hash: Set(hash.clone().into()),
         cmd: Set(payload.cmd),
-        env: Set(payload.env.as_bytes().into()),
+        env: Set(payload.env),
         cwd: Set(payload.cwd),
         stdin: Set(payload.stdin),
         is_atty: Set(payload.is_atty),

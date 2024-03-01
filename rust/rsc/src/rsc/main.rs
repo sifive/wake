@@ -97,6 +97,13 @@ async fn activate_stores(
         );
     }
 
+    // ---    Activate DBOnly Store   ---
+    let dbonly_id = Uuid::parse_str("00000000-0000-0000-0000-000000000000").unwrap();
+    active_stores.insert(
+        dbonly_id,
+        Arc::new(blob_store_impls::DbOnlyBlobStore { id: dbonly_id }),
+    );
+
     return active_stores;
 }
 

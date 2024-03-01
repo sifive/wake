@@ -178,9 +178,9 @@ pub async fn read_job(
         Err(cause) => {
             tracing::error! {
               %cause,
-              "failed to add job"
+              "failed to read job"
             };
-            (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch))
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(ReadJobResponse::NoMatch))
         }
     }
 }

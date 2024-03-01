@@ -10,7 +10,6 @@ use std::sync::Arc;
 use tokio_util::bytes::Bytes;
 use tracing;
 
-// TODO: Update this trait to return the url for a given key
 #[async_trait]
 pub trait BlobStore {
     async fn stream<'a>(

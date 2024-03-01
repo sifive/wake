@@ -75,3 +75,28 @@ impl BlobStore for TestBlobStore {
 }
 
 impl DebugBlobStore for TestBlobStore {}
+
+#[derive(Debug, Clone)]
+pub struct DbOnlyBlobStore {
+    pub id: Uuid,
+}
+
+#[async_trait]
+impl BlobStore for DbOnlyBlobStore {
+    async fn stream<'a>(
+        &self,
+        _stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
+    ) -> Result<String, std::io::Error> {
+        panic!("DbOnly Blobs must not be created at runtime");
+    }
+
+    async fn download_url(&self, key: String) -> String {
+        return format!("dbonly://{key}");
+    }
+
+    async fn delete_key(&self, _key: String) -> Result<(), std::io::Error> {
+        Ok(())
+    }
+}
+
+impl DebugBlobStore for DbOnlyBlobStore {}

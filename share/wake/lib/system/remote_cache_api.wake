@@ -1,0 +1,143 @@
+# Copyright 2024 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package wake
+
+from http import _
+
+export tuple RemoteCacheApi =
+    export Domain: String
+    export Port: Integer
+    export Authorization: Option String
+
+export def rscApiPostStringBlob (name: String) (value: String) ((RemoteCacheApi domain port _): RemoteCacheApi): Result String Error =
+    require False = value ==* ""
+    else Pass "00000000-0000-0000-0000-000000000000"
+
+    require Pass temp = writeTempFile name value
+
+    buildHttpRequest "{domain}:{port|str}/blob"
+    | addFormData name temp
+    | uploadBlobRequest
+
+export def rscApiPostFileBlob (name: String) (file: String) ((RemoteCacheApi domain port _): RemoteCacheApi): Result String Error =
+    buildHttpRequest "{domain}:{port|str}/blob"
+    # We must use unsafe here since we cannot elevate *file* to a Path without either copying it
+    # or triggering the 'job output by multiple files' error.
+    | unsafe_addFormData name file
+    | uploadBlobRequest
+
+export def rscApiPostJob (json: JValue) ((RemoteCacheApi domain port auth): RemoteCacheApi): Result Unit Error =
+    require Some auth = auth 
+    else failWithError "rsc: Posting a job requires authorization but none was provided"
+
+    def jsonStr = 
+        formatJSON
+        $ json
+
+    require Pass response =
+        buildHttpRequest "{domain}:{port|str}/job"
+        | setMethod HttpMethodPost
+        | addContentTypeJsonHeader
+        | addAuthorizationHeader auth 
+        | setBody jsonStr
+        | makeRequest
+
+    require (Some 200) = response.getHttpResponseStatusCode
+    else failWithError "rsc: post job failed with code {response.getHttpResponseStatusCode | format}"
+
+    Pass Unit
+
+# TODO: it would be nice for the in/out types to be fully typed
+export def rscApiFindMatchingJob (json: JValue) ((RemoteCacheApi domain port _): RemoteCacheApi): Result JValue Error =
+    def jsonStr = formatJSON $ json
+    require Pass response =
+        buildHttpRequest "{domain}:{port|str}/job/matching"
+        | setMethod HttpMethodPost
+        | addContentTypeJsonHeader
+        | setBody jsonStr 
+        | makeRequest
+
+    response.getHttpResponseBody.parseJSONBody
+
+#export def rscApiGetStringBlob (id: String) (url: String) ((RemoteCacheApi domain port _): RemoteCacheApi): Result String Error =
+#    require False = id ==* "00000000-0000-0000-0000-000000000000"
+#    else Pass  ""
+#
+#    require Pass response =
+#        buildHttpRequest url
+#        | setMethod HttpMethodGet
+#        | makeRequest
+#
+#    Pass response.getHttpResponseBody
+#
+#def _downloadBlobFile (url: String) (path: String) (mode: Integer): Result String Error =
+#    require Pass downloadPath =
+#        buildHttpRequest url
+#        | setMethod HttpMethodGet
+#        | makeBinaryRequest
+#
+#    def fixupScript =
+#        """
+#        cp %{downloadPath.getPathName} %{path} 
+#        chmod %{mode | strOctal} %{path} 
+#        """
+#
+#    def job =
+#        makeShellPlan fixupScript (downloadPath, Nil)
+#        | setPlanLabel "rsc: fixup blob {path} from {downloadPath.getPathName}"
+#        # We need to copy the file over another jobs output space so:
+#        #   - We must run with the local running
+#        #   - We must lie and say we output nothing
+#        #   - We must write to the path another job reports that it output
+#        | runJobWith localRunner
+#
+#    require True = job.isJobOk
+#    else failWithError "Failed to cleanup downloaded file {path} from {downloadPath.getPathName}"
+#
+#    Pass path
+
+
+# Helper function for uploading a blob.
+def uploadBlobRequest (request: HttpRequest): Result String Error =
+    require Pass response =
+        request
+        | setMethod HttpMethodPost
+        | makeRequest
+
+    require (Some 200) = response.getHttpResponseStatusCode
+    else
+        failWithError
+        "rsc: failed to upload string as blob with code {response.getHttpResponseStatusCode | format}"
+
+    require Pass json = response.getHttpResponseBody.parseJSONBody
+
+    require Pass (JString "Ok") = jField json "type"
+    else failWithError "rsc: failed to upload blob"
+
+    require Pass (JArray blobs) = jField json "blobs"
+    else failWithError "rsc: JSON response has incorrect schema for blob upload. (Missing blobs key)"
+
+    def idJVals =
+        blobs
+        | map (jField _ "id")
+
+    require Pass ids = idJVals.findFail
+    else failWithError "rsc: JSON response has incorrect schema for blob upload. (Missing blob ids)"
+
+    require Some (JString id) = ids.head
+    else failWithError "rsc: JSON response has incorrect schema for blob upload. (Expected only 1 id saw {ids.len.str})"
+
+    Pass id
