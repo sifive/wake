@@ -1,4 +1,4 @@
-FROM alpine:3.19.1
+FROM alpine:3.14
 
 RUN apk add m4 g++ make pkgconf git tar xz gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev dash sqlite-static ncurses-static linux-headers jq openssl-dev
 
