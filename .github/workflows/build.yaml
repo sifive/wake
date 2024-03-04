@@ -10,7 +10,7 @@ on:
 
 jobs:
     tarball:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       name: Tarball
       steps:
         - name: Clone wake
@@ -72,7 +72,7 @@ jobs:
             retention-days: 1
 
     docker_builds:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       needs: tarball
       name: Build ${{ matrix.target }}
       strategy:
