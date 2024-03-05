@@ -5,6 +5,7 @@ use futures::stream::BoxStream;
 use rand_core::{OsRng, RngCore};
 use sea_orm::prelude::Uuid;
 use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio::io::BufWriter;
 use tokio_util::bytes::Bytes;
 use tokio_util::io::StreamReader;
@@ -18,11 +19,16 @@ fn create_temp_filename() -> String {
 
 #[derive(Debug, Clone)]
 pub struct LocalBlobStore {
+    pub id: Uuid,
     pub root: String,
 }
 
 #[async_trait]
 impl BlobStore for LocalBlobStore {
+    fn id(&self) -> Uuid {
+        self.id
+    }
+
     async fn stream<'a>(
         &self,
         stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
@@ -58,6 +64,10 @@ pub struct TestBlobStore {
 
 #[async_trait]
 impl BlobStore for TestBlobStore {
+    fn id(&self) -> Uuid {
+        self.id
+    }
+
     async fn stream<'a>(
         &self,
         _stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
@@ -75,3 +85,56 @@ impl BlobStore for TestBlobStore {
 }
 
 impl DebugBlobStore for TestBlobStore {}
+
+#[derive(Debug, Clone)]
+pub struct DbOnlyBlobStore {
+    pub id: Uuid,
+}
+
+#[async_trait]
+impl BlobStore for DbOnlyBlobStore {
+    fn id(&self) -> Uuid {
+        self.id
+    }
+
+    async fn stream<'a>(
+        &self,
+        stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
+    ) -> Result<String, std::io::Error> {
+        let reader = StreamReader::new(stream);
+        futures::pin_mut!(reader);
+        let mut buffer = [0u8; 101];
+        let mut count = 0;
+
+        loop {
+            // If we have filled the buffer then the request has exceeded the max.
+            if count == 101 {
+                panic!("DbOnlyBlobStore only supports up to 100 byte blobs");
+            }
+
+            let n = reader.read(&mut buffer[count..]).await?;
+            if n == 0 {
+                break;
+            }
+
+            count += n;
+        }
+
+        Ok(buffer[0..count]
+            .iter()
+            .map(|x| format!("%{:02X}", x))
+            .collect::<Vec<_>>()
+            .concat())
+    }
+
+    async fn download_url(&self, key: String) -> String {
+        return format!("db://{key}");
+    }
+
+    async fn delete_key(&self, _key: String) -> Result<(), std::io::Error> {
+        // Nothing outside of the db to delete
+        Ok(())
+    }
+}
+
+impl DebugBlobStore for DbOnlyBlobStore {}

@@ -10,9 +10,9 @@ use std::sync::Arc;
 use tokio_util::bytes::Bytes;
 use tracing;
 
-// TODO: Update this trait to return the url for a given key
 #[async_trait]
 pub trait BlobStore {
+    fn id(&self) -> Uuid;
     async fn stream<'a>(
         &self,
         stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
@@ -34,8 +34,8 @@ pub async fn get_upload_url(server_addr: String) -> Json<GetUploadUrlResponse> {
 pub async fn create_blob(
     mut multipart: Multipart,
     db: Arc<DatabaseConnection>,
-    store_id: Uuid,
-    store: Arc<dyn DebugBlobStore + Send + Sync>,
+    active_store: Arc<dyn DebugBlobStore + Send + Sync>,
+    dbonly_store: Arc<dyn DebugBlobStore + Send + Sync>,
 ) -> (StatusCode, Json<PostBlobResponse>) {
     let mut parts: Vec<PostBlobResponsePart> = Vec::new();
 
@@ -50,6 +50,13 @@ pub async fn create_blob(
                     }),
                 )
             }
+        };
+
+        // If the client tells us the blob is small we'll trust them and just store it directly in
+        // the database.
+        let store = match field.content_type() {
+            Some("blob/small") => dbonly_store.clone(),
+            _ => active_store.clone(),
         };
 
         let result = store
@@ -71,7 +78,7 @@ pub async fn create_blob(
             id: NotSet,
             created_at: NotSet,
             key: Set(result.unwrap()),
-            store_id: Set(store_id),
+            store_id: Set(store.id()),
         };
 
         match active_blob.insert(db.as_ref()).await {
