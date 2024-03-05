@@ -7,6 +7,10 @@ trap 'rm link_file_src.txt link_file_dst.txt' EXIT
 
 STDOUT=$(${1}/wakebox -p input.json)
 
+ls -lah .
+cat link_file_src.txt
+cat link_file_dst.txt
+
 echo "$?"
 echo "${STDOUT}"
 
