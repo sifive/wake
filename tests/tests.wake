@@ -259,7 +259,7 @@ def runTest (testScript: Path): Result Unit Error =
             def _ =
                 (testName, "\n", jobStderr, Nil)
                 | cat
-                | println
+                | printlnLevel logWarning
 
             Fail (makeError "Unexpected standard error. See above for details")
 
@@ -271,6 +271,6 @@ def runTest (testScript: Path): Result Unit Error =
             def _ =
                 (testName, "\n", jobStdout, Nil)
                 | cat
-                | println
+                | printlnLevel logWarning
 
             Fail (makeError "Unexpected standard output. See above for details")
