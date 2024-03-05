@@ -7,4 +7,7 @@ trap 'rm link_file_src.txt link_file_dst.txt' EXIT
 
 STDOUT=$(${1}/wakebox -p input.json)
 
+echo "$?"
+echo "${STDOUT}"
+
 [ "$STDOUT" = "pass" ] || exit 1
