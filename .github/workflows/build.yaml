@@ -101,7 +101,7 @@ jobs:
               extra_docker_build_args: ''
               extra_docker_run_args: ''
               build_cmd: make -C wake-* static
-              test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests
+              test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake -x Unit
               install_src_glob: build/wake-*/wake-static_*
 
             - target: centos_7_6
