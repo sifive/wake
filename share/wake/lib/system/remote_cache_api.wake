@@ -24,5 +24,23 @@ export tuple RemoteCacheApi =
     # The api key required for authenicated routes. Not required for all requests
     export Authorization: Option String
 
+export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
+    require (domain, portStr, authStr, Nil) =
+        config
+        | tokenize `:`
+    else
+        failWithError
+        "Remote cache config was set with incorrect format. Saw: '{config}'. Expected 'domain:port:auth' (auth may be omitted)"
+
+    require Some (port) =
+        portStr
+        | int
+    else failWithError "Remote cache config was set with non-integer port. Saw: {portStr}"
+
+    def auth = if authStr ==* "" then None else Some authStr
+
+    RemoteCacheApi domain port auth
+    | Pass
+
 # TODO: methods such as "downloadFile" and "postJob" should be implemented here.
 

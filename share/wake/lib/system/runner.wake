@@ -162,20 +162,11 @@ export def defaultRunner: Runner =
         # consistent place across runs.
         mkJobCacheRunner (\_ Pass "") "/workspace" fuseRunner
 
-    require (domain, portStr, authStr, Nil) =
-        config
-        | tokenize `:`
-    else
-        panic "Remote cache config was set with incorrect format. Saw: '{config}'. Expected 'domain:port:auth' (auth may be omitted)"
+    def remoteCacheApi = match (makeRemoteCacheApi config)
+        Pass x -> x
+        Fail (Error why _) -> panic why
 
-    require Some (port) =
-        portStr
-        | int
-    else panic "Remote cache config was set with non-integer port. Saw: {portStr}"
-
-    def auth = if authStr ==* "" then None else Some authStr
-
-    rscRunner (RemoteCacheApi domain port auth)
+    rscRunner remoteCacheApi
 
 # A plan describing how to construct a JSONRunner
 # RawScript: the path to the script to run jobs with
