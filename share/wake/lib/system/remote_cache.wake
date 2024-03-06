@@ -15,9 +15,24 @@
 
 package wake
 
+# rscRunner: Creates a remote cache runner for a given api config
+#
+# ```
+# rscRunner (RemoteCacheApi "local" 1234 "auth") = (Runner ...)
+# ```
 export target rscRunner (rscApi: RemoteCacheApi): Runner =
     mkRemoteCacheRunner rscApi (\_ Pass "") "/workspace" fuseRunner
 
+# mkRemoteCacheRunner: Creates a remote cache runner from an underlying runner
+#
+# - `rscApi`: the remote cache to connect to
+# - `hashFn`: a runner provided hash, used to invalate jobs that match by key but not by something
+#   known only to the runner
+# - `wakeroot`: Absolute path to the root of the wake project
+# - `baseRunner`: The runner that should be used for a cache miss
+# ```
+# mkRemoteCacheRunner (RemoteCacheApi ...) (\_ Pass "") "" baseRunner = (Runner ...)
+# ```
 export def mkRemoteCacheRunner (_rscApi: RemoteCacheApi) (_hashFn: Result RunnerInput Error => Result String Error) (_wakeroot: String) ((Runner name score baseDoIt): Runner): Runner =
     def badlaunch job error = prim "job_fail_launch"
 
