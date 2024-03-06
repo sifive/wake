@@ -24,6 +24,15 @@ export tuple RemoteCacheApi =
     # The api key required for authenicated routes. Not required for all requests
     export Authorization: Option String
 
+# makeRemoteCacheApi: Parses config string into RemoteCacheApi
+#
+# ```
+#  makeRemoteCacheApi "local:1234:myauth" = Pass (RemoteCacheApi "local" 1234 (Some "myauth"))
+#  makeRemoteCacheApi "local:1234:" = Pass (RemoteCacheApi "local" 1234 None)
+#  makeRemoteCacheApi "local:1234" = Fail (...)
+#  makeRemoteCacheApi "local" = Fail (...)
+#  makeRemoteCacheApi "local:asdf:myauth" = Fail (...)
+# ```
 export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
     require (domain, portStr, authStr, Nil) =
         config
