@@ -186,7 +186,7 @@ static void copy(int src_fd, int dst_fd) {
   do {
     intptr_t written = sendfile(dst_fd, src_fd, &idx, size);
     if (written < 0) {
-      wcl::log::error("sendfile(src_fd = %d, NULL, dst_fd = %d, size = %ld, 0): %s", src_fd, dst_fd,
+      wcl::log::error("sendfile(src_fd = %d, NULL, dst_fd = %d, size = %d, 0): %s", src_fd, dst_fd,
                       buf.st_size, strerror(errno))
           .urgent()();
       exit(1);

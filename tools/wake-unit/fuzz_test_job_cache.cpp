@@ -156,21 +156,21 @@ struct TestJob {
     return job_cache::FindJobRequest(request);
   }
 
-  static TestJob gen(const FuzzLoopConfig& config, wcl::xoshiro_256& rng) {
+  static TestJob gen(const FuzzLoopConfig& config, wcl::xoshiro_256& gen) {
     TestJob out;
 
     // Generate our primary key
     out.cwd = "/workspace";
-    out.cmd = rng.unique_name();
-    out.env = rng.unique_name();
-    out.stdin = rng.unique_name();
+    out.cmd = gen.unique_name();
+    out.env = gen.unique_name();
+    out.stdin = gen.unique_name();
 
     // Generate our input and output files
     std::uniform_int_distribution<> number_of_inputs_dist(0, config.max_vis);
     std::uniform_int_distribution<> number_of_outputs_dist(0, config.max_out);
     std::uniform_int_distribution<> file_path_size(16, config.max_path_size);
-    int number_of_inputs = number_of_inputs_dist(rng);
-    int number_of_outputs = number_of_outputs_dist(rng);
+    int number_of_inputs = number_of_inputs_dist(gen);
+    int number_of_outputs = number_of_outputs_dist(gen);
 
     // TODO: Pull these from input and output pools
     //       This will require an auxiliery type of some
@@ -178,14 +178,14 @@ struct TestJob {
     for (int i = 0; i < number_of_inputs; ++i) {
       out.input_files.emplace_back();
       out.input_files.back().path =
-          generate_long_string('/', rng.unique_name(), file_path_size(rng));
-      out.input_files.back().content = rng.unique_name();
+          generate_long_string('/', gen.unique_name(), file_path_size(gen));
+      out.input_files.back().content = gen.unique_name();
     }
     for (int i = 0; i < number_of_outputs; ++i) {
       out.output_files.emplace_back();
       out.output_files.back().path =
-          generate_long_string('/', rng.unique_name(), file_path_size(rng));
-      out.output_files.back().content = rng.unique_name();
+          generate_long_string('/', gen.unique_name(), file_path_size(gen));
+      out.output_files.back().content = gen.unique_name();
     }
 
     return out;
