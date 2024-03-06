@@ -1,0 +1,24 @@
+Cleaning up stale artifacts
+Running test one to fill the cache
+Pass ("one.txt", Nil)
+Running test two to fill the cache
+Pass ("two.txt", Nil)
+Running test three to fill the cache
+Pass ("three.txt", Nil)
+Running test one again. Should be a cache hit
+Pass ("one.txt", Nil)
+Going over. Expecting two and three to be dropped
+Running test one again. Should be a cache hit
+Pass ("one.txt", Nil)
+Running test three again. Should be a cache hit
+Pass ("three.txt", Nil)
+Running test two again. Should be a cache miss
+Pass ("two.txt", Nil)
+Running test one again. Should be a cache hit
+Pass ("one.txt", Nil)
+Running test four again. Should be a cache miss
+Pass ("four.txt", Nil)
+Running test two again. Should be a cache hit
+Pass ("two.txt", Nil)
+Running test four again. Should be a cache hit
+Pass ("four.txt", Nil)
