@@ -370,6 +370,27 @@ static std::vector<CSTElement> collect_block_parts(CSTElement node) {
   return parts;
 }
 
+static bool should_stop_collecting(
+    const std::vector<std::pair<cst_id_t, const std::string&>>& collect_over, CSTElement op) {
+  // Stop collecting if we don't see an OP
+  if (op.id() != CST_OP) {
+    return true;
+  }
+
+  // Stop collecting if the OP doesn't match both token and string contents
+  // Ex: OP_OR != OP_AND
+  // Ex: OP_OR("|") != OP_OR("||")
+  // Ex: OP_OR("||") == OP_OR("||")
+  for (const auto& i : collect_over) {
+    if (op.firstChildElement().id() == i.first &&
+        op.firstChildElement().fragment().segment().str() == i.second) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 static std::vector<CSTElement> collect_left_binary(
     const std::vector<std::pair<cst_id_t, const std::string&>>& collect_over, CSTElement node) {
   if (node.id() != CST_BINARY) {
@@ -388,25 +409,7 @@ static std::vector<CSTElement> collect_left_binary(
   CSTElement right = op;
   right.nextSiblingNode();
 
-  // Stop collecting if we don't see an OP
-  if (op.id() != CST_OP) {
-    return {node};
-  }
-
-  // Stop collecting if the OP doesn't match both token and string contents
-  // Ex: OP_OR != OP_AND
-  // Ex: OP_OR("|") != OP_OR("||")
-  // Ex: OP_OR("||") == OP_OR("||")
-  bool matches = false;
-  for (const auto& i : collect_over) {
-    if (op.firstChildElement().id() == i.first &&
-        op.firstChildElement().fragment().segment().str() == i.second) {
-      matches = true;
-      break;
-    }
-  }
-
-  if (!matches) {
+  if (should_stop_collecting(collect_over, op)) {
     return {node};
   }
 
@@ -423,6 +426,10 @@ static std::vector<CSTElement> collect_right_binary(
     return {node};
   }
 
+  if (collect_over.empty()) {
+    return {node};
+  }
+
   // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
   // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
   CSTElement left = node.firstChildNode();
@@ -431,25 +438,7 @@ static std::vector<CSTElement> collect_right_binary(
   CSTElement right = op;
   right.nextSiblingNode();
 
-  // Stop collecting if we don't see an OP
-  if (op.id() != CST_OP) {
-    return {node};
-  }
-
-  // Stop collecting if the OP doesn't match both token and string contents
-  // Ex: OP_OR != OP_AND
-  // Ex: OP_OR("|") != OP_OR("||")
-  // Ex: OP_OR("||") == OP_OR("||")
-  bool matches = false;
-  for (const auto& i : collect_over) {
-    if (op.firstChildElement().id() == i.first &&
-        op.firstChildElement().fragment().segment().str() == i.second) {
-      matches = true;
-      break;
-    }
-  }
-
-  if (!matches) {
+  if (should_stop_collecting(collect_over, op)) {
     return {node};
   }
 
