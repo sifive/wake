@@ -240,7 +240,7 @@ export def addErrorContext (prefix: String): Result a Error => Result a Error = 
 export def failWithError (cause: String): Result a Error =
     Fail (makeError cause)
 
-# |>: Result compatible pipeline function. Used in the same way as '|'.
+# |>: Result compatible pipeline function. Used in the same way as '|' when both the input and the following function return a Result.
 #
 # Example:
 # ```
