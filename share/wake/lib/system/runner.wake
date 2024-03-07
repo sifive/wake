@@ -148,17 +148,25 @@ export def fuseRunner: Runner =
     | makeJSONRunner
 
 export def defaultRunner: Runner =
-    require Some _ = getenv "WAKE_LOCAL_JOB_CACHE"
-    else fuseRunner
+    require Some config = getenv "WAKE_REMOTE_CACHE"
+    else
+        require Some _ = getenv "WAKE_LOCAL_JOB_CACHE"
+        else fuseRunner
 
-    # The fuseRunner does not actully mount over / and instead uses the
-    # the host root as the sandbox root. This means that wakeroot will
-    # change from depending on where wake is being run from. As a hack
-    # to work around this we abuse the fact that the fuseRunner only
-    # works in relative paths to make different runs consistent. Ideally
-    # you'd have a more complex sandbox that kept the wakeroot at a
-    # consistent place across runs.
-    mkJobCacheRunner (\_ Pass "") "/workspace" fuseRunner
+        # The fuseRunner does not actully mount over / and instead uses the
+        # the host root as the sandbox root. This means that wakeroot will
+        # change from depending on where wake is being run from. As a hack
+        # to work around this we abuse the fact that the fuseRunner only
+        # works in relative paths to make different runs consistent. Ideally
+        # you'd have a more complex sandbox that kept the wakeroot at a
+        # consistent place across runs.
+        mkJobCacheRunner (\_ Pass "") "/workspace" fuseRunner
+
+    def remoteCacheApi = match (makeRemoteCacheApi config)
+        Pass x -> x
+        Fail (Error why _) -> panic why
+
+    rscRunner remoteCacheApi
 
 # A plan describing how to construct a JSONRunner
 # RawScript: the path to the script to run jobs with
