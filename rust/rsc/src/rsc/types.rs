@@ -52,7 +52,7 @@ pub struct AddJobPayload {
 }
 
 impl AddJobPayload {
-    pub fn hash(&self) -> [u8; 32] {
+    pub fn hash(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&self.cmd.len().to_le_bytes());
         hasher.update(&self.cmd);
@@ -72,7 +72,7 @@ impl AddJobPayload {
             hasher.update(&file.hash.len().to_le_bytes());
             hasher.update(file.hash.as_bytes());
         }
-        hasher.finalize().into()
+        hasher.finalize().to_string()
     }
 }
 
@@ -90,7 +90,7 @@ pub struct ReadJobPayload {
 
 impl ReadJobPayload {
     // TODO: Figure out a way to de-dup this with AddJobPayload somehow
-    pub fn hash(&self) -> [u8; 32] {
+    pub fn hash(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&self.cmd.len().to_le_bytes());
         hasher.update(&self.cmd);
@@ -110,7 +110,7 @@ impl ReadJobPayload {
             hasher.update(&file.hash.len().to_le_bytes());
             hasher.update(file.hash.as_bytes());
         }
-        hasher.finalize().into()
+        hasher.finalize().to_string()
     }
 }
 

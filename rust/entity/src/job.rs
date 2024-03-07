@@ -7,8 +7,8 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
-    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))", unique)]
-    pub hash: Vec<u8>,
+    #[sea_orm(unique)]
+    pub hash: String,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
     pub cmd: Vec<u8>,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]

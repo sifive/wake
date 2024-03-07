@@ -50,9 +50,6 @@ pub async fn read_job(
     conn: Arc<DatabaseConnection>,
     blob_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) -> (StatusCode, Json<ReadJobResponse>) {
-    // First find the hash so we can look up the exact job
-    let hash: Vec<u8> = payload.hash().into();
-
     // TODO: This transaction is quite large with a bunch of "serialized" queries. If read_job
     // becomes a bottleneck it should be rewritten such that joining on promises is delayed for as
     // long as possible. Another option would be to collect all blob ids ahead of time and make a
@@ -62,7 +59,7 @@ pub async fn read_job(
         .transaction::<_, (Option<Uuid>, ReadJobResponse), DbErr>(|txn| {
             Box::pin(async move {
                 let Some(matching_job) = job::Entity::find()
-                    .filter(job::Column::Hash.eq(hash))
+                    .filter(job::Column::Hash.eq(payload.hash()))
                     .one(txn)
                     .await?
                 else {
