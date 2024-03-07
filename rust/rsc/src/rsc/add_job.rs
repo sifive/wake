@@ -51,7 +51,7 @@ pub async fn add_job(
                     id: NotSet,
                     created_at: NotSet,
                     path: Set(vis_file.path),
-                    hash: Set(vis_file.hash.into()),
+                    hash: Set(vis_file.hash),
                     job_id: Set(job_id),
                 });
 

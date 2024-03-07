@@ -84,7 +84,7 @@ impl MigrationTrait for Migration {
                             .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(VisibleFile::Path).string().not_null())
-                    .col(ColumnDef::new(VisibleFile::Hash).string())
+                    .col(ColumnDef::new(VisibleFile::Hash).string().not_null())
                     .col(ColumnDef::new(VisibleFile::JobId).uuid().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
