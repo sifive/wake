@@ -8,8 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub path: String,
-    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
-    pub hash: Vec<u8>,
+    pub hash: String,
     pub job_id: Uuid,
     pub created_at: DateTime,
 }

@@ -29,8 +29,8 @@ impl MigrationTrait for Migration {
                             .primary_key()
                             .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
-                    .col(ColumnDef::new(Job::Hash).ezblob().unique_key())
-                    .col(ColumnDef::new(Job::Cmd).string().not_null())
+                    .col(ColumnDef::new(Job::Hash).string().not_null().unique_key())
+                    .col(ColumnDef::new(Job::Cmd).ezblob().not_null())
                     .col(ColumnDef::new(Job::Env).ezblob())
                     .col(ColumnDef::new(Job::Cwd).string().not_null())
                     .col(ColumnDef::new(Job::Stdin).string().not_null())
@@ -84,7 +84,7 @@ impl MigrationTrait for Migration {
                             .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(VisibleFile::Path).string().not_null())
-                    .col(ColumnDef::new(VisibleFile::Hash).ezblob())
+                    .col(ColumnDef::new(VisibleFile::Hash).string().not_null())
                     .col(ColumnDef::new(VisibleFile::JobId).uuid().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()

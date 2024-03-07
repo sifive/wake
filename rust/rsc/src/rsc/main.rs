@@ -497,8 +497,8 @@ mod tests {
                     .header("Authorization", api_key)
                     .body(Body::from(
                         serde_json::to_vec(&json!({
-                            "cmd": "blarg",
-                            "env":"PATH=/usr/bin",
+                            "cmd": b"blarg",
+                            "env": b"PATH=/usr/bin",
                             "cwd":"/workspace",
                             "stdin":"",
                             "is_atty": false,
@@ -534,8 +534,8 @@ mod tests {
                     .header("Content-Type", "application/json")
                     .body(Body::from(
                         serde_json::to_vec(&json!({
-                            "cmd": "blrg",
-                            "env":"PATH=/usr/bin",
+                            "cmd": b"blrg",
+                            "env": b"PATH=/usr/bin",
                             "cwd":"/workspace",
                             "stdin":"",
                             "is_atty": false,
@@ -564,8 +564,8 @@ mod tests {
                     .header("Content-Type", "application/json")
                     .body(Body::from(
                         serde_json::to_vec(&json!({
-                            "cmd": "blarg",
-                            "env":"PATH=/usr/bin",
+                            "cmd": b"blarg",
+                            "env": b"PATH=/usr/bin",
                             "cwd":"/workspace",
                             "stdin":"",
                             "is_atty": false,
@@ -615,16 +615,11 @@ mod tests {
         let blob_id = create_fake_blob(&db, store_id).await.unwrap();
         let conn = Arc::new(db);
 
-        let hash: [u8; 32] = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0,
-        ];
-
         // Create a job that is 5 days old
         let insert_job = entity::job::ActiveModel {
             id: NotSet,
             created_at: Set((Utc::now() - Duration::days(5)).naive_utc()),
-            hash: Set(hash.into()),
+            hash: Set("00000000".to_string()),
             cmd: Set("blarg".into()),
             env: Set("PATH=/usr/bin".as_bytes().into()),
             cwd: Set("/workspace".into()),
@@ -643,16 +638,11 @@ mod tests {
 
         insert_job.save(conn.clone().as_ref()).await.unwrap();
 
-        let hash: [u8; 32] = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 1,
-        ];
-
         // Create a job that is 1 day old
         let insert_job = entity::job::ActiveModel {
             id: NotSet,
             created_at: Set((Utc::now() - Duration::days(1)).naive_utc()),
-            hash: Set(hash.into()),
+            hash: Set("00000001".to_string()),
             cmd: Set("blarg2".into()),
             env: Set("PATH=/usr/bin".as_bytes().into()),
             cwd: Set("/workspace".into()),

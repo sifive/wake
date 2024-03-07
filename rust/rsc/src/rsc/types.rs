@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
 pub struct VisibleFile {
     pub path: String,
-    pub hash: [u8; 32],
+    pub hash: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -30,8 +30,8 @@ pub struct Symlink {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AddJobPayload {
-    pub cmd: String,
-    pub env: String,
+    pub cmd: Vec<u8>,
+    pub env: Vec<u8>,
     pub cwd: String,
     pub stdin: String,
     pub is_atty: bool,
@@ -52,12 +52,12 @@ pub struct AddJobPayload {
 }
 
 impl AddJobPayload {
-    pub fn hash(&self) -> [u8; 32] {
+    pub fn hash(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&self.cmd.len().to_le_bytes());
-        hasher.update(self.cmd.as_bytes());
+        hasher.update(&self.cmd);
         hasher.update(&self.env.len().to_le_bytes());
-        hasher.update(self.env.as_bytes());
+        hasher.update(&self.env);
         hasher.update(&self.cwd.len().to_le_bytes());
         hasher.update(self.cwd.as_bytes());
         hasher.update(&self.stdin.len().to_le_bytes());
@@ -70,16 +70,16 @@ impl AddJobPayload {
             hasher.update(&file.path.len().to_le_bytes());
             hasher.update(file.path.as_bytes());
             hasher.update(&file.hash.len().to_le_bytes());
-            hasher.update(&file.hash);
+            hasher.update(file.hash.as_bytes());
         }
-        hasher.finalize().into()
+        hasher.finalize().to_string()
     }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ReadJobPayload {
-    pub cmd: String,
-    pub env: String,
+    pub cmd: Vec<u8>,
+    pub env: Vec<u8>,
     pub cwd: String,
     pub stdin: String,
     pub is_atty: bool,
@@ -90,12 +90,12 @@ pub struct ReadJobPayload {
 
 impl ReadJobPayload {
     // TODO: Figure out a way to de-dup this with AddJobPayload somehow
-    pub fn hash(&self) -> [u8; 32] {
+    pub fn hash(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&self.cmd.len().to_le_bytes());
-        hasher.update(self.cmd.as_bytes());
+        hasher.update(&self.cmd);
         hasher.update(&self.env.len().to_le_bytes());
-        hasher.update(self.env.as_bytes());
+        hasher.update(&self.env);
         hasher.update(&self.cwd.len().to_le_bytes());
         hasher.update(self.cwd.as_bytes());
         hasher.update(&self.stdin.len().to_le_bytes());
@@ -108,9 +108,9 @@ impl ReadJobPayload {
             hasher.update(&file.path.len().to_le_bytes());
             hasher.update(file.path.as_bytes());
             hasher.update(&file.hash.len().to_le_bytes());
-            hasher.update(&file.hash);
+            hasher.update(file.hash.as_bytes());
         }
-        hasher.finalize().into()
+        hasher.finalize().to_string()
     }
 }
 
