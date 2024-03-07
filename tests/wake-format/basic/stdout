@@ -1794,9 +1794,11 @@ def a =
     |< c
 
 def a =
-    a |> b
+    a
+    |> b
     |< c
 
 def a =
-    a |< b
+    a
+    |< b
     |> c
