@@ -55,6 +55,32 @@ def wakeUnitToTest Unit =
 
     Pass result
 
+def showDiff (expect: String) (actual: String): Result Unit Error =
+    require Pass expectFile = writeTempFile "diff.expect" expect
+    else failWithError "Unable to write expect file"
+
+    require Pass actualFile = writeTempFile "diff.actual" actual
+    else failWithError "Unable to write actual file"
+
+    def cmd =
+        "diff",
+        "-u",
+        actualFile.getPathName,
+        expectFile.getPathName,
+
+    # The job outputs here don't actually matter, depending on them forces the output order for
+    # failed tests so they print out nicely.
+    require Exited _ =
+        makeExecPlan cmd (expectFile, actualFile, Nil)
+        | setPlanStdout logWarning
+        | setPlanStderr logWarning
+        | setPlanIsAtty True
+        | runJobWith defaultRunner
+        | getJobStatus
+    else failWithError "Unable to diff files"
+
+    Pass Unit
+
 export def runTests (cmdline: List String): Result String Error =
     require Pass filter = match cmdline
         Nil -> Pass `.*`
@@ -235,42 +261,60 @@ def runTest (testScript: Path): Result Unit Error =
         | setPlanShare False
         | runJobWith localRunner # On OS/X you cannot mount fuse within fuse
 
+    def removeCarriageReturns = replace `\r` ""
+
     require Pass jobStdout =
         testJob.getJobFailedStdout
-        | rmap (replace `\r` "")
+        | rmap removeCarriageReturns
 
     require Pass jobStderr =
         testJob.getJobFailedStderr
-        | rmap (replace `\r` "")
+        | rmap removeCarriageReturns
 
     require Pass _ = match shouldPass testJob.isJobOk
         True True -> Pass Unit
         False False -> Pass Unit
         True False ->
-            Fail (makeError "Test failed ({format testJob.getJobStatus}) with '{replace `\n.*` "" jobStderr}'")
+            def _ =
+                "{testName} failed! Stdout: \n{jobStdout}"
+                | printlnLevel logWarning
+
+            def _ =
+                "{testName} failed! Stderr: \n{jobStderr}"
+                | printlnLevel logWarning
+
+            Fail (makeError "Test failed. Expected: Ok, Actual: {format testJob.getJobStatus}. See above for details")
         False True ->
-            Fail (makeError "Test should not have passed with '{replace `\n.*` "" jobStderr}'")
-
-    require Pass _ = match expectedStderr
-        Some x if x ==* jobStderr -> Pass Unit
-        None -> Pass Unit
-        Some _ ->
-            # TODO: use diff prim to compare jobStderr with expectedStderr
             def _ =
-                (testName, "\n", jobStderr, Nil)
-                | cat
-                | println
+                "{testName} failed! Stdout: \n{jobStdout}"
+                | printlnLevel logWarning
 
-            Fail (makeError "Unexpected standard error. See above for details")
-
-    match expectedStdout
-        Some x if x ==* jobStdout -> Pass Unit
-        None -> Pass Unit
-        _ ->
-            # TODO: use diff prim to compare jobStdout with expectedStdout
             def _ =
-                (testName, "\n", jobStdout, Nil)
-                | cat
-                | println
+                "{testName} failed! Stderr: \n{jobStderr}"
+                | printlnLevel logWarning
 
-            Fail (makeError "Unexpected standard output. See above for details")
+            Fail (makeError "Test failed. Expected: Err, Actual: {format testJob.getJobStatus}. See above for details")
+
+    def expectEqualOutput (stream: String) (expected: Option String) (actual: String): Result Unit Error =
+        # If the integration test doesn't provide an expected output then anything is allowed.
+        require Some expect = expected
+        else Pass Unit
+
+        # If they are equal, pass the expect
+        require False = expect ==* actual
+        else Pass Unit
+
+        # They are not equal, show a nice diff and fail.
+        require Pass _ =
+            "{testName} failed! The diff below should be applied to jobs {stream}"
+            | printlnLevel logWarning
+            | Pass
+
+        require Pass _ = showDiff expect actual
+
+        Fail (makeError "Unexpected {stream}. See above for details")
+
+    require Pass Unit = expectEqualOutput "stderr" expectedStderr jobStderr
+    require Pass Unit = expectEqualOutput "stdout" expectedStdout jobStdout
+
+    Pass Unit
