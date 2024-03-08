@@ -3,6 +3,26 @@
 set -e
 WAKE="${1:+$1/wake}"
 
+cleanup () {
+  rm -f wake.db 2> /dev/null || true
+  rm -rf .cache-misses  2> /dev/null || true
+  rm -rf .cache-hit  2> /dev/null || true
+}
+
+expect_hit() {
+  if [ -z "$(ls -A .cache-hit)" ]; then
+    echo "Expected a cache hit but none found"
+    exit 1
+  fi
+}
+
+expect_miss() {
+  if [ -z "$(ls -A .cache-misses)" ]; then
+    echo "Expected a cache miss but none found"
+    exit 1
+  fi
+}
+
 echo "Cleaning up stale artifacts"
 
 rm wake.db 2> /dev/null || true
@@ -16,20 +36,17 @@ rm four.txt 2> /dev/null || true
 
 echo "Running test one to fill the cache"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
-rm wake.db
-rm -rf .cache-misses
+cleanup
 sleep 1
 
 echo "Running test two to fill the cache"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
-rm wake.db
-rm -rf .cache-misses
+cleanup
 sleep 2
 
 echo "Running test three to fill the cache"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test three
-rm wake.db
-rm -rf .cache-misses
+cleanup
 sleep 1
 
 # Times:
@@ -38,12 +55,8 @@ sleep 1
 # three: 1 of 6 old
 echo "Running test one again. Should be a cache hit"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
-rm wake.db
-rm -rf .cache-misses
-if [ -z "$(ls -A .cache-hit)" ]; then
-  echo "No cache hit found"
-  exit 1
-fi
+expect_hit
+cleanup
 sleep 3
 
 # Times:
@@ -55,21 +68,12 @@ echo "Going over. Expecting one and two to be dropped"
 
 echo "Running test one again to refill the cache"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
-rm wake.db
-rm -rf .cache-misses
+cleanup
 
 echo "Running test three again. Should be a cache hit"
-rm -rf .cache-hit  2> /dev/null || true
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test three
-rm wake.db
-if [ -z "$(ls -A .cache-hit)" ]; then
-  echo "No cache hit found"
-  exit 1
-fi
-if [ -d ".cache-misses" ]; then
-  echo "Found a cache miss"
-  exit 1
-fi
+expect_hit
+cleanup
 sleep 1
 
 # Times:
@@ -80,11 +84,8 @@ sleep 1
 echo "Running test two again. Should be a cache miss"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
 rm wake.db
-if [ -z "$(ls -A .cache-misses)" ]; then
-  echo "Expected a cache miss!!"
-  exit 1
-fi
-rm -rf .cache-misses
+expect_miss
+cleanup
 sleep 1
 
 # Times:
@@ -94,21 +95,13 @@ sleep 1
 
 echo "Running test one again. Should be a cache hit"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
-rm wake.db
-if [ -d ".cache-misses" ]; then
-  echo "Found a cache miss"
-  exit 1
-fi
-rm -rf .cache-hit
+expect_hit
+cleanup
 
 echo "Running test four to fill the cache"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test four
-rm wake.db
-if [ -z "$(ls -A .cache-misses)" ]; then
-  echo "Expected a cache miss!!"
-  exit 1
-fi
-rm -rf .cache-misses
+expect_miss
+cleanup
 
 # Times:
 # one: 2 of 6 old (refilled)
@@ -118,27 +111,16 @@ rm -rf .cache-misses
 
 echo "Running test two again. Should be a cache hit"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
-rm wake.db
-if [ -d ".cache-misses" ]; then
-  echo "Found a cache miss"
-  exit 1
-fi
-rm -rf .cache-hit
+expect_hit
+cleanup
 
 echo "Running test four again. Should be a cache hit"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test four
-rm wake.db
-if [ -z "$(ls -A .cache-hit)" ]; then
-  echo "No cache hit found"
-  exit 1
-fi
-if [ -d ".cache-misses" ]; then
-  echo "Found a cache miss"
-  exit 1
-fi
+expect_hit
+cleanup
 
 
-# Cleanup
+# Cleanup job files 
 rm one.txt
 rm two.txt
 rm three.txt
