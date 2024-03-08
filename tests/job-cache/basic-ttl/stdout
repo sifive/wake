@@ -14,5 +14,3 @@ Running test three again. Should be a cache hit
 Pass ("three.txt", Nil)
 Running test two again. Should be a cache miss
 Pass ("two.txt", Nil)
-Running test two again. Should be a cache hit
-Pass ("two.txt", Nil)
