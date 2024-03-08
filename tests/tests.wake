@@ -276,21 +276,21 @@ def runTest (testScript: Path): Result Unit Error =
         False False -> Pass Unit
         True False ->
             def _ =
-                "{testName} Failed! Stdout: \n{jobStdout}"
+                "{testName} failed! Stdout: \n{jobStdout}"
                 | printlnLevel logWarning
 
             def _ =
-                "{testName} Failed! Stderr: \n{jobStderr}"
+                "{testName} failed! Stderr: \n{jobStderr}"
                 | printlnLevel logWarning
 
             Fail (makeError "Test failed. Expected: Ok, Actual: {format testJob.getJobStatus}. See above for details")
         False True ->
             def _ =
-                "{testName} Failed! Stdout: \n{jobStdout}"
+                "{testName} failed! Stdout: \n{jobStdout}"
                 | printlnLevel logWarning
 
             def _ =
-                "{testName} Failed! Stderr: \n{jobStderr}"
+                "{testName} failed! Stderr: \n{jobStderr}"
                 | printlnLevel logWarning
 
             Fail (makeError "Test failed. Expected: Err, Actual: {format testJob.getJobStatus}. See above for details")
@@ -306,7 +306,7 @@ def runTest (testScript: Path): Result Unit Error =
 
         # They are not equal, show a nice diff and fail.
         require Pass _ =
-            "{testName} Failed! The diff below should be applied to jobs {stream}"
+            "{testName} failed! The diff below should be applied to jobs {stream}"
             | printlnLevel logWarning
             | Pass
 
