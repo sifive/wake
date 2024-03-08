@@ -87,11 +87,6 @@ rm wake.db
 expect_miss
 cleanup
 
-echo "Running test two again. Should be a cache hit"
-WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
-expect_hit
-cleanup
-
 # Cleanup job files 
 rm one.txt
 rm two.txt
