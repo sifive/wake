@@ -24,7 +24,7 @@ echo "Running test two to fill the cache"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
 rm wake.db
 rm -rf .cache-misses
-sleep 1
+sleep 2
 
 echo "Running test three to fill the cache"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test three
@@ -32,7 +32,10 @@ rm wake.db
 rm -rf .cache-misses
 sleep 1
 
-# We should still be under the limit here. This is to ensure we mark test one as used
+# Times:
+# one: 4 of 6 old
+# two: 3 of 6 old
+# three: 1 of 6 old
 echo "Running test one again. Should be a cache hit"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
 rm wake.db
@@ -41,16 +44,20 @@ if [ -z "$(ls -A .cache-hit)" ]; then
   echo "No cache hit found"
   exit 1
 fi
-sleep 4
+sleep 3
 
-# Now we're going to go over. Hopefully dropping two and three, but keeping one and four
-echo "Going over. Expecting two and three to be dropped"
-echo "Running test one again. Should be a cache hit"
+# Times:
+# one: 7 of 6 old (evicted)
+# two: 6 of 6 old (evicted)
+# three: 4 of 6 old
+
+echo "Going over. Expecting one and two to be dropped"
+
+echo "Running test one again to refill the cache"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
 rm wake.db
 rm -rf .cache-misses
 
-# Now make sure we still get a hit on 1
 echo "Running test three again. Should be a cache hit"
 rm -rf .cache-hit  2> /dev/null || true
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test three
@@ -65,8 +72,11 @@ if [ -d ".cache-misses" ]; then
 fi
 sleep 1
 
+# Times:
+# one: 1 of 6 old (refilled)
+# two: 7 of 6 old (evicted)
+# three: 5 of 6 old
 
-# And check that we get misses on four and three
 echo "Running test two again. Should be a cache miss"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
 rm wake.db
@@ -77,6 +87,10 @@ fi
 rm -rf .cache-misses
 sleep 1
 
+# Times:
+# one: 2 of 6 old (refilled)
+# two: 1 of 6 old (refilled)
+# three: 6 of 6 old (evicted)
 
 echo "Running test one again. Should be a cache hit"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
@@ -87,7 +101,7 @@ if [ -d ".cache-misses" ]; then
 fi
 rm -rf .cache-hit
 
-echo "Running test four again. Should be a cache miss"
+echo "Running test four to fill the cache"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test four
 rm wake.db
 if [ -z "$(ls -A .cache-misses)" ]; then
@@ -96,6 +110,11 @@ if [ -z "$(ls -A .cache-misses)" ]; then
 fi
 rm -rf .cache-misses
 
+# Times:
+# one: 2 of 6 old (refilled)
+# two: 1 of 6 old (refilled)
+# three: 6 of 6 old (evicted)
+# four: 0 of 6 old
 
 echo "Running test two again. Should be a cache hit"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
