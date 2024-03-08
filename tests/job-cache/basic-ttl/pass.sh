@@ -86,7 +86,18 @@ WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.j
 rm wake.db
 expect_miss
 cleanup
+
+echo "Running test two again. Should be a cache hit"
+WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
+expect_hit
+cleanup
+
 sleep 1
+
+echo "Running test two again. Should be a cache hit"
+WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
+expect_hit
+cleanup
 
 # Times:
 # one: 2 of 6 old (refilled)
@@ -95,11 +106,6 @@ sleep 1
 
 echo "Running test one again. Should be a cache hit"
 WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
-expect_hit
-cleanup
-
-echo "Running test two again. Should be a cache hit"
-WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
 expect_hit
 cleanup
 
