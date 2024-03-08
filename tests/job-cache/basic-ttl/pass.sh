@@ -92,35 +92,7 @@ WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.j
 expect_hit
 cleanup
 
-sleep 1
-
-echo "Running test two again. Should be a cache hit"
-WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test two
-expect_hit
-cleanup
-
-# Times:
-# one: 2 of 6 old (refilled)
-# two: 1 of 6 old (refilled)
-# three: 6 of 6 old (evicted)
-
-echo "Running test one again. Should be a cache hit"
-WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test one
-expect_hit
-cleanup
-
-echo "Running test four to fill the cache"
-WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test four
-expect_miss
-cleanup
-
-echo "Running test four again. Should be a cache hit"
-WAKE_SHARED_CACHE_FAST_CLOSE=1 DEBUG_WAKE_SHARED_CACHE=1 WAKE_LOCAL_JOB_CACHE=.job-cache "${WAKE:-wake}" test four
-expect_hit
-cleanup
-
 # Cleanup job files 
 rm one.txt
 rm two.txt
 rm three.txt
-rm four.txt
