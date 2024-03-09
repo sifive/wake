@@ -239,3 +239,25 @@ export def addErrorContext (prefix: String): Result a Error => Result a Error = 
 #   else failWithError "Could not parse {str} as an Integer"
 export def failWithError (cause: String): Result a Error =
     Fail (makeError cause)
+
+# |>: Result compatible pipeline function. Used in the same way as '|' when both the input and the following function return a Result.
+#
+# Example:
+# ```
+# Pass "foo.json" 
+# |> source 
+# |> parseJSONFile 
+# ```
+export def (argument: Result a b) |> (pipeFn: a => Result c b): Result c b =
+    rmapPass (\a pipeFn a) argument
+
+# |<: Dual to |>. Used to inject a function that doesn't return a result into the result pipeline.
+# Example:
+# ```
+# Pass 1 
+# |< str
+# |> source 
+# |> parseJSONFile 
+# ```
+export def (argument: Result a b) |< (pipeFn: a => c): Result c b =
+    rmap (\a pipeFn a) argument

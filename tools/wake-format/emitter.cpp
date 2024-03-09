@@ -176,7 +176,9 @@ static bool is_op_suffix(const CSTElement& op) {
     case TOKEN_OP_DOLLAR:
       return !is_binop_matching_str(op, TOKEN_OP_DOLLAR, "$");
     case TOKEN_OP_OR:
-      return !is_binop_matching_str(op, TOKEN_OP_OR, "|");
+      return !is_binop_matching_str(op, TOKEN_OP_OR, "|") &&
+             !is_binop_matching_str(op, TOKEN_OP_OR, "|>") &&
+             !is_binop_matching_str(op, TOKEN_OP_OR, "|<");
     case TOKEN_OP_DOT:
       return false;
 
@@ -368,8 +370,34 @@ static std::vector<CSTElement> collect_block_parts(CSTElement node) {
   return parts;
 }
 
-static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement node) {
+static bool should_stop_collecting(
+    const std::vector<std::pair<cst_id_t, std::string>>& collect_over, CSTElement op) {
+  // Stop collecting if we don't see an OP
+  if (op.id() != CST_OP) {
+    return true;
+  }
+
+  // Stop collecting if the OP doesn't match both token and string contents
+  // Ex: OP_OR != OP_AND
+  // Ex: OP_OR("|") != OP_OR("||")
+  // Ex: OP_OR("||") == OP_OR("||")
+  for (const auto& i : collect_over) {
+    if (op.firstChildElement().id() == i.first &&
+        op.firstChildElement().fragment().segment().str() == i.second) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static std::vector<CSTElement> collect_left_binary(
+    const std::vector<std::pair<cst_id_t, std::string>>& collect_over, CSTElement node) {
   if (node.id() != CST_BINARY) {
+    return {node};
+  }
+
+  if (collect_over.empty()) {
     return {node};
   }
 
@@ -381,9 +409,7 @@ static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTE
   CSTElement right = op;
   right.nextSiblingNode();
 
-  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
-        op.firstChildElement().fragment().segment().str() ==
-            collect_over.fragment().segment().str())) {
+  if (should_stop_collecting(collect_over, op)) {
     return {node};
   }
 
@@ -394,8 +420,13 @@ static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTE
   return collect;
 }
 
-static std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CSTElement node) {
+static std::vector<CSTElement> collect_right_binary(
+    const std::vector<std::pair<cst_id_t, std::string>>& collect_over, CSTElement node) {
   if (node.id() != CST_BINARY) {
+    return {node};
+  }
+
+  if (collect_over.empty()) {
     return {node};
   }
 
@@ -407,9 +438,7 @@ static std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CST
   CSTElement right = op;
   right.nextSiblingNode();
 
-  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
-        op.firstChildElement().fragment().segment().str() ==
-            collect_over.fragment().segment().str())) {
+  if (should_stop_collecting(collect_over, op)) {
     return {node};
   }
 
@@ -457,9 +486,9 @@ static inline bool is_simple_binop(wcl::doc_builder& builder, ctx_t ctx, CSTElem
 
   std::vector<CSTElement> parts = {};
   if (is_op_left_assoc(op_token)) {
-    parts = collect_left_binary(op_token, node);
+    parts = collect_left_binary({{op_token.id(), op_token.fragment().segment().str()}}, node);
   } else {
-    parts = collect_right_binary(op_token, node);
+    parts = collect_right_binary({{op_token.id(), op_token.fragment().segment().str()}}, node);
   }
 
   if (parts.size() != 3) {
@@ -1359,9 +1388,14 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
 
   std::vector<CSTElement> parts = {};
   if (is_op_left_assoc(op_token)) {
-    parts = collect_left_binary(op_token, node);
+    if (is_binop_matching_str(op_token, TOKEN_OP_OR, "|>") ||
+        is_binop_matching_str(op_token, TOKEN_OP_OR, "|<")) {
+      parts = collect_left_binary({{TOKEN_OP_OR, "|>"}, {TOKEN_OP_OR, "|<"}}, node);
+    } else {
+      parts = collect_left_binary({{op_token.id(), op_token.fragment().segment().str()}}, node);
+    }
   } else {
-    parts = collect_right_binary(op_token, node);
+    parts = collect_right_binary({{op_token.id(), op_token.fragment().segment().str()}}, node);
   }
 
   if (ctx.explode_option == ExplodeOption::Prevent) {
@@ -1388,8 +1422,11 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
     }
   }
 
+  // Binops of '$', '|', '|>', and '|<' should always pipeline unless they are already nested
   if (!ctx.nested_binop && (is_binop_matching_str(op_token, TOKEN_OP_DOLLAR, "$") ||
-                            is_binop_matching_str(op_token, TOKEN_OP_OR, "|"))) {
+                            is_binop_matching_str(op_token, TOKEN_OP_OR, "|") ||
+                            is_binop_matching_str(op_token, TOKEN_OP_OR, "|>") ||
+                            is_binop_matching_str(op_token, TOKEN_OP_OR, "|<"))) {
     MEMO_RET(select_best_choice({
         combine_explode_first(ctx.binop(), parts),
         combine_explode_last(ctx.binop(), parts),
