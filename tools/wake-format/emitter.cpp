@@ -371,7 +371,7 @@ static std::vector<CSTElement> collect_block_parts(CSTElement node) {
 }
 
 static bool should_stop_collecting(
-    const std::vector<std::pair<cst_id_t, const std::string&>>& collect_over, CSTElement op) {
+    const std::vector<std::pair<cst_id_t, std::string>>& collect_over, CSTElement op) {
   // Stop collecting if we don't see an OP
   if (op.id() != CST_OP) {
     return true;
@@ -392,7 +392,7 @@ static bool should_stop_collecting(
 }
 
 static std::vector<CSTElement> collect_left_binary(
-    const std::vector<std::pair<cst_id_t, const std::string&>>& collect_over, CSTElement node) {
+    const std::vector<std::pair<cst_id_t, std::string>>& collect_over, CSTElement node) {
   if (node.id() != CST_BINARY) {
     return {node};
   }
@@ -421,7 +421,7 @@ static std::vector<CSTElement> collect_left_binary(
 }
 
 static std::vector<CSTElement> collect_right_binary(
-    const std::vector<std::pair<cst_id_t, const std::string&>>& collect_over, CSTElement node) {
+    const std::vector<std::pair<cst_id_t, std::string>>& collect_over, CSTElement node) {
   if (node.id() != CST_BINARY) {
     return {node};
   }
