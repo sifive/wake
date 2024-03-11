@@ -20,4 +20,4 @@ from rust import _
 
 export def buildLspWakeTest Unit =
     makeCargoExecutable "test-lsp-wake" "rust/test-lsp-wake"
-    | rmapPass (cargoBuildWith (defaultCargoToolchain Unit))
+    |> cargoBuildWith (defaultCargoToolchain Unit)
