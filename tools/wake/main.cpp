@@ -136,6 +136,10 @@ DescribePolicy get_describe_policy(const CommandLineOptions &clo) {
     return DescribePolicy::timeline();
   }
 
+  if (clo.simple) {
+    return DescribePolicy::simple();
+  }
+
   if (clo.debug) {
     return DescribePolicy::debug();
   }
@@ -275,10 +279,12 @@ void print_help(const char *argv0) {
     << "    --last-used      Capture all jobs used by last build. Regardless of cache"   << std::endl
     << "    --last-executed  Capture all jobs executed by the last build. Skips cache"   << std::endl
     << "    --failed   -f    Capture jobs which failed last build"                       << std::endl
+    << "    --tag    KEY=VAL Capture jobs which are tagged, matching KEY and VAL globs"  << std::endl
     << "    --timeline       Report timeline of captured jobs as HTML"                   << std::endl
     << "    --verbose  -v    Report metadata, stdout and stderr of captured jobs"        << std::endl
     << "    --metadata       Report metadata of captured jobs"                           << std::endl
     << "    --debug    -d    Report stack frame of captured jobs"                        << std::endl
+    << "    --simple         Report only label, cmdline, and tags of captured jobs"      << std::endl
     << "    --script   -s    Format captured jobs as an executable shell script"         << std::endl
     << std::endl
     << "  Help functions:" << std::endl

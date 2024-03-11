@@ -209,6 +209,40 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
   }
 }
 
+void describe_simple(const std::vector<JobReflection> &jobs) {
+  TermInfoBuf tbuf(std::cout.rdbuf());
+  std::ostream out(&tbuf);
+  for (size_t i = 0; i < jobs.size(); i++) {
+    const auto &job = jobs[i];
+    out << term_colour(TERM_GREEN) << "# " << job.label << " (" << job.job << ")";
+
+    if (!job.tags.empty()) {
+      out << " [";
+      for (auto &tag : job.tags) {
+        out << tag.uri << "=" << tag.content << ",";
+      }
+      out << "]";
+    }
+
+    out << "\n";
+    out << term_normal() << "$ " << term_colour(TERM_CYAN);
+    for (size_t i = 0; i < job.commandline.size(); i++) {
+      const auto &cmd_part = job.commandline[i];
+      out << cmd_part;
+
+      if (i != job.commandline.size() - 1) {
+        out << " ";
+      }
+    }
+
+    out << "\n" << term_normal();
+
+    if (i + 1 < jobs.size()) {
+      out << "\n";
+    }
+  }
+}
+
 void describe_human(const std::vector<JobReflection> &jobs) {
   TermInfoBuf tbuf(std::cout.rdbuf());
   std::ostream out(&tbuf);
@@ -324,6 +358,10 @@ void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy, con
       }
 
       describe_timeline(jobs, filtered_deps);
+      break;
+    }
+    case DescribePolicy::SIMPLE: {
+      describe_simple(jobs);
       break;
     }
   }
