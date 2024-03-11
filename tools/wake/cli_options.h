@@ -55,6 +55,7 @@ struct CommandLineOptions {
   bool optim;
   bool exports;
   bool timeline;
+  bool simple;
   bool clean;
   bool list_outputs;
   wcl::optional<bool> log_header_align;
@@ -138,6 +139,7 @@ struct CommandLineOptions {
       {'e', "exports", GOPT_ARGUMENT_FORBIDDEN},
       {0, "html", GOPT_ARGUMENT_FORBIDDEN},
       {0, "timeline", GOPT_ARGUMENT_OPTIONAL},
+      {0, "simple", GOPT_ARGUMENT_OPTIONAL},
       {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
       {0, "config", GOPT_ARGUMENT_FORBIDDEN},
       {0, "debug-db", GOPT_ARGUMENT_FORBIDDEN},
@@ -198,6 +200,7 @@ struct CommandLineOptions {
     optim = !arg(options, "no-optimize")->count;
     exports = arg(options, "exports")->count;
     timeline = arg(options, "timeline")->count;
+    simple = arg(options, "simple")->count;
     clean = arg(options, "clean")->count;
     list_outputs = arg(options, "list-outputs")->count;
 
