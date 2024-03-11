@@ -82,6 +82,7 @@ struct JobReflection {
   std::vector<JobTag> tags;
 
   JAST to_json() const;
+  JAST to_simple_json() const;
 };
 
 struct JobEdge {

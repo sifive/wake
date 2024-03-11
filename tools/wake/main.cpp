@@ -136,6 +136,10 @@ DescribePolicy get_describe_policy(const CommandLineOptions &clo) {
     return DescribePolicy::timeline();
   }
 
+  if (clo.simple_timeline) {
+    return DescribePolicy::simple_timeline();
+  }
+
   if (clo.simple) {
     return DescribePolicy::simple();
   }
@@ -281,6 +285,7 @@ void print_help(const char *argv0) {
     << "    --failed   -f    Capture jobs which failed last build"                       << std::endl
     << "    --tag    KEY=VAL Capture jobs which are tagged, matching KEY and VAL globs"  << std::endl
     << "    --timeline       Report timeline of captured jobs as HTML"                   << std::endl
+    << "    --simple-timeline       Report timeline of captured jobs as HTML"            << std::endl
     << "    --verbose  -v    Report metadata, stdout and stderr of captured jobs"        << std::endl
     << "    --metadata       Report metadata of captured jobs"                           << std::endl
     << "    --debug    -d    Report stack frame of captured jobs"                        << std::endl
@@ -426,7 +431,7 @@ int main(int argc, char **argv) {
   bool is_db_inspection = !clo.job_ids.empty() || !clo.output_files.empty() ||
                           !clo.input_files.empty() || !clo.labels.empty() || !clo.tags.empty() ||
                           clo.last_use || clo.last_exe || clo.failed || clo.tagdag ||
-                          clo.timeline || clo.taguri;
+                          clo.timeline || clo.taguri || clo.simple || clo.simple_timeline;
   // Arguments are forbidden with these options
   bool noargs =
       is_db_inspection || clo.init || clo.html || clo.global || clo.exports || clo.api || clo.exec;

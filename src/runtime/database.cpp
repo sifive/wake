@@ -1177,6 +1177,24 @@ std::string Time::as_string() const {
   return buf;
 }
 
+JAST JobReflection::to_simple_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("job", job);
+  json.add("label", label.c_str());
+
+  std::stringstream commandline_stream;
+  for (const std::string &line : commandline) {
+    commandline_stream << line << " ";
+  }
+  json.add("commandline", commandline_stream.str());
+
+  json.add("starttime", starttime.as_int64());
+  json.add("endtime", endtime.as_int64());
+  json.add("wake_start", wake_start.as_int64());
+
+  return json;
+}
+
 JAST JobReflection::to_json() const {
   JAST json(JSON_OBJECT);
   json.add("job", job);

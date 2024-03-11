@@ -24,7 +24,17 @@
 #include "runtime/database.h"
 
 struct DescribePolicy {
-  enum type { TAG_URI, SCRIPT, HUMAN, METADATA, DEBUG, VERBOSE, TIMELINE, SIMPLE } type;
+  enum type {
+    TAG_URI,
+    SCRIPT,
+    HUMAN,
+    METADATA,
+    DEBUG,
+    VERBOSE,
+    TIMELINE,
+    SIMPLE,
+    SIMPLE_TIMELINE
+  } type;
   union {
     const char *tag;
   };
@@ -75,6 +85,12 @@ struct DescribePolicy {
   static DescribePolicy simple() {
     DescribePolicy policy;
     policy.type = SIMPLE;
+    return policy;
+  }
+
+  static DescribePolicy simple_timeline() {
+    DescribePolicy policy;
+    policy.type = SIMPLE_TIMELINE;
     return policy;
   }
 };
