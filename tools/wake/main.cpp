@@ -251,54 +251,54 @@ void print_help(const char *argv0) {
     << "Usage in script: #! /usr/bin/env wake [OPTIONS] -:target" << std::endl
     << std::endl
     << "  Flags affecting build execution:" << std::endl
-    << "    --jobs=N   -jN   Schedule local jobs for N cores or N% of CPU (default 90%)" << std::endl
-    << "    --memory=M -mM   Schedule local jobs for M bytes or M% of RAM (default 90%)" << std::endl
-    << "    --check    -c    Rerun all jobs and confirm their output is reproducible"    << std::endl
-    << "    --verbose  -v    Report hash progress and result expression types"           << std::endl
-    << "    --debug    -d    Report stack frame information for exceptions and closures" << std::endl
-    << "    --quiet    -q    Surpress report of launched jobs and final expressions"     << std::endl
-    << "    --no-tty         Surpress interactive build progress interface"              << std::endl
-    << "    --no-wait        Do not wait to obtain database lock; fail immediately"      << std::endl
-    << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
-    << "    --fatal-warnings Do not execute if there are any warnings"                   << std::endl
-    << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)" << std::endl
-    << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
-    << "    --profile  FILE  Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
-    << "    --chdir -C PATH  Locate database and default package starting from PATH"     << std::endl
-    << "    --in       PKG   Evaluate command-line in package PKG (default is chdir)"    << std::endl
-    << "    --exec -x  EXPR  Execute expression EXPR instead of a target function"       << std::endl
-    << "    --stdout   EXPR  Send specified log levels to stdout (FD 1)"                 << std::endl
-    << "    --stderr   EXPR  Send specified log levels to stderr (FD 2)"                 << std::endl
-    << "    --fd:3     EXPR  Send specified log levels to FD 3. Same for --fd:4, --fd:5" << std::endl
+    << "    --jobs=N   -jN     Schedule local jobs for N cores or N% of CPU (default 90%)" << std::endl
+    << "    --memory=M -mM     Schedule local jobs for M bytes or M% of RAM (default 90%)" << std::endl
+    << "    --check    -c      Rerun all jobs and confirm their output is reproducible"    << std::endl
+    << "    --verbose  -v      Report hash progress and result expression types"           << std::endl
+    << "    --debug    -d      Report stack frame information for exceptions and closures" << std::endl
+    << "    --quiet    -q      Surpress report of launched jobs and final expressions"     << std::endl
+    << "    --no-tty           Surpress interactive build progress interface"              << std::endl
+    << "    --no-wait          Do not wait to obtain database lock; fail immediately"      << std::endl
+    << "    --no-workspace     Do not open a database or scan for sources files"           << std::endl
+    << "    --fatal-warnings   Do not execute if there are any warnings"                   << std::endl
+    << "    --heap-factor X    Heap-size is X * live data after the last GC (default 4.0)" << std::endl
+    << "    --profile-heap     Report memory consumption on every garbage collection"      << std::endl
+    << "    --profile     FILE Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
+    << "    --chdir    -C PATH Locate database and default package starting from PATH"     << std::endl
+    << "    --in          PKG  Evaluate command-line in package PKG (default is chdir)"    << std::endl
+    << "    --exec     -x EXPR Execute expression EXPR instead of a target function"       << std::endl
+    << "    --stdout      EXPR Send specified log levels to stdout (FD 1)"                 << std::endl
+    << "    --stderr      EXPR Send specified log levels to stderr (FD 2)"                 << std::endl
+    << "    --fd:3        EXPR Send specified log levels to FD 3. Same for --fd:4, --fd:5" << std::endl
     << std::endl
     << "  Database commands:" << std::endl
-    << "    --init      DIR  Create or replace a wake.db in the specified directory"     << std::endl
-    << "    --list-outputs   List all job outputs"                                       << std::endl
-    << "    --clean          Delete all job outputs"                                     << std::endl
-    << "    --input  -i FILE Capture jobs which read FILE. (repeat for multiple files)"  << std::endl
-    << "    --output -o FILE Capture jobs which wrote FILE. (repeat for multiple files)" << std::endl
-    << "    --label     GLOB Capture jobs where label matches GLOB"                      << std::endl
-    << "    --job       JOB  Capture the job with the specified job id"                  << std::endl
-    << "    --last     -l    See --last-used"                                            << std::endl
-    << "    --last-used      Capture all jobs used by last build. Regardless of cache"   << std::endl
-    << "    --last-executed  Capture all jobs executed by the last build. Skips cache"   << std::endl
-    << "    --failed   -f    Capture jobs which failed last build"                       << std::endl
-    << "    --tag    KEY=VAL Capture jobs which are tagged, matching KEY and VAL globs"  << std::endl
-    << "    --timeline       Report timeline of captured jobs as HTML"                   << std::endl
-    << "    --simple-timeline       Report timeline of captured jobs as HTML"            << std::endl
-    << "    --verbose  -v    Report metadata, stdout and stderr of captured jobs"        << std::endl
-    << "    --metadata       Report metadata of captured jobs"                           << std::endl
-    << "    --debug    -d    Report stack frame of captured jobs"                        << std::endl
-    << "    --simple         Report only label, cmdline, and tags of captured jobs"      << std::endl
-    << "    --script   -s    Format captured jobs as an executable shell script"         << std::endl
+    << "    --init        DIR  Create or replace a wake.db in the specified directory"     << std::endl
+    << "    --list-outputs     List all job outputs"                                       << std::endl
+    << "    --clean            Delete all job outputs"                                     << std::endl
+    << "    --input    -i FILE Capture jobs which read FILE. (repeat for multiple files)"  << std::endl
+    << "    --output   -o FILE Capture jobs which wrote FILE. (repeat for multiple files)" << std::endl
+    << "    --label       GLOB Capture jobs where label matches GLOB"                      << std::endl
+    << "    --job         JOB  Capture the job with the specified job id"                  << std::endl
+    << "    --last     -l      See --last-used"                                            << std::endl
+    << "    --last-used        Capture all jobs used by last build. Regardless of cache"   << std::endl
+    << "    --last-executed    Capture all jobs executed by the last build. Skips cache"   << std::endl
+    << "    --failed   -f      Capture jobs which failed last build"                       << std::endl
+    << "    --tag      KEY=VAL Capture jobs which are tagged, matching KEY and VAL globs"  << std::endl
+    << "    --timeline         Report timeline of captured jobs as HTML"                   << std::endl
+    << "    --simple-timeline  Report simplified timeline of captured jobs as HTML"        << std::endl
+    << "    --verbose  -v      Report metadata, stdout and stderr of captured jobs"        << std::endl
+    << "    --metadata         Report metadata of captured jobs"                           << std::endl
+    << "    --debug    -d      Report stack frame of captured jobs"                        << std::endl
+    << "    --simple           Report only label, cmdline, and tags of captured jobs"      << std::endl
+    << "    --script   -s      Format captured jobs as an executable shell script"         << std::endl
     << std::endl
     << "  Help functions:" << std::endl
-    << "    --version        Print the version of wake on standard output"               << std::endl
-    << "    --html           Print all wake source files as cross-referenced HTML"       << std::endl
-    << "    --globals -g     Print global symbols made available to all wake files"      << std::endl
-    << "    --exports -e     Print symbols exported by the selected package (see --in)"  << std::endl
-    << "    --config         Print the configuration parsed from wakeroot and wakerc"    << std::endl
-    << "    --help    -h     Print this help message and exit"                           << std::endl
+    << "    --version          Print the version of wake on standard output"               << std::endl
+    << "    --html             Print all wake source files as cross-referenced HTML"       << std::endl
+    << "    --globals  -g      Print global symbols made available to all wake files"      << std::endl
+    << "    --exports  -e      Print symbols exported by the selected package (see --in)"  << std::endl
+    << "    --config           Print the configuration parsed from wakeroot and wakerc"    << std::endl
+    << "    --help     -h      Print this help message and exit"                           << std::endl
     << std::endl;
     // debug-db, no-optimize, stop-after-* are secret undocumented options
   // clang-format on
