@@ -57,6 +57,7 @@ struct CommandLineOptions {
   bool timeline;
   bool simple_timeline;
   bool simple;
+  bool canceled;
   bool clean;
   bool list_outputs;
   wcl::optional<bool> log_header_align;
@@ -139,9 +140,10 @@ struct CommandLineOptions {
       {'g', "globals", GOPT_ARGUMENT_FORBIDDEN},
       {'e', "exports", GOPT_ARGUMENT_FORBIDDEN},
       {0, "html", GOPT_ARGUMENT_FORBIDDEN},
-      {0, "timeline", GOPT_ARGUMENT_OPTIONAL},
-      {0, "simple-timeline", GOPT_ARGUMENT_OPTIONAL},
-      {0, "simple", GOPT_ARGUMENT_OPTIONAL},
+      {0, "timeline", GOPT_ARGUMENT_FORBIDDEN},
+      {0, "simple-timeline", GOPT_ARGUMENT_FORBIDDEN},
+      {0, "simple", GOPT_ARGUMENT_FORBIDDEN},
+      {0, "canceled", GOPT_ARGUMENT_FORBIDDEN},
       {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
       {0, "config", GOPT_ARGUMENT_FORBIDDEN},
       {0, "debug-db", GOPT_ARGUMENT_FORBIDDEN},
@@ -204,6 +206,7 @@ struct CommandLineOptions {
     timeline = arg(options, "timeline")->count;
     simple_timeline = arg(options, "simple-timeline")->count;
     simple = arg(options, "simple")->count;
+    canceled = arg(options, "canceled")->count;
     clean = arg(options, "clean")->count;
     list_outputs = arg(options, "list-outputs")->count;
 
