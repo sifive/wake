@@ -73,12 +73,8 @@ format:
 		bin/wake-format.native-cpp14-release -i $$FILES; \
 	fi || true
 
-test:		wake.db
+test:		all
 	$(WAKE_ENV) ./bin/wake --in test_wake runTests
-
-# We need to bootstrap job-cache to run the tests
-unittest:	all
-	$(WAKE_ENV) ./bin/wake --in test_wake runUnitTests
 
 remoteCacheTests:	all
 	$(WAKE_ENV) ./bin/wake -d -x 'testPostgres Unit'

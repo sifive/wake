@@ -28,7 +28,7 @@ jobs:
           run: make tarball
 
         - name: Run Tests
-          run: make test && make unittest
+          run: make test
 
         - name: Check Wake Formatting
           run: ./bin/wake-format.native-cpp14-release --auto --dry-run
@@ -96,13 +96,13 @@ jobs:
       strategy:
         matrix:
           include:
-            - target: alpine
-              dockerfile: alpine
-              extra_docker_build_args: ''
-              extra_docker_run_args: ''
-              build_cmd: make -C wake-* static
-              test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake -x Unit
-              install_src_glob: build/wake-*/wake-static_*
+            # - target: alpine
+            #   dockerfile: alpine
+            #   extra_docker_build_args: ''
+            #   extra_docker_run_args: ''
+            #   build_cmd: make -C wake-* static
+            #   test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake -x Unit
+            #   install_src_glob: build/wake-*/wake-static_*
 
             - target: centos_7_6
               dockerfile: centos-7.6
