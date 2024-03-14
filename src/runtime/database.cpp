@@ -1202,6 +1202,15 @@ JAST JobReflection::to_simple_json() const {
   json.add("endtime", endtime.as_int64());
   json.add("wake_start", wake_start.as_int64());
 
+  std::stringstream tags_stream;
+  for (const auto &tag : tags) {
+    tags_stream << "{<br>"
+                << "  job: " << tag.job << ",<br>"
+                << "  uri: " << tag.uri << ",<br>"
+                << "  content: " << tag.content << "<br>},<br>";
+  }
+  json.add("tags", tags_stream.str());
+
   return json;
 }
 

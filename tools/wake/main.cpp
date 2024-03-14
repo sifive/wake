@@ -438,6 +438,7 @@ int main(int argc, char **argv) {
       !clo.job_ids.empty() || !clo.output_files.empty() || !clo.input_files.empty() ||
       !clo.labels.empty() || !clo.tags.empty() || clo.last_use || clo.last_exe || clo.failed ||
       clo.tagdag || clo.timeline || clo.taguri || clo.simple || clo.simple_timeline || clo.canceled;
+
   // Arguments are forbidden with these options
   bool noargs =
       is_db_inspection || clo.init || clo.html || clo.global || clo.exports || clo.api || clo.exec;
