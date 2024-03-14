@@ -312,6 +312,42 @@ void describe_timeline(const std::vector<JobReflection> &jobs,
          "</html>\n";
 }
 
+void describe_simple_timeline(const std::vector<JobReflection> &jobs,
+                              const std::vector<FileDependency> &dependencies) {
+  TermInfoBuf tbuf(std::cout.rdbuf(), true);
+  std::ostream out(&tbuf);
+
+  std::ifstream html_template(find_execpath() + "/../share/wake/html/timeline_template.html");
+  std::ifstream arrow_library(find_execpath() + "/../share/wake/html/timeline_arrow_lib.js");
+  std::ifstream main(find_execpath() + "/../share/wake/html/timeline_main.js");
+
+  out << html_template.rdbuf();
+
+  out << R"(<script type="application/json" id="jobReflections">)" << std::endl;
+  {
+    JAST json(JSON_ARRAY);
+    for (const JobReflection &j : jobs) {
+      json.add("", j.to_simple_json());
+    }
+    out << json;
+  }
+  out << "</script>" << std::endl;
+
+  out << R"(<script type="application/json" id="fileDependencies">)" << std::endl;
+  out << JAST::from_vec(dependencies);
+  out << "</script>" << std::endl;
+
+  out << R"(<script type="text/javascript">)" << std::endl;
+  out << arrow_library.rdbuf();
+  out << "</script>" << std::endl;
+
+  out << R"(<script type="module">)" << std::endl;
+  out << main.rdbuf();
+  out << "</script>\n"
+         "</body>\n"
+         "</html>\n";
+}
+
 void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy, const Database &db) {
   switch (policy.type) {
     case DescribePolicy::SCRIPT: {
@@ -338,6 +374,26 @@ void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy, con
       for (auto &job : jobs)
         for (auto &tag : job.tags)
           if (tag.uri == policy.tag) std::cout << tag.content << std::endl;
+      break;
+    }
+    case DescribePolicy::SIMPLE_TIMELINE: {
+      std::unordered_set<long> job_ids;
+      for (const JobReflection &job : jobs) {
+        job_ids.insert(job.job);
+      }
+
+      std::vector<FileDependency> all_deps = db.get_file_dependencies();
+      std::vector<FileDependency> filtered_deps;
+
+      while (!all_deps.empty()) {
+        FileDependency last = std::move(all_deps.back());
+        all_deps.pop_back();
+        if (job_ids.count(last.reader) && job_ids.count(last.writer)) {
+          filtered_deps.emplace_back(std::move(last));
+        }
+      }
+
+      describe_simple_timeline(jobs, filtered_deps);
       break;
     }
     case DescribePolicy::TIMELINE: {

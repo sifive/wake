@@ -312,11 +312,6 @@ timeline.on('click', function (properties) {
     }
     let job = jobMap.get(parseInt(properties.item)).job;
     document.getElementById("job").innerHTML = job.job
-    if (job.usage.charAt(8) === '0') {
-        document.getElementById("job").style.color = "green";
-    } else {
-        document.getElementById("job").style.color = "red";
-    }
     document.getElementById("stale").innerHTML = job.stale ? "true" : "false";
     document.getElementById("label").innerHTML = job.label;
     document.getElementById("directory").innerHTML = job.directory;
