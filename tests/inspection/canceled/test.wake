@@ -1,0 +1,8 @@
+from wake import _
+
+export def test _: Result Unit Error =
+    def _ =
+        makeShellPlan "sleep 10; echo hello" Nil
+        | runJobWith defaultRunner
+
+    Pass Unit
