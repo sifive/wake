@@ -9,4 +9,4 @@ rm -f wake.db
 # Use || true to ignore the expected non-0 return from timeout
 timeout 1 ${WAKE} test || true
 
-${WAKE} --last --canceled
+${WAKE} --canceled --simple
