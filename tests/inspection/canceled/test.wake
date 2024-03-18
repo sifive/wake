@@ -2,7 +2,7 @@ from wake import _
 
 export def test _: Result Unit Error =
     def _ =
-        makeExecPlan ("/usr/bin/sleep", "10",) Nil
+        makeExecPlan ("sleep", "10",) Nil
         | runJobWith defaultRunner
 
     Pass Unit

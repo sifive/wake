@@ -1,2 +1,2 @@
 #  (3)
-$ /usr/bin/sleep 10
+$ sleep 10
