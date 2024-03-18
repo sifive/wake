@@ -1,2 +1,2 @@
 #  (3)
-$ /usr/bin/dash -c sleep 10; echo hello
+$ /usr/bin/sleep 10
