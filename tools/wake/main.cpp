@@ -224,6 +224,11 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
         upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.failed());
   }
 
+  if (clo.canceled) {
+    intersected_job_ids =
+        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.canceled());
+  }
+
   std::vector<JobReflection> intersected_jobs = {};
   for (auto &it : captured_jobs) {
     if (intersected_job_ids(it.first)) {
@@ -284,6 +289,7 @@ void print_help(const char *argv0) {
     << "    --last-executed    Capture all jobs executed by the last build. Skips cache"   << std::endl
     << "    --failed   -f      Capture jobs which failed last build"                       << std::endl
     << "    --tag      KEY=VAL Capture jobs which are tagged, matching KEY and VAL globs"  << std::endl
+    << "    --canceled         Capture jobs which were canceled in the last build"         << std::endl
     << "    --timeline         Report timeline of captured jobs as HTML"                   << std::endl
     << "    --simple-timeline  Report simplified timeline of captured jobs as HTML"        << std::endl
     << "    --verbose  -v      Report metadata, stdout and stderr of captured jobs"        << std::endl
@@ -428,10 +434,11 @@ int main(int argc, char **argv) {
     clo.argv[1] = clo.shebang;
   }
 
-  bool is_db_inspection = !clo.job_ids.empty() || !clo.output_files.empty() ||
-                          !clo.input_files.empty() || !clo.labels.empty() || !clo.tags.empty() ||
-                          clo.last_use || clo.last_exe || clo.failed || clo.tagdag ||
-                          clo.timeline || clo.taguri || clo.simple || clo.simple_timeline;
+  bool is_db_inspection =
+      !clo.job_ids.empty() || !clo.output_files.empty() || !clo.input_files.empty() ||
+      !clo.labels.empty() || !clo.tags.empty() || clo.last_use || clo.last_exe || clo.failed ||
+      clo.tagdag || clo.timeline || clo.taguri || clo.simple || clo.simple_timeline || clo.canceled;
+
   // Arguments are forbidden with these options
   bool noargs =
       is_db_inspection || clo.init || clo.html || clo.global || clo.exports || clo.api || clo.exec;

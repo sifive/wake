@@ -175,6 +175,7 @@ struct Database {
   std::vector<JobReflection> tags_matching(const std::string &glob);
   std::vector<JobReflection> last_exe();
   std::vector<JobReflection> last_use();
+  std::vector<JobReflection> canceled();
 
   std::vector<JobEdge> get_edges();
   std::vector<JobTag> get_tags();

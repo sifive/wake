@@ -1,0 +1,8 @@
+from wake import _
+
+export def test _: Result Unit Error =
+    def _ =
+        makeExecPlan ("sleep", "10",) Nil
+        | runJobWith defaultRunner
+
+    Pass Unit
