@@ -1,0 +1,357 @@
+# Copyright 2024 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package wake
+
+# rscRunner: Creates a remote cache runner for a given api config
+#
+# ```
+# rscRunner (RemoteCacheApi "local" 1234 "auth") = (Runner ...)
+# ```
+export target rscRunner (rscApi: RemoteCacheApi): Runner =
+    mkRemoteCacheRunner rscApi (\_ Pass "") "/workspace" fuseRunner
+
+# mkRemoteCacheRunner: Creates a remote cache runner from an underlying runner
+#
+# - `rscApi`: the remote cache to connect to
+# - `hashFn`: a runner provided hash, used to invalate jobs that match by key but not by something
+#   known only to the runner
+# - `wakeroot`: Absolute path to the root of the wake project
+# - `baseRunner`: The runner that should be used for a cache miss
+# ```
+# mkRemoteCacheRunner (RemoteCacheApi ...) (\_ Pass "") "" baseRunner = (Runner ...)
+# ```
+export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerInput Error => Result String Error) (wakeroot: String) ((Runner name score baseDoIt): Runner): Runner =
+    def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
+    def badlaunch job error = prim "job_fail_launch"
+
+    def doit job runnerInput = match runnerInput
+        Fail e ->
+            def _ = badlaunch job e
+
+            Fail e
+        Pass input ->
+            require Pass hashKey = hashFn runnerInput
+
+            # -------------------------------------
+            # --- Search the cache for the job  ---
+            # -------------------------------------
+
+            # Search the cache for a match
+            require Pass response = searchJob rscApi hashKey input
+            else
+                # Leave a breadcrumb and fallback to the base runner if the cache fails to respond
+                def _ = breadcrumb "Failed to search for job in the cache"
+
+                # This job isn't getting cached. That's probably preferable since the server
+                # request failed but good to keep in mind.
+                baseDoIt job (Pass input)
+
+            # If a match was found use it
+            require NoMatch = response
+            else
+                require (Match details) = response
+                else unreachable "two-constructor tuple must have one value"
+
+                def _ = breadcrumb "Found a match in the cache"
+
+                def (
+                    CacheSearchResponseMatch
+                    output_symlinks
+                    output_dirs
+                    output_files
+                    stdout_blob
+                    stderr_blob
+                    status
+                    runtime
+                    cputime
+                    mem
+                    ibytes
+                    obytes
+                ) = details
+
+                def insertDownload (item: CacheSearchOutputFile): (map: Map String (Result String Error)) => (map: Map String (Result String Error)) =
+                    def blob = item.getCacheSearchOutputFileBlob
+                    def path = item.getCacheSearchOutputFilePath
+                    def mode = item.getCacheSearchOutputFileMode
+
+                    minsert
+                    blob.getRemoteCacheBlobId
+                    (rscApiGetFileBlob blob "{input.getRunnerInputDirectory}/{path}" mode)
+
+                def blobDownloads =
+                    def out_id = stdout_blob.getRemoteCacheBlobId
+                    def err_id = stderr_blob.getRemoteCacheBlobId
+
+                    foldr insertDownload (mnew scmp) output_files
+                    | minsert out_id (rscApiGetStringBlob stdout_blob)
+                    | minsert err_id (rscApiGetStringBlob stderr_blob)
+
+                require Some (Pass stdout) =
+                    blobDownloads
+                    | mlookup stdout_blob.getRemoteCacheBlobId
+                else failWithError "unable to download stdout"
+
+                require Some (Pass stderr) =
+                    blobDownloads
+                    | mlookup stderr_blob.getRemoteCacheBlobId
+                else failWithError "unable to download stderr"
+
+                def resolved_outputs =
+                    output_files
+                    | map (_.getCacheSearchOutputFilePath)
+
+                def outputs = resolved_outputs ++ output_dirs ++ output_symlinks
+                def predict = Usage status runtime cputime mem ibytes obytes
+                def _ = virtual job stdout stderr status runtime cputime mem ibytes obytes
+                def inputs = map getPathName (input.getRunnerInputVisible)
+
+                Pass (RunnerOutput inputs outputs predict)
+
+            def _ = breadcrumb "Did not find a match"
+
+            # -------------------------------------
+            # --- Insert the job into the cache ---
+            # -------------------------------------
+
+            # Run the job to get the results
+            require Pass output = baseDoIt job (Pass input)
+
+            # Post the job to the server. This is left as 'def _' so that wake won't block progess
+            # on it but it will stil be joined on before wake exits. Regardless of the result this
+            # call should return the passing output to allow the build to continue.
+            def _ = postJob rscApi job wakeroot hashKey input output
+
+            Pass output
+
+    Runner "remote-cache: {name}" score doit
+
+## --- Helper functions ---
+
+# strToBytes "foo" = (13, 14, 15, Nil)
+def strToBytes (str: String): List Integer =
+    str
+    | explode
+    # FIXME: unicodeToInteger may return values larger than u8 which will break the serialization
+    | map (unicodeToInteger _)
+
+# listFlattenWithNull ((1,2,3,), (4,5,6,), (7,8,9,),) = (1,2,3,0,4,5,6,0,7,8,9,)
+def listFlattenWithNull (parts: List (List Integer)): List Integer =
+    foldr (\x \acc x ++ (0, acc)) Nil parts
+
+# asBytesDelimedByNull ("a", "b", "cd",) = (15, 0, 16, 0, 17, 18)
+def asBytesDelimedByNull (parts: List String): List Integer =
+    parts
+    | map strToBytes
+    | listFlattenWithNull
+
+# getPathAsJson (Path "foo" "asdf") = (JObject ...)
+def getPathAsJson (Path path hash) =
+    JObject (
+        "path" :-> JString path,
+        "hash" :-> JString hash,
+    )
+
+# toJIntegerList (1,2,3,) = (JInteger 1, JInteger 2, JInteger 3,)
+def toJIntegerList (parts: List Integer): List JValue =
+    parts
+    | map JInteger
+
+# Posts a completed job to the remote cache
+def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: String) ((RunnerInput _label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) ((RunnerOutput _ outputs usage): RunnerOutput): Result Unit Error =
+    def Usage status runtime cputime mem ibytes obytes = usage
+
+    def visible =
+        vis
+        | map getPathAsJson
+
+    require Pass stdout = job.getJobFailedStdoutRaw
+    require Pass stderr = job.getJobFailedStderrRaw
+
+    def insertUpload (item: String): (map: Map String (Result String Error)) => (map: Map String (Result String Error)) =
+        minsert item (rscApi | rscApiPostFileBlob item item)
+
+    def blobUploads =
+        foldr insertUpload (mnew scmp) outputs
+        | minsert "stdout" (rscApi | rscApiPostStringBlob "stdout" stdout)
+        | minsert "stderr" (rscApi | rscApiPostStringBlob "stderr" stderr)
+
+    require Some (Pass stdout_id) =
+        blobUploads
+        | mlookup "stdout"
+    else failWithError "Failed to lookup stdout"
+
+    require Some (Pass stderr_id) =
+        blobUploads
+        | mlookup "stderr"
+    else failWithError "Failed to lookup stderr"
+
+    def mkOutputFileJson src ids =
+        require Some (Pass id) =
+            ids
+            | mlookup src
+        else failWithError "Unable to lookup id for {src}"
+
+        require Pass (Stat _ mode _) = unsafe_stat src
+
+        JObject (
+            "path" :-> JString src,
+            # TODO: This may need to consider the fully qualified wakeroot
+            # Ex: "path" :-> JString "{wakeroot}/{src}",
+            "mode" :-> JInteger (mode | mode2bits),
+            "blob_id" :-> JString id,
+        )
+        | Pass
+
+    require Pass outputFiles =
+        outputs
+        | map (mkOutputFileJson _ blobUploads)
+        | findFail
+        | rmap JArray
+
+    def json =
+        JObject (
+            "comment_cmd" :-> JString (cmd | catWith " "),
+            "comment_env" :-> JString (env | catWith " "),
+            "cmd" :-> JArray cmd.asBytesDelimedByNull.toJIntegerList,
+            "cwd" :-> JString dir,
+            "env" :-> JArray env.asBytesDelimedByNull.toJIntegerList,
+            "hidden_info" :-> JString hidden,
+            "is_atty" :-> JBoolean isAtty,
+            "stdin" :-> JString stdin,
+            "visible_files" :-> JArray visible,
+            "output_dirs" :-> JArray Nil,
+            "output_symlinks" :-> JArray Nil,
+            "output_files" :-> outputFiles,
+            "stdout_blob_id" :-> JString stdout_id,
+            "stderr_blob_id" :-> JString stderr_id,
+            "status" :-> JInteger status,
+            "runtime" :-> JDouble runtime,
+            "cputime" :-> JDouble cputime,
+            "memory" :-> JInteger mem,
+            "ibytes" :-> JInteger ibytes,
+            "obytes" :-> JInteger obytes,
+        )
+
+    rscApi
+    | rscApiPostJob json
+
+# Uses input to determine if the job is cached in a remote cache
+# if so, returns the resolved job, otherwise returns None
+def searchJob (rscApi: RemoteCacheApi) (hidden: String) ((RunnerInput _label cmd vis env dir stdin _res _prefix _usage isAtty): RunnerInput): Result CacheSearchResponse Error =
+    def visible =
+        vis
+        | map getPathAsJson
+
+    def jsonReq =
+        JObject (
+            "comment_cmd" :-> JString (cmd | catWith " "),
+            "comment_env" :-> JString (env | catWith " "),
+            "cmd" :-> JArray cmd.asBytesDelimedByNull.toJIntegerList,
+            "cwd" :-> JString dir,
+            "env" :-> JArray env.asBytesDelimedByNull.toJIntegerList,
+            "hidden_info" :-> JString hidden,
+            "is_atty" :-> JBoolean isAtty,
+            "stdin" :-> JString stdin,
+            "visible_files" :-> JArray visible,
+        )
+
+    require Pass json =
+        rscApi
+        | rscApiFindMatchingJob jsonReq
+
+    require Pass (JString isMatch) = jField json "type"
+    else failWithError "JSON response has incorrect schema"
+
+    require True = isMatch ==* "Match"
+    else Pass NoMatch
+
+    def mkBlob (v: JValue): Result RemoteCacheBlob Error =
+        require Pass (JString id) = jField v "id"
+        else failWithError "id"
+
+        require Pass (JString url) = jField v "url"
+        else failWithError "url"
+
+        RemoteCacheBlob id url
+        | Pass
+
+    require Pass stdoutBlobF = jField json "stdout_blob"
+    else failWithError "stdout_blob"
+
+    require Pass stderrBlobF = jField json "stderr_blob"
+    else failWithError "stderr_blob"
+
+    require Pass stdoutBlob = mkBlob stdoutBlobF
+    else failWithError "stdout_blob"
+
+    require Pass stderrBlob = mkBlob stderrBlobF
+    else failWithError "stderr_blob"
+
+    require Pass (JInteger status) = jField json "status"
+    else failWithError "status"
+
+    require Pass (JDouble runtime) = jField json "runtime"
+    else failWithError "runtime"
+
+    require Pass (JDouble cputime) = jField json "cputime"
+    else failWithError "cputime"
+
+    require Pass (JInteger memory) = jField json "memory"
+    else failWithError "memory"
+
+    require Pass (JInteger ibytes) = jField json "ibytes"
+    else failWithError "ibytes"
+
+    require Pass (JInteger obytes) = jField json "obytes"
+    else failWithError "obytes"
+
+    require Pass (JArray outputFiles) = jField json "output_files"
+    else failWithError "output_files"
+
+    def mkOutputFile (v: JValue): Result CacheSearchOutputFile Error =
+        require Pass (JString path) = jField v "path"
+        else failWithError "path"
+
+        require Pass (JInteger mode) = jField v "mode"
+        else failWithError "mode"
+
+        require Pass jblob = jField v "blob"
+        else failWithError "blob"
+
+        require Pass blob = mkBlob jblob
+
+        CacheSearchOutputFile path mode blob
+        | Pass
+
+    require Pass ofs =
+        outputFiles
+        | map mkOutputFile
+        | findFail
+
+    CacheSearchResponseMatch
+    Nil
+    Nil
+    ofs
+    stdoutBlob
+    stderrBlob
+    status
+    runtime
+    cputime
+    memory
+    ibytes
+    obytes
+    | Match
+    | Pass

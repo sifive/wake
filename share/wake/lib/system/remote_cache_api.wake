@@ -15,6 +15,8 @@
 
 package wake
 
+from http import _
+
 # Configuration details required to connect to the remote shared cache.
 export tuple RemoteCacheApi =
     # The domain or ip address of the cache
@@ -23,6 +25,35 @@ export tuple RemoteCacheApi =
     export Port: Integer
     # The api key required for authenicated routes. Not required for all requests
     export Authorization: Option String
+
+# A downloaded blob returned from the remote shared cache
+export tuple RemoteCacheBlob =
+    # The id of the blob on the remote server
+    export Id: String
+    # The uri where the blob may be downloaded from. Not guaranteed to be http/https
+    export Uri: String
+
+tuple CacheSearchOutputFile =
+    Path: String
+    Mode: Integer
+    Blob: RemoteCacheBlob
+
+tuple CacheSearchResponseMatch =
+    OutputSymlinks: List String
+    OutputDirs: List String
+    OutputFiles: List CacheSearchOutputFile
+    StdoutBlob: RemoteCacheBlob
+    StderrBlob: RemoteCacheBlob
+    Status: Integer
+    Runtime: Double
+    Cputime: Double
+    Memory: Integer
+    IBytes: Integer
+    OBytes: Integer
+
+data CacheSearchResponse =
+    NoMatch
+    Match CacheSearchResponseMatch
 
 # makeRemoteCacheApi: Parses config string into RemoteCacheApi
 #
@@ -51,5 +82,182 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
     RemoteCacheApi domain port auth
     | Pass
 
-# TODO: methods such as "downloadFile" and "postJob" should be implemented here.
+# rscApiPostStringBlob: Posts a named string as a blob to the remote server defined by *api*
+#                       then returns the id associated to the blob. Requires authorization.
+#
+# ```
+#  api | rscApiPostStringBlob "foo" "my foo contents" = Pass "asdf-fdsa-asdf-fdsa"
+#  (RemoteCacheApi "foo" 1 None) | rscApiPostStringBlob "foo" "my foo contents" = Fail "authorization required"
+# ```
+export def rscApiPostStringBlob (name: String) (value: String) (api: RemoteCacheApi): Result String Error =
+    # TODO: use "small blob" for this
+    # require False = value ==* ""
+    # else Pass "00000000-0000-0000-0000-000000000000"
 
+    require Pass temp = writeTempFile name value
+
+    uploadBlobRequest api (addFormData name temp)
+
+# rscApiPostFileBlob: Posts a named file on disk to the remote server defined by *api*
+#                     then returns the id associated to the blob. Requires authorization.
+#
+# ```
+#  api | rscApiPostFileBlob "foo" "/some/path/to/foo" = Pass "asdf-fdsa-asdf-fdsa"
+#  (RemoteCacheApi "foo" 1 None) | rscApiPostFileBlob "foo" "/some/path/to/foo" = Fail "authorization required"
+# ```
+export def rscApiPostFileBlob (name: String) (file: String) (api: RemoteCacheApi): Result String Error =
+    # We must use unsafe here since we cannot elevate *file* to a Path without either copying it
+    # or triggering the 'job output by multiple files' error.
+    uploadBlobRequest api (unsafe_addFormData name file)
+
+# rscApiPostJob: Posts a job defined by *json* to the remote cache server. Requires authorization.
+#
+# ```
+#  api | rscApiPostJob (JObject ...) = Pass Unit
+#  (RemoteCacheApi "foo" 1 None) | rscApiPostJob (JObject ...) = Fail "authorization required"
+# ```
+# TODO: The functions should accept/return fully validated types instead of JValues
+export def rscApiPostJob (json: JValue) (api: RemoteCacheApi): Result Unit Error =
+    require Some auth = api.getRemoteCacheApiAuthorization
+    else failWithError "rsc: Posting a job requires authorization but none was provided"
+
+    def jsonStr =
+        formatJSON
+        $ json
+
+    require Pass response =
+        makeRoute api "job"
+        | buildHttpRequest
+        | setMethod HttpMethodPost
+        | addContentTypeJsonHeader
+        | addAuthorizationHeader auth
+        | setBody jsonStr
+        | makeRequest
+
+    require (Some 200) = response.getHttpResponseStatusCode
+    else failWithError "rsc: post job failed with code {response.getHttpResponseStatusCode | format}"
+
+    Pass Unit
+
+# rscApiFindMatchingJob: Searches the remote server defined by *api* for a cached job that matches 
+#                        the job key provided by *json*. Returns a json that may or may not have
+#                        the matching job. Does not require authorization.
+#
+# ```
+#  api | rscApiFindMatchingJob (JObject ...) = Pass (JObject ...)
+# ```
+# TODO: The functions should accept/return fully validated types instead of JValues
+export def rscApiFindMatchingJob (json: JValue) (api: RemoteCacheApi): Result JValue Error =
+    def jsonStr =
+        formatJSON
+        $ json
+
+    require Pass response =
+        makeRoute api "job/matching"
+        | buildHttpRequest
+        | setMethod HttpMethodPost
+        | addContentTypeJsonHeader
+        | setBody jsonStr
+        | makeRequest
+
+    response.getHttpResponseBody.parseJSONBody
+
+# rscApiGetStringBlob: Downloads a blob and returns the contents as a string 
+#
+# ```
+#  rscApiGetStringBlob (RemoteCacheBlob "asdf" "https://...") = Pass "foo\nbar\nbat" 
+# ```
+export def rscApiGetStringBlob ((RemoteCacheBlob _ uri): RemoteCacheBlob): Result String Error =
+    # TODO: use "small blob" for this and also parse the schema out
+    # require False = id ==* "00000000-0000-0000-0000-000000000000"
+    # else Pass  ""
+
+    require Pass response =
+        buildHttpRequest uri
+        | setMethod HttpMethodGet
+        | makeRequest
+
+    Pass response.getHttpResponseBody
+
+# rscApiGetFileBlob: Downloads a blob to *path* with *mode* permisssions and return *path*
+#
+# ```
+#  rscApiGetFileBlob (RemoteCacheBlob "asdf" "https://...") "foo/bar" 0644 = Pass "foo/bar" 
+# ```
+export def rscApiGetFileBlob ((RemoteCacheBlob _ uri): RemoteCacheBlob) (path: String) (mode: Integer): Result String Error =
+    # TODO: use "small blob" for this and also parse the schema out
+    # require False = id ==* "00000000-0000-0000-0000-000000000000"
+    # else Pass  ""
+
+    require Pass downloadPath =
+        buildHttpRequest uri
+        | setMethod HttpMethodGet
+        | makeBinaryRequest
+
+    # TODO: I should probably mv instead of cp since this will be very space expensive
+    def fixupScript =
+        """
+        cp %{downloadPath.getPathName} %{path} 
+        chmod %{mode | strOctal} %{path} 
+        """
+
+    def job =
+        makeShellPlan fixupScript (downloadPath, Nil)
+        | setPlanLabel "rsc: fixup blob {path} from {downloadPath.getPathName}"
+        # We need to copy the file over another jobs output space so:
+        #   - We must run with the localRunner
+        #   - We must lie and say we output nothing
+        #   - The *path* must be listed as another jobs output to be available to the system 
+        | setPlanFnOutputs (\_ Nil)
+        | runJobWith localRunner
+
+    require True = job.isJobOk
+    else failWithError "Failed to cleanup downloaded file {path} from {downloadPath.getPathName}"
+
+    Pass path
+
+## --- Helper functions ---
+
+# Helper function for building the route for the resource
+def makeRoute ((RemoteCacheApi domain port _)) (resource: String): String =
+    "{domain}:{port | str}/{resource}"
+
+# Helper function for uploading a blob.
+def uploadBlobRequest (api: RemoteCacheApi) (setBlob: HttpRequest => HttpRequest): Result String Error =
+    require Some auth = api.getRemoteCacheApiAuthorization
+    else failWithError "rsc: Posting a blob requires authorization but none was provided"
+
+    require Pass response =
+        makeRoute api "blob"
+        | buildHttpRequest
+        | setMethod HttpMethodPost
+        | addAuthorizationHeader auth
+        | setBlob
+        | makeRequest
+
+    require (Some 200) = response.getHttpResponseStatusCode
+    else
+        failWithError
+        "rsc: failed to upload string as blob with code {response.getHttpResponseStatusCode | format}"
+
+    require Pass json = response.getHttpResponseBody.parseJSONBody
+
+    require Pass (JString "Ok") = jField json "type"
+    else failWithError "rsc: failed to upload blob"
+
+    require Pass (JArray blobs) = jField json "blobs"
+    else failWithError "rsc: JSON response has incorrect schema for blob upload. (Missing blobs key)"
+
+    def idJVals =
+        blobs
+        | map (jField _ "id")
+
+    require Pass ids = idJVals.findFail
+    else failWithError "rsc: JSON response has incorrect schema for blob upload. (Missing blob ids)"
+
+    require Some (JString id) = ids.head
+    else
+        failWithError
+        "rsc: JSON response has incorrect schema for blob upload. (Expected only 1 id saw {ids.len.str})"
+
+    Pass id
