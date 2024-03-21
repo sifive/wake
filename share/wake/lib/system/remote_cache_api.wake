@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO: change this to package remote_cache and deal with all the churn
 package wake
 
 from http import _
@@ -28,69 +29,119 @@ export tuple RemoteCacheApi =
 
 ## --- POST /job/matching types ---
 
+# A request to the remote server to check if a job is cached
 tuple CacheSearchRequest =
+    # The command line of the job
     Cmd: List String
+    # The directory of the job
     Cwd: String
+    # The environment of the job
     Env: List String
+    # User provided string to mark two jobs as different even if wake considers them the same
     HiddenInfo: String
+    # If the job was ran as if a user was running it from a terminal
     IsAtty: Boolean
+    # The stdin of the job
     Stdin: String
+    # The list of files the job is allowed to read in the sandbox
     VisibleFiles: List Path
 
 # A downloadable blob returned from the remote shared cache
-export tuple CacheSearchBlob =
+tuple CacheSearchBlob =
     # The id of the blob on the remote server
-    export Id: String
+    Id: String
     # The uri where the blob may be downloaded from. Not guaranteed to be http/https
-    export Uri: String
+    Uri: String
 
+# A single file backed by a blob that a cached job output
 tuple CacheSearchOutputFile =
+    # The path on disk of the file
     Path: String
+    # The mode on disk of the file
     Mode: Integer
+    # The description of how to download the files contents
     Blob: CacheSearchBlob
 
+# A match response from the server. Specifies all details of a cached job
 tuple CacheSearchResponseMatch =
+    # The symlinks that were output by the job
     OutputSymlinks: List String
+    # The directories that were output by the job
     OutputDirs: List String
+    # The files that were output by the job
     OutputFiles: List CacheSearchOutputFile
+    # The stdout of the job
     StdoutBlob: CacheSearchBlob
+    # The stderr of the job
     StderrBlob: CacheSearchBlob
+    # The code that the job return on exit
     Status: Integer
+    # The total runtime of the job
     Runtime: Double
+    # The total cputime of the job
     Cputime: Double
+    # The total memory of the job
     Memory: Integer
+    # The number of bytes read by the job
     IBytes: Integer
+    # The number of bytes written by the job
     OBytes: Integer
 
+# A response from the server to a CacheSearchRequest
 data CacheSearchResponse =
+    # The job was not found on the remote server
     NoMatch
+    # The job was found on the remote server
     Match CacheSearchResponseMatch
 
 ## --- POST /job types ---
 
+# A single file uploaded to the server for the owning job
 tuple CachePostRequestOutputFile =
+    # The path on disk of the file
     Path: String
+    # The mode on disk of the file
     Mode: Integer
+    # The blob id returned by the server from the blob upload
     BlobId: String
 
+# A request to the remote server to cache a job
 tuple CachePostRequest =
+    # The command line of the job
     Cmd: List String
+    # The directory of the job
     Cwd: String
+    # The environment of the job
     Env: List String
+    # User provided string to mark two jobs as different even if wake considers them the same
     HiddenInfo: String
+    # If the job was ran as if a user was running it from a terminal
     IsAtty: Boolean
+    # The stdin of the job
     Stdin: String
+    # The list of files the job is allowed to read in the sandbox
     VisibleFiles: List Path
+    # The directories that were output by the job
     OutputDirs: List Integer
+    # The symlinks that were output by the job
     OutputSymlinks: List Integer
+    # The files that were output by the job
     OutputFiles: List CachePostRequestOutputFile
+    # The blob id returned from the server for the stdout of the job
     StdoutBlobId: String
+    # The blob id returned from the server for the stderr of the job
     StderrBlobId: String
+    # The code that the job return on exit
     Status: Integer
+    # The total runtime of the job
     Runtime: Double
+    # The total cputime of the job
     Cputime: Double
+    # The total memory of the job
     Memory: Integer
+    # The number of bytes read by the job
     IBytes: Integer
+    # The number of bytes written by the job
     OBytes: Integer
 
 # makeRemoteCacheApi: Parses config string into RemoteCacheApi
