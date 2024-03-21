@@ -169,84 +169,70 @@ def toJIntegerList (parts: List Integer): List JValue =
     parts
     | map JInteger
 
+def toPostJobReq ((RunnerInput _label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (output: RunnerOutput) (hidden: String) (stdoutBlobId: String) (stderrBlobId: String) (files: List CachePostJobRequestOutputFile) =
+    def Usage status runtime cputime mem ibytes obytes = output.getRunnerOutputUsage
+
+    CachePostJobRequest
+    cmd
+    dir
+    env
+    hidden
+    isAtty
+    stdin
+    vis
+    Nil
+    Nil
+    files
+    stdoutBlobId
+    stderrBlobId
+    status
+    runtime
+    cputime
+    mem
+    ibytes
+    obytes
+
 # Posts a completed job to the remote cache
-def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: String) ((RunnerInput _label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) ((RunnerOutput _ outputs usage): RunnerOutput): Result Unit Error =
-    def Usage status runtime cputime mem ibytes obytes = usage
-
-    def visible =
-        vis
-        | map getPathAsJson
-
+def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: String) (input: RunnerInput) (output: RunnerOutput): Result Unit Error =
     require Pass stdout = job.getJobFailedStdoutRaw
     require Pass stderr = job.getJobFailedStderrRaw
 
-    def insertUpload (item: String): (map: Map String (Result String Error)) => (map: Map String (Result String Error)) =
-        minsert item (rscApi | rscApiPostFileBlob item item)
+    def uploadFileAndCollect path =
+        def doUpload =
+            rscApi
+            | rscApiPostFileBlob path path
 
-    def blobUploads =
-        foldr insertUpload (mnew scmp) outputs
-        | minsert "stdout" (rscApi | rscApiPostStringBlob "stdout" stdout)
-        | minsert "stderr" (rscApi | rscApiPostStringBlob "stderr" stderr)
+        def doStat = unsafe_stat path
 
-    require Some (Pass stdout_id) =
-        blobUploads
-        | mlookup "stdout"
-    else failWithError "Failed to lookup stdout"
+        require Pass id = doUpload
+        require Pass (Stat _ mode _) = doStat
 
-    require Some (Pass stderr_id) =
-        blobUploads
-        | mlookup "stderr"
-    else failWithError "Failed to lookup stderr"
-
-    def mkOutputFileJson src ids =
-        require Some (Pass id) =
-            ids
-            | mlookup src
-        else failWithError "Unable to lookup id for {src}"
-
-        require Pass (Stat _ mode _) = unsafe_stat src
-
-        JObject (
-            "path" :-> JString src,
-            # TODO: This may need to consider the fully qualified wakeroot
-            # Ex: "path" :-> JString "{wakeroot}/{src}",
-            "mode" :-> JInteger (mode | mode2bits),
-            "blob_id" :-> JString id,
-        )
+        CachePostJobRequestOutputFile path (mode | mode2bits) id
         | Pass
 
-    require Pass outputFiles =
-        outputs
-        | map (mkOutputFileJson _ blobUploads)
-        | findFail
-        | rmap JArray
+    def fileUploads =
+        output.getRunnerOutputOutputs
+        | map uploadFileAndCollect
 
-    def json =
-        JObject (
-            "comment_cmd" :-> JString (cmd | catWith " "),
-            "comment_env" :-> JString (env | catWith " "),
-            "cmd" :-> JArray cmd.asBytesDelimedByNull.toJIntegerList,
-            "cwd" :-> JString dir,
-            "env" :-> JArray env.asBytesDelimedByNull.toJIntegerList,
-            "hidden_info" :-> JString hidden,
-            "is_atty" :-> JBoolean isAtty,
-            "stdin" :-> JString stdin,
-            "visible_files" :-> JArray visible,
-            "output_dirs" :-> JArray Nil,
-            "output_symlinks" :-> JArray Nil,
-            "output_files" :-> outputFiles,
-            "stdout_blob_id" :-> JString stdout_id,
-            "stderr_blob_id" :-> JString stderr_id,
-            "status" :-> JInteger status,
-            "runtime" :-> JDouble runtime,
-            "cputime" :-> JDouble cputime,
-            "memory" :-> JInteger mem,
-            "ibytes" :-> JInteger ibytes,
-            "obytes" :-> JInteger obytes,
-        )
+    def stdoutUpload =
+        rscApi
+        | rscApiPostStringBlob "stdout" stdout
+
+    def stderrUpload =
+        rscApi
+        | rscApiPostStringBlob "stderr" stderr
+
+    require Pass stdoutId = stdoutUpload
+    require Pass stderrId = stderrUpload
+
+    require Pass uploads =
+        fileUploads
+        | findFail
+
+    def req = toPostJobReq input output hidden stdoutId stderrId uploads
 
     rscApi
-    | rscApiPostJob json
+    | rscApiPostJob req
 
 # Uses input to determine if the job is cached in a remote cache
 # if so, returns the resolved job, otherwise returns None
@@ -257,8 +243,6 @@ def searchJob (rscApi: RemoteCacheApi) (hidden: String) ((RunnerInput _label cmd
 
     def jsonReq =
         JObject (
-            "comment_cmd" :-> JString (cmd | catWith " "),
-            "comment_env" :-> JString (env | catWith " "),
             "cmd" :-> JArray cmd.asBytesDelimedByNull.toJIntegerList,
             "cwd" :-> JString dir,
             "env" :-> JArray env.asBytesDelimedByNull.toJIntegerList,

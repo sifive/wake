@@ -55,6 +55,85 @@ data CacheSearchResponse =
     NoMatch
     Match CacheSearchResponseMatch
 
+tuple CachePostJobRequestOutputFile =
+    Path: String
+    Mode: Integer
+    BlobId: String
+
+tuple CachePostJobRequest =
+    Cmd: List String
+    Cwd: String
+    Env: List String
+    HiddenInfo: String
+    IsAtty: Boolean
+    Stdin: String
+    VisibleFiles: List Path
+    OutputDirs: List Integer
+    OutputSymlinks: List Integer
+    OutputFiles: List CachePostJobRequestOutputFile
+    StdoutBlobId: String
+    StderrBlobId: String
+    Status: Integer
+    Runtime: Double
+    Cputime: Double
+    Memory: Integer
+    IBytes: Integer
+    OBytes: Integer
+
+def getCachePostJobRequestJson (req: CachePostJobRequest): JValue =
+    def (
+        CachePostJobRequest
+        cmd
+        cwd
+        env
+        hiddenInfo
+        isAtty
+        stdin
+        visibleFiles
+        # TODO: these two are just being ignored right now
+        # That is probably not right
+        _outputDirs
+        _outputSymlinks
+        outputFiles
+        stdoutBlobId
+        stderrBlobId
+        status
+        runtime
+        cputime
+        memory
+        ibytes
+        obytes
+    ) = req
+
+    def mkOutputFileJson ((CachePostJobRequestOutputFile path mode blobId): CachePostJobRequestOutputFile): JValue =
+        JObject (
+            "path" :-> JString path,
+            "mode" :-> JInteger mode,
+            "blob_id" :-> JString blobId,
+        )
+
+    JObject (
+        # TODO: Move these functions over once everything is done
+        "cmd" :-> JArray cmd.asBytesDelimedByNull.toJIntegerList,
+        "cwd" :-> JString cwd,
+        "env" :-> JArray env.asBytesDelimedByNull.toJIntegerList,
+        "hidden_info" :-> JString hiddenInfo,
+        "is_atty" :-> JBoolean isAtty,
+        "stdin" :-> JString stdin,
+        "visible_files" :-> JArray (visibleFiles | map getPathAsJson),
+        "output_dirs" :-> JArray Nil,
+        "output_symlinks" :-> JArray Nil,
+        "output_files" :-> JArray (outputFiles | map mkOutputFileJson),
+        "stdout_blob_id" :-> JString stdoutBlobId,
+        "stderr_blob_id" :-> JString stderrBlobId,
+        "status" :-> JInteger status,
+        "runtime" :-> JDouble runtime,
+        "cputime" :-> JDouble cputime,
+        "memory" :-> JInteger memory,
+        "ibytes" :-> JInteger ibytes,
+        "obytes" :-> JInteger obytes,
+    )
+
 # makeRemoteCacheApi: Parses config string into RemoteCacheApi
 #
 # ```
@@ -110,20 +189,20 @@ export def rscApiPostFileBlob (name: String) (file: String) (api: RemoteCacheApi
     # or triggering the 'job output by multiple files' error.
     uploadBlobRequest api (unsafe_addFormData name file)
 
-# rscApiPostJob: Posts a job defined by *json* to the remote cache server. Requires authorization.
+# rscApiPostJob: Posts a job defined by *req* to the remote cache server. Requires authorization.
 #
 # ```
-#  api | rscApiPostJob (JObject ...) = Pass Unit
-#  (RemoteCacheApi "foo" 1 None) | rscApiPostJob (JObject ...) = Fail "authorization required"
+#  api | rscApiPostJob (CachePostJobRequest ...) = Pass Unit
+#  (RemoteCacheApi "foo" 1 None) | rscApiPostJob (CachePostJobRequest ...) = Fail "authorization required"
 # ```
-# TODO: The functions should accept/return fully validated types instead of JValues
-export def rscApiPostJob (json: JValue) (api: RemoteCacheApi): Result Unit Error =
+export def rscApiPostJob (req: CachePostJobRequest) (api: RemoteCacheApi): Result Unit Error =
     require Some auth = api.getRemoteCacheApiAuthorization
     else failWithError "rsc: Posting a job requires authorization but none was provided"
 
     def jsonStr =
-        formatJSON
-        $ json
+        req
+        | getCachePostJobRequestJson
+        | formatJSON
 
     require Pass response =
         makeRoute api "job"
