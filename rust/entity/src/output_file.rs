@@ -9,7 +9,7 @@ pub struct Model {
     pub id: Uuid,
     pub path: String,
     pub mode: i32,
-    pub job_id: Uuid,
+    pub job_id: Option<Uuid>,
     pub blob_id: Uuid,
     pub created_at: DateTime,
 }

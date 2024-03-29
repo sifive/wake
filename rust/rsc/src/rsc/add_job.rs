@@ -39,26 +39,29 @@ pub async fn add_job(
         o_bytes: Set(payload.obytes as i64),
     };
 
-    // Now perform the insert as a single transaction
-    let insert_result = conn
-        .as_ref()
-        .transaction::<_, (), DbErr>(|txn| {
-            Box::pin(async move {
-                let job = insert_job.save(txn).await?;
-                let job_id = job.id.unwrap();
+    // TODO: We can quite significantly speed this up by making the following changes
+    // 1) Make the job id on VisibleFile/OutputFile/OutputDir/OutputSymlink nullable
+    // 2) remove all of them from the transaction, and set them all up to run in parallel
+    // 3) collect their ids
+    // 4) inside of a transaction create the job then update all the models to have the correct job
+    //    id
+    // 5) Its also worth considering a blob like approach where we create all those things in a
+    //    different request and then return the ids, but probably not necessary
 
                 let visible_files = vis.into_iter().map(|vis_file| visible_file::ActiveModel {
                     id: NotSet,
                     created_at: NotSet,
                     path: Set(vis_file.path),
                     hash: Set(vis_file.hash),
-                    job_id: Set(job_id),
+                    job_id: Set(None),
                 });
 
-                VisibleFile::insert_many(visible_files)
-                    .on_empty_do_nothing()
-                    .exec(txn)
-                    .await?;
+                let res = VisibleFile::insert_many(visible_files)
+                    .exec(conn.as_ref())
+                    .await
+                    .unwrap();
+
+                println!("{:?}", res.identifiers);
 
                 let out_files = output_files
                     .into_iter()
@@ -67,14 +70,15 @@ pub async fn add_job(
                         created_at: NotSet,
                         path: Set(out_file.path),
                         mode: Set(out_file.mode),
-                        job_id: Set(job_id),
+                        job_id: Set(None),
                         blob_id: Set(out_file.blob_id),
                     });
 
                 OutputFile::insert_many(out_files)
                     .on_empty_do_nothing()
-                    .exec(txn)
-                    .await?;
+                    .exec(conn.as_ref())
+                    .await
+                    .unwrap();
 
                 let out_symlinks =
                     output_symlinks
@@ -83,27 +87,38 @@ pub async fn add_job(
                             id: NotSet,
                             created_at: NotSet,
                             path: Set(out_symlink.path),
-                            content: Set(out_symlink.content),
-                            job_id: Set(job_id),
+                            link: Set(out_symlink.link),
+                            job_id: Set(None),
                         });
 
                 OutputSymlink::insert_many(out_symlinks)
                     .on_empty_do_nothing()
-                    .exec(txn)
-                    .await?;
+                    .exec(conn.as_ref())
+                    .await
+                    .unwrap();
 
                 let dirs = output_dirs.into_iter().map(|dir| output_dir::ActiveModel {
                     id: NotSet,
                     created_at: NotSet,
                     path: Set(dir.path),
                     mode: Set(dir.mode),
-                    job_id: Set(job_id),
+                    job_id: Set(None),
                 });
 
                 OutputDir::insert_many(dirs)
                     .on_empty_do_nothing()
-                    .exec(txn)
-                    .await?;
+                    .exec(conn.as_ref())
+                    .await
+                    .unwrap();
+
+    // Now perform the insert as a single transaction
+    let insert_result = conn
+        .as_ref()
+        .transaction::<_, (), DbErr>(|txn| {
+            Box::pin(async move {
+                let job = insert_job.save(txn).await?;
+                let job_id = job.id.unwrap();
+
 
                 Ok(())
             })

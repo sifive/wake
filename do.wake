@@ -1,0 +1,6 @@
+package build_wake
+
+export def do _ =
+    makeShellPlan "mkdir -p fex/a/b/c; mkdir -p fex/b; mkdir -p fex/foo/bar/bat; mkdir -p fex/foo; echo tfot > foo.txt; ln -s foo.txt bar.txt" Nil
+    | setPlanLabel "do"
+    | runJobWith defaultRunner

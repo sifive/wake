@@ -3,9 +3,10 @@ use entity::{api_key, blob_store, job, local_blob_store};
 use rand_core::{OsRng, RngCore};
 use sea_orm::prelude::Uuid;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr, DeleteResult, EntityTrait,
+    ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr, DeleteResult, EntityTrait, Query,
 };
 use tracing;
+use entity::prelude::{ApiKey};
 
 // --------------------------------------------------
 // ----------          Api Key             ----------
@@ -36,6 +37,20 @@ pub async fn create_api_key(
     };
 
     active_key.insert(db).await
+}
+
+pub async fn create_many_keys(
+    db: &DatabaseConnection,
+    descriptions: Vec<String>,
+) -> Result<Unit, DbErr> {
+    // let query = Query::delete()
+    //     .from_table(Glyph::Table)
+    //     .and_where(Expr::col(Glyph::Id).eq(1))
+    //     .returning(Query::returning().column(Glyph::Id))
+    //     .to_owned();
+    // let query = Query::insert()  
+    //    .into_table(api_key::Model);
+
 }
 
 // ----------             Read             ----------

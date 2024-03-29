@@ -2,5 +2,5 @@
   "database_url": "postgres://localhost:5433/test",
   "server_addr": "127.0.0.1:3001",
   "standalone": false,
-  "active_store": "eea6b695-3fbe-4686-a5a5-f6a823e5b917"
+  "active_store": "3bb9636a-1fce-4729-bd44-ea4ea140188e"
 }

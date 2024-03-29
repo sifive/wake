@@ -105,7 +105,7 @@ pub async fn read_job(
                     .into_iter()
                     .map(|m| Symlink {
                         path: m.path,
-                        content: m.content,
+                        link: m.link,
                     })
                     .collect();
 

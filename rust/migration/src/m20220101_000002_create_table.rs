@@ -85,7 +85,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(VisibleFile::Path).string().not_null())
                     .col(ColumnDef::new(VisibleFile::Hash).string().not_null())
-                    .col(ColumnDef::new(VisibleFile::JobId).uuid().not_null())
+                    .col(ColumnDef::new(VisibleFile::JobId).uuid())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-visible_file-job")
@@ -112,7 +112,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(OutputFile::Path).string().not_null())
                     .col(ColumnDef::new(OutputFile::Mode).integer().not_null())
-                    .col(ColumnDef::new(OutputFile::JobId).uuid().not_null())
+                    .col(ColumnDef::new(OutputFile::JobId).uuid())
                     .col(ColumnDef::new(OutputFile::BlobId).uuid().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
@@ -150,8 +150,8 @@ impl MigrationTrait for Migration {
                             .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(OutputSymlink::Path).string().not_null())
-                    .col(ColumnDef::new(OutputSymlink::Content).ezblob())
-                    .col(ColumnDef::new(OutputSymlink::JobId).uuid().not_null())
+                    .col(ColumnDef::new(OutputSymlink::Link).string().not_null())
+                    .col(ColumnDef::new(OutputSymlink::JobId).uuid())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-output_file-job")
@@ -178,7 +178,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(OutputDir::Path).string().not_null())
                     .col(ColumnDef::new(OutputDir::Mode).integer().not_null())
-                    .col(ColumnDef::new(OutputDir::JobId).uuid().not_null())
+                    .col(ColumnDef::new(OutputDir::JobId).uuid())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-output_file-job")
@@ -237,7 +237,7 @@ enum OutputSymlink {
     Table,
     Id,
     Path,
-    Content,
+    Link,
     JobId,
 }
 

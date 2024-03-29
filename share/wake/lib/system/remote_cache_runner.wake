@@ -50,12 +50,22 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
             # -------------------------------------
 
             # Search the cache for a match
-            require Pass response =
+            def requestTask =
                 rscApi
                 | rscApiFindMatchingJob (mkSearchRequest input hashKey)
+
+            require Pass response = requestTask
             else
-                # Leave a breadcrumb and fallback to the base runner if the cache fails to respond
-                def _ = breadcrumb "Failed to search for job in the cache"
+                require Fail err = requestTask
+                else unreachable "Result must be either Pass or Fail"
+
+                def _ =
+                    require True = shouldDebugRemoteCache Unit
+
+                    def _ =
+                        writeTempFile "remote.cache.lookup.fail" "label: {input.getRunnerInputLabel}\nerror: {err | format}"
+
+                    True
 
                 # This job isn't getting cached. That's probably preferable since the server
                 # request failed but good to keep in mind.
@@ -67,7 +77,13 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                 require (Match details) = response
                 else unreachable "two-constructor tuple must have one value"
 
-                def _ = breadcrumb "Found a match in the cache"
+                def _ =
+                    require True = shouldDebugRemoteCache Unit
+
+                    def _ =
+                        writeTempFile "remote.cache.lookup.hit" "label: {input.getRunnerInputLabel}"
+
+                    True
 
                 def (
                     CacheSearchResponseMatch
@@ -84,15 +100,81 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                     obytes
                 ) = details
 
+                # Start these downloads now since they aren't written to disk
+                def stdoutDownload = rscApiGetStringBlob stdoutBlob
+                def stderrDownload = rscApiGetStringBlob stderrBlob
+
+                def doMakeDirectory (CacheSearchOutputDirectory path mode) = 
+                    require True =
+                        makeExecPlan ("mkdir", "-p", path,) Nil
+                        | setPlanLabel "rsc: mkdir output dir {path}" 
+                        | runJobWith localRunner
+                        | isJobOk
+                    else 
+                       failWithError "rsc: Failed to mkdir output dir: {path}"
+
+                    Pass Unit
+
+                # We need to create directories from shortest to longest, each directory along the
+                # chain may have a different permission set and by creating short dirs first we
+                # ensure they don't incorrectly inheret the permissions of a subdir. This required
+                # ordering significantly decreases parallism, however this is mitigated by the fact
+                # that most outputs are files, not dirs.
+                def dirLoop (dirs: List CacheSearchOutputDirectory) = match dirs
+                    Nil -> Pass Nil
+                    h, t ->
+                        require Pass dir = doMakeDirectory h
+                        require Pass rest = dirLoop t
+
+                        Pass (dir, rest)
+
+                def lenOrder lhs rhs =
+                    def lhsLen = lhs.getCacheSearchOutputDirectoryPath.strlen
+                    def rhsLen = rhs.getCacheSearchOutputDirectoryPath.strlen
+
+                    if lhsLen == rhsLen then
+                        EQ
+                    else if lhsLen < rhsLen then
+                        LT
+                    else 
+                        GT
+
+                def orderedDirs = outputDirs | sortBy lenOrder
+
+                # We don't actually care about the result here but we need to ensure that all
+                # directories are created before potentially downloading files into them.
+                require Pass _ = dirLoop orderedDirs 
+                else failWithError "rsc: Failed to make output directory"
+
                 def doDownload ((CacheSearchOutputFile path mode blob): CacheSearchOutputFile) =
                     rscApiGetFileBlob blob "{input.getRunnerInputDirectory}/{path}" mode
 
-                def blobDownloads =
+                # We don't actually care about the result here but we need to ensure that all
+                # downloads have completed and succeeded before we attempt any symlinks/continue.
+                require Pass _ =
                     outputFiles
                     | map doDownload
+                    | findFail
+                else failWithError "rsc: Failed to download a blob"
 
-                def stdoutDownload = rscApiGetStringBlob stdoutBlob
-                def stderrDownload = rscApiGetStringBlob stderrBlob
+                # TODO: These probably need to be wakeroot relative
+                # Link must point to dest. We do the reverse here of what is done for posting a job
+                def doMakeSymlink ((CacheSearchOutputSymlink dest link): CacheSearchOutputSymlink) =
+                    require True =
+                        makeExecPlan ("ln", "-s", dest, link,) Nil
+                        | setPlanLabel "rsc: symlink {link} to {dest}" 
+                        | runJobWith localRunner
+                        | isJobOk
+                    else 
+                       failWithError "rsc: Failed to link {link} to {dest}"
+
+                    Pass Unit
+
+                require Pass _ =
+                    outputSymlinks
+                    | map doMakeSymlink
+                    | findFail
+                else failWithError "rsc: Failed to create a symlink"
 
                 require Pass stdout = stdoutDownload
                 else failWithError "rsc: Failed to download stdout"
@@ -100,26 +182,33 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                 require Pass stderr = stderrDownload
                 else failWithError "rsc: Failed to download stderr"
 
-                # We don't actually care about the result here but we do need to ensure that all
-                # downloads have completed and succeeded before we continue on.
-                require Pass _ =
-                    blobDownloads
-                    | findFail
-                else failWithError "rsc: Failed to download a blob"
-
                 def resolvedOutputs =
                     outputFiles
-                    | map (_.getCacheSearchOutputFilePath)
+                    | map getCacheSearchOutputFilePath
 
-                def outputs = resolvedOutputs ++ outputDirs ++ outputSymlinks
+                def resolvedSymlinks =
+                    outputSymlinks
+                    | map getCacheSearchOutputSymlinkPath
+
+                def resolvedDirectories =
+                    outputDirs
+                    | map getCacheSearchOutputDirectoryPath
+
+                def outputs = resolvedOutputs ++ resolvedDirectories ++ resolvedSymlinks
                 def predict = Usage status runtime cputime mem ibytes obytes
                 def _ = virtual job stdout stderr status runtime cputime mem ibytes obytes
                 def inputs = map getPathName (input.getRunnerInputVisible)
 
                 Pass (RunnerOutput inputs outputs predict)
 
-            def _ = breadcrumb "Did not find a match"
+            def _ =
+                require True = shouldDebugRemoteCache Unit
 
+                def _ =
+                    writeTempFile "remote.cache.lookup.miss" "label: {input.getRunnerInputLabel}"
+
+                True
+                
             # -------------------------------------
             # --- Insert the job into the cache ---
             # -------------------------------------
@@ -139,14 +228,15 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
 ## --- Helper functions ---
 
 # Creates a CacheSearchRequest from the various inputs to a runner
-def mkSearchRequest ((RunnerInput _label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (hidden: String) =
-    CacheSearchRequest cmd dir env hidden isAtty stdin vis
+def mkSearchRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (hidden: String) =
+    CacheSearchRequest label cmd dir env hidden isAtty stdin vis
 
 # Creates a CachePostJobRequest from the various inputs and outputs of a runner
-def mkPostJobRequest ((RunnerInput _label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (output: RunnerOutput) (hidden: String) (stdoutBlobId: String) (stderrBlobId: String) (files: List CachePostRequestOutputFile) =
+def mkPostJobRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (output: RunnerOutput) (hidden: String) (stdoutBlobId: String) (stderrBlobId: String) (files: List CachePostRequestOutputFile) (directories: List CachePostRequestOutputDirectory) (symlinks: List CachePostRequestOutputSymlink) =
     def Usage status runtime cputime mem ibytes obytes = output.getRunnerOutputUsage
 
     CachePostRequest
+    label
     cmd
     dir
     env
@@ -154,8 +244,8 @@ def mkPostJobRequest ((RunnerInput _label cmd vis env dir stdin _res _prefix _ i
     isAtty
     stdin
     vis
-    Nil
-    Nil
+    directories
+    symlinks
     files
     stdoutBlobId
     stderrBlobId
@@ -166,27 +256,86 @@ def mkPostJobRequest ((RunnerInput _label cmd vis env dir stdin _res _prefix _ i
     ibytes
     obytes
 
+export def thirdBy (acceptFn: a => Integer): (list: List a) => Triple (one: List a) (two: List a) (three: List a) =
+    def loop list = match list
+        Nil -> Triple Nil Nil Nil
+        h, t ->
+            # don't wait on f to process tail:
+            def Triple x y z = loop t
+
+            match (acceptFn h)
+                1 -> Triple (h, x) y z
+                2 -> Triple x (h, y) z
+                3 -> Triple x y (h, z)
+                _ -> Triple x y z
+
+    loop
+
 # Posts a completed job to the remote cache
 def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: String) (input: RunnerInput) (output: RunnerOutput): Result Unit Error =
     require Pass stdout = job.getJobFailedStdoutRaw
     require Pass stderr = job.getJobFailedStderrRaw
 
-    def uploadFileAndCollect path =
+    def allOutputs = 
+        output.getRunnerOutputOutputs
+
+    def rmapStat path = match (unsafe_stat path)
+        Fail x -> Fail x
+        Pass x -> Pass (Pair path x)
+
+    require Pass outputsStat =
+        allOutputs
+        | map rmapStat 
+        | findFail
+
+    def statToGroup (Stat t _ _) = match t
+        PathTypeRegularFile -> 1
+        PathTypeDirectory -> 2
+        PathTypeSymlink -> 3
+        _ -> panic "unsuported filetype for rsc"
+
+    def (Triple regFiles directories symlinks) =
+        outputsStat
+        | thirdBy (\x x.getPairSecond.statToGroup)
+
+    def uploadAndMakeFile (Pair path (Stat _ mode _)) =
         def doUpload =
             rscApi
             | rscApiPostFileBlob path path
 
-        def doStat = unsafe_stat path
-
         require Pass id = doUpload
-        require Pass (Stat _ mode _) = doStat
 
         CachePostRequestOutputFile path (mode | mode2bits) id
         | Pass
 
+    # TODO: readlink may need to be a PRIM for performance reasons
+    # The path output by the job itself is the created symlink. The contents of the symlink
+    # is the original file on disk. This is reversed when downloading a job.
+    def makeSymlink (Pair link _) =
+        require Pass dest =
+            makeExecPlan ("readlink", "-n", link,) Nil
+            | setPlanLabel "rsc: readlink {link}"
+            | runJobWith localRunner
+            | getJobStdout
+
+        # TODO: Pretty sure this needs to be wakeroot relative
+        CachePostRequestOutputSymlink dest link 
+        | Pass
+
+    def makeDirectory (Pair path (Stat _ mode _)) =
+        CachePostRequestOutputDirectory path (mode | mode2bits)
+
     def fileUploads =
-        output.getRunnerOutputOutputs
-        | map uploadFileAndCollect
+        regFiles 
+        | map uploadAndMakeFile 
+
+    def symlinksUpload = 
+        symlinks
+        | map makeSymlink
+
+    def directoriesUpload =
+        directories
+        | map makeDirectory
 
     def stdoutUpload =
         rscApi
@@ -203,8 +352,16 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
         fileUploads
         | findFail
 
-    def req = mkPostJobRequest input output hidden stdoutId stderrId uploads
+    require Pass resolvedLinks =
+        symlinksUpload
+        | findFail
+
+    def req = mkPostJobRequest input output hidden stdoutId stderrId uploads directoriesUpload resolvedLinks
 
     rscApi
     | rscApiPostJob req
+
+target shouldDebugRemoteCache Unit: Boolean = match (getenv "DEBUG_WAKE_REMOTE_CACHE")
+    Some _ -> True
+    None -> False
 

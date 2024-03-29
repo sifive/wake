@@ -24,8 +24,7 @@ pub struct Dir {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Symlink {
     pub path: String,
-    #[serde(with = "serde_bytes")]
-    pub content: Vec<u8>,
+    pub link: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

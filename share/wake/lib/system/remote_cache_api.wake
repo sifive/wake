@@ -31,6 +31,8 @@ export tuple RemoteCacheApi =
 
 # A request to the remote server to check if a job is cached
 tuple CacheSearchRequest =
+    # The label for the job. Not part of the key, used for inspection
+    Label: String
     # The command line of the job
     Cmd: List String
     # The directory of the job
@@ -53,7 +55,7 @@ tuple CacheSearchBlob =
     # The uri where the blob may be downloaded from. Not guaranteed to be http/https
     Uri: String
 
-# A single file backed by a blob that a cached job output
+# A file backed by a blob that a cached job output
 tuple CacheSearchOutputFile =
     # The path on disk of the file
     Path: String
@@ -62,12 +64,26 @@ tuple CacheSearchOutputFile =
     # The description of how to download the files contents
     Blob: CacheSearchBlob
 
+# A directory output by a cached job
+tuple CacheSearchOutputDirectory =
+    # The path on disk of the directory 
+    Path: String
+    # The mode on disk of the directory
+    Mode: Integer
+
+# A symlink output by a cached job
+tuple CacheSearchOutputSymlink =
+    # The path on disk of the symlink
+    Path: String
+    # The file being link to
+    Link: String
+
 # A match response from the server. Specifies all details of a cached job
 tuple CacheSearchResponseMatch =
     # The symlinks that were output by the job
-    OutputSymlinks: List String
+    OutputSymlinks: List CacheSearchOutputSymlink
     # The directories that were output by the job
-    OutputDirs: List String
+    OutputDirs: List CacheSearchOutputDirectory
     # The files that were output by the job
     OutputFiles: List CacheSearchOutputFile
     # The stdout of the job
@@ -96,7 +112,7 @@ data CacheSearchResponse =
 
 ## --- POST /job types ---
 
-# A single file uploaded to the server for the owning job
+# A file output by a job and uploaded to the server as a blob
 tuple CachePostRequestOutputFile =
     # The path on disk of the file
     Path: String
@@ -105,8 +121,24 @@ tuple CachePostRequestOutputFile =
     # The blob id returned by the server from the blob upload
     BlobId: String
 
+# A directory output by a job
+tuple CachePostRequestOutputDirectory =
+    # The path on disk of the directory 
+    Path: String
+    # The mode on disk of the directory
+    Mode: Integer
+
+# A symlink output by a job
+tuple CachePostRequestOutputSymlink =
+    # The path on disk of the symlink
+    Path: String
+    # The file being link to
+    Link: String
+
 # A request to the remote server to cache a job
 tuple CachePostRequest =
+    # The label for the job. Not part of the key, used for inspection
+    Label: String
     # The command line of the job
     Cmd: List String
     # The directory of the job
@@ -122,9 +154,9 @@ tuple CachePostRequest =
     # The list of files the job is allowed to read in the sandbox
     VisibleFiles: List Path
     # The directories that were output by the job
-    OutputDirs: List Integer
+    OutputDirs: List CachePostRequestOutputDirectory
     # The symlinks that were output by the job
-    OutputSymlinks: List Integer
+    OutputSymlinks: List CachePostRequestOutputSymlink
     # The files that were output by the job
     OutputFiles: List CachePostRequestOutputFile
     # The blob id returned from the server for the stdout of the job
@@ -214,6 +246,14 @@ export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result U
         | getCachePostRequestJson
         | formatJSON
 
+    def _ =
+        require True = shouldDebugRemoteCache Unit
+
+        def _ =
+            writeTempFile "remote.cache.api.postJob.req" "label: {req.getCachePostRequestLabel}\nreq: {jsonStr}"
+
+        True
+
     require Pass response =
         makeRoute api "job"
         | buildHttpRequest
@@ -222,6 +262,16 @@ export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result U
         | addAuthorizationHeader auth
         | setBody jsonStr
         | makeRequest
+
+    def _ =
+        require True = shouldDebugRemoteCache Unit
+
+        def _ =
+            writeTempFile
+            "remote.cache.api.postJob.res.{response.getHttpResponseStatusCode | format}"
+            "label: {req.getCachePostRequestLabel}\nres: {response | format}"
+
+        True
 
     require (Some 200) = response.getHttpResponseStatusCode
     else failWithError "rsc: post job failed with code {response.getHttpResponseStatusCode | format}"
@@ -241,6 +291,16 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
         | getCacheSearchRequestJson
         | formatJSON
 
+    def _ =
+        require True = shouldDebugRemoteCache Unit
+
+        def _ =
+            writeTempFile
+            "remote.cache.api.findJob.req"
+            "label: {req.getCacheSearchRequestLabel}\nreq: {jsonStr}"
+
+        True
+
     require Pass response =
         makeRoute api "job/matching"
         | buildHttpRequest
@@ -248,6 +308,16 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
         | addContentTypeJsonHeader
         | setBody jsonStr
         | makeRequest
+
+    def _ =
+        require True = shouldDebugRemoteCache Unit
+
+        def _ =
+            writeTempFile
+            "remote.cache.api.findJob.res.{response.getHttpResponseStatusCode | format}"
+            "label: {req.getCacheSearchRequestLabel}\nres: {response | format}"
+
+        True
 
     require Pass json = response.getHttpResponseBody.parseJSONBody
 
@@ -288,8 +358,8 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
     # TODO: I should probably mv instead of cp since this will be very space expensive
     def fixupScript =
         """
-        cp %{downloadPath.getPathName} %{path} 
-        chmod %{mode | strOctal} %{path} 
+        cp %{downloadPath.getPathName} '%{path}' 
+        chmod %{mode | strOctal} '%{path}' 
         """
 
     def job =
@@ -384,7 +454,7 @@ def uploadBlobRequest (api: RemoteCacheApi) (setBlob: HttpRequest => HttpRequest
 
 # Converts a CacheSearchRequest to JSON
 def getCacheSearchRequestJson (req: CacheSearchRequest): JValue =
-    def (CacheSearchRequest cmd cwd env hiddenInfo isAtty stdin visibleFiles) = req
+    def (CacheSearchRequest _label cmd cwd env hiddenInfo isAtty stdin visibleFiles) = req
 
     JObject (
         "cmd" :-> JArray cmd.asBytesDelimedByNull.toJIntegerList,
@@ -400,6 +470,7 @@ def getCacheSearchRequestJson (req: CacheSearchRequest): JValue =
 def getCachePostRequestJson (req: CachePostRequest): JValue =
     def (
         CachePostRequest
+        _label
         cmd
         cwd
         env
@@ -407,10 +478,8 @@ def getCachePostRequestJson (req: CachePostRequest): JValue =
         isAtty
         stdin
         visibleFiles
-        # TODO: these two are just being ignored right now
-        # That is probably not right
-        _outputDirs
-        _outputSymlinks
+        outputDirs
+        outputSymlinks
         outputFiles
         stdoutBlobId
         stderrBlobId
@@ -422,11 +491,23 @@ def getCachePostRequestJson (req: CachePostRequest): JValue =
         obytes
     ) = req
 
-    def mkOutputFileJson ((CachePostRequestOutputFile path mode blobId): CachePostRequestOutputFile): JValue =
+    def mkOutputFileJson (CachePostRequestOutputFile path mode blobId) =
         JObject (
             "path" :-> JString path,
             "mode" :-> JInteger mode,
             "blob_id" :-> JString blobId,
+        )
+
+    def mkOutputDirJson (CachePostRequestOutputDirectory path mode) =
+        JObject (
+            "path" :-> JString path,
+            "mode" :-> JInteger mode,
+        )
+
+    def mkOutputSymlinkJson (CachePostRequestOutputSymlink path link) =
+        JObject (
+            "path" :-> JString path,
+            "link" :-> JString link,
         )
 
     JObject (
@@ -437,8 +518,8 @@ def getCachePostRequestJson (req: CachePostRequest): JValue =
         "is_atty" :-> JBoolean isAtty,
         "stdin" :-> JString stdin,
         "visible_files" :-> JArray (visibleFiles | map getPathAsJson),
-        "output_dirs" :-> JArray Nil,
-        "output_symlinks" :-> JArray Nil,
+        "output_dirs" :-> JArray (outputDirs | map mkOutputDirJson),
+        "output_symlinks" :-> JArray (outputSymlinks | map mkOutputSymlinkJson),
         "output_files" :-> JArray (outputFiles | map mkOutputFileJson),
         "stdout_blob_id" :-> JString stdoutBlobId,
         "stderr_blob_id" :-> JString stderrBlobId,
@@ -498,7 +579,33 @@ def mkCacheSearchResponse (json: JValue): Result CacheSearchResponse Error =
     require Pass (JArray outputFiles) = jField json "output_files"
     else failWithError "rsc: JSON response has incorrect schema. Must have array key 'output_files'"
 
-    # TODO: Decode output_dirs and output_symlinks
+    require Pass (JArray outputSymlinks) = jField json "output_symlinks"
+    else failWithError "rsc: JSON response has incorrect schema. Must have array key 'output_symlinks'"
+
+    require Pass (JArray outputDirectories) = jField json "output_dirs"
+    else failWithError "rsc: JSON response has incorrect schema. Must have array key 'output_dirs'"
+
+    def mkOutputSymlink (v: JValue): Result CacheSearchOutputSymlink Error =
+        require Pass (JString path) = jField v "path"
+        else failWithError "rsc: JSON response has incorrect schema. output_symlinks[x] must have string key 'path'"
+
+        require Pass (JString link) = jField v "link"
+        else failWithError "rsc: JSON response has incorrect schema. output_symlinks[x] must have string key 'link'"
+
+        CacheSearchOutputSymlink path link
+        | Pass
+
+    def mkOutputDirectory (v: JValue): Result CacheSearchOutputDirectory Error =
+        require Pass (JString path) = jField v "path"
+        else failWithError "rsc: JSON response has incorrect schema. output_directories[x] must have string key 'path'"
+
+        require Pass (JInteger mode) = jField v "mode"
+        else
+            failWithError
+            "rsc: JSON response has incorrect schema. output_directories[x] must have integer key 'mode'"
+
+        CacheSearchOutputDirectory path mode
+        | Pass
 
     def mkOutputFile (v: JValue): Result CacheSearchOutputFile Error =
         require Pass (JString path) = jField v "path"
@@ -517,15 +624,25 @@ def mkCacheSearchResponse (json: JValue): Result CacheSearchResponse Error =
         CacheSearchOutputFile path mode blob
         | Pass
 
-    require Pass csofs =
+    require Pass csOutputFiles =
         outputFiles
         | map mkOutputFile
         | findFail
 
+    require Pass csOutputSymlinks =
+        outputSymlinks 
+        | map mkOutputSymlink
+        | findFail
+
+    require Pass csOutputDirectories =
+        outputDirectories
+        | map mkOutputDirectory
+        | findFail
+
     CacheSearchResponseMatch
-    Nil
-    Nil
-    csofs
+    csOutputSymlinks
+    csOutputDirectories
+    csOutputFiles 
     stdoutBlob
     stderrBlob
     status
