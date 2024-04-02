@@ -43,6 +43,8 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
 
             Fail e
         Pass input ->
+            def label = input.getRunnerInputLabel
+
             require Pass hashKey = hashFn runnerInput
 
             # -------------------------------------
@@ -55,7 +57,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                 | rscApiFindMatchingJob (mkSearchRequest input hashKey)
             else
                 # Leave a breadcrumb and fallback to the base runner if the cache fails to respond
-                def _ = breadcrumb "Failed to search for job in the cache"
+                def _ = breadcrumb "{label}: Failed to search for job in the cache"
 
                 # This job isn't getting cached. That's probably preferable since the server
                 # request failed but good to keep in mind.
@@ -67,7 +69,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                 require (Match details) = response
                 else unreachable "two-constructor tuple must have one value"
 
-                def _ = breadcrumb "Found a match in the cache"
+                def _ = breadcrumb "{label}: Found a match in the cache"
 
                 def (
                     CacheSearchResponseMatch
@@ -84,7 +86,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                     obytes
                 ) = details
 
-                def doDownload ((CacheSearchOutputFile path mode blob): CacheSearchOutputFile) =
+                def doDownload (CacheSearchOutputFile path mode blob) =
                     rscApiGetFileBlob blob "{input.getRunnerInputDirectory}/{path}" mode
 
                 def blobDownloads =
@@ -118,7 +120,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
 
                 Pass (RunnerOutput inputs outputs predict)
 
-            def _ = breadcrumb "Did not find a match"
+            def _ = breadcrumb "{label}: Did not find a match"
 
             # -------------------------------------
             # --- Insert the job into the cache ---
@@ -139,7 +141,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
 ## --- Helper functions ---
 
 # Creates a CacheSearchRequest from the various inputs to a runner
-def mkSearchRequest ((RunnerInput _label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (hidden: String) =
+def mkSearchRequest ((RunnerInput _label cmd vis env dir stdin _res _prefix _usage isAtty): RunnerInput) (hidden: String) =
     CacheSearchRequest cmd dir env hidden isAtty stdin vis
 
 # Creates a CachePostJobRequest from the various inputs and outputs of a runner

@@ -53,7 +53,7 @@ tuple CacheSearchBlob =
     # The uri where the blob may be downloaded from. Not guaranteed to be http/https
     Uri: String
 
-# A single file backed by a blob that a cached job output
+# A single file backed by a blob that a cached job created
 tuple CacheSearchOutputFile =
     # The path on disk of the file
     Path: String
@@ -249,7 +249,9 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
         | setBody jsonStr
         | makeRequest
 
-    require Pass json = response.getHttpResponseBody.parseJSONBody
+    require Pass json =
+        response.getHttpResponseBody.parseJSONBody
+        | addErrorContext "rsc: http body contains invalid JSON"
 
     mkCacheSearchResponse json
 
@@ -316,11 +318,11 @@ def strToBytes (str: String): List Integer =
     # FIXME: unicodeToInteger may return values larger than u8 which will break the serialization
     | map (unicodeToInteger _)
 
-# listFlattenWithNull ((1,2,3,), (4,5,6,), (7,8,9,),) = (1,2,3,0,4,5,6,0,7,8,9,)
-def listFlattenWithNull (parts: List (List Integer)): List Integer =
+# listFlattenWithNull ((1,2,3,), (4,5,6,), (7,8,9,),) = (1,2,3,0,4,5,6,0,7,8,9,0,)
+export def listFlattenWithNull (parts: List (List Integer)): List Integer =
     foldr (\x \acc x ++ (0, acc)) Nil parts
 
-# asBytesDelimedByNull ("a", "b", "cd",) = (15, 0, 16, 0, 17, 18)
+# asBytesDelimedByNull ("a", "b", "cd",) = (15, 0, 16, 0, 17, 18, 0)
 def asBytesDelimedByNull (parts: List String): List Integer =
     parts
     | map strToBytes
@@ -332,11 +334,6 @@ def getPathAsJson (Path path hash) =
         "path" :-> JString path,
         "hash" :-> JString hash,
     )
-
-# toJIntegerList (1,2,3,) = (JInteger 1, JInteger 2, JInteger 3,)
-def toJIntegerList (parts: List Integer): List JValue =
-    parts
-    | map JInteger
 
 # Helper function for building the route for the resource
 def makeRoute ((RemoteCacheApi domain port _)) (resource: String): String =
@@ -375,7 +372,7 @@ def uploadBlobRequest (api: RemoteCacheApi) (setBlob: HttpRequest => HttpRequest
     require Pass ids = idJVals.findFail
     else failWithError "rsc: JSON response has incorrect schema for blob upload. (Missing blob ids)"
 
-    require Some (JString id) = ids.head
+    require ((JString id), Nil) = ids
     else
         failWithError
         "rsc: JSON response has incorrect schema for blob upload. (Expected only 1 id saw {ids.len.str})"
@@ -387,9 +384,9 @@ def getCacheSearchRequestJson (req: CacheSearchRequest): JValue =
     def (CacheSearchRequest cmd cwd env hiddenInfo isAtty stdin visibleFiles) = req
 
     JObject (
-        "cmd" :-> JArray cmd.asBytesDelimedByNull.toJIntegerList,
+        "cmd" :-> JArray (cmd.asBytesDelimedByNull | map JInteger),
         "cwd" :-> JString cwd,
-        "env" :-> JArray env.asBytesDelimedByNull.toJIntegerList,
+        "env" :-> JArray (env.asBytesDelimedByNull | map JInteger),
         "hidden_info" :-> JString hiddenInfo,
         "is_atty" :-> JBoolean isAtty,
         "stdin" :-> JString stdin,
@@ -430,9 +427,9 @@ def getCachePostRequestJson (req: CachePostRequest): JValue =
         )
 
     JObject (
-        "cmd" :-> JArray cmd.asBytesDelimedByNull.toJIntegerList,
+        "cmd" :-> JArray (cmd.asBytesDelimedByNull | map JInteger),
         "cwd" :-> JString cwd,
-        "env" :-> JArray env.asBytesDelimedByNull.toJIntegerList,
+        "env" :-> JArray (env.asBytesDelimedByNull | map JInteger),
         "hidden_info" :-> JString hiddenInfo,
         "is_atty" :-> JBoolean isAtty,
         "stdin" :-> JString stdin,
@@ -458,12 +455,12 @@ def mkCacheSearchResponse (json: JValue): Result CacheSearchResponse Error =
     require True = isMatch ==* "Match"
     else Pass NoMatch
 
-    def mkBlob (v: JValue) (key: String): Result CacheSearchBlob Error =
+    def mkBlob (v: JValue): Result CacheSearchBlob Error =
         require Pass (JString id) = jField v "id"
-        else failWithError "rsc: JSON response has incorrect schema. {key} must have string key 'id'"
+        else failWithError "rsc: JSON response has incorrect schema. '{v | format}' must have string key 'id'"
 
         require Pass (JString url) = jField v "url"
-        else failWithError "rsc: JSON response has incorrect schema. {key} must have string key 'url'"
+        else failWithError "rsc: JSON response has incorrect schema. '{v | format}' must have string key 'url'"
 
         CacheSearchBlob id url
         | Pass
@@ -474,8 +471,8 @@ def mkCacheSearchResponse (json: JValue): Result CacheSearchResponse Error =
     require Pass stderrBlobF = jField json "stderr_blob"
     else failWithError "rsc: JSON response has incorrect schema. Must have object key 'stderr_blob'"
 
-    require Pass stdoutBlob = mkBlob stdoutBlobF "stdout_blob"
-    require Pass stderrBlob = mkBlob stderrBlobF "stderr_blob"
+    require Pass stdoutBlob = mkBlob stdoutBlobF
+    require Pass stderrBlob = mkBlob stderrBlobF
 
     require Pass (JInteger status) = jField json "status"
     else failWithError "rsc: JSON response has incorrect schema. Must have integer key 'status'"
@@ -502,17 +499,21 @@ def mkCacheSearchResponse (json: JValue): Result CacheSearchResponse Error =
 
     def mkOutputFile (v: JValue): Result CacheSearchOutputFile Error =
         require Pass (JString path) = jField v "path"
-        else failWithError "rsc: JSON response has incorrect schema. output_files[x] must have string key 'path'"
+        else
+            failWithError
+            "rsc: JSON response has incorrect schema. '{v | format}' in output_files must have string key 'path'"
 
         require Pass (JInteger mode) = jField v "mode"
         else
             failWithError
-            "rsc: JSON response has incorrect schema. output_files[x] must have integer key 'mode'"
+            "rsc: JSON response has incorrect schema. {v | format} in output_files must have integer key 'mode'"
 
         require Pass jblob = jField v "blob"
-        else failWithError "rsc: JSON response has incorrect schema. output_files[x] must have object key 'blob'"
+        else
+            failWithError
+            "rsc: JSON response has incorrect schema. '{v | format}' in output_files must have object key 'blob'"
 
-        require Pass blob = mkBlob jblob "output_files[]/{path}"
+        require Pass blob = mkBlob jblob
 
         CacheSearchOutputFile path mode blob
         | Pass
