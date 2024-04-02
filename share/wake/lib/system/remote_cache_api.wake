@@ -319,7 +319,7 @@ def strToBytes (str: String): List Integer =
     | map (unicodeToInteger _)
 
 # listFlattenWithNull ((1,2,3,), (4,5,6,), (7,8,9,),) = (1,2,3,0,4,5,6,0,7,8,9,0,)
-export def listFlattenWithNull (parts: List (List Integer)): List Integer =
+def listFlattenWithNull (parts: List (List Integer)): List Integer =
     foldr (\x \acc x ++ (0, acc)) Nil parts
 
 # asBytesDelimedByNull ("a", "b", "cd",) = (15, 0, 16, 0, 17, 18, 0)
