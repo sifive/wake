@@ -140,6 +140,7 @@ fn create_router(
                 let conn = conn.clone();
                 move |body| add_job::add_job(body, conn)
             })
+            .layer(DefaultBodyLimit::disable()),
             .layer(axum::middleware::from_fn({
                 let conn = conn.clone();
                 move |req, next| api_key_check::api_key_check_middleware(req, next, conn.clone())
@@ -151,7 +152,8 @@ fn create_router(
                 let conn = conn.clone();
                 let blob_stores = blob_stores.clone();
                 move |body| read_job::read_job(body, conn, blob_stores)
-            }),
+            })
+            .layer(DefaultBodyLimit::disable()),
         )
         .route(
             "/blob",

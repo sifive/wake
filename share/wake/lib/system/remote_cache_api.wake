@@ -290,8 +290,8 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
     # TODO: I should probably mv instead of cp since this will be very space expensive
     def fixupScript =
         """
-        cp %{downloadPath.getPathName} %{path} 
-        chmod %{mode | strOctal} %{path} 
+        cp %{downloadPath.getPathName} '%{path}'
+        chmod %{mode | strOctal} '%{path}'
         """
 
     def job =
