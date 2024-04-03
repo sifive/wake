@@ -1,0 +1,214 @@
+# Copyright 2024 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package wake
+
+# rscRunner: Creates a remote cache runner for a given api config
+#
+# ```
+# rscRunner (RemoteCacheApi "local" 1234 "auth") = (Runner ...)
+# ```
+export target rscRunner (rscApi: RemoteCacheApi): Runner =
+    mkRemoteCacheRunner rscApi (\_ Pass "") "/workspace" fuseRunner
+
+# mkRemoteCacheRunner: Creates a remote cache runner from an underlying runner
+#
+# - `rscApi`: the remote cache to connect to
+# - `hashFn`: a runner provided hash, used to invalate jobs that match by key but not by something
+#   known only to the runner
+# - `wakeroot`: Absolute path to the root of the wake project
+# - `baseRunner`: The runner that should be used for a cache miss
+# ```
+# mkRemoteCacheRunner (RemoteCacheApi ...) (\_ Pass "") "" baseRunner = (Runner ...)
+# ```
+export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerInput Error => Result String Error) (wakeroot: String) ((Runner name score baseDoIt): Runner): Runner =
+    def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
+    def badlaunch job error = prim "job_fail_launch"
+
+    def doit job runnerInput = match runnerInput
+        Fail e ->
+            def _ = badlaunch job e
+
+            Fail e
+        Pass input ->
+            def label = input.getRunnerInputLabel
+
+            require Pass hashKey = hashFn runnerInput
+
+            # -------------------------------------
+            # --- Search the cache for the job  ---
+            # -------------------------------------
+
+            # Search the cache for a match
+            require Pass response =
+                rscApi
+                | rscApiFindMatchingJob (mkSearchRequest input hashKey)
+            else
+                # Leave a breadcrumb and fallback to the base runner if the cache fails to respond
+                def _ = breadcrumb "{label}: Failed to search for job in the cache"
+
+                # This job isn't getting cached. That's probably preferable since the server
+                # request failed but good to keep in mind.
+                baseDoIt job (Pass input)
+
+            # If a match was found use it
+            require NoMatch = response
+            else
+                require (Match details) = response
+                else unreachable "two-constructor tuple must have one value"
+
+                def _ = breadcrumb "{label}: Found a match in the cache"
+
+                def (
+                    CacheSearchResponseMatch
+                    outputSymlinks
+                    outputDirs
+                    outputFiles
+                    stdoutBlob
+                    stderrBlob
+                    status
+                    runtime
+                    cputime
+                    mem
+                    ibytes
+                    obytes
+                ) = details
+
+                def doDownload (CacheSearchOutputFile path mode blob) =
+                    rscApiGetFileBlob blob "{input.getRunnerInputDirectory}/{path}" mode
+
+                def blobDownloads =
+                    outputFiles
+                    | map doDownload
+
+                def stdoutDownload = rscApiGetStringBlob stdoutBlob
+                def stderrDownload = rscApiGetStringBlob stderrBlob
+
+                require Pass stdout =
+                    stdoutDownload
+                    | addErrorContext "rsc: Failed to download stdout for '{label}'"
+
+                require Pass stderr =
+                    stderrDownload
+                    | addErrorContext "rsc: Failed to download stderr for '{label}'"
+
+                # We don't actually care about the result here but we do need to ensure that all
+                # downloads have completed and succeeded before we continue on.
+                require Pass _ =
+                    blobDownloads
+                    | findFail
+                    | addErrorContext "rsc: Failed to download a blob for '{label}'"
+
+                def resolvedOutputs =
+                    outputFiles
+                    | map (_.getCacheSearchOutputFilePath)
+
+                def outputs = resolvedOutputs ++ outputDirs ++ outputSymlinks
+                def predict = Usage status runtime cputime mem ibytes obytes
+                def _ = virtual job stdout stderr status runtime cputime mem ibytes obytes
+                def inputs = map getPathName (input.getRunnerInputVisible)
+
+                Pass (RunnerOutput inputs outputs predict)
+
+            def _ = breadcrumb "{label}: Did not find a match"
+
+            # -------------------------------------
+            # --- Insert the job into the cache ---
+            # -------------------------------------
+
+            # Run the job to get the results
+            require Pass output = baseDoIt job (Pass input)
+
+            # Post the job to the server. This is left as 'def _' so that wake won't block progess
+            # on it but it will stil be joined on before wake exits. Regardless of the result this
+            # call should return the passing output to allow the build to continue.
+            def _ = postJob rscApi job wakeroot hashKey input output
+
+            Pass output
+
+    Runner "remote-cache: {name}" score doit
+
+## --- Helper functions ---
+
+# Creates a CacheSearchRequest from the various inputs to a runner
+def mkSearchRequest ((RunnerInput _label cmd vis env dir stdin _res _prefix _usage isAtty): RunnerInput) (hidden: String) =
+    CacheSearchRequest cmd dir env hidden isAtty stdin vis
+
+# Creates a CachePostJobRequest from the various inputs and outputs of a runner
+def mkPostJobRequest ((RunnerInput _label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (output: RunnerOutput) (hidden: String) (stdoutBlobId: String) (stderrBlobId: String) (files: List CachePostRequestOutputFile) =
+    def Usage status runtime cputime mem ibytes obytes = output.getRunnerOutputUsage
+
+    CachePostRequest
+    cmd
+    dir
+    env
+    hidden
+    isAtty
+    stdin
+    vis
+    Nil
+    Nil
+    files
+    stdoutBlobId
+    stderrBlobId
+    status
+    runtime
+    cputime
+    mem
+    ibytes
+    obytes
+
+# Posts a completed job to the remote cache
+def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: String) (input: RunnerInput) (output: RunnerOutput): Result Unit Error =
+    require Pass stdout = job.getJobFailedStdoutRaw
+    require Pass stderr = job.getJobFailedStderrRaw
+
+    def uploadFileAndCollect path =
+        def doUpload =
+            rscApi
+            | rscApiPostFileBlob path path
+
+        def doStat = unsafe_stat path
+
+        require Pass id = doUpload
+        require Pass (Stat _ mode _) = doStat
+
+        CachePostRequestOutputFile path (mode | mode2bits) id
+        | Pass
+
+    def fileUploads =
+        output.getRunnerOutputOutputs
+        | map uploadFileAndCollect
+
+    def stdoutUpload =
+        rscApi
+        | rscApiPostStringBlob "stdout" stdout
+
+    def stderrUpload =
+        rscApi
+        | rscApiPostStringBlob "stderr" stderr
+
+    require Pass stdoutId = stdoutUpload
+    require Pass stderrId = stderrUpload
+
+    require Pass uploads =
+        fileUploads
+        | findFail
+
+    def req = mkPostJobRequest input output hidden stdoutId stderrId uploads
+
+    rscApi
+    | rscApiPostJob req
+

@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO: change this to package remote_cache and deal with all the churn
 package wake
+
+from http import _
 
 # Configuration details required to connect to the remote shared cache.
 export tuple RemoteCacheApi =
@@ -23,6 +26,123 @@ export tuple RemoteCacheApi =
     export Port: Integer
     # The api key required for authenicated routes. Not required for all requests
     export Authorization: Option String
+
+## --- POST /job/matching types ---
+
+# A request to the remote server to check if a job is cached
+tuple CacheSearchRequest =
+    # The command line of the job
+    Cmd: List String
+    # The directory of the job
+    Cwd: String
+    # The environment of the job
+    Env: List String
+    # User provided string to mark two jobs as different even if wake considers them the same
+    HiddenInfo: String
+    # If the job was ran as if a user was running it from a terminal
+    IsAtty: Boolean
+    # The stdin of the job
+    Stdin: String
+    # The list of files the job is allowed to read in the sandbox
+    VisibleFiles: List Path
+
+# A downloadable blob returned from the remote shared cache
+tuple CacheSearchBlob =
+    # The id of the blob on the remote server
+    Id: String
+    # The uri where the blob may be downloaded from. Not guaranteed to be http/https
+    Uri: String
+
+# A single file backed by a blob that a cached job created
+tuple CacheSearchOutputFile =
+    # The path on disk of the file
+    Path: String
+    # The mode on disk of the file
+    Mode: Integer
+    # The description of how to download the files contents
+    Blob: CacheSearchBlob
+
+# A match response from the server. Specifies all details of a cached job
+tuple CacheSearchResponseMatch =
+    # The symlinks that were output by the job
+    OutputSymlinks: List String
+    # The directories that were output by the job
+    OutputDirs: List String
+    # The files that were output by the job
+    OutputFiles: List CacheSearchOutputFile
+    # The stdout of the job
+    StdoutBlob: CacheSearchBlob
+    # The stderr of the job
+    StderrBlob: CacheSearchBlob
+    # The code that the job return on exit
+    Status: Integer
+    # The total runtime of the job
+    Runtime: Double
+    # The total cputime of the job
+    Cputime: Double
+    # The total memory of the job
+    Memory: Integer
+    # The number of bytes read by the job
+    IBytes: Integer
+    # The number of bytes written by the job
+    OBytes: Integer
+
+# A response from the server to a CacheSearchRequest
+data CacheSearchResponse =
+    # The job was not found on the remote server
+    NoMatch
+    # The job was found on the remote server
+    Match CacheSearchResponseMatch
+
+## --- POST /job types ---
+
+# A single file uploaded to the server for the owning job
+tuple CachePostRequestOutputFile =
+    # The path on disk of the file
+    Path: String
+    # The mode on disk of the file
+    Mode: Integer
+    # The blob id returned by the server from the blob upload
+    BlobId: String
+
+# A request to the remote server to cache a job
+tuple CachePostRequest =
+    # The command line of the job
+    Cmd: List String
+    # The directory of the job
+    Cwd: String
+    # The environment of the job
+    Env: List String
+    # User provided string to mark two jobs as different even if wake considers them the same
+    HiddenInfo: String
+    # If the job was ran as if a user was running it from a terminal
+    IsAtty: Boolean
+    # The stdin of the job
+    Stdin: String
+    # The list of files the job is allowed to read in the sandbox
+    VisibleFiles: List Path
+    # The directories that were output by the job
+    OutputDirs: List Integer
+    # The symlinks that were output by the job
+    OutputSymlinks: List Integer
+    # The files that were output by the job
+    OutputFiles: List CachePostRequestOutputFile
+    # The blob id returned from the server for the stdout of the job
+    StdoutBlobId: String
+    # The blob id returned from the server for the stderr of the job
+    StderrBlobId: String
+    # The code that the job return on exit
+    Status: Integer
+    # The total runtime of the job
+    Runtime: Double
+    # The total cputime of the job
+    Cputime: Double
+    # The total memory of the job
+    Memory: Integer
+    # The number of bytes read by the job
+    IBytes: Integer
+    # The number of bytes written by the job
+    OBytes: Integer
 
 # makeRemoteCacheApi: Parses config string into RemoteCacheApi
 #
@@ -51,5 +171,369 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
     RemoteCacheApi domain port auth
     | Pass
 
-# TODO: methods such as "downloadFile" and "postJob" should be implemented here.
+# rscApiPostStringBlob: Posts a named string as a blob to the remote server defined by *api*
+#                       then returns the id associated to the blob. Requires authorization.
+#
+# ```
+#  api | rscApiPostStringBlob "foo" "my foo contents" = Pass "asdf-fdsa-asdf-fdsa"
+#  (RemoteCacheApi "foo" 1 None) | rscApiPostStringBlob "foo" "my foo contents" = Fail "authorization required"
+# ```
+export def rscApiPostStringBlob (name: String) (value: String) (api: RemoteCacheApi): Result String Error =
+    # TODO: use "small blob" for this
+    # require False = value ==* ""
+    # else Pass "00000000-0000-0000-0000-000000000000"
 
+    require Pass temp = writeTempFile name value
+
+    uploadBlobRequest api (addFormData name temp)
+
+# rscApiPostFileBlob: Posts a named file on disk to the remote server defined by *api*
+#                     then returns the id associated to the blob. Requires authorization.
+#
+# ```
+#  api | rscApiPostFileBlob "foo" "/some/path/to/foo" = Pass "asdf-fdsa-asdf-fdsa"
+#  (RemoteCacheApi "foo" 1 None) | rscApiPostFileBlob "foo" "/some/path/to/foo" = Fail "authorization required"
+# ```
+export def rscApiPostFileBlob (name: String) (file: String) (api: RemoteCacheApi): Result String Error =
+    # We must use unsafe here since we cannot elevate *file* to a Path without either copying it
+    # or triggering the 'job output by multiple files' error.
+    uploadBlobRequest api (unsafe_addFormData name file)
+
+# rscApiPostJob: Posts a job defined by *req* to the remote cache server. Requires authorization.
+#
+# ```
+#  api | rscApiPostJob (CachePostRequest ...) = Pass Unit
+#  (RemoteCacheApi "foo" 1 None) | rscApiPostJob (CachePostRequest ...) = Fail "authorization required"
+# ```
+export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result Unit Error =
+    require Some auth = api.getRemoteCacheApiAuthorization
+    else failWithError "rsc: Posting a job requires authorization but none was provided"
+
+    def jsonStr =
+        req
+        | getCachePostRequestJson
+        | formatJSON
+
+    require Pass response =
+        makeRoute api "job"
+        | buildHttpRequest
+        | setMethod HttpMethodPost
+        | addContentTypeJsonHeader
+        | addAuthorizationHeader auth
+        | setBody jsonStr
+        | makeRequest
+
+    require (Some 200) = response.getHttpResponseStatusCode
+    else failWithError "rsc: post job failed with code {response.getHttpResponseStatusCode | format}"
+
+    Pass Unit
+
+# rscApiFindMatchingJob: Searches the remote server defined by *api* for a cached job that matches 
+#                        the job key provided by *req*. Returns a response that may or may not have
+#                        the matching job. Does not require authorization.
+#
+# ```
+#  api | rscApiFindMatchingJob (CacheSearchRequest ...) = Pass (CacheSearchResponse ...)
+# ```
+export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi): Result CacheSearchResponse Error =
+    def jsonStr =
+        req
+        | getCacheSearchRequestJson
+        | formatJSON
+
+    require Pass response =
+        makeRoute api "job/matching"
+        | buildHttpRequest
+        | setMethod HttpMethodPost
+        | addContentTypeJsonHeader
+        | setBody jsonStr
+        | makeRequest
+
+    require Pass json =
+        response.getHttpResponseBody.parseJSONBody
+        | addErrorContext "rsc: http body contains invalid JSON"
+
+    mkCacheSearchResponse json
+
+# rscApiGetStringBlob: Downloads a blob and returns the contents as a string 
+#
+# ```
+#  rscApiGetStringBlob (RemoteCacheBlob "asdf" "https://...") = Pass "foo\nbar\nbat" 
+# ```
+export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Result String Error =
+    # TODO: use "small blob" for this and also parse the schema out
+    # require False = id ==* "00000000-0000-0000-0000-000000000000"
+    # else Pass  ""
+
+    require Pass response =
+        buildHttpRequest uri
+        | setMethod HttpMethodGet
+        | makeRequest
+
+    Pass response.getHttpResponseBody
+
+# rscApiGetFileBlob: Downloads a blob to *path* with *mode* permisssions and return *path*
+#
+# ```
+#  rscApiGetFileBlob (RemoteCacheBlob "asdf" "https://...") "foo/bar" 0644 = Pass "foo/bar" 
+# ```
+export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: String) (mode: Integer): Result String Error =
+    # TODO: use "small blob" for this and also parse the schema out
+    # require False = id ==* "00000000-0000-0000-0000-000000000000"
+    # else Pass  ""
+
+    require Pass downloadPath =
+        buildHttpRequest uri
+        | setMethod HttpMethodGet
+        | makeBinaryRequest
+
+    # TODO: I should probably mv instead of cp since this will be very space expensive
+    def fixupScript =
+        """
+        cp %{downloadPath.getPathName} %{path} 
+        chmod %{mode | strOctal} %{path} 
+        """
+
+    def job =
+        makeShellPlan fixupScript (downloadPath, Nil)
+        | setPlanLabel "rsc: fixup blob {path} from {downloadPath.getPathName}"
+        # We need to copy the file over another jobs output space so:
+        #   - We must run with the localRunner
+        #   - We must lie and say we output nothing
+        #   - The *path* must be listed as another jobs output to be available to the system 
+        | setPlanFnOutputs (\_ Nil)
+        | runJobWith localRunner
+
+    require True = job.isJobOk
+    else failWithError "Failed to cleanup downloaded file {path} from {downloadPath.getPathName}"
+
+    Pass path
+
+## --- Helper functions ---
+
+# strToBytes "foo" = (13, 14, 15, Nil)
+def strToBytes (str: String): List Integer =
+    str
+    | explode
+    # FIXME: unicodeToInteger may return values larger than u8 which will break the serialization
+    | map (unicodeToInteger _)
+
+# listFlattenWithNull ((1,2,3,), (4,5,6,), (7,8,9,),) = (1,2,3,0,4,5,6,0,7,8,9,0,)
+def listFlattenWithNull (parts: List (List Integer)): List Integer =
+    foldr (\x \acc x ++ (0, acc)) Nil parts
+
+# asBytesDelimedByNull ("a", "b", "cd",) = (15, 0, 16, 0, 17, 18, 0)
+def asBytesDelimedByNull (parts: List String): List Integer =
+    parts
+    | map strToBytes
+    | listFlattenWithNull
+
+# getPathAsJson (Path "foo" "asdf") = (JObject ...)
+def getPathAsJson (Path path hash) =
+    JObject (
+        "path" :-> JString path,
+        "hash" :-> JString hash,
+    )
+
+# Helper function for building the route for the resource
+def makeRoute ((RemoteCacheApi domain port _)) (resource: String): String =
+    "{domain}:{port | str}/{resource}"
+
+# Helper function for uploading a blob.
+def uploadBlobRequest (api: RemoteCacheApi) (setBlob: HttpRequest => HttpRequest): Result String Error =
+    require Some auth = api.getRemoteCacheApiAuthorization
+    else failWithError "rsc: Posting a blob requires authorization but none was provided"
+
+    require Pass response =
+        makeRoute api "blob"
+        | buildHttpRequest
+        | setMethod HttpMethodPost
+        | addAuthorizationHeader auth
+        | setBlob
+        | makeRequest
+
+    require (Some 200) = response.getHttpResponseStatusCode
+    else
+        failWithError
+        "rsc: failed to upload string as blob with code {response.getHttpResponseStatusCode | format}"
+
+    require Pass json = response.getHttpResponseBody.parseJSONBody
+
+    require Pass (JString "Ok") = jField json "type"
+    else failWithError "rsc: failed to upload blob"
+
+    require Pass (JArray blobs) = jField json "blobs"
+    else failWithError "rsc: JSON response has incorrect schema for blob upload. (Missing blobs key)"
+
+    def idJVals =
+        blobs
+        | map (jField _ "id")
+
+    require Pass ids = idJVals.findFail
+    else failWithError "rsc: JSON response has incorrect schema for blob upload. (Missing blob ids)"
+
+    require ((JString id), Nil) = ids
+    else
+        failWithError
+        "rsc: JSON response has incorrect schema for blob upload. (Expected only 1 id saw {ids.len.str})"
+
+    Pass id
+
+# Converts a CacheSearchRequest to JSON
+def getCacheSearchRequestJson (req: CacheSearchRequest): JValue =
+    def (CacheSearchRequest cmd cwd env hiddenInfo isAtty stdin visibleFiles) = req
+
+    JObject (
+        "cmd" :-> JArray (cmd.asBytesDelimedByNull | map JInteger),
+        "cwd" :-> JString cwd,
+        "env" :-> JArray (env.asBytesDelimedByNull | map JInteger),
+        "hidden_info" :-> JString hiddenInfo,
+        "is_atty" :-> JBoolean isAtty,
+        "stdin" :-> JString stdin,
+        "visible_files" :-> JArray (visibleFiles | map getPathAsJson),
+    )
+
+# Converts a CachePostJobRequest to JSON
+def getCachePostRequestJson (req: CachePostRequest): JValue =
+    def (
+        CachePostRequest
+        cmd
+        cwd
+        env
+        hiddenInfo
+        isAtty
+        stdin
+        visibleFiles
+        # TODO: these two are just being ignored right now
+        # That is probably not right
+        _outputDirs
+        _outputSymlinks
+        outputFiles
+        stdoutBlobId
+        stderrBlobId
+        status
+        runtime
+        cputime
+        memory
+        ibytes
+        obytes
+    ) = req
+
+    def mkOutputFileJson ((CachePostRequestOutputFile path mode blobId): CachePostRequestOutputFile): JValue =
+        JObject (
+            "path" :-> JString path,
+            "mode" :-> JInteger mode,
+            "blob_id" :-> JString blobId,
+        )
+
+    JObject (
+        "cmd" :-> JArray (cmd.asBytesDelimedByNull | map JInteger),
+        "cwd" :-> JString cwd,
+        "env" :-> JArray (env.asBytesDelimedByNull | map JInteger),
+        "hidden_info" :-> JString hiddenInfo,
+        "is_atty" :-> JBoolean isAtty,
+        "stdin" :-> JString stdin,
+        "visible_files" :-> JArray (visibleFiles | map getPathAsJson),
+        "output_dirs" :-> JArray Nil,
+        "output_symlinks" :-> JArray Nil,
+        "output_files" :-> JArray (outputFiles | map mkOutputFileJson),
+        "stdout_blob_id" :-> JString stdoutBlobId,
+        "stderr_blob_id" :-> JString stderrBlobId,
+        "status" :-> JInteger status,
+        "runtime" :-> JDouble runtime,
+        "cputime" :-> JDouble cputime,
+        "memory" :-> JInteger memory,
+        "ibytes" :-> JInteger ibytes,
+        "obytes" :-> JInteger obytes,
+    )
+
+# Makes a CacheSearchResponse from json if possible
+def mkCacheSearchResponse (json: JValue): Result CacheSearchResponse Error =
+    require Pass (JString isMatch) = jField json "type"
+    else failWithError "rsc: JSON response has incorrect schema. Must have string key 'type'"
+
+    require True = isMatch ==* "Match"
+    else Pass NoMatch
+
+    def mkBlob (v: JValue): Result CacheSearchBlob Error =
+        require Pass (JString id) = jField v "id"
+        else failWithError "rsc: JSON response has incorrect schema. '{v | format}' must have string key 'id'"
+
+        require Pass (JString url) = jField v "url"
+        else failWithError "rsc: JSON response has incorrect schema. '{v | format}' must have string key 'url'"
+
+        CacheSearchBlob id url
+        | Pass
+
+    require Pass stdoutBlobF = jField json "stdout_blob"
+    else failWithError "rsc: JSON response has incorrect schema. Must have object key 'stdout_blob'"
+
+    require Pass stderrBlobF = jField json "stderr_blob"
+    else failWithError "rsc: JSON response has incorrect schema. Must have object key 'stderr_blob'"
+
+    require Pass stdoutBlob = mkBlob stdoutBlobF
+    require Pass stderrBlob = mkBlob stderrBlobF
+
+    require Pass (JInteger status) = jField json "status"
+    else failWithError "rsc: JSON response has incorrect schema. Must have integer key 'status'"
+
+    require Pass (JDouble runtime) = jField json "runtime"
+    else failWithError "rsc: JSON response has incorrect schema. Must have double key 'runtime'"
+
+    require Pass (JDouble cputime) = jField json "cputime"
+    else failWithError "rsc: JSON response has incorrect schema. Must have double key 'cputime'"
+
+    require Pass (JInteger memory) = jField json "memory"
+    else failWithError "rsc: JSON response has incorrect schema. Must have integer key 'memory'"
+
+    require Pass (JInteger ibytes) = jField json "ibytes"
+    else failWithError "rsc: JSON response has incorrect schema. Must have integer key 'ibytes'"
+
+    require Pass (JInteger obytes) = jField json "obytes"
+    else failWithError "rsc: JSON response has incorrect schema. Must have integer key 'obytes'"
+
+    require Pass (JArray outputFiles) = jField json "output_files"
+    else failWithError "rsc: JSON response has incorrect schema. Must have array key 'output_files'"
+
+    # TODO: Decode output_dirs and output_symlinks
+
+    def mkOutputFile (v: JValue): Result CacheSearchOutputFile Error =
+        require Pass (JString path) = jField v "path"
+        else
+            failWithError
+            "rsc: JSON response has incorrect schema. '{v | format}' in output_files must have string key 'path'"
+
+        require Pass (JInteger mode) = jField v "mode"
+        else
+            failWithError
+            "rsc: JSON response has incorrect schema. {v | format} in output_files must have integer key 'mode'"
+
+        require Pass jblob = jField v "blob"
+        else
+            failWithError
+            "rsc: JSON response has incorrect schema. '{v | format}' in output_files must have object key 'blob'"
+
+        require Pass blob = mkBlob jblob
+
+        CacheSearchOutputFile path mode blob
+        | Pass
+
+    require Pass csofs =
+        outputFiles
+        | map mkOutputFile
+        | findFail
+
+    CacheSearchResponseMatch
+    Nil
+    Nil
+    csofs
+    stdoutBlob
+    stderrBlob
+    status
+    runtime
+    cputime
+    memory
+    ibytes
+    obytes
+    | Match
+    | Pass
