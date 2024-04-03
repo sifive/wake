@@ -96,18 +96,20 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                 def stdoutDownload = rscApiGetStringBlob stdoutBlob
                 def stderrDownload = rscApiGetStringBlob stderrBlob
 
-                require Pass stdout = stdoutDownload
-                else failWithError "rsc: Failed to download stdout"
+                require Pass stdout =
+                    stdoutDownload
+                    | addErrorContext "rsc: Failed to download stdout for '{label}'"
 
-                require Pass stderr = stderrDownload
-                else failWithError "rsc: Failed to download stderr"
+                require Pass stderr =
+                    stderrDownload
+                    | addErrorContext "rsc: Failed to download stderr for '{label}'"
 
                 # We don't actually care about the result here but we do need to ensure that all
                 # downloads have completed and succeeded before we continue on.
                 require Pass _ =
                     blobDownloads
                     | findFail
-                else failWithError "rsc: Failed to download a blob"
+                    | addErrorContext "rsc: Failed to download a blob for '{label}'"
 
                 def resolvedOutputs =
                     outputFiles
