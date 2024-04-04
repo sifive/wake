@@ -192,14 +192,28 @@ def methodToString = match _
 # helper function for building up the curl cmd representing a request
 def makeCurlCmd ((HttpRequest url method headers body formData): HttpRequest) (extraFlags: List String): Result (List String) Error =
     def headerToCurlFlag (HttpHeader name value) = "--header", "{name}:{value}", Nil
-    def bodyToCurlFlag body = "--data", body, Nil
     def formDataToCurlFlag (HttpFormData name file) = "--form", "{name}=@{file}", Nil
+
+    def bodyToCurlFlag body =
+        require True = body.strlen >= 5000
+        else
+            ("--data", body, Nil)
+            | Pass
+
+        require Pass path = writeTempFile "curl.long.body" body
+
+        ("--data", "@{path.getPathName}", Nil)
+        | Pass
 
     require False = body.isSome && formData.isSome
     else failWithError "Request Body and FormData are both set. This is not allowed."
 
+    require Pass bodyFlags = match body
+        Some x -> bodyToCurlFlag x
+        None -> Pass Nil
+
     # Curl does a preflight check before sending the request if it is large. In core use cases
-    # this requres a clunky retry of the request. For now we accpt the tradeoff of wasting time
+    # this requres a clunky retry of the request. For now we accept the tradeoff of wasting time
     # uploading a reject file to not muddy the api. Setting 'Expect' to empty disables the check.
     # See https://everything.curl.dev/http/post/expect100 for more details.
     def heads = (HttpHeader "Expect" ""), headers
@@ -211,7 +225,7 @@ def makeCurlCmd ((HttpRequest url method headers body formData): HttpRequest) (e
         "--url",
         url,
         (heads | mapFlat headerToCurlFlag) ++
-        (body | omap bodyToCurlFlag | optionToList | flatten) ++
+        bodyFlags ++
         (formData | omap (mapFlat formDataToCurlFlag) | optionToList | flatten) ++
         extraFlags
     )
