@@ -52,12 +52,26 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
             # -------------------------------------
 
             # Search the cache for a match
-            require Pass response =
+            def requestTask =
                 rscApi
                 | rscApiFindMatchingJob (mkSearchRequest input hashKey)
+
+            require Pass response = requestTask
             else
-                # Leave a breadcrumb and fallback to the base runner if the cache fails to respond
+                require Fail err = requestTask
+                else unreachable "Result must be either Pass or Fail"
+
+                # Always leave a breadcrumb since this should be a rare error.
                 def _ = breadcrumb "{label}: Failed to search for job in the cache"
+
+                # Leave detailed info if debugging is enabled
+                def _ =
+                    require True = shouldDebugRemoteCache Unit
+
+                    def _ =
+                        writeTempFile "remote.cache.lookup.fail" "label: {input.getRunnerInputLabel}\nerror: {err | format}"
+
+                    True
 
                 # This job isn't getting cached. That's probably preferable since the server
                 # request failed but good to keep in mind.
@@ -69,7 +83,15 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                 require (Match details) = response
                 else unreachable "two-constructor tuple must have one value"
 
-                def _ = breadcrumb "{label}: Found a match in the cache"
+                def _ =
+                    require True = shouldDebugRemoteCache Unit
+
+                    def _ = breadcrumb "{label}: Found a match in the cache"
+
+                    def _ =
+                        writeTempFile "remote.cache.lookup.hit" "label: {input.getRunnerInputLabel}"
+
+                    True
 
                 def (
                     CacheSearchResponseMatch
@@ -122,7 +144,15 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
 
                 Pass (RunnerOutput inputs outputs predict)
 
-            def _ = breadcrumb "{label}: Did not find a match"
+            def _ =
+                require True = shouldDebugRemoteCache Unit
+
+                def _ = breadcrumb "{label}: Did not find a match"
+
+                def _ =
+                    writeTempFile "remote.cache.lookup.miss" "label: {input.getRunnerInputLabel}"
+
+                True
 
             # -------------------------------------
             # --- Insert the job into the cache ---
@@ -143,14 +173,15 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
 ## --- Helper functions ---
 
 # Creates a CacheSearchRequest from the various inputs to a runner
-def mkSearchRequest ((RunnerInput _label cmd vis env dir stdin _res _prefix _usage isAtty): RunnerInput) (hidden: String) =
-    CacheSearchRequest cmd dir env hidden isAtty stdin vis
+def mkSearchRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _usage isAtty): RunnerInput) (hidden: String) =
+    CacheSearchRequest label cmd dir env hidden isAtty stdin vis
 
 # Creates a CachePostJobRequest from the various inputs and outputs of a runner
-def mkPostJobRequest ((RunnerInput _label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (output: RunnerOutput) (hidden: String) (stdoutBlobId: String) (stderrBlobId: String) (files: List CachePostRequestOutputFile) =
+def mkPostJobRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (output: RunnerOutput) (hidden: String) (stdoutBlobId: String) (stderrBlobId: String) (files: List CachePostRequestOutputFile) =
     def Usage status runtime cputime mem ibytes obytes = output.getRunnerOutputUsage
 
     CachePostRequest
+    label
     cmd
     dir
     env
@@ -212,3 +243,7 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
     rscApi
     | rscApiPostJob req
 
+# Determines if the user has requested that debug info be emitted from the cache
+target shouldDebugRemoteCache Unit: Boolean = match (getenv "DEBUG_WAKE_REMOTE_CACHE")
+    Some _ -> True
+    None -> False

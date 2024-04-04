@@ -31,6 +31,8 @@ export tuple RemoteCacheApi =
 
 # A request to the remote server to check if a job is cached
 tuple CacheSearchRequest =
+    # The label for the job. Not part of the key, used only for inspection
+    Label: String
     # The command line of the job
     Cmd: List String
     # The directory of the job
@@ -53,7 +55,7 @@ tuple CacheSearchBlob =
     # The uri where the blob may be downloaded from. Not guaranteed to be http/https
     Uri: String
 
-# A single file backed by a blob that a cached job created
+# A file backed by a blob that a cached job created
 tuple CacheSearchOutputFile =
     # The path on disk of the file
     Path: String
@@ -96,7 +98,7 @@ data CacheSearchResponse =
 
 ## --- POST /job types ---
 
-# A single file uploaded to the server for the owning job
+# A file created by a job and uploaded to the server as a blob
 tuple CachePostRequestOutputFile =
     # The path on disk of the file
     Path: String
@@ -107,6 +109,8 @@ tuple CachePostRequestOutputFile =
 
 # A request to the remote server to cache a job
 tuple CachePostRequest =
+    # The label for the job. Not part of the key, used only for inspection
+    Label: String
     # The command line of the job
     Cmd: List String
     # The directory of the job
@@ -214,6 +218,14 @@ export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result U
         | getCachePostRequestJson
         | formatJSON
 
+    def _ =
+        require True = shouldDebugRemoteCache Unit
+
+        def _ =
+            writeTempFile "remote.cache.api.postJob.req" "label: {req.getCachePostRequestLabel}\nreq: {jsonStr}"
+
+        True
+
     require Pass response =
         makeRoute api "job"
         | buildHttpRequest
@@ -222,6 +234,16 @@ export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result U
         | addAuthorizationHeader auth
         | setBody jsonStr
         | makeRequest
+
+    def _ =
+        require True = shouldDebugRemoteCache Unit
+
+        def _ =
+            writeTempFile
+            "remote.cache.api.postJob.res.{response.getHttpResponseStatusCode | format}"
+            "label: {req.getCachePostRequestLabel}\nres: {response | format}"
+
+        True
 
     require (Some 200) = response.getHttpResponseStatusCode
     else failWithError "rsc: post job failed with code {response.getHttpResponseStatusCode | format}"
@@ -241,6 +263,16 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
         | getCacheSearchRequestJson
         | formatJSON
 
+    def _ =
+        require True = shouldDebugRemoteCache Unit
+
+        def _ =
+            writeTempFile
+            "remote.cache.api.findJob.req"
+            "label: {req.getCacheSearchRequestLabel}\nreq: {jsonStr}"
+
+        True
+
     require Pass response =
         makeRoute api "job/matching"
         | buildHttpRequest
@@ -248,6 +280,16 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
         | addContentTypeJsonHeader
         | setBody jsonStr
         | makeRequest
+
+    def _ =
+        require True = shouldDebugRemoteCache Unit
+
+        def _ =
+            writeTempFile
+            "remote.cache.api.findJob.res.{response.getHttpResponseStatusCode | format}"
+            "label: {req.getCacheSearchRequestLabel}\nres: {response | format}"
+
+        True
 
     require Pass json =
         response.getHttpResponseBody.parseJSONBody
@@ -381,7 +423,7 @@ def uploadBlobRequest (api: RemoteCacheApi) (setBlob: HttpRequest => HttpRequest
 
 # Converts a CacheSearchRequest to JSON
 def getCacheSearchRequestJson (req: CacheSearchRequest): JValue =
-    def (CacheSearchRequest cmd cwd env hiddenInfo isAtty stdin visibleFiles) = req
+    def (CacheSearchRequest _label cmd cwd env hiddenInfo isAtty stdin visibleFiles) = req
 
     JObject (
         "cmd" :-> JArray (cmd.asBytesDelimedByNull | map JInteger),
@@ -397,6 +439,7 @@ def getCacheSearchRequestJson (req: CacheSearchRequest): JValue =
 def getCachePostRequestJson (req: CachePostRequest): JValue =
     def (
         CachePostRequest
+        _label
         cmd
         cwd
         env
@@ -419,7 +462,7 @@ def getCachePostRequestJson (req: CachePostRequest): JValue =
         obytes
     ) = req
 
-    def mkOutputFileJson ((CachePostRequestOutputFile path mode blobId): CachePostRequestOutputFile): JValue =
+    def mkOutputFileJson (CachePostRequestOutputFile path mode blobId) =
         JObject (
             "path" :-> JString path,
             "mode" :-> JInteger mode,
