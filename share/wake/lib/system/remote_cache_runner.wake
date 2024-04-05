@@ -112,16 +112,15 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                 def stdoutDownload = rscApiGetStringBlob stdoutBlob
                 def stderrDownload = rscApiGetStringBlob stderrBlob
 
-                # TODO: mode must be used here for this to be fully correct
                 def doMakeDirectory (CacheSearchOutputDirectory path mode) =
+                    # wake-format off
+                    def cmd =
+                        "mkdir",
+                        "-m", "{strOctal mode}",
+                        "-p", path,
+
                     require True =
-                        makeExecPlan
-                        (
-                            "mkdir",
-                            "-p",
-                            path,
-                        )
-                        Nil
+                        makeExecPlan cmd Nil
                         | setPlanLabel "rsc: mkdir output dir {path}"
                         | runJobWith localRunner
                         | isJobOk
