@@ -116,7 +116,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                     # wake-format off
                     def cmd =
                         "mkdir",
-                        "-m", "{strOctal mode}",
+                        "-m", mode.strOctal,
                         "-p", path,
 
                     require True =
@@ -128,7 +128,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
 
                     Pass Unit
 
-                # We need to create directories from shortest to longest, each directory along the
+                # We need to create directories from shallowest to deepest, each directory along the
                 # chain may have a different permission set and by creating short dirs first we
                 # ensure they don't incorrectly inheret the permissions of a subdir. This required
                 # ordering significantly decreases parallism, however this is mitigated by the fact
@@ -281,18 +281,22 @@ def mkPostJobRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _ is
     ibytes
     obytes
 
-export def thirdBy (acceptFn: a => Integer): (list: List a) => Triple (one: List a) (two: List a) (three: List a) =
+data ThirdByGroup =
+    ThirdByGroupFirst
+    ThirdByGroupSecond
+    ThirdByGroupThird
+
+def thirdBy (acceptFn: a => ThirdByGroup): (list: List a) => Triple (one: List a) (two: List a) (three: List a) =
     def loop list = match list
         Nil -> Triple Nil Nil Nil
         h, t ->
-            # don't wait on f to process tail:
+            # don't wait on acceptFn to process tail:
             def Triple x y z = loop t
 
             match (acceptFn h)
-                1 -> Triple (h, x) y z
-                2 -> Triple x (h, y) z
-                3 -> Triple x y (h, z)
-                _ -> Triple x y z
+                ThirdByGroupFirst -> Triple (h, x) y z
+                ThirdByGroupSecond -> Triple x (h, y) z
+                ThirdByGroupThird -> Triple x y (h, z)
 
     loop
 
@@ -314,10 +318,10 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
         | addErrorContext "rsc: Failed to stat files to upload"
 
     def statToGroup (Stat t _ _) = match t
-        PathTypeRegularFile -> 1
-        PathTypeDirectory -> 2
-        PathTypeSymlink -> 3
-        _ -> panic "unsuported filetype for rsc"
+        PathTypeRegularFile -> ThirdByGroupFirst
+        PathTypeDirectory -> ThirdByGroupSecond
+        PathTypeSymlink -> ThirdByGroupThird
+        _ -> panic "rsc: unsuported filetype: {format t}"
 
     def (Triple regFiles directories symlinks) =
         outputsStat

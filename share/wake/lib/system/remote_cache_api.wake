@@ -75,7 +75,7 @@ tuple CacheSearchOutputDirectory =
 tuple CacheSearchOutputSymlink =
     # The path on disk of the symlink
     Path: String
-    # The file being link to
+    # The file being linked to
     Link: String
 
 # A match response from the server. Specifies all details of a cached job
@@ -132,7 +132,7 @@ tuple CachePostRequestOutputDirectory =
 tuple CachePostRequestOutputSymlink =
     # The path on disk of the symlink
     Path: String
-    # The file being link to
+    # The file being linked to
     Link: String
 
 # A request to the remote server to cache a job
