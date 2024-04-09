@@ -150,7 +150,7 @@ impl MigrationTrait for Migration {
                             .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
                     )
                     .col(ColumnDef::new(OutputSymlink::Path).string().not_null())
-                    .col(ColumnDef::new(OutputSymlink::Content).ezblob())
+                    .col(ColumnDef::new(OutputSymlink::Link).string().not_null())
                     .col(ColumnDef::new(OutputSymlink::JobId).uuid().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
@@ -237,7 +237,7 @@ enum OutputSymlink {
     Table,
     Id,
     Path,
-    Content,
+    Link,
     JobId,
 }
 

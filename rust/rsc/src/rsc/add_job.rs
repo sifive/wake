@@ -83,7 +83,7 @@ pub async fn add_job(
                             id: NotSet,
                             created_at: NotSet,
                             path: Set(out_symlink.path),
-                            content: Set(out_symlink.content),
+                            link: Set(out_symlink.link),
                             job_id: Set(job_id),
                         });
 
