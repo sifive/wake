@@ -106,13 +106,13 @@ def all variant =
 def doInstall dest kind =
     # kick off in parallel, but rsc and rsc_tool cannot be built at the same time right now.
     # Force them to be serial relative to each other.
-    def install_rsc_bins =
-        require Pass rsc = buildRSC Unit
-        require Pass rsc = installAs "{dest}/bin/wake-remote-cache" rsc
-        require Pass rsc_tool = buildRSCTool Unit
-        require Pass rsc_tool = installAs "{dest}/bin/wake-remote-cache-tool" rsc_tool
-
-        Pass (Pair rsc rsc_tool)
+    #def install_rsc_bins =
+    #    require Pass rsc = buildRSC Unit
+    #    require Pass rsc = installAs "{dest}/bin/wake-remote-cache" rsc
+    #    require Pass rsc_tool = buildRSCTool Unit
+    #    require Pass rsc_tool = installAs "{dest}/bin/wake-remote-cache-tool" rsc_tool
+    #
+    #    Pass (Pair rsc rsc_tool)
 
     def install_log_viewer =
         buildWakeLogViewer Unit
@@ -140,10 +140,10 @@ def doInstall dest kind =
     require Pass binfiles = install_binfiles
 
     # Rust builds are slow, delay blocking on them for as long as possible
-    require Pass (Pair rsc rsc_tool) = install_rsc_bins
+    #require Pass (Pair rsc rsc_tool) = install_rsc_bins
     require Pass log_viewer = install_log_viewer
 
-    (readme, log_viewer, rsc, rsc_tool, binfiles ++ datfiles)
+    (readme, log_viewer, binfiles ++ datfiles)
     | Pass
 
 # Replace @VERSION@ with 'release'
@@ -309,13 +309,9 @@ export def static _: Result Path Error =
     | getJobOutput
 
 from test_wake import topic wakeTestBinary
-from test_wake import topic wakeUnitTestBinary
 
 publish wakeTestBinary =
     defaultWake, Nil
-
-publish wakeUnitTestBinary =
-    buildWakeUnit, Nil
 
 def defaultWake Unit =
     require Pass wakeVisible = doInstall "tmp" "default"
