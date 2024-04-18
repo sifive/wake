@@ -161,6 +161,8 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                 require Pass _ = dirLoop orderedDirs
                 else failWithError "rsc: Failed to make output directory"
 
+                # The path is downloaded directly, as is, because it is relative to the workspace.
+                # Everything besides Command is stored in the server as workspace relative
                 def doDownload (CacheSearchOutputFile path mode blob) =
                     rscApiGetFileBlob blob path mode
 
