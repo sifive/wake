@@ -48,8 +48,8 @@ pub async fn add_job(
                 let job = insert_job.save(txn).await?;
                 let job_id = job.id.unwrap();
 
-                // sqlx only allows 65635 sql parameters per query and each visible file accounts
-                // for 5 parameters so we can only insert 65635/5 visible files per query
+                // sqlx only allows 65536 sql parameters per query and each visible file accounts
+                // for 5 parameters so we can only insert 65536/5 visible files per query
                 let chunked_visible_files: Vec<Vec<visible_file::ActiveModel>> = vis
                     .into_iter()
                     .map(|vis_file| visible_file::ActiveModel {
@@ -59,7 +59,7 @@ pub async fn add_job(
                         hash: Set(vis_file.hash),
                         job_id: Set(job_id),
                     })
-                    .chunks(65635 / 5)
+                    .chunks(65500 / 5)
                     .into_iter()
                     .map(|chunk| chunk.collect())
                     .collect();
@@ -71,8 +71,8 @@ pub async fn add_job(
                         .await?;
                 }
 
-                // sqlx only allows 65635 sql parameters per query and each output file accounts
-                // for 6 parameters so we can only insert 65635/6 visible files per query
+                // sqlx only allows 65536 sql parameters per query and each output file accounts
+                // for 6 parameters so we can only insert 65536/6 visible files per query
                 let chunked_output_files: Vec<Vec<output_file::ActiveModel>> = output_files
                     .into_iter()
                     .map(|out_file| output_file::ActiveModel {
@@ -83,7 +83,7 @@ pub async fn add_job(
                         job_id: Set(job_id),
                         blob_id: Set(out_file.blob_id),
                     })
-                    .chunks(65635 / 6)
+                    .chunks(65500 / 6)
                     .into_iter()
                     .map(|chunk| chunk.collect())
                     .collect();
@@ -95,8 +95,8 @@ pub async fn add_job(
                         .await?;
                 }
 
-                // sqlx only allows 65635 sql parameters per query and each output symlink accounts
-                // for 5 parameters so we can only insert 65635/5 visible files per query
+                // sqlx only allows 65536 sql parameters per query and each output symlink accounts
+                // for 5 parameters so we can only insert 65536/5 visible files per query
                 let chunked_output_symlinks: Vec<Vec<output_symlink::ActiveModel>> =
                     output_symlinks
                         .into_iter()
@@ -107,7 +107,7 @@ pub async fn add_job(
                             link: Set(out_symlink.link),
                             job_id: Set(job_id),
                         })
-                        .chunks(65635 / 5)
+                        .chunks(65500 / 5)
                         .into_iter()
                         .map(|chunk| chunk.collect())
                         .collect();
@@ -119,8 +119,8 @@ pub async fn add_job(
                         .await?;
                 }
 
-                // sqlx only allows 65635 sql parameters per query and each output dir accounts
-                // for 5 parameters so we can only insert 65635/5 visible files per query
+                // sqlx only allows 65536 sql parameters per query and each output dir accounts
+                // for 5 parameters so we can only insert 65536/5 visible files per query
                 let chunked_output_dirs: Vec<Vec<output_dir::ActiveModel>> = output_dirs
                     .into_iter()
                     .map(|dir| output_dir::ActiveModel {
@@ -130,7 +130,7 @@ pub async fn add_job(
                         mode: Set(dir.mode),
                         job_id: Set(job_id),
                     })
-                    .chunks(65635 / 5)
+                    .chunks(65500 / 5)
                     .into_iter()
                     .map(|chunk| chunk.collect())
                     .collect();
