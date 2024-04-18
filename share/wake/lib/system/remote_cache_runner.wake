@@ -161,41 +161,58 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                 require Pass _ = dirLoop orderedDirs
                 else failWithError "rsc: Failed to make output directory"
 
+                # The path is downloaded directly, as is, because it is relative to the workspace.
+                # Everything besides Command is stored in the server as workspace relative
                 def doDownload (CacheSearchOutputFile path mode blob) =
-                    rscApiGetFileBlob blob "{input.getRunnerInputDirectory}/{path}" mode
+                    rscApiGetFileBlob blob path mode
 
-                # We don't actually care about the result here but we need to ensure that all
-                # downloads have completed and succeeded before we attempt any symlinks/continue.
-                require Pass _ =
-                    outputFiles
-                    | map doDownload
-                    | findFail
-                    | addErrorContext "rsc: Failed to download a blob"
-
-                # TODO: These probably need to be wakeroot relative
-                # Link must point to dest. We do the reverse here of what is done for posting a job
-                def doMakeSymlink (CacheSearchOutputSymlink dest link) =
+                # Link must point to path. We do the reverse here of what is done for posting a job
+                def doMakeSymlink (CacheSearchOutputSymlink path link) =
                     require True =
                         makeExecPlan
                         (
                             "ln",
+                            # create symbolic link
                             "-s",
-                            dest,
+                            # overwrite <link> on disk if a file already exists at that path.
+                            # Ideally, we could just fail but its very common to delete wake.db
+                            # without cleaning all the outputs. This causes problems since the link
+                            # would already exist on disk
+                            "-f",
+                            path,
                             link,
                         )
                         Nil
-                        | setPlanLabel "rsc: symlink {link} to {dest}"
+                        | setPlanLabel "rsc: symlink {link} to {path}"
                         | runJobWith localRunner
                         | isJobOk
-                    else failWithError "rsc: Failed to link {link} to {dest}"
+                    else failWithError "rsc: Failed to link {link} to {path}"
 
                     Pass Unit
 
-                require Pass _ =
+                def outputFilesDownload =
+                    outputFiles
+                    | map doDownload
+
+                # Symlinks don't need to wait for files, the symlinks will just momentarily be invalid if created first
+                def outputSymlinksDownload =
                     outputSymlinks
                     | map doMakeSymlink
-                    | findFail
-                    | addErrorContext "rsc: Failed to create a symlink"
+
+                def resolvedOutputs =
+                    outputFiles
+                    | map getCacheSearchOutputFilePath
+
+                def resolvedSymlinks =
+                    outputSymlinks
+                    | map getCacheSearchOutputSymlinkLink
+
+                def resolvedDirectories =
+                    outputDirs
+                    | map getCacheSearchOutputDirectoryPath
+
+                def outputs = resolvedOutputs ++ resolvedDirectories ++ resolvedSymlinks
+                def predict = Usage status runtime cputime mem ibytes obytes
 
                 require Pass stdout =
                     stdoutDownload
@@ -205,22 +222,20 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                     stderrDownload
                     | addErrorContext "rsc: Failed to download stderr for '{label}'"
 
-                def resolvedOutputs =
-                    outputFiles
-                    | map getCacheSearchOutputFilePath
-
-                def resolvedSymlinks =
-                    outputSymlinks
-                    | map getCacheSearchOutputSymlinkPath
-
-                def resolvedDirectories =
-                    outputDirs
-                    | map getCacheSearchOutputDirectoryPath
-
-                def outputs = resolvedOutputs ++ resolvedDirectories ++ resolvedSymlinks
-                def predict = Usage status runtime cputime mem ibytes obytes
                 def _ = virtual job stdout stderr status runtime cputime mem ibytes obytes
                 def inputs = map getPathName (input.getRunnerInputVisible)
+
+                # We don't actually care about the result here but we need to ensure that all
+                # downloads have completed before returning.
+                require Pass _ =
+                    outputFilesDownload
+                    | findFail
+                    | addErrorContext "rsc: Failed to download a blob"
+
+                require Pass _ =
+                    outputSymlinksDownload
+                    | findFail
+                    | addErrorContext "rsc: Failed to create a symlink"
 
                 Pass (RunnerOutput inputs outputs predict)
 
@@ -341,7 +356,7 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
     # The path output by the job itself is the created symlink. The contents of the symlink
     # is the original file on disk. This is reversed when downloading a job.
     def makeSymlink (Pair link _) =
-        require Pass dest =
+        require Pass path =
             makeExecPlan
             (
                 "readlink",
@@ -353,8 +368,7 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
             | runJobWith localRunner
             | getJobStdout
 
-        # TODO: Pretty sure this needs to be wakeroot relative
-        CachePostRequestOutputSymlink dest link
+        CachePostRequestOutputSymlink path link
         | Pass
 
     def makeDirectory (Pair path (Stat _ mode _)) =

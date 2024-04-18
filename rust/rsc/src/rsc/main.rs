@@ -333,8 +333,10 @@ fn launch_blob_eviction(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // setup a subscriber for logging
-    let subscriber = tracing_subscriber::FmtSubscriber::new();
-    tracing::subscriber::set_global_default(subscriber)?;
+    // TODO: The logging is incredibly spammy right now and causes significant slow down.
+    //       for now, logging is disabled but this should be turned back on once logging is pruned.
+    // let subscriber = tracing_subscriber::FmtSubscriber::new();
+    // tracing::subscriber::set_global_default(subscriber)?;
 
     // Parse the arguments
     let args = ServerOptions::parse();
