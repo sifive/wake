@@ -9,6 +9,9 @@ use sea_orm::{
 use std::sync::Arc;
 use tracing;
 
+// The actual max is 65536, but adding an arbritrary buffer of 36 for any incidental parameters
+const MAX_SQLX_PARAMS: usize = 65500;
+
 #[tracing::instrument]
 pub async fn add_job(
     Json(payload): Json<AddJobPayload>,
@@ -59,7 +62,7 @@ pub async fn add_job(
                         hash: Set(vis_file.hash),
                         job_id: Set(job_id),
                     })
-                    .chunks(65500 / 5)
+                    .chunks(MAX_SQLX_PARAMS / 5)
                     .into_iter()
                     .map(|chunk| chunk.collect())
                     .collect();
@@ -83,7 +86,7 @@ pub async fn add_job(
                         job_id: Set(job_id),
                         blob_id: Set(out_file.blob_id),
                     })
-                    .chunks(65500 / 6)
+                    .chunks(MAX_SQLX_PARAMS / 6)
                     .into_iter()
                     .map(|chunk| chunk.collect())
                     .collect();
@@ -107,7 +110,7 @@ pub async fn add_job(
                             link: Set(out_symlink.link),
                             job_id: Set(job_id),
                         })
-                        .chunks(65500 / 5)
+                        .chunks(MAX_SQLX_PARAMS / 5)
                         .into_iter()
                         .map(|chunk| chunk.collect())
                         .collect();
@@ -130,7 +133,7 @@ pub async fn add_job(
                         mode: Set(dir.mode),
                         job_id: Set(job_id),
                     })
-                    .chunks(65500 / 5)
+                    .chunks(MAX_SQLX_PARAMS / 5)
                     .into_iter()
                     .map(|chunk| chunk.collect())
                     .collect();
