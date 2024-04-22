@@ -38,3 +38,4 @@ serde_json = "1.0.100"
 clap = { version = "4.3.23", features = ["derive"] }
 is-terminal = "0.4.9"
 async-trait = "0.1.74"
+itertools = "0.12.1"
