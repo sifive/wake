@@ -417,6 +417,8 @@ mod tests {
     async fn create_test_store(
         db: &DatabaseConnection,
     ) -> Result<Uuid, Box<dyn std::error::Error>> {
+        database::create_dbonly_blob_store(db).await?;
+
         let test_store = blob_store::ActiveModel {
             id: NotSet,
             r#type: Set("TestBlobStore".into()),
