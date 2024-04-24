@@ -189,7 +189,7 @@ async fn bootstrap_db(db: &DatabaseConnection) -> Result<(), Box<dyn std::error:
     // Create the local blob store
     add_local_blob_store(local_store_root, db).await?;
 
-    // Create "DBOnly blob store"
+    // Create DbOnly blob store
     database::create_dbonly_blob_store(db).await?;
 
     println!("");
