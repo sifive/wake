@@ -134,6 +134,7 @@ fn create_router(
     };
 
     Router::new()
+        // Authorized Routes
         .route(
             "/job",
             post({
@@ -146,6 +147,22 @@ fn create_router(
                 move |req, next| api_key_check::api_key_check_middleware(req, next, conn.clone())
             })),
         )
+        .route(
+            "/blob",
+            post({
+                let conn = conn.clone();
+                let active = active_store.clone();
+                let dbonly = dbonly_store.clone();
+
+                move |multipart: Multipart| blob::create_blob(multipart, conn, active, dbonly)
+            })
+            .layer(DefaultBodyLimit::disable())
+            .layer(axum::middleware::from_fn({
+                let conn = conn.clone();
+                move |req, next| api_key_check::api_key_check_middleware(req, next, conn.clone())
+            })),
+        )
+        // Unauthorized Routes
         .route(
             "/job/matching",
             post({
@@ -161,17 +178,6 @@ fn create_router(
                 let config = config.clone();
                 move || blob::get_upload_url(config.server_addr.clone())
             }),
-        )
-        .route(
-            "/blob",
-            post({
-                let conn = conn.clone();
-                let active = active_store.clone();
-                let dbonly = dbonly_store.clone();
-
-                move |multipart: Multipart| blob::create_blob(multipart, conn, active, dbonly)
-            })
-            .layer(DefaultBodyLimit::disable()),
         )
 }
 
