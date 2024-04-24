@@ -325,6 +325,27 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
 
     mkCacheSearchResponse json
 
+# rscApiCheckAuthorization: Checks if the provided authorization key is valid. 
+#
+# ```
+#  api | rscApiCheckAuthorization = Pass Unit
+# ```
+export def rscApiCheckAuthorization (api: RemoteCacheApi): Result Unit Error =
+    require Some auth = api.getRemoteCacheApiAuthorization
+    else failWithError "rsc: Checking authorization requires authorization but none was provided"
+
+    require Pass response =
+        makeRoute api "auth/check"
+        | buildHttpRequest
+        | setMethod HttpMethodPost
+        | addAuthorizationHeader auth
+        | makeRequest
+
+    match response.getHttpResponseStatusCode
+        Some 200 -> Pass Unit
+        Some x -> failWithError "Invalid auth key. Status code: {str x}"
+        None -> failWithError "Invalid auth key. Unable to determine statuc code"
+
 # rscApiGetStringBlob: Downloads a blob and returns the contents as a string 
 #
 # ```

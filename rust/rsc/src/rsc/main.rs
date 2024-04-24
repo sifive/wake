@@ -171,6 +171,13 @@ fn create_router(
                 move |req, next| api_key_check::api_key_check_middleware(req, next, conn.clone())
             })),
         )
+        .route(
+            "/auth/check",
+            post(axum::http::StatusCode::OK).layer(axum::middleware::from_fn({
+                let conn = conn.clone();
+                move |req, next| api_key_check::api_key_check_middleware(req, next, conn.clone())
+            })),
+        )
         // Unauthorized Routes
         .route(
             "/job/matching",
@@ -507,6 +514,36 @@ mod tests {
             .unwrap();
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        // Authorization check with invalid auth should 401
+        let res = router
+            .call(
+                Request::builder()
+                    .uri("/auth/check")
+                    .method(http::Method::POST)
+                    .header("Authorization", "badauth")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+        // Authorization check with valid auth should 200
+        let res = router
+            .call(
+                Request::builder()
+                    .uri("/auth/check")
+                    .method(http::Method::POST)
+                    .header("Authorization", api_key.clone())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::OK);
 
         // Correctly inserting a job should 200
         let res = router
