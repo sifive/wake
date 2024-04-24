@@ -344,7 +344,7 @@ export def rscApiCheckAuthorization (api: RemoteCacheApi): Result Unit Error =
     match response.getHttpResponseStatusCode
         Some 200 -> Pass Unit
         Some x -> failWithError "Invalid auth key. Status code: {str x}"
-        None -> failWithError "Invalid auth key. Unable to determine statuc code"
+        None -> failWithError "Invalid auth key. Unable to determine status code"
 
 # rscApiGetStringBlob: Downloads a blob and returns the contents as a string 
 #
