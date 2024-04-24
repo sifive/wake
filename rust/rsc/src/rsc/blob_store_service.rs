@@ -39,6 +39,9 @@ pub async fn fetch_unreferenced_blobs(
     //                 .union( *OTHER STUFF* ));
     //                 .take().
 
+    // Limit = 16k as the query is also subject to parameter max.
+    // Blob has 4 params so (2^16)/4 = 16384. Also generally best to chunk blob eviction
+    // to avoid large eviction stalls.
     Blob::find()
         .from_raw_sql(Statement::from_sql_and_values(
             DbBackend::Postgres,
@@ -51,6 +54,7 @@ pub async fn fetch_unreferenced_blobs(
                 UNION SELECT stdout_blob_id FROM job
                 UNION SELECT stderr_blob_id FROM job
             )
+            LIMIT 16000
             "#,
             [ttl.into()],
         ))
