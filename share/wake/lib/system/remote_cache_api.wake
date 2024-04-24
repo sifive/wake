@@ -199,9 +199,18 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
     else failWithError "Remote cache config was set with non-integer port. Saw: {portStr}"
 
     def auth = if authStr ==* "" then None else Some authStr
+    def api = RemoteCacheApi domain port auth
 
-    RemoteCacheApi domain port auth
-    | Pass
+    # TODO: check for compatable wake version
+
+    # If auth is not set we are done. Just return the api
+    require Some _ = auth
+    else Pass api
+
+    # Auth was set so it must be validated.
+    api
+    | rscApiCheckAuthorization
+    | rmapPass (\_ Pass api)
 
 # rscApiPostStringBlob: Posts a named string as a blob to the remote server defined by *api*
 #                       then returns the id associated to the blob. Requires authorization.
