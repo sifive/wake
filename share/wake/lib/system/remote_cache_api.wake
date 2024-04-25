@@ -210,7 +210,7 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
     # Auth was set so it must be validated.
     api
     | rscApiCheckAuthorization
-    | rmapPass (\_ Pass api)
+    | rmap (\_ api)
 
 # rscApiPostStringBlob: Posts a named string as a blob to the remote server defined by *api*
 #                       then returns the id associated to the blob. Requires authorization.
