@@ -1,19 +1,30 @@
+use chrono::NaiveDateTime;
 use data_encoding::BASE64;
-use entity::{api_key, blob_store, job, local_blob_store};
+use entity::prelude::{
+    Blob, BlobStore, LocalBlobStore, OutputDir, OutputFile, OutputSymlink, VisibleFile,
+};
+use entity::{
+    api_key, blob, blob_store, job, local_blob_store, output_dir, output_file, output_symlink,
+    visible_file,
+};
+use itertools::Itertools;
 use rand_core::{OsRng, RngCore};
-use sea_orm::prelude::Uuid;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr, DeleteResult, EntityTrait,
+    prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, DbBackend,
+    DbErr, DeleteResult, EntityTrait, QueryFilter, Statement,
 };
 use tracing;
+
+// The actual max is 65536, but adding an arbritrary buffer of 36 for any incidental parameters
+const MAX_SQLX_PARAMS: usize = 65500;
 
 // --------------------------------------------------
 // ----------          Api Key             ----------
 // --------------------------------------------------
 
 // ----------            Create            ----------
-pub async fn create_api_key(
-    db: &DatabaseConnection,
+pub async fn create_api_key<T: ConnectionTrait>(
+    db: &T,
     key: Option<String>,
     description: String,
 ) -> Result<api_key::Model, DbErr> {
@@ -39,22 +50,22 @@ pub async fn create_api_key(
 }
 
 // ----------             Read             ----------
-pub async fn read_api_key(
-    db: &DatabaseConnection,
+pub async fn read_api_key<T: ConnectionTrait>(
+    db: &T,
     id: Uuid,
 ) -> Result<Option<api_key::Model>, DbErr> {
     api_key::Entity::find_by_id(id).one(db).await
 }
 
-pub async fn read_api_keys(db: &DatabaseConnection) -> Result<Vec<api_key::Model>, DbErr> {
+pub async fn read_api_keys<T: ConnectionTrait>(db: &T) -> Result<Vec<api_key::Model>, DbErr> {
     api_key::Entity::find().all(db).await
 }
 
 // ----------            Update            ----------
 
 // ----------            Delete            ----------
-pub async fn delete_api_key(
-    db: &DatabaseConnection,
+pub async fn delete_api_key<T: ConnectionTrait>(
+    db: &T,
     key: api_key::Model,
 ) -> Result<DeleteResult, DbErr> {
     tracing::info!("Deleting api key {}", key.key);
@@ -62,12 +73,32 @@ pub async fn delete_api_key(
 }
 
 // --------------------------------------------------
+// ----------          Blob Store          ----------
+// --------------------------------------------------
+
+// ----------            Create            ----------
+
+// ----------             Read             ----------
+pub async fn read_test_blob_stores<T: ConnectionTrait>(
+    db: &T,
+) -> Result<Vec<blob_store::Model>, DbErr> {
+    BlobStore::find()
+        .filter(blob_store::Column::Type.eq("TestBlobStore"))
+        .all(db)
+        .await
+}
+
+// ----------            Update            ----------
+
+// ----------            Delete            ----------
+
+// --------------------------------------------------
 // ----------       Local Blob Store       ----------
 // --------------------------------------------------
 
 // ----------            Create            ----------
-pub async fn create_local_blob_store(
-    db: &DatabaseConnection,
+pub async fn create_local_blob_store<T: ConnectionTrait>(
+    db: &T,
     root: String,
 ) -> Result<local_blob_store::Model, DbErr> {
     let active_blob_store = blob_store::ActiveModel {
@@ -87,24 +118,24 @@ pub async fn create_local_blob_store(
 }
 
 // ----------             Read             ----------
-pub async fn read_local_blob_store(
-    db: &DatabaseConnection,
+pub async fn read_local_blob_store<T: ConnectionTrait>(
+    db: &T,
     id: Uuid,
 ) -> Result<Option<local_blob_store::Model>, DbErr> {
     local_blob_store::Entity::find_by_id(id).one(db).await
 }
 
-pub async fn read_local_blob_stores(
-    db: &DatabaseConnection,
+pub async fn read_local_blob_stores<T: ConnectionTrait>(
+    db: &T,
 ) -> Result<Vec<local_blob_store::Model>, DbErr> {
-    local_blob_store::Entity::find().all(db).await
+    LocalBlobStore::find().all(db).await
 }
 
 // ----------            Update            ----------
 
 // ----------            Delete            ----------
-pub async fn delete_local_blob_store(
-    db: &DatabaseConnection,
+pub async fn delete_local_blob_store<T: ConnectionTrait>(
+    db: &T,
     store: local_blob_store::Model,
 ) -> Result<DeleteResult, DbErr> {
     tracing::info!("Deleting local blob store {}", store.id);
@@ -157,7 +188,212 @@ pub async fn read_dbonly_blob_store(
 // ----------            Update            ----------
 
 // ----------            Delete            ----------
-pub async fn delete_all_jobs(db: &DatabaseConnection) -> Result<DeleteResult, DbErr> {
+pub async fn delete_all_jobs<T: ConnectionTrait>(db: &T) -> Result<DeleteResult, DbErr> {
     tracing::info!("Deleting ALL jobs");
     job::Entity::delete_many().exec(db).await
+}
+
+// --------------------------------------------------
+// ----------         Visible File         ----------
+// --------------------------------------------------
+
+// ----------            Create            ----------
+pub async fn create_many_visible_files<T: ConnectionTrait>(
+    db: &T,
+    visible_files: Vec<visible_file::ActiveModel>,
+) -> Result<(), DbErr> {
+    if visible_files.len() == 0 {
+        return Ok(());
+    }
+
+    let chunked: Vec<Vec<visible_file::ActiveModel>> = visible_files
+        .into_iter()
+        .chunks(MAX_SQLX_PARAMS / 5)
+        .into_iter()
+        .map(|chunk| chunk.collect())
+        .collect();
+
+    for chunk in chunked {
+        VisibleFile::insert_many(chunk).exec(db).await?;
+    }
+
+    Ok(())
+}
+
+// ----------             Read             ----------
+
+// ----------            Update            ----------
+
+// ----------            Delete            ----------
+
+// --------------------------------------------------
+// ----------         Output File          ----------
+// --------------------------------------------------
+
+// ----------            Create            ----------
+pub async fn create_many_output_files<T: ConnectionTrait>(
+    db: &T,
+    output_files: Vec<output_file::ActiveModel>,
+) -> Result<(), DbErr> {
+    if output_files.len() == 0 {
+        return Ok(());
+    }
+
+    let chunked: Vec<Vec<output_file::ActiveModel>> = output_files
+        .into_iter()
+        .chunks(MAX_SQLX_PARAMS / 6)
+        .into_iter()
+        .map(|chunk| chunk.collect())
+        .collect();
+
+    for chunk in chunked {
+        OutputFile::insert_many(chunk).exec(db).await?;
+    }
+
+    Ok(())
+}
+
+// ----------             Read             ----------
+
+// ----------            Update            ----------
+
+// ----------            Delete            ----------
+
+// --------------------------------------------------
+// ----------        Output Symlink        ----------
+// --------------------------------------------------
+
+// ----------            Create            ----------
+pub async fn create_many_output_symlinks<T: ConnectionTrait>(
+    db: &T,
+    output_symlinks: Vec<output_symlink::ActiveModel>,
+) -> Result<(), DbErr> {
+    if output_symlinks.len() == 0 {
+        return Ok(());
+    }
+
+    let chunked: Vec<Vec<output_symlink::ActiveModel>> = output_symlinks
+        .into_iter()
+        .chunks(MAX_SQLX_PARAMS / 5)
+        .into_iter()
+        .map(|chunk| chunk.collect())
+        .collect();
+
+    for chunk in chunked {
+        OutputSymlink::insert_many(chunk).exec(db).await?;
+    }
+
+    Ok(())
+}
+
+// ----------             Read             ----------
+
+// ----------            Update            ----------
+
+// ----------            Delete            ----------
+
+// --------------------------------------------------
+// ----------          Output Dir          ----------
+// --------------------------------------------------
+
+// ----------            Create            ----------
+pub async fn create_many_output_dirs<T: ConnectionTrait>(
+    db: &T,
+    output_dirs: Vec<output_dir::ActiveModel>,
+) -> Result<(), DbErr> {
+    if output_dirs.len() == 0 {
+        return Ok(());
+    }
+
+    let chunked: Vec<Vec<output_dir::ActiveModel>> = output_dirs
+        .into_iter()
+        .chunks(MAX_SQLX_PARAMS / 5)
+        .into_iter()
+        .map(|chunk| chunk.collect())
+        .collect();
+
+    for chunk in chunked {
+        OutputDir::insert_many(chunk).exec(db).await?;
+    }
+
+    Ok(())
+}
+
+// ----------             Read             ----------
+
+// ----------            Update            ----------
+
+// ----------            Delete            ----------
+
+// --------------------------------------------------
+// ----------             Blob             ----------
+// --------------------------------------------------
+
+// ----------            Create            ----------
+
+// ----------             Read             ----------
+
+// Reads blobs from the database that are unreferenced and have surpassed the allocated grace
+// period to be referenced.
+//
+// For new blobs this allows the client to create several blobs and then reference them all at
+// once. Existing blobs whose job was just evicted will likely be well past the grace period and
+// thus quickly evicted themselves.
+pub async fn read_unreferenced_blobs<T: ConnectionTrait>(
+    db: &T,
+    ttl: NaiveDateTime,
+) -> Result<Vec<blob::Model>, DbErr> {
+    // TODO: this can probably be refactored as a ORM query with something like
+    // Blob::find()
+    //     .filter(
+    //         blob::Column::Id.not_in_subquery(
+    //             sea_orm::query::Query::select()
+    //                 .column(OutputFile::BlobId)
+    //                 .from(OutputFile::Table
+    //                 .union( *OTHER STUFF* ));
+    //                 .take().
+
+    // Limit = 16k as the query is also subject to parameter max.
+    // Blob has 4 params so (2^16)/4 = 16384. Also generally best to chunk blob eviction
+    // to avoid large eviction stalls.
+    Blob::find()
+        .from_raw_sql(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            r#"
+            SELECT * FROM blob
+            WHERE created_at <= $1
+            AND id NOT IN
+            (
+                SELECT blob_id FROM output_file
+                UNION SELECT stdout_blob_id FROM job
+                UNION SELECT stderr_blob_id FROM job
+            )
+            LIMIT 16000
+            "#,
+            [ttl.into()],
+        ))
+        .all(db)
+        .await
+}
+
+// ----------            Update            ----------
+
+// ----------            Delete            ----------
+pub async fn delete_blobs_by_ids<T: ConnectionTrait>(db: &T, ids: Vec<Uuid>) -> Result<u64, DbErr> {
+    if ids.len() == 0 {
+        return Ok(0);
+    }
+
+    entity::blob::Entity::delete_many()
+        .filter(
+            entity::blob::Column::Id.in_subquery(
+                migration::Query::select()
+                    .column(migration::Asterisk)
+                    .from_values(ids, migration::Alias::new("foo"))
+                    .take(),
+            ),
+        )
+        .exec(db)
+        .await
+        .map(|i| i.rows_affected)
 }
