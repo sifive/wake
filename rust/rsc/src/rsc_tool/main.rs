@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use inquire::Confirm;
+use inquire::{Confirm, Text};
 use is_terminal::IsTerminal;
 use migration::{DbErr, Migrator, MigratorTrait};
 use sea_orm::{prelude::Uuid, DatabaseConnection};
@@ -14,11 +14,14 @@ mod config;
 mod database;
 
 async fn add_api_key(
-    opts: AddApiKeyOpts,
+    key: Option<String>,
+    desc: String,
     db: &DatabaseConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let key = database::create_api_key(db, opts.key, opts.desc).await?;
-    println!("Created api key: {}", key.id);
+    let key = database::create_api_key(db, key, desc).await?;
+    println!("Created api key:");
+    println!("  Id: {}", key.id);
+    println!("  Key: {}", key.key);
     Ok(())
 }
 
@@ -74,12 +77,13 @@ async fn remove_api_key(
 }
 
 async fn add_local_blob_store(
-    opts: AddLocalBlobStoreOpts,
+    root: String,
     db: &DatabaseConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    tokio::fs::create_dir_all(opts.root.clone()).await?;
-    let store = database::create_local_blob_store(db, opts.root).await?;
-    println!("Created local blob store: {}", store.id);
+    tokio::fs::create_dir_all(root.clone()).await?;
+    let store = database::create_local_blob_store(db, root).await?;
+    println!("Created local blob store:");
+    println!("  Id: {}", store.id);
     Ok(())
 }
 
@@ -166,6 +170,33 @@ async fn remove_all_jobs(db: &DatabaseConnection) -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+async fn bootstrap_db(db: &DatabaseConnection) -> Result<(), Box<dyn std::error::Error>> {
+    // Get all the info from the user
+    let use_dev_key = Confirm::new("Create a test API key? (development only!)")
+        .with_default(false)
+        .prompt()?;
+    let key_desc = Text::new("What is the key used for?").prompt()?;
+    let local_store_root = Text::new("Where should local blobs be saved?").prompt()?;
+
+    // Create the API key
+    let key = if use_dev_key {
+        Some("InsecureKey".into())
+    } else {
+        None
+    };
+    add_api_key(key, key_desc, db).await?;
+
+    // Create the local blob store
+    add_local_blob_store(local_store_root, db).await?;
+
+    // Create DbOnly blob store
+    database::create_dbonly_blob_store(db).await?;
+
+    println!("");
+    println!("Done! Use the store id to set the active store and share the key as appropiate.");
+    Ok(())
+}
+
 // Define all of our top level commands
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -185,8 +216,11 @@ struct TopLevel {
     )]
     database_url: Option<String>,
 
-    #[arg(help = "Show's the config and then exits", long)]
+    #[arg(help = "Shows the config and then exits", long)]
     show_config: bool,
+
+    #[arg(help = "Bootstraps the database with minimal configs", long)]
+    bootstrap: bool,
 
     #[command(subcommand)]
     db_command: Option<DBCommand>,
@@ -326,6 +360,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(err)?;
     }
 
+    if args.bootstrap {
+        bootstrap_db(&db).await?;
+        return Ok(());
+    }
+
     let Some(db_command) = args.db_command else {
         return Ok(());
     };
@@ -342,10 +381,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Add Commands
         DBCommand::Add(AddOpts {
             db_command: DBModelAdd::ApiKey(args),
-        }) => add_api_key(args, &db).await?,
+        }) => add_api_key(args.key, args.desc, &db).await?,
         DBCommand::Add(AddOpts {
             db_command: DBModelAdd::LocalBlobStore(args),
-        }) => add_local_blob_store(args, &db).await?,
+        }) => add_local_blob_store(args.root, &db).await?,
 
         // Remove Commands
         DBCommand::Remove(RemoveOpts {

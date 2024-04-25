@@ -30,6 +30,8 @@ mod types;
 
 #[path = "../common/config.rs"]
 mod config;
+#[path = "../common/database.rs"]
+mod database;
 
 #[derive(Debug, Parser)]
 struct ServerOptions {
@@ -101,10 +103,18 @@ async fn activate_stores(
     }
 
     // ---    Activate DBOnly Store   ---
-    let dbonly_id = Uuid::parse_str("00000000-0000-0000-0000-000000000000").unwrap();
+    let dbonly_store = match database::read_dbonly_blob_store(&conn).await {
+        Ok(Some(store)) => store,
+        Ok(None) => {
+            panic!("Database is not configured with a DbOnly store. Please bootstrap the db")
+        }
+        Err(_) => panic!("Failed to load DbOnly store from database. Unable to continue"),
+    };
     active_stores.insert(
-        dbonly_id,
-        Arc::new(blob_store_impls::DbOnlyBlobStore { id: dbonly_id }),
+        dbonly_store.id,
+        Arc::new(blob_store_impls::DbOnlyBlobStore {
+            id: dbonly_store.id,
+        }),
     );
 
     return active_stores;
@@ -128,7 +138,7 @@ fn create_router(
         panic!("UUID for active store not in database");
     };
 
-    let dbonly_uuid = Uuid::parse_str("00000000-0000-0000-0000-000000000000").unwrap();
+    let dbonly_uuid = database::read_dbonly_blob_store_id();
     let Some(dbonly_store) = blob_stores.get(&dbonly_uuid).clone() else {
         panic!("UUID for db store not in database");
     };
@@ -407,6 +417,8 @@ mod tests {
     async fn create_test_store(
         db: &DatabaseConnection,
     ) -> Result<Uuid, Box<dyn std::error::Error>> {
+        database::create_dbonly_blob_store(db).await?;
+
         let test_store = blob_store::ActiveModel {
             id: NotSet,
             r#type: Set("TestBlobStore".into()),
