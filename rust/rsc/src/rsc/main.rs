@@ -119,6 +119,20 @@ async fn activate_stores(
     return active_stores;
 }
 
+#[derive(serde::Deserialize)]
+struct VersionCheck {
+    version: String,
+}
+
+async fn check_version(check: axum::extract::Query<VersionCheck>) -> axum::http::StatusCode {
+    println!("{:?}", check.version);
+    if check.version != "sifive/wake/41.1.1" {
+        return axum::http::StatusCode::FORBIDDEN;
+    }
+
+    return axum::http::StatusCode::OK;
+}
+
 fn create_router(
     conn: Arc<DatabaseConnection>,
     config: Arc<config::RSCConfig>,
@@ -195,6 +209,7 @@ fn create_router(
                 move || blob::get_upload_url(config.server_addr.clone())
             }),
         )
+        .route("/version/check", get(check_version))
 }
 
 async fn create_standalone_db() -> Result<DatabaseConnection, sea_orm::DbErr> {

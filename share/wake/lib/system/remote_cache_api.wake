@@ -201,7 +201,24 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
     def auth = if authStr ==* "" then None else Some authStr
     def api = RemoteCacheApi domain port auth
 
-    # TODO: check for compatable wake version
+    # When in debug mode, allow server incompatible version.
+    def overrideOnDebugCache check =
+        require Fail err = check
+        else check
+
+        require Some _ = getenv "DEBUG_WAKE_SHARED_CACHE"
+        else check
+
+        printlnLevel
+        logWarning
+        "RSC client is incompatable with server but continuing due to DEBUG enabled. Reason: {format err}"
+        | Pass
+
+    # If the client isn't compatiable with the server then give up on the cache
+    require Pass Unit =
+        api
+        | rscApiCheckClientVersion "sifive/wake/{version}"
+        | overrideOnDebugCache
 
     # If auth is not set we are done. Just return the api
     require Some _ = auth
@@ -333,6 +350,23 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
         | addErrorContext "rsc: http body contains invalid JSON"
 
     mkCacheSearchResponse json
+
+# rscApiCheckClientVersion: Checks if the client version is compatiable with the server. 
+#
+# ```
+#  api | rscApiCheckClientVersion "sifive/wake/1.2.3 = Pass Unit
+# ```
+export def rscApiCheckClientVersion (version: String) (api: RemoteCacheApi): Result Unit Error =
+    require Pass response =
+        makeRoute api "version/check?version={version}"
+        | buildHttpRequest
+        | setMethod HttpMethodGet
+        | makeRequest
+
+    match response.getHttpResponseStatusCode
+        Some 200 -> Pass Unit
+        Some x -> failWithError "Incompatiable client. Status code: {str x}"
+        None -> failWithError "Incompatiable client. Unable to determine status code"
 
 # rscApiCheckAuthorization: Checks if the provided authorization key is valid.
 #
