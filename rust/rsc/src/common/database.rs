@@ -149,7 +149,9 @@ pub async fn delete_local_blob_store<T: ConnectionTrait>(
 // ----------       DbOnly Blob Store       ----------
 // --------------------------------------------------
 // ----------            Create            ----------
-pub async fn create_dbonly_blob_store(db: &DatabaseConnection) -> Result<blob_store::Model, DbErr> {
+pub async fn create_dbonly_blob_store<T: ConnectionTrait>(
+    db: &T,
+) -> Result<blob_store::Model, DbErr> {
     let active_blob_store = blob_store::ActiveModel {
         id: Set(read_dbonly_blob_store_id()),
         r#type: Set("DbOnlyBlobStore".to_string()),
@@ -165,8 +167,8 @@ pub fn read_dbonly_blob_store_id() -> Uuid {
     Uuid::parse_str("00000000-0000-0000-0000-000000000000").unwrap()
 }
 
-pub async fn read_dbonly_blob_store(
-    db: &DatabaseConnection,
+pub async fn read_dbonly_blob_store<T: ConnectionTrait>(
+    db: &T,
 ) -> Result<Option<blob_store::Model>, DbErr> {
     blob_store::Entity::find_by_id(read_dbonly_blob_store_id())
         .one(db)

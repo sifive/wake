@@ -102,7 +102,7 @@ async fn activate_stores(
     }
 
     // ---    Activate DBOnly Store   ---
-    let dbonly_store = match database::read_dbonly_blob_store(&conn).await {
+    let dbonly_store = match database::read_dbonly_blob_store(conn.as_ref()).await {
         Ok(Some(store)) => store,
         Ok(None) => {
             panic!("Database is not configured with a DbOnly store. Please bootstrap the db")
