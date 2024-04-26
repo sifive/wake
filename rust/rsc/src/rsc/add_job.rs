@@ -3,9 +3,7 @@ use axum::{http::StatusCode, Json};
 
 use entity::{job, output_dir, output_file, output_symlink, visible_file};
 
-use sea_orm::{
-    ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr, TransactionTrait,
-};
+use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr, TransactionTrait};
 use std::sync::Arc;
 use tracing;
 

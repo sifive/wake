@@ -384,16 +384,30 @@ pub async fn delete_blobs_by_ids<T: ConnectionTrait>(db: &T, ids: Vec<Uuid>) -> 
         return Ok(0);
     }
 
-    entity::blob::Entity::delete_many()
-        .filter(
-            entity::blob::Column::Id.in_subquery(
-                migration::Query::select()
-                    .column(migration::Asterisk)
-                    .from_values(ids, migration::Alias::new("foo"))
-                    .take(),
-            ),
-        )
-        .exec(db)
-        .await
-        .map(|i| i.rows_affected)
+    let mut affected = 0;
+
+    let chunked: Vec<Vec<Uuid>> = ids
+        .into_iter()
+        .chunks(MAX_SQLX_PARAMS / 1)
+        .into_iter()
+        .map(|chunk| chunk.collect())
+        .collect();
+
+    for chunk in chunked {
+        let result = entity::blob::Entity::delete_many()
+            .filter(
+                entity::blob::Column::Id.in_subquery(
+                    migration::Query::select()
+                        .column(migration::Asterisk)
+                        .from_values(chunk, migration::Alias::new("foo"))
+                        .take(),
+                ),
+            )
+            .exec(db)
+            .await?;
+
+        affected += result.rows_affected;
+    }
+
+    Ok(affected)
 }
