@@ -51,7 +51,7 @@ pub async fn read_job(
     blob_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) -> (StatusCode, Json<ReadJobResponse>) {
     let hash = payload.hash();
-    tracing::info!(hash, "Add Request Hash");
+    tracing::info!(hash);
 
     // TODO: This transaction is quite large with a bunch of "serialized" queries. If read_job
     // becomes a bottleneck it should be rewritten such that joining on promises is delayed for as

@@ -17,7 +17,7 @@ pub async fn add_job(
 ) -> StatusCode {
     // First construct all the job details as an ActiveModel for insert
     let hash = payload.hash();
-    tracing::info!(hash, "Add Request Hash");
+    tracing::info!(hash);
 
     let vis = payload.visible_files;
     let output_files = payload.output_files;
