@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing;
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 async fn record_use(job_id: Uuid, conn: Arc<DatabaseConnection>) {
     let usage = job_use::ActiveModel {
         id: NotSet,
@@ -44,12 +44,15 @@ async fn resolve_blob(
     });
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn read_job(
     Json(payload): Json<ReadJobPayload>,
     conn: Arc<DatabaseConnection>,
     blob_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) -> (StatusCode, Json<ReadJobResponse>) {
+    let hash = payload.hash();
+    tracing::info!(hash, "Add Request Hash");
+
     // TODO: This transaction is quite large with a bunch of "serialized" queries. If read_job
     // becomes a bottleneck it should be rewritten such that joining on promises is delayed for as
     // long as possible. Another option would be to collect all blob ids ahead of time and make a
@@ -59,7 +62,7 @@ pub async fn read_job(
         .transaction::<_, (Option<Uuid>, ReadJobResponse), DbErr>(|txn| {
             Box::pin(async move {
                 let Some(matching_job) = job::Entity::find()
-                    .filter(job::Column::Hash.eq(payload.hash()))
+                    .filter(job::Column::Hash.eq(hash))
                     .one(txn)
                     .await?
                 else {

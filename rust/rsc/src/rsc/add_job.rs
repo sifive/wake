@@ -10,13 +10,15 @@ use tracing;
 #[path = "../common/database.rs"]
 mod database;
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn add_job(
     Json(payload): Json<AddJobPayload>,
     conn: Arc<DatabaseConnection>,
 ) -> StatusCode {
     // First construct all the job details as an ActiveModel for insert
     let hash = payload.hash();
+    tracing::info!(hash, "Add Request Hash");
+
     let vis = payload.visible_files;
     let output_files = payload.output_files;
     let output_symlinks = payload.output_symlinks;
