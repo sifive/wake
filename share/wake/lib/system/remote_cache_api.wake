@@ -357,11 +357,13 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
         | setMethod HttpMethodGet
         | makeBinaryRequest
 
-    # TODO: I should probably mv instead of cp since this will be very space expensive
     def fixupScript =
         """
-        cp %{downloadPath.getPathName} '%{path}'
-        chmod %{mode | strOctal} '%{path}'
+        # 1. Hardlink the file to not use 2x disk space
+        # 2. Do all edits to a tmp file then atomically mv so interruptions don't effect the build
+        cp -l %{downloadPath.getPathName} '%{path}.rsctmp'
+        chmod %{mode | strOctal} '%{path}.rsctmp'
+        mv '%{path}.rsctmp' '%{path}'
         """
 
     def job =
