@@ -31,6 +31,8 @@ tuple HttpFormData =
     # in the fullness of time it should be converted to a Path. This library is careful to not
     # claim or otherwise convert it to a Path as it should be done by the caller when possible
     File: String
+    # The optional Content-Type field of the specific form entry. The field is not set when None
+    ContentType: Option String
 
 # The description of a http request to send to a web server.
 tuple HttpRequest =
@@ -104,15 +106,15 @@ export def setBody (body: String): HttpRequest => HttpRequest =
     setHttpRequestBody (Some body)
 
 # Adds a named file to the requests form data.
-export def addFormData (name: String) (value: Path): HttpRequest => HttpRequest =
-    unsafe_addFormData name value.getPathName
+export def addFormData (name: String) (value: Path) (contentType: Option String): HttpRequest => HttpRequest =
+    unsafe_addFormData name value.getPathName contentType
 
 # Adds a named file to the request's form data from an unhashed file.
 #
 # This is a restricted function and should be reserved for advanced use only
-export def unsafe_addFormData (name: String) (value: String): HttpRequest => HttpRequest =
+export def unsafe_addFormData (name: String) (value: String) (contentType: Option String): HttpRequest => HttpRequest =
     def setOrAppend field =
-        def entry = HttpFormData name value
+        def entry = HttpFormData name value contentType
 
         match field
             Some formDatas -> Some (entry, formDatas)
@@ -192,7 +194,10 @@ def methodToString = match _
 # helper function for building up the curl cmd representing a request
 def makeCurlCmd ((HttpRequest url method headers body formData): HttpRequest) (extraFlags: List String): Result (List String) Error =
     def headerToCurlFlag (HttpHeader name value) = "--header", "{name}:{value}", Nil
-    def formDataToCurlFlag (HttpFormData name file) = "--form", "{name}=@{file}", Nil
+
+    def formDataToCurlFlag (HttpFormData name file contentType) = match contentType
+        Some ct -> "--form", "{name}=@{file};type={ct}", Nil
+        None -> "--form", "{name}=@{file}", Nil
 
     def bodyToCurlFlag body =
         require True = body.strlen >= 5000
