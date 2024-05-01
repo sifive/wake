@@ -2268,6 +2268,7 @@ dependencies = [
  "is-terminal",
  "itertools 0.12.1",
  "migration",
+ "mime",
  "papergrid",
  "rand_core",
  "sea-orm",
