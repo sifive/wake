@@ -300,7 +300,7 @@ fn launch_blob_eviction(
             let blob_ids: Vec<Uuid> = blobs.iter().map(|blob| blob.id).collect();
             let eligible = blob_ids.len();
 
-            tracing::info!(%eligible, "Blobs eligible for eviction");
+            tracing::info!(%eligible, "At least N blobs eligible for eviction");
 
             // Delete blobs from database
             match database::delete_blobs_by_ids(conn.as_ref(), blob_ids).await {
