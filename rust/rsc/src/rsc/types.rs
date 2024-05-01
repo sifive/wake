@@ -2,6 +2,11 @@ use blake3;
 use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 
+// Note:
+//   When changing these types, remember to review database.rs for max parameter queries.
+//   Without the implementation of a macro, we need to manually maintain the number of
+//   parameters in each type.
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct VisibleFile {
     pub path: String,

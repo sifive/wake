@@ -16,7 +16,7 @@ use sea_orm::{
 use tracing;
 
 // The actual max is 65536, but adding an arbritrary buffer of 36 for any incidental parameters
-const MAX_SQLX_PARAMS: usize = 65500;
+const MAX_SQLX_PARAMS: u16 = u16::MAX - 36;
 
 // --------------------------------------------------
 // ----------          Api Key             ----------
@@ -210,7 +210,7 @@ pub async fn create_many_visible_files<T: ConnectionTrait>(
 
     let chunked: Vec<Vec<visible_file::ActiveModel>> = visible_files
         .into_iter()
-        .chunks(MAX_SQLX_PARAMS / 5)
+        .chunks((MAX_SQLX_PARAMS / 5).into())
         .into_iter()
         .map(|chunk| chunk.collect())
         .collect();
@@ -243,7 +243,7 @@ pub async fn create_many_output_files<T: ConnectionTrait>(
 
     let chunked: Vec<Vec<output_file::ActiveModel>> = output_files
         .into_iter()
-        .chunks(MAX_SQLX_PARAMS / 6)
+        .chunks((MAX_SQLX_PARAMS / 6).into())
         .into_iter()
         .map(|chunk| chunk.collect())
         .collect();
@@ -276,7 +276,7 @@ pub async fn create_many_output_symlinks<T: ConnectionTrait>(
 
     let chunked: Vec<Vec<output_symlink::ActiveModel>> = output_symlinks
         .into_iter()
-        .chunks(MAX_SQLX_PARAMS / 5)
+        .chunks((MAX_SQLX_PARAMS / 5).into())
         .into_iter()
         .map(|chunk| chunk.collect())
         .collect();
@@ -309,7 +309,7 @@ pub async fn create_many_output_dirs<T: ConnectionTrait>(
 
     let chunked: Vec<Vec<output_dir::ActiveModel>> = output_dirs
         .into_iter()
-        .chunks(MAX_SQLX_PARAMS / 5)
+        .chunks((MAX_SQLX_PARAMS / 5).into())
         .into_iter()
         .map(|chunk| chunk.collect())
         .collect();
@@ -370,9 +370,9 @@ pub async fn read_unreferenced_blobs<T: ConnectionTrait>(
                 UNION SELECT stdout_blob_id FROM job
                 UNION SELECT stderr_blob_id FROM job
             )
-            LIMIT 16000
+            LIMIT $2
             "#,
-            [ttl.into()],
+            [ttl.into(), (MAX_SQLX_PARAMS / 4).into()],
         ))
         .all(db)
         .await
@@ -390,7 +390,7 @@ pub async fn delete_blobs_by_ids<T: ConnectionTrait>(db: &T, ids: Vec<Uuid>) -> 
 
     let chunked: Vec<Vec<Uuid>> = ids
         .into_iter()
-        .chunks(MAX_SQLX_PARAMS / 1)
+        .chunks((MAX_SQLX_PARAMS / 1).into())
         .into_iter()
         .map(|chunk| chunk.collect())
         .collect();
