@@ -334,7 +334,7 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
 # ```
 export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Result String Error =
     require scheme, path, Nil = extract `([a-zA-Z][a-zA-Z0-9+.-]*)://(.*)` uri
-    else failWithError "rsc: uri has too many components: '{uri}'"
+    else failWithError "rsc: uri has unexpected format: '{uri}'"
 
     # maps path = "%46%6F%6F" to content = "foo"
     def dbScheme _scheme path =
@@ -342,11 +342,11 @@ export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Resul
         require True = path.strlen > 0
         else Pass ""
 
-        # If not empty then it must as lease be %00
+        # If not empty then it must as least be %00
         require True = path.strlen > 3
         else failWithError "rsc: Invalid db path: '{path}'"
 
-        require _empty, byteStrs = tokenize `%` path
+        require "", byteStrs = tokenize `%` path
         else failWithError "rsc: Failed to extract bytes from db path: '{path}'"
 
         require Some bytes =
