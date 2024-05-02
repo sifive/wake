@@ -212,7 +212,7 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
 # ```
 export def rscApiPostStringBlob (name: String) (value: String) (api: RemoteCacheApi): Result String Error =
     def contentType =
-        if value.strlen < 75 then
+        if value.strlen < 95 then
             Some "blob/small"
         else
             None
