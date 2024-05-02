@@ -1,16 +1,14 @@
 use crate::types::AddJobPayload;
 use axum::{http::StatusCode, Json};
-use entity::prelude::{OutputDir, OutputFile, OutputSymlink, VisibleFile};
+
 use entity::{job, output_dir, output_file, output_symlink, visible_file};
-use itertools::Itertools;
-use sea_orm::{
-    ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr, EntityTrait, TransactionTrait,
-};
+
+use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr, TransactionTrait};
 use std::sync::Arc;
 use tracing;
 
-// The actual max is 65536, but adding an arbritrary buffer of 36 for any incidental parameters
-const MAX_SQLX_PARAMS: usize = 65500;
+#[path = "../common/database.rs"]
+mod database;
 
 #[tracing::instrument]
 pub async fn add_job(
@@ -51,56 +49,38 @@ pub async fn add_job(
                 let job = insert_job.save(txn).await?;
                 let job_id = job.id.unwrap();
 
-                // sqlx only allows 65536 sql parameters per query and each visible file accounts
-                // for 5 parameters so we can only insert 65536/5 visible files per query
-                let chunked_visible_files: Vec<Vec<visible_file::ActiveModel>> = vis
-                    .into_iter()
-                    .map(|vis_file| visible_file::ActiveModel {
-                        id: NotSet,
-                        created_at: NotSet,
-                        path: Set(vis_file.path),
-                        hash: Set(vis_file.hash),
-                        job_id: Set(job_id),
-                    })
-                    .chunks(MAX_SQLX_PARAMS / 5)
-                    .into_iter()
-                    .map(|chunk| chunk.collect())
-                    .collect();
+                database::create_many_visible_files(
+                    txn,
+                    vis.into_iter()
+                        .map(|vis_file| visible_file::ActiveModel {
+                            id: NotSet,
+                            created_at: NotSet,
+                            path: Set(vis_file.path),
+                            hash: Set(vis_file.hash),
+                            job_id: Set(job_id),
+                        })
+                        .collect(),
+                )
+                .await?;
 
-                for chunk in chunked_visible_files {
-                    VisibleFile::insert_many(chunk)
-                        .on_empty_do_nothing()
-                        .exec(txn)
-                        .await?;
-                }
+                database::create_many_output_files(
+                    txn,
+                    output_files
+                        .into_iter()
+                        .map(|out_file| output_file::ActiveModel {
+                            id: NotSet,
+                            created_at: NotSet,
+                            path: Set(out_file.path),
+                            mode: Set(out_file.mode),
+                            job_id: Set(job_id),
+                            blob_id: Set(out_file.blob_id),
+                        })
+                        .collect(),
+                )
+                .await?;
 
-                // sqlx only allows 65536 sql parameters per query and each output file accounts
-                // for 6 parameters so we can only insert 65536/6 visible files per query
-                let chunked_output_files: Vec<Vec<output_file::ActiveModel>> = output_files
-                    .into_iter()
-                    .map(|out_file| output_file::ActiveModel {
-                        id: NotSet,
-                        created_at: NotSet,
-                        path: Set(out_file.path),
-                        mode: Set(out_file.mode),
-                        job_id: Set(job_id),
-                        blob_id: Set(out_file.blob_id),
-                    })
-                    .chunks(MAX_SQLX_PARAMS / 6)
-                    .into_iter()
-                    .map(|chunk| chunk.collect())
-                    .collect();
-
-                for chunk in chunked_output_files {
-                    OutputFile::insert_many(chunk)
-                        .on_empty_do_nothing()
-                        .exec(txn)
-                        .await?;
-                }
-
-                // sqlx only allows 65536 sql parameters per query and each output symlink accounts
-                // for 5 parameters so we can only insert 65536/5 visible files per query
-                let chunked_output_symlinks: Vec<Vec<output_symlink::ActiveModel>> =
+                database::create_many_output_symlinks(
+                    txn,
                     output_symlinks
                         .into_iter()
                         .map(|out_symlink| output_symlink::ActiveModel {
@@ -110,40 +90,24 @@ pub async fn add_job(
                             link: Set(out_symlink.link),
                             job_id: Set(job_id),
                         })
-                        .chunks(MAX_SQLX_PARAMS / 5)
+                        .collect(),
+                )
+                .await?;
+
+                database::create_many_output_dirs(
+                    txn,
+                    output_dirs
                         .into_iter()
-                        .map(|chunk| chunk.collect())
-                        .collect();
-
-                for chunk in chunked_output_symlinks {
-                    OutputSymlink::insert_many(chunk)
-                        .on_empty_do_nothing()
-                        .exec(txn)
-                        .await?;
-                }
-
-                // sqlx only allows 65536 sql parameters per query and each output dir accounts
-                // for 5 parameters so we can only insert 65536/5 visible files per query
-                let chunked_output_dirs: Vec<Vec<output_dir::ActiveModel>> = output_dirs
-                    .into_iter()
-                    .map(|dir| output_dir::ActiveModel {
-                        id: NotSet,
-                        created_at: NotSet,
-                        path: Set(dir.path),
-                        mode: Set(dir.mode),
-                        job_id: Set(job_id),
-                    })
-                    .chunks(MAX_SQLX_PARAMS / 5)
-                    .into_iter()
-                    .map(|chunk| chunk.collect())
-                    .collect();
-
-                for chunk in chunked_output_dirs {
-                    OutputDir::insert_many(chunk)
-                        .on_empty_do_nothing()
-                        .exec(txn)
-                        .await?;
-                }
+                        .map(|dir| output_dir::ActiveModel {
+                            id: NotSet,
+                            created_at: NotSet,
+                            path: Set(dir.path),
+                            mode: Set(dir.mode),
+                            job_id: Set(job_id),
+                        })
+                        .collect(),
+                )
+                .await?;
 
                 Ok(())
             })

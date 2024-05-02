@@ -24,7 +24,6 @@ mod add_job;
 mod api_key_check;
 mod blob;
 mod blob_store_impls;
-mod blob_store_service;
 mod read_job;
 mod types;
 
@@ -68,7 +67,7 @@ async fn activate_stores(
         HashMap::new();
 
     // --- Activate Test Blob Stores  ---
-    let test_stores = match blob_store_service::fetch_test_blob_stores(&conn).await {
+    let test_stores = match database::read_test_blob_stores(conn.as_ref()).await {
         Ok(stores) => stores,
         Err(err) => {
             tracing::warn!(%err, "Failed to read test stores from database");
@@ -84,7 +83,7 @@ async fn activate_stores(
     }
 
     // --- Activate Local Blob Stores ---
-    let stores = match blob_store_service::fetch_local_blob_stores(&conn).await {
+    let stores = match database::read_local_blob_stores(conn.as_ref()).await {
         Ok(stores) => stores,
         Err(err) => {
             tracing::warn!(%err, "Failed to read local stores from database");
@@ -103,7 +102,7 @@ async fn activate_stores(
     }
 
     // ---    Activate DBOnly Store   ---
-    let dbonly_store = match database::read_dbonly_blob_store(&conn).await {
+    let dbonly_store = match database::read_dbonly_blob_store(conn.as_ref()).await {
         Ok(Some(store)) => store,
         Ok(None) => {
             panic!("Database is not configured with a DbOnly store. Please bootstrap the db")
@@ -290,9 +289,7 @@ fn launch_blob_eviction(
             // This gives clients time to reference a blob before it gets evicted.
             let setup_ttl = (Utc::now() - Duration::from_secs(setup_ttl)).naive_utc();
 
-            let blobs = match blob_store_service::fetch_unreferenced_blobs(conn.as_ref(), setup_ttl)
-                .await
-            {
+            let blobs = match database::read_unreferenced_blobs(conn.as_ref(), setup_ttl).await {
                 Ok(b) => b,
                 Err(err) => {
                     tracing::error!(%err, "Failed to fetch blobs for eviction");
@@ -303,10 +300,10 @@ fn launch_blob_eviction(
             let blob_ids: Vec<Uuid> = blobs.iter().map(|blob| blob.id).collect();
             let eligible = blob_ids.len();
 
-            tracing::info!(%eligible, "Blobs eligible for eviction");
+            tracing::info!(%eligible, "At least N blobs eligible for eviction");
 
             // Delete blobs from database
-            match blob_store_service::delete_blobs_by_ids(conn.as_ref(), blob_ids).await {
+            match database::delete_blobs_by_ids(conn.as_ref(), blob_ids).await {
                 Ok(deleted) => tracing::info!(%deleted, "Deleted blobs from database"),
                 Err(err) => {
                     tracing::error!(%err, "Failed to delete blobs from db for eviction");
