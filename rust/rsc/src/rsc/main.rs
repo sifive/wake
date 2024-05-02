@@ -143,6 +143,7 @@ fn create_router(
     };
 
     Router::new()
+        // Authorized Routes
         .route(
             "/job",
             post({
@@ -155,6 +156,22 @@ fn create_router(
                 move |req, next| api_key_check::api_key_check_middleware(req, next, conn.clone())
             })),
         )
+        .route(
+            "/blob",
+            post({
+                let conn = conn.clone();
+                let active = active_store.clone();
+                let dbonly = dbonly_store.clone();
+
+                move |multipart: Multipart| blob::create_blob(multipart, conn, active, dbonly)
+            })
+            .layer(DefaultBodyLimit::disable())
+            .layer(axum::middleware::from_fn({
+                let conn = conn.clone();
+                move |req, next| api_key_check::api_key_check_middleware(req, next, conn.clone())
+            })),
+        )
+        // Unauthorized Routes
         .route(
             "/job/matching",
             post({
@@ -170,17 +187,6 @@ fn create_router(
                 let config = config.clone();
                 move || blob::get_upload_url(config.server_addr.clone())
             }),
-        )
-        .route(
-            "/blob",
-            post({
-                let conn = conn.clone();
-                let active = active_store.clone();
-                let dbonly = dbonly_store.clone();
-
-                move |multipart: Multipart| blob::create_blob(multipart, conn, active, dbonly)
-            })
-            .layer(DefaultBodyLimit::disable()),
         )
 }
 
@@ -405,10 +411,12 @@ mod tests {
 
     use axum::{
         body::Body,
-        http::{self, Request, StatusCode},
+        http::{self, header::*, Request, StatusCode},
     };
     use chrono::Duration;
+    use mime::BOUNDARY;
     use serde_json::{json, Value};
+    use std::io::Write;
     use tower::Service;
 
     async fn create_test_store(
@@ -475,7 +483,7 @@ mod tests {
                 Request::builder()
                     .uri("/job")
                     .method(http::Method::POST)
-                    .header("Content-Type", "application/json")
+                    .header(CONTENT_TYPE, "application/json")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -490,8 +498,8 @@ mod tests {
                 Request::builder()
                     .uri("/job")
                     .method(http::Method::POST)
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", api_key.clone())
+                    .header(CONTENT_TYPE, "application/json")
+                    .header(AUTHORIZATION, api_key.clone())
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -506,8 +514,8 @@ mod tests {
                 Request::builder()
                     .uri("/job")
                     .method(http::Method::POST)
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", api_key)
+                    .header(CONTENT_TYPE, "application/json")
+                    .header(AUTHORIZATION, api_key.clone())
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "cmd": b"blarg",
@@ -544,7 +552,7 @@ mod tests {
                 Request::builder()
                     .uri("/job/matching")
                     .method(http::Method::POST)
-                    .header("Content-Type", "application/json")
+                    .header(CONTENT_TYPE, "application/json")
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "cmd": b"blrg",
@@ -574,7 +582,7 @@ mod tests {
                 Request::builder()
                     .uri("/job/matching")
                     .method(http::Method::POST)
-                    .header("Content-Type", "application/json")
+                    .header(CONTENT_TYPE, "application/json")
                     .body(Body::from(
                         serde_json::to_vec(&json!({
                             "cmd": b"blarg",
@@ -619,6 +627,56 @@ mod tests {
                 "obytes":1000
             })
         );
+
+        // Protected post blob route without auth should 401
+        let body_data: Vec<u8> = Vec::new();
+        let res = router
+            .call(
+                Request::builder()
+                    .uri("/blob")
+                    .method(http::Method::POST)
+                    .header(
+                        CONTENT_TYPE,
+                        format!("multipart/form-data; boundary={}", BOUNDARY),
+                    )
+                    .body(body_data.into())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+        // Protected post blob route with auth should 200
+        let mut body_data: Vec<u8> = Vec::new();
+        write!(body_data, "--{}\r\n", BOUNDARY).unwrap();
+        write!(
+            body_data,
+            "Content-Disposition: form-data; name=\"file\";\r\n"
+        )
+        .unwrap();
+        write!(body_data, "\r\n").unwrap();
+        write!(body_data, "contents").unwrap();
+        write!(body_data, "\r\n").unwrap();
+        write!(body_data, "--{}--\r\n", BOUNDARY).unwrap();
+
+        let res = router
+            .call(
+                Request::builder()
+                    .uri("/blob")
+                    .method(http::Method::POST)
+                    .header(
+                        CONTENT_TYPE,
+                        format!("multipart/form-data; boundary={}", BOUNDARY),
+                    )
+                    .header(AUTHORIZATION, api_key)
+                    .body(body_data.into())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::OK);
     }
 
     #[tokio::test]
