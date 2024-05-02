@@ -125,8 +125,8 @@ struct VersionCheck {
 }
 
 async fn check_version(check: axum::extract::Query<VersionCheck>) -> axum::http::StatusCode {
-    println!("{:?}", check.version);
-    if check.version != "sifive/wake/41.1.1" {
+    // During development, declare all version as compatible
+    if !check.version.starts_with("sifive/wake/") {
         return axum::http::StatusCode::FORBIDDEN;
     }
 
@@ -729,6 +729,34 @@ mod tests {
             .unwrap();
 
         assert_eq!(res.status(), StatusCode::OK);
+
+        // Allowed version should should 200
+        let res = router
+            .call(
+                Request::builder()
+                    .uri("/version/check?version=sifive/wake/1.2.3")
+                    .method(http::Method::GET)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Disallowed version should should 403
+        let res = router
+            .call(
+                Request::builder()
+                    .uri("/version/check?version=sifive/foo/1.2.3")
+                    .method(http::Method::GET)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]
