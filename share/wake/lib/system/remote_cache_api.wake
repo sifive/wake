@@ -343,7 +343,7 @@ export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Resul
         else Pass ""
 
         # If not empty then it must as least be %00
-        require True = path.strlen > 3
+        require True = path.strlen >= 3
         else failWithError "rsc: Invalid db path: '{path}'"
 
         require "", byteStrs = tokenize `%` path
