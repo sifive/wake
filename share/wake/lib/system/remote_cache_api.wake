@@ -334,7 +334,7 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
 
     mkCacheSearchResponse json
 
-# rscApiCheckAuthorization: Checks if the provided authorization key is valid. 
+# rscApiCheckAuthorization: Checks if the provided authorization key is valid.
 #
 # ```
 #  api | rscApiCheckAuthorization = Pass Unit
