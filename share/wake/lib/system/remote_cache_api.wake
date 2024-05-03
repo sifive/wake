@@ -237,13 +237,15 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
 #  (RemoteCacheApi "foo" 1 None) | rscApiPostStringBlob "foo" "my foo contents" = Fail "authorization required"
 # ```
 export def rscApiPostStringBlob (name: String) (value: String) (api: RemoteCacheApi): Result String Error =
-    # TODO: use "small blob" for this
-    # require False = value ==* ""
-    # else Pass "00000000-0000-0000-0000-000000000000"
+    def contentType =
+        if value.strlen < 95 then
+            Some "blob/small"
+        else
+            None
 
     require Pass temp = writeTempFile name value
 
-    uploadBlobRequest api (addFormData name temp)
+    uploadBlobRequest api (addFormData name temp contentType)
 
 # rscApiPostFileBlob: Posts a named file on disk to the remote server defined by *api*
 #                     then returns the id associated to the blob. Requires authorization.
@@ -255,7 +257,7 @@ export def rscApiPostStringBlob (name: String) (value: String) (api: RemoteCache
 export def rscApiPostFileBlob (name: String) (file: String) (api: RemoteCacheApi): Result String Error =
     # We must use unsafe here since we cannot elevate *file* to a Path without either copying it
     # or triggering the 'job output by multiple files' error.
-    uploadBlobRequest api (unsafe_addFormData name file)
+    uploadBlobRequest api (unsafe_addFormData name file None)
 
 # rscApiPostJob: Posts a job defined by *req* to the remote cache server. Requires authorization.
 #
@@ -395,16 +397,53 @@ export def rscApiCheckAuthorization (api: RemoteCacheApi): Result Unit Error =
 #  rscApiGetStringBlob (RemoteCacheBlob "asdf" "https://...") = Pass "foo\nbar\nbat" 
 # ```
 export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Result String Error =
-    # TODO: use "small blob" for this and also parse the schema out
-    # require False = id ==* "00000000-0000-0000-0000-000000000000"
-    # else Pass  ""
+    require scheme, path, Nil = extract `([a-zA-Z][a-zA-Z0-9+.-]*)://(.*)` uri
+    else failWithError "rsc: uri has unexpected format: '{uri}'"
 
-    require Pass response =
-        buildHttpRequest uri
-        | setMethod HttpMethodGet
-        | makeRequest
+    # maps path = "%46%6F%6F" to content = "foo"
+    def dbScheme _scheme path =
+        # If path is empty we have the empty string
+        require True = path.strlen > 0
+        else Pass ""
 
-    Pass response.getHttpResponseBody
+        # If not empty then it must as least be %00
+        require True = path.strlen >= 3
+        else failWithError "rsc: Invalid db path: '{path}'"
+
+        require "", byteStrs = tokenize `%` path
+        else failWithError "rsc: Failed to extract bytes from db path: '{path}'"
+
+        require Some bytes =
+            byteStrs
+            | map (intbase 16)
+            | findNone
+        else failWithError "rsc: Failed to parse bytes strings into bytes from db path: '{path}'"
+
+        bytes
+        # TODO: this only supports ASCII, not unicode. This needs to be enforced somewhere.
+        | map integerToByte
+        | cat
+        | Pass
+
+    def fileScheme scheme path =
+        require Pass response =
+            buildHttpRequest "{scheme}://{path}"
+            | setMethod HttpMethodGet
+            | makeRequest
+
+        Pass response.getHttpResponseBody
+
+    def unsupportedScheme scheme path =
+        failWithError "rsc: scheme '{scheme}' from uri '{uri}' is not supported"
+
+    def schemeFn = match scheme
+        "db" -> dbScheme
+        "file" -> fileScheme
+        "http" -> fileScheme
+        "https" -> fileScheme
+        _ -> unsupportedScheme
+
+    schemeFn scheme path
 
 # rscApiGetFileBlob: Downloads a blob to *path* with *mode* permisssions and return *path*
 #
