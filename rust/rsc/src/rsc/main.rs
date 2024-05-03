@@ -119,6 +119,20 @@ async fn activate_stores(
     return active_stores;
 }
 
+#[derive(serde::Deserialize)]
+struct VersionCheck {
+    version: String,
+}
+
+async fn check_version(check: axum::extract::Query<VersionCheck>) -> axum::http::StatusCode {
+    // During development, declare all version as compatible
+    if !check.version.starts_with("sifive/wake/") {
+        return axum::http::StatusCode::FORBIDDEN;
+    }
+
+    return axum::http::StatusCode::OK;
+}
+
 fn create_router(
     conn: Arc<DatabaseConnection>,
     config: Arc<config::RSCConfig>,
@@ -195,6 +209,7 @@ fn create_router(
                 move || blob::get_upload_url(config.server_addr.clone())
             }),
         )
+        .route("/version/check", get(check_version))
 }
 
 async fn create_standalone_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
@@ -714,6 +729,34 @@ mod tests {
             .unwrap();
 
         assert_eq!(res.status(), StatusCode::OK);
+
+        // Allowed version should should 200
+        let res = router
+            .call(
+                Request::builder()
+                    .uri("/version/check?version=sifive/wake/1.2.3")
+                    .method(http::Method::GET)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Disallowed version should should 403
+        let res = router
+            .call(
+                Request::builder()
+                    .uri("/version/check?version=sifive/foo/1.2.3")
+                    .method(http::Method::GET)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]
