@@ -24,13 +24,13 @@ pub trait BlobStore {
 
 pub trait DebugBlobStore: BlobStore + std::fmt::Debug {}
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn get_upload_url(server_addr: String) -> Json<GetUploadUrlResponse> {
     let url = server_addr + "/blob";
     Json(GetUploadUrlResponse { url })
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn create_blob(
     mut multipart: Multipart,
     db: Arc<DatabaseConnection>,

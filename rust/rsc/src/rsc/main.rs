@@ -14,8 +14,8 @@ use std::time::Duration;
 use tracing;
 
 use sea_orm::{
-    prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, Database,
-    DatabaseConnection, EntityTrait, QueryFilter,
+    prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectOptions, ConnectionTrait,
+    Database, DatabaseConnection, EntityTrait, QueryFilter,
 };
 
 use chrono::Utc;
@@ -230,7 +230,9 @@ async fn create_standalone_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
 async fn create_remote_db(
     config: &config::RSCConfig,
 ) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
-    let connection = Database::connect(&config.database_url).await?;
+    let mut opt = ConnectOptions::new(&config.database_url);
+    opt.sqlx_logging_level(tracing::log::LevelFilter::Debug);
+    let connection = Database::connect(opt).await?;
     let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
     if pending_migrations.len() != 0 {
         let err = Error::new(
@@ -368,10 +370,8 @@ fn launch_blob_eviction(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // setup a subscriber for logging
-    // TODO: The logging is incredibly spammy right now and causes significant slow down.
-    //       for now, logging is disabled but this should be turned back on once logging is pruned.
-    // let subscriber = tracing_subscriber::FmtSubscriber::new();
-    // tracing::subscriber::set_global_default(subscriber)?;
+    let subscriber = tracing_subscriber::FmtSubscriber::new();
+    tracing::subscriber::set_global_default(subscriber)?;
 
     // Parse the arguments
     let args = ServerOptions::parse();

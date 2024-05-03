@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing;
 
-#[tracing::instrument]
+#[tracing::instrument(skip(conn))]
 async fn record_use(job_id: Uuid, conn: Arc<DatabaseConnection>) {
     let usage = job_use::ActiveModel {
         id: NotSet,
@@ -22,6 +22,7 @@ async fn record_use(job_id: Uuid, conn: Arc<DatabaseConnection>) {
     let _ = usage.insert(conn.as_ref()).await;
 }
 
+#[tracing::instrument(skip(db, stores))]
 async fn resolve_blob(
     id: Uuid,
     db: &DatabaseTransaction,
@@ -44,12 +45,14 @@ async fn resolve_blob(
     });
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn read_job(
     Json(payload): Json<ReadJobPayload>,
     conn: Arc<DatabaseConnection>,
     blob_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) -> (StatusCode, Json<ReadJobResponse>) {
+    let hash = payload.hash();
+
     // TODO: This transaction is quite large with a bunch of "serialized" queries. If read_job
     // becomes a bottleneck it should be rewritten such that joining on promises is delayed for as
     // long as possible. Another option would be to collect all blob ids ahead of time and make a
@@ -59,13 +62,15 @@ pub async fn read_job(
         .transaction::<_, (Option<Uuid>, ReadJobResponse), DbErr>(|txn| {
             Box::pin(async move {
                 let Some(matching_job) = job::Entity::find()
-                    .filter(job::Column::Hash.eq(payload.hash()))
+                    .filter(job::Column::Hash.eq(hash.clone()))
                     .one(txn)
                     .await?
                 else {
+                    tracing::info!(%hash, "Miss");
                     return Ok((None, ReadJobResponse::NoMatch));
                 };
 
+                tracing::info!(%hash, "Hit");
                 let output_files = matching_job
                     .find_related(output_file::Entity)
                     .all(txn)
