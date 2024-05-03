@@ -433,6 +433,7 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
     def job =
         makeShellPlan fixupScript (downloadPath, Nil)
         | setPlanLabel "rsc: fixup blob {path} from {downloadPath.getPathName}"
+        | setPlanPersistence Once
         # We need to copy the file over another jobs output space so:
         #   - We must run with the localRunner
         #   - We must lie and say we output nothing
