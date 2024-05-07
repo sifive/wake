@@ -462,11 +462,17 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
 
     def fixupScript =
         """
-        # 1. Hardlink the file to not use 2x disk space
-        # 2. Do all edits to a tmp file then atomically mv so interruptions don't effect the build
+        # 1. No failures are acceptable
+        set -e
+        # 2. Hardlink the file to not use 2x disk space
         cp -l %{downloadPath.getPathName} '%{path}.rsctmp'
+        # 3. Set the permissions as specified
         chmod %{mode | strOctal} '%{path}.rsctmp'
-        mv '%{path}.rsctmp' '%{path}'
+        # 4. If the file was previously created with the exact inode by the rsc but not cleaned up
+        #    then it needs to be removed so we can complete the atomic mv
+        [ '%{path}.rsctmp' -ef '%{path}' ] && rm '%{path}'
+        # 5. Atomically move so interruptions don't effect the build.
+        mv -f '%{path}.rsctmp' '%{path}'
         """
 
     def job =
