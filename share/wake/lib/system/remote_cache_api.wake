@@ -472,7 +472,7 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
         #    then it needs to be removed so we can complete the atomic mv
         [ '%{path}.rsctmp' -ef '%{path}' ] && rm '%{path}'
         # 5. Atomically move so interruptions don't effect the build.
-        mv -f '%{path}.rsctmp' '%{path}'
+        mv '%{path}.rsctmp' '%{path}'
         """
 
     def job =
