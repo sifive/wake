@@ -162,11 +162,13 @@ export def defaultRunner: Runner =
         # consistent place across runs.
         mkJobCacheRunner (\_ Pass "") "/workspace" fuseRunner
 
-    def remoteCacheApi = match (makeRemoteCacheApi config)
-        Pass x -> x
-        Fail (Error why _) -> panic why
+    match (makeRemoteCacheApi config)
+        Pass api -> rscRunner api
+        Fail (Error why _) ->
+            def _ =
+                printlnLevel logError "Remote Cache requested, but unavailable. Continuing anyways. Why: '{why}'"
 
-    rscRunner remoteCacheApi
+            fuseRunner
 
 # A plan describing how to construct a JSONRunner
 # RawScript: the path to the script to run jobs with
