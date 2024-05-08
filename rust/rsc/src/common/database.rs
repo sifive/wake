@@ -345,16 +345,6 @@ pub async fn read_unreferenced_blobs<T: ConnectionTrait>(
     db: &T,
     ttl: NaiveDateTime,
 ) -> Result<Vec<blob::Model>, DbErr> {
-    // TODO: this can probably be refactored as a ORM query with something like
-    // Blob::find()
-    //     .filter(
-    //         blob::Column::Id.not_in_subquery(
-    //             sea_orm::query::Query::select()
-    //                 .column(OutputFile::BlobId)
-    //                 .from(OutputFile::Table
-    //                 .union( *OTHER STUFF* ));
-    //                 .take().
-
     // Limit = 16k as the query is also subject to parameter max.
     // Blob has 4 params so (2^16)/4 = 16384. Also generally best to chunk blob eviction
     // to avoid large eviction stalls.
@@ -364,11 +354,15 @@ pub async fn read_unreferenced_blobs<T: ConnectionTrait>(
             r#"
             SELECT * FROM blob
             WHERE created_at <= $1
-            AND id NOT IN
+            AND id IN
             (
-                SELECT blob_id FROM output_file
-                UNION SELECT stdout_blob_id FROM job
-                UNION SELECT stderr_blob_id FROM job
+                SELECT id FROM blob
+                EXCEPT
+                (
+                    SELECT blob_id FROM output_file
+                    UNION SELECT stdout_blob_id FROM job
+                    UNION SELECT stderr_blob_id FROM job
+                )
             )
             LIMIT $2
             "#,
