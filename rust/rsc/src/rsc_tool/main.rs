@@ -164,7 +164,7 @@ async fn remove_all_jobs(db: &DatabaseConnection) -> Result<(), Box<dyn std::err
     }
 
     // Ok now that we're really sure we want to delete this key
-    database::delete_all_jobs(db).await?;
+    database::delete_all_jobs(db, 5000).await?;
 
     println!("All jobs successfully removed");
     Ok(())
@@ -330,6 +330,10 @@ struct AddLocalBlobStoreOpts {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // setup a subscriber for logging
+    let subscriber = tracing_subscriber::FmtSubscriber::new();
+    tracing::subscriber::set_global_default(subscriber)?;
+
     // Parse our arguments
     let args = TopLevel::parse();
 
@@ -346,7 +350,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // connect to our db
-    let db = sea_orm::Database::connect(config.database_url).await?;
+    let mut opt = sea_orm::ConnectOptions::new(&config.database_url);
+    opt.sqlx_logging_level(tracing::log::LevelFilter::Debug);
+    let db = sea_orm::Database::connect(opt).await?;
     let pending_migrations = Migrator::get_pending_migrations(&db).await?;
     if pending_migrations.len() != 0 {
         let err = Error::new(
