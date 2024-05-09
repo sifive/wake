@@ -785,6 +785,7 @@ mod tests {
             memory: Set(1000),
             i_bytes: Set(100000),
             o_bytes: Set(1000),
+            label: Set("".to_string()),
         };
 
         insert_job.save(conn.clone().as_ref()).await.unwrap();
@@ -808,6 +809,7 @@ mod tests {
             memory: Set(1000),
             i_bytes: Set(100000),
             o_bytes: Set(1000),
+            label: Set("".to_string()),
         };
 
         insert_job.save(conn.clone().as_ref()).await.unwrap();
