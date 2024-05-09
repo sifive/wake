@@ -581,7 +581,7 @@ def getCacheSearchRequestJson (req: CacheSearchRequest): JValue =
 def getCachePostRequestJson (req: CachePostRequest): JValue =
     def (
         CachePostRequest
-        _label
+        label
         cmd
         cwd
         env
@@ -640,6 +640,7 @@ def getCachePostRequestJson (req: CachePostRequest): JValue =
         "memory" :-> JInteger memory,
         "ibytes" :-> JInteger ibytes,
         "obytes" :-> JInteger obytes,
+        "label" :-> JString label,
     )
 
 # Makes a CacheSearchResponse from json if possible

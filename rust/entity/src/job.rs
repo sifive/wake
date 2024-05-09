@@ -29,6 +29,7 @@ pub struct Model {
     pub i_bytes: i64,
     pub o_bytes: i64,
     pub created_at: DateTime,
+    pub label: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
