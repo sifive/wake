@@ -53,6 +53,11 @@ pub struct AddJobPayload {
     pub memory: u64,
     pub ibytes: u64,
     pub obytes: u64,
+
+    // Label is not part of the job key and is not considered in any caching decisions. It is
+    // strictly used for inspecting the remote cache's database. Left as optional for soft migration
+    // purposes. May become required in the future
+    pub label: Option<String>,
 }
 
 impl AddJobPayload {
