@@ -358,7 +358,7 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
 # ```
 #  api | rscApiCheckClientVersion "sifive/wake/1.2.3 = Pass Unit
 # ```
-export def rscApiCheckClientVersion (version: String) (api: RemoteCacheApi): Result Unit Error =
+export target rscApiCheckClientVersion (version: String) (api: RemoteCacheApi): Result Unit Error =
     require Pass response =
         makeRoute api "version/check?version={version}"
         | buildHttpRequest
@@ -375,7 +375,7 @@ export def rscApiCheckClientVersion (version: String) (api: RemoteCacheApi): Res
 # ```
 #  api | rscApiCheckAuthorization = Pass Unit
 # ```
-export def rscApiCheckAuthorization (api: RemoteCacheApi): Result Unit Error =
+export target rscApiCheckAuthorization (api: RemoteCacheApi): Result Unit Error =
     require Some auth = api.getRemoteCacheApiAuthorization
     else failWithError "rsc: Checking authorization requires authorization but none was provided"
 
