@@ -138,6 +138,51 @@ async fn remove_local_blob_store(
     Ok(())
 }
 
+async fn list_jobs_matching_label(db: &DatabaseConnection, label: &String) -> Result<(), DbErr> {
+    let mut jobs: Vec<_> = database::search_jobs_by_label(db, label)
+        .await?
+        .into_iter()
+        .map(|x| vec![format!("{}", x.id), textwrap::wrap(&x.label, 60).join("\n")])
+        .collect();
+
+    let headers = vec!["Id".into(), "Label".into()];
+    jobs.insert(0, headers);
+
+    table::print_table(jobs);
+
+    Ok(())
+}
+
+async fn remove_job(
+    id: &String,
+    db: &DatabaseConnection,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let uuid = Uuid::parse_str(id)?;
+    let Some(job) = database::read_job(db, uuid).await? else {
+        println!("{} is not a valid job", id);
+        std::process::exit(2);
+    };
+
+    // We only want to prompt the user if the user can type into the terminal
+    if std::io::stdin().is_terminal() {
+        let should_delete = Confirm::new("Are you sure you want to delete this job?")
+            .with_default(false)
+            .with_help_message(format!("id = {}, label = {:?}", job.id, job.label).as_str())
+            .prompt()?;
+
+        if !should_delete {
+            println!("Aborting removal");
+            return Ok(());
+        }
+    }
+
+    // Ok now that we're really sure we want to delete this key
+    database::delete_job(db, job).await?;
+
+    println!("Job {} was successfully removed", id);
+    Ok(())
+}
+
 async fn remove_all_jobs(db: &DatabaseConnection) -> Result<(), Box<dyn std::error::Error>> {
     // Only let a human perform this action
     if !std::io::stdin().is_terminal() {
@@ -263,6 +308,9 @@ enum DBModelList {
 
     /// List all local blob stores
     LocalBlobStore(NullOpts),
+
+    /// List jobs matching the label
+    JobsMatching(ListJobsMatchingOpts),
 }
 
 #[derive(Debug, Subcommand)]
@@ -281,6 +329,9 @@ enum DBModelRemove {
 
     /// Remove a local blob store
     LocalBlobStore(RemoveByIdOpts),
+
+    /// Remove a job
+    Job(RemoveByIdOpts),
 
     /// DANGER Remove all cached jobs
     DangerJobsAll(NullOpts),
@@ -315,6 +366,17 @@ struct AddApiKeyOpts {
         long
     )]
     desc: String,
+}
+
+#[derive(Debug, Parser)]
+struct ListJobsMatchingOpts {
+    #[arg(
+        required = true,
+        help = "The label to search for. '%' is match any characters",
+        value_name = "LABEL",
+        long
+    )]
+    label: String,
 }
 
 #[derive(Debug, Parser)]
@@ -383,6 +445,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         DBCommand::List(ListOpts {
             db_command: DBModelList::LocalBlobStore(_),
         }) => list_local_blob_stores(&db).await?,
+        DBCommand::List(ListOpts {
+            db_command: DBModelList::JobsMatching(ListJobsMatchingOpts { label }),
+        }) => list_jobs_matching_label(&db, &label).await?,
 
         // Add Commands
         DBCommand::Add(AddOpts {
@@ -399,6 +464,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         DBCommand::Remove(RemoveOpts {
             db_command: DBModelRemove::LocalBlobStore(args),
         }) => remove_local_blob_store(&args.id, &db).await?,
+        DBCommand::Remove(RemoveOpts {
+            db_command: DBModelRemove::Job(args),
+        }) => remove_job(&args.id, &db).await?,
         DBCommand::Remove(RemoveOpts {
             db_command: DBModelRemove::DangerJobsAll(_),
         }) => remove_all_jobs(&db).await?,

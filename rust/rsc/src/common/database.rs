@@ -12,7 +12,7 @@ use rand_core::{OsRng, RngCore};
 use sea_orm::ExecResult;
 use sea_orm::{
     prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, DbBackend,
-    DbErr, DeleteResult, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Statement,
+    DbErr, DeleteResult, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Statement,
 };
 use tracing;
 
@@ -187,7 +187,20 @@ pub async fn read_dbonly_blob_store<T: ConnectionTrait>(
 // ----------            Create            ----------
 
 // ----------             Read             ----------
+pub async fn read_job<T: ConnectionTrait>(db: &T, id: Uuid) -> Result<Option<job::Model>, DbErr> {
+    job::Entity::find_by_id(id).one(db).await
+}
 
+pub async fn search_jobs_by_label<T: ConnectionTrait>(
+    db: &T,
+    label: &String,
+) -> Result<Vec<job::Model>, DbErr> {
+    job::Entity::find()
+        .filter(job::Column::Label.like(label))
+        .order_by_asc(job::Column::Label)
+        .all(db)
+        .await
+}
 // ----------            Update            ----------
 
 // ----------            Delete            ----------
@@ -223,6 +236,14 @@ pub async fn delete_all_jobs<T: ConnectionTrait>(db: &T, chunk_size: u16) -> Res
             break Ok(affected);
         }
     }
+}
+
+pub async fn delete_job<T: ConnectionTrait>(
+    db: &T,
+    job: job::Model,
+) -> Result<DeleteResult, DbErr> {
+    tracing::info!(%job.id, "Deleting job");
+    job::Entity::delete_by_id(job.id).exec(db).await
 }
 
 // --------------------------------------------------
