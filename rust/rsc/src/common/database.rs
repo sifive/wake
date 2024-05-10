@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use data_encoding::BASE64;
 use entity::prelude::{
-    Blob, BlobStore, LocalBlobStore, OutputDir, OutputFile, OutputSymlink, VisibleFile,
+    Blob, BlobStore, Job, LocalBlobStore, OutputDir, OutputFile, OutputSymlink, VisibleFile,
 };
 use entity::{
     api_key, blob, blob_store, job, local_blob_store, output_dir, output_file, output_symlink,
@@ -9,9 +9,10 @@ use entity::{
 };
 use itertools::Itertools;
 use rand_core::{OsRng, RngCore};
+use sea_orm::ExecResult;
 use sea_orm::{
     prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, DbBackend,
-    DbErr, DeleteResult, EntityTrait, QueryFilter, QueryOrder, Statement,
+    DbErr, DeleteResult, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Statement,
 };
 use tracing;
 
@@ -203,9 +204,38 @@ pub async fn search_jobs_by_label<T: ConnectionTrait>(
 // ----------            Update            ----------
 
 // ----------            Delete            ----------
-pub async fn delete_all_jobs<T: ConnectionTrait>(db: &T) -> Result<DeleteResult, DbErr> {
+pub async fn delete_all_jobs<T: ConnectionTrait>(db: &T, chunk_size: u16) -> Result<u64, DbErr> {
     tracing::info!("Deleting ALL jobs");
-    job::Entity::delete_many().exec(db).await
+
+    if chunk_size == 0 {
+        panic!("Chunk size must be larger than zero");
+    }
+
+    let total = entity::job::Entity::find().count(db).await?;
+    let mut affected = 0;
+
+    loop {
+        let exec: ExecResult = db
+            .execute(Statement::from_sql_and_values(
+                DbBackend::Postgres,
+                r#"
+                DELETE FROM job
+                WHERE id IN
+                (
+                    SELECT id FROM job
+                    LIMIT $1
+                )
+                "#,
+                [chunk_size.into()],
+            ))
+            .await?;
+        affected += exec.rows_affected();
+        tracing::info!(%affected, %total, "Jobs deleted");
+
+        if exec.rows_affected() <= chunk_size.into() {
+            break Ok(affected);
+        }
+    }
 }
 
 pub async fn delete_job<T: ConnectionTrait>(
