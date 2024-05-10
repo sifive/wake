@@ -219,7 +219,7 @@ pub async fn delete_all_jobs<T: ConnectionTrait>(db: &T, chunk_size: u16) -> Res
         affected += exec.rows_affected();
         tracing::info!(%affected, %total, "Jobs deleted");
 
-        if exec.rows_affected() == 0 {
+        if exec.rows_affected() <= chunk_size.into() {
             break Ok(affected);
         }
     }
