@@ -7,6 +7,7 @@ use clap::Parser;
 use data_encoding::HEXLOWER;
 use migration::{Migrator, MigratorTrait};
 use rand_core::{OsRng, RngCore};
+use rlimit::{getrlimit, Resource};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
@@ -367,6 +368,22 @@ fn launch_blob_eviction(
     });
 }
 
+fn request_max_fileno_limit() {
+    let Ok((current, max)) = Resource::NOFILE.get() else {
+        tracing::warn!("Unable to discover fileno limits. Using default");
+        return;
+    };
+
+    tracing::info!(%current, %max, "Discovered fileno limits");
+
+    let Ok(new_limit) = rlimit::increase_nofile_limit(max) else {
+        tracing::warn!("Unable to increase fileno limits. Using default");
+        return;
+    };
+
+    tracing::info!(%new_limit, "Increased fileno limit");
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // setup a subscriber for logging
@@ -394,6 +411,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}", serde_json::to_string(&config).unwrap());
         return Ok(());
     }
+
+    // Increase the number of allowed open files the the max
+    request_max_fileno_limit();
 
     // Connect to the db
     let connection = connect_to_database(&config).await?;
