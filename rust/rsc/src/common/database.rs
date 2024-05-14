@@ -7,7 +7,6 @@ use entity::{
     api_key, blob, blob_store, job, local_blob_store, output_dir, output_file, output_symlink,
     visible_file,
 };
-use futures::future::join_all;
 use futures::stream::FuturesUnordered;
 use futures::stream::StreamExt;
 use itertools::Itertools;
@@ -16,7 +15,7 @@ use sea_orm::ExecResult;
 use sea_orm::{
     prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, DbBackend,
     DbErr, DeleteResult, EntityTrait, InsertResult, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Statement,
+    Statement,
 };
 use tracing;
 
