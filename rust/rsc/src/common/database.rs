@@ -7,12 +7,16 @@ use entity::{
     api_key, blob, blob_store, job, local_blob_store, output_dir, output_file, output_symlink,
     visible_file,
 };
+use futures::future::join_all;
+use futures::stream::FuturesUnordered;
+use futures::stream::StreamExt;
 use itertools::Itertools;
 use rand_core::{OsRng, RngCore};
 use sea_orm::ExecResult;
 use sea_orm::{
     prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, DbBackend,
-    DbErr, DeleteResult, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Statement,
+    DbErr, DeleteResult, EntityTrait, InsertResult, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Statement,
 };
 use tracing;
 
@@ -266,11 +270,15 @@ pub async fn create_many_visible_files<T: ConnectionTrait>(
         .map(|chunk| chunk.collect())
         .collect();
 
+    let futs = FuturesUnordered::new();
     for chunk in chunked {
-        VisibleFile::insert_many(chunk).exec(db).await?;
+        futs.push(VisibleFile::insert_many(chunk).exec(db));
     }
 
-    Ok(())
+    let res: Vec<Result<InsertResult<_>, DbErr>> = futs.collect().await;
+    let res: Result<Vec<InsertResult<_>>, DbErr> = res.into_iter().collect();
+
+    res.map(|_| ())
 }
 
 // ----------             Read             ----------
@@ -299,11 +307,15 @@ pub async fn create_many_output_files<T: ConnectionTrait>(
         .map(|chunk| chunk.collect())
         .collect();
 
+    let futs = FuturesUnordered::new();
     for chunk in chunked {
-        OutputFile::insert_many(chunk).exec(db).await?;
+        futs.push(OutputFile::insert_many(chunk).exec(db));
     }
 
-    Ok(())
+    let res: Vec<Result<InsertResult<_>, DbErr>> = futs.collect().await;
+    let res: Result<Vec<InsertResult<_>>, DbErr> = res.into_iter().collect();
+
+    res.map(|_| ())
 }
 
 // ----------             Read             ----------
@@ -332,11 +344,15 @@ pub async fn create_many_output_symlinks<T: ConnectionTrait>(
         .map(|chunk| chunk.collect())
         .collect();
 
+    let futs = FuturesUnordered::new();
     for chunk in chunked {
-        OutputSymlink::insert_many(chunk).exec(db).await?;
+        futs.push(OutputSymlink::insert_many(chunk).exec(db));
     }
 
-    Ok(())
+    let res: Vec<Result<InsertResult<_>, DbErr>> = futs.collect().await;
+    let res: Result<Vec<InsertResult<_>>, DbErr> = res.into_iter().collect();
+
+    res.map(|_| ())
 }
 
 // ----------             Read             ----------
@@ -365,11 +381,15 @@ pub async fn create_many_output_dirs<T: ConnectionTrait>(
         .map(|chunk| chunk.collect())
         .collect();
 
+    let futs = FuturesUnordered::new();
     for chunk in chunked {
-        OutputDir::insert_many(chunk).exec(db).await?;
+        futs.push(OutputDir::insert_many(chunk).exec(db));
     }
 
-    Ok(())
+    let res: Vec<Result<InsertResult<_>, DbErr>> = futs.collect().await;
+    let res: Result<Vec<InsertResult<_>>, DbErr> = res.into_iter().collect();
+
+    res.map(|_| ())
 }
 
 // ----------             Read             ----------
