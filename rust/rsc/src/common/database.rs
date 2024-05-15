@@ -8,6 +8,7 @@ use entity::{
     visible_file,
 };
 use itertools::Itertools;
+use migration::OnConflict;
 use rand_core::{OsRng, RngCore};
 use sea_orm::ExecResult;
 use sea_orm::{
@@ -382,6 +383,21 @@ pub async fn create_many_output_dirs<T: ConnectionTrait>(
 // --------------------------------------------------
 // ----------             Blob             ----------
 // --------------------------------------------------
+pub async fn upsert_blob<T: ConnectionTrait>(
+    db: &T,
+    blob: blob::ActiveModel,
+) -> Result<Uuid, DbErr> {
+    let result = blob::Entity::insert(blob)
+        .on_conflict(
+            OnConflict::columns(vec![blob::Column::Key, blob::Column::StoreId])
+                .update_column(blob::Column::CreatedAt)
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
+
+    Ok(result.last_insert_id)
+}
 
 // ----------            Create            ----------
 
