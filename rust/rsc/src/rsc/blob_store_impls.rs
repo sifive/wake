@@ -32,7 +32,7 @@ impl BlobStore for LocalBlobStore {
     async fn stream<'a>(
         &self,
         stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
-    ) -> Result<String, std::io::Error> {
+    ) -> Result<(String, i64), std::io::Error> {
         let reader = StreamReader::new(stream);
         futures::pin_mut!(reader);
 
@@ -40,9 +40,17 @@ impl BlobStore for LocalBlobStore {
         let path = std::path::Path::new(&self.root).join(key.clone());
         let mut file = BufWriter::new(File::create(path).await?);
 
-        tokio::io::copy(&mut reader, &mut file).await?;
+        let written = tokio::io::copy(&mut reader, &mut file).await?;
 
-        Ok(key)
+        let size = match i64::try_from(written) {
+            Err(_) => {
+                tracing::error!(%written, "Size overflows i64, setting to i64::MAX instead");
+                i64::MAX
+            }
+            Ok(size) => size,
+        };
+
+        Ok((key, size))
     }
 
     async fn download_url(&self, key: String) -> String {
@@ -71,8 +79,8 @@ impl BlobStore for TestBlobStore {
     async fn stream<'a>(
         &self,
         _stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
-    ) -> Result<String, std::io::Error> {
-        Ok(create_temp_filename())
+    ) -> Result<(String, i64), std::io::Error> {
+        Ok((create_temp_filename(), 0xDEADBEEF))
     }
 
     async fn download_url(&self, key: String) -> String {
@@ -100,7 +108,7 @@ impl BlobStore for DbOnlyBlobStore {
     async fn stream<'a>(
         &self,
         stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
-    ) -> Result<String, std::io::Error> {
+    ) -> Result<(String, i64), std::io::Error> {
         let reader = StreamReader::new(stream);
         futures::pin_mut!(reader);
         let mut buffer = [0u8; 101];
@@ -120,11 +128,17 @@ impl BlobStore for DbOnlyBlobStore {
             count += n;
         }
 
-        Ok(buffer[0..count]
-            .iter()
-            .map(|x| format!("%{:02X}", x))
-            .collect::<Vec<_>>()
-            .concat())
+        // Safe to unwrap here since count is stopped at 101
+        let size: i64 = count.try_into().unwrap();
+
+        Ok((
+            buffer[0..count]
+                .iter()
+                .map(|x| format!("%{:02X}", x))
+                .collect::<Vec<_>>()
+                .concat(),
+            size,
+        ))
     }
 
     async fn download_url(&self, key: String) -> String {

@@ -17,7 +17,7 @@ pub trait BlobStore {
     async fn stream<'a>(
         &self,
         stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
-    ) -> Result<String, std::io::Error>;
+    ) -> Result<(String, i64), std::io::Error>;
 
     async fn download_url(&self, key: String) -> String;
     async fn delete_key(&self, key: String) -> Result<(), std::io::Error>;
@@ -75,10 +75,13 @@ pub async fn create_blob(
             );
         }
 
+        let (blob_key, blob_size) = result.unwrap();
+
         let active_blob = blob::ActiveModel {
             id: NotSet,
             created_at: NotSet,
-            key: Set(result.unwrap()),
+            key: Set(blob_key),
+            size: Set(blob_size),
             store_id: Set(store.id()),
         };
 
