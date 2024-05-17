@@ -51,6 +51,18 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
+            .create_index(
+                Index::create()
+                    .name("idx-key-store_id-unq")
+                    .table(Blob::Table)
+                    .col(Blob::Key)
+                    .col(Blob::StoreId)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
             .create_table(
                 Table::create()
                     .table(LocalBlobStore::Table)

@@ -1,3 +1,4 @@
+use crate::database;
 use crate::types::{GetUploadUrlResponse, PostBlobResponse, PostBlobResponsePart};
 use async_trait::async_trait;
 use axum::{extract::Multipart, http::StatusCode, Json};
@@ -81,7 +82,7 @@ pub async fn create_blob(
             store_id: Set(store.id()),
         };
 
-        match active_blob.insert(db.as_ref()).await {
+        match database::upsert_blob(db.as_ref(), active_blob).await {
             Err(msg) => {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -90,7 +91,7 @@ pub async fn create_blob(
                     }),
                 )
             }
-            Ok(blob) => parts.push(PostBlobResponsePart { id: blob.id, name }),
+            Ok(id) => parts.push(PostBlobResponsePart { id, name }),
         }
     }
 
