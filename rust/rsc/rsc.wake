@@ -18,6 +18,10 @@ package build_wake
 from wake import _
 from rust import _
 
+export def buildRSCMigration _ =
+    makeCargoExecutable "migration" "rust/migration"
+    |> cargoBuildWith (defaultCargoToolchain Unit)
+
 export def buildRSC _ =
     makeCargoExecutable "rsc" "rust/rsc"
     |> addCargoCrate "entity" "rust/entity"
