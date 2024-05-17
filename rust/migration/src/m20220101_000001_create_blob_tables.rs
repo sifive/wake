@@ -35,6 +35,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Blob::Key).string().not_null())
                     .col(ColumnDef::new(Blob::StoreId).uuid().not_null())
+                    .col(ColumnDef::new(Blob::Size).big_integer().not_null())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-store_id-blob_store")
@@ -121,6 +122,7 @@ enum Blob {
     Id,
     Key,
     StoreId,
+    Size,
 }
 
 #[derive(DeriveIden)]
