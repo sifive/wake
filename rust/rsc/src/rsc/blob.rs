@@ -80,6 +80,7 @@ pub async fn create_blob(
         let active_blob = blob::ActiveModel {
             id: NotSet,
             created_at: NotSet,
+            updated_at: NotSet,
             key: Set(blob_key),
             size: Set(blob_size),
             store_id: Set(store.id()),

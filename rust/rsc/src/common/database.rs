@@ -390,7 +390,7 @@ pub async fn upsert_blob<T: ConnectionTrait>(
     let result = blob::Entity::insert(blob)
         .on_conflict(
             OnConflict::columns(vec![blob::Column::Key, blob::Column::StoreId])
-                .update_column(blob::Column::CreatedAt)
+                .update_column(blob::Column::UpdatedAt)
                 .to_owned(),
         )
         .exec(db)
@@ -421,7 +421,7 @@ pub async fn read_unreferenced_blobs<T: ConnectionTrait>(
             DbBackend::Postgres,
             r#"
             SELECT * FROM blob
-            WHERE created_at <= $1
+            WHERE updated_at <= $1
             AND id IN
             (
                 SELECT id FROM blob
