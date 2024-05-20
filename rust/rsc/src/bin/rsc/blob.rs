@@ -6,7 +6,7 @@ use entity::blob;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use sea_orm::prelude::Uuid;
-use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection};
+use sea_orm::{ActiveValue::*, DatabaseConnection};
 use std::sync::Arc;
 use tokio_util::bytes::Bytes;
 use tracing;

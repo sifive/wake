@@ -3,23 +3,22 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use chrono::Utc;
 use clap::Parser;
 use data_encoding::HEXLOWER;
 use migration::{Migrator, MigratorTrait};
 use rand_core::{OsRng, RngCore};
-use rlimit::{getrlimit, Resource};
+use rlimit::Resource;
+use rsc::{config, database};
+use sea_orm::{
+    prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectOptions, ConnectionTrait,
+    Database, DatabaseConnection, EntityTrait, QueryFilter,
+};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing;
-
-use sea_orm::{
-    prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectOptions, ConnectionTrait,
-    Database, DatabaseConnection, EntityTrait, QueryFilter,
-};
-
-use chrono::Utc;
 
 mod add_job;
 mod api_key_check;
@@ -27,11 +26,6 @@ mod blob;
 mod blob_store_impls;
 mod read_job;
 mod types;
-
-#[path = "../common/config.rs"]
-mod config;
-#[path = "../common/database.rs"]
-mod database;
 
 #[derive(Debug, Parser)]
 struct ServerOptions {

@@ -2,16 +2,12 @@ use clap::{Parser, Subcommand};
 use inquire::{Confirm, Text};
 use is_terminal::IsTerminal;
 use migration::{DbErr, Migrator, MigratorTrait};
+use rsc::{config, database};
 use sea_orm::{prelude::Uuid, DatabaseConnection};
 use std::io::{Error, ErrorKind};
 use tracing;
 
 mod table;
-
-#[path = "../common/config.rs"]
-mod config;
-#[path = "../common/database.rs"]
-mod database;
 
 async fn add_api_key(
     key: Option<String>,

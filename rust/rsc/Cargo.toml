@@ -3,14 +3,6 @@ name = "rsc"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "rsc"
-path = "src/rsc/main.rs"
-
-[[bin]]
-name = "rsc_tool"
-path = "src/rsc_tool/main.rs"
-
 [dependencies]
 entity = { path = "../entity" }
 migration = { path = "../migration" }
