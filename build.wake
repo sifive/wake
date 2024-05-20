@@ -104,15 +104,17 @@ def all variant =
 
 # Install wake into a target location
 def doInstall dest kind =
-    # kick off in parallel, but rsc and rsc_tool cannot be built at the same time right now.
-    # Force them to be serial relative to each other.
+    # kick off in parallel, but rsc, rsc_tool, and rsc_migration cannot be built at the same
+    # time right now. Force them to be serial relative to each other.
     def install_rsc_bins =
+        require Pass rsc_migration = buildRSCMigration Unit
+        require Pass rsc_migration = installAs "{dest}/bin/wake-rsc-migration" rsc_migration
         require Pass rsc = buildRSC Unit
-        require Pass rsc = installAs "{dest}/bin/wake-remote-cache" rsc
+        require Pass rsc = installAs "{dest}/bin/wake-rsc" rsc
         require Pass rsc_tool = buildRSCTool Unit
-        require Pass rsc_tool = installAs "{dest}/bin/wake-remote-cache-tool" rsc_tool
+        require Pass rsc_tool = installAs "{dest}/bin/wake-rsc-tool" rsc_tool
 
-        Pass (Pair rsc rsc_tool)
+        Pass (Triple rsc rsc_tool rsc_migration)
 
     def install_log_viewer =
         buildWakeLogViewer Unit
@@ -140,10 +142,10 @@ def doInstall dest kind =
     require Pass binfiles = install_binfiles
 
     # Rust builds are slow, delay blocking on them for as long as possible
-    require Pass (Pair rsc rsc_tool) = install_rsc_bins
+    require Pass (Triple rsc rsc_tool rsc_migration) = install_rsc_bins
     require Pass log_viewer = install_log_viewer
 
-    (readme, log_viewer, rsc, rsc_tool, binfiles ++ datfiles)
+    (readme, log_viewer, rsc, rsc_tool, rsc_migration, binfiles ++ datfiles)
     | Pass
 
 # Replace @VERSION@ with 'release'
