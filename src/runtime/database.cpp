@@ -1361,10 +1361,6 @@ std::string collapse_and(const std::vector<std::vector<std::string>> &ands) {
 
 std::vector<JobReflection> Database::matching(
     const std::vector<std::vector<std::string>> &and_or_filters) {
-  // "SELECT j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin,
-  // j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes,
-  // s.ibytes, s.obytes"
-
   // This query creates a subtable of the following shape:
   //
   // | job_id | label | run_id | use_id | endtime | commandline | status |       input_files   |

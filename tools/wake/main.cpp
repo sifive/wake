@@ -16,7 +16,6 @@
  */
 
 // Open Group Base Specifications Issue 7
-#include <math.h>
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
@@ -209,11 +208,18 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
 
   // Convert the collected parts into a meaningful query
   if (collect_ands.empty()) {
-    std::cout << "No filters were applied" << std::endl;
+    std::cerr << "No filters were applied" << std::endl;
     exit(1);
   }
 
-  describe(db.matching(collect_ands), get_describe_policy(clo), db);
+  auto matching_jobs = db.matching(collect_ands);
+
+  if (matching_jobs.empty()) {
+    std::cerr << "No jobs matched query" << std::endl;
+    exit(1);
+  }
+
+  describe(matching_jobs, get_describe_policy(clo), db);
 }
 
 }  // namespace
