@@ -16,6 +16,7 @@
  */
 
 // Open Group Base Specifications Issue 7
+#include <math.h>
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
@@ -79,56 +80,11 @@ static CPPFile cppFile(__FILE__);
 
 namespace {
 
-template <class T>
-using Set = std::function<bool(const T &)>;
-
-template <class T>
-Set<T> from_finite(std::set<T> set) {
-  return [s = std::move(set)](const T &member) -> bool { return s.count(member); };
-}
-
-template <class T>
-Set<T> sintersect(Set<T> a, Set<T> b) {
-  return [a = std::move(a), b = std::move(b)](const T &member) -> bool {
-    return a(member) && b(member);
-  };
-}
-
-template <class T>
-Set<T> suniversal() {
-  return [](const T &member) -> bool { return true; };
-}
-
-Set<long> upkeep_intersects(std::unordered_map<long, JobReflection> &captured_jobs,
-                            Set<long> current, std::vector<JobReflection> jobs) {
-  std::set<long> ids = {};
-  for (JobReflection &job : jobs) {
-    ids.insert(job.job);
-    captured_jobs[job.job] = std::move(job);
-  }
-  return sintersect(std::move(current), from_finite(std::move(ids)));
-}
-
 std::string globish_to_like(const std::string &str) {
   std::string glob = str;
   std::replace(glob.begin(), glob.end(), '*', '%');
   std::replace(glob.begin(), glob.end(), '?', '_');
   return glob;
-}
-
-template <class QueryF>
-Set<long> apply_inspection_query(std::unordered_map<long, JobReflection> &captured_jobs,
-                                 Set<long> current,
-                                 const std::vector<std::vector<std::string>> &query, QueryF qf) {
-  for (const std::vector<std::string> &and_part : query) {
-    std::vector<JobReflection> hits = {};
-    for (const std::string &or_part : and_part) {
-      std::vector<JobReflection> results = qf(globish_to_like(or_part));
-      std::move(results.begin(), results.end(), std::back_inserter(hits));
-    }
-    current = upkeep_intersects(captured_jobs, std::move(current), std::move(hits));
-  }
-  return current;
 }
 
 DescribePolicy get_describe_policy(const CommandLineOptions &clo) {
@@ -167,6 +123,40 @@ DescribePolicy get_describe_policy(const CommandLineOptions &clo) {
   return DescribePolicy::human();
 }
 
+std::string make_like_query(const std::string &lhs, const std::string &rhs,
+                            const std::string &delim) {
+  std::string like = rhs;
+
+  bool negate = (!rhs.empty() && rhs[0] == '!');
+  if (negate) {
+    like = rhs.substr(1);
+  }
+
+  like = globish_to_like(like);
+
+  if (delim != "") {
+    like = "%" + delim + like + delim + "%";
+  }
+
+  // Negative search
+  if (negate) {
+    return lhs + " not like '" + like + "'";
+  }
+
+  return lhs + " like '" + like + "'";
+}
+
+void make_and_group(const std::vector<std::vector<std::string>> &query, const std::string &lhs,
+                    const std::string &delim, std::vector<std::vector<std::string>> &out) {
+  for (const auto &and_group : query) {
+    std::vector<std::string> collect_ors = {};
+    for (const auto &or_group : and_group) {
+      collect_ors.push_back(make_like_query(lhs, or_group, delim));
+    }
+    out.push_back(collect_ors);
+  }
+}
+
 void inspect_database(const CommandLineOptions &clo, Database &db, const std::string &wake_cwd) {
   // tagdag is technically a db inspection, but its very different from the
   // rest, just handle it and exit.
@@ -176,75 +166,54 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
     return;
   }
 
-  std::unordered_map<long, JobReflection> captured_jobs = {};
-  Set<long> intersected_job_ids = suniversal<long>();
+  std::vector<std::vector<std::string>> collect_ands = {};
 
-  if (!clo.job_ids.empty()) {
-    intersected_job_ids =
-        apply_inspection_query(captured_jobs, std::move(intersected_job_ids), clo.job_ids,
-                               [&](auto a) { return db.job_ids_matching(a); });
-  }
+  // Process --job
+  make_and_group(clo.job_ids, "cast(job_id as TEXT)", "", collect_ands);
 
-  if (!clo.input_files.empty()) {
-    intersected_job_ids = apply_inspection_query(
-        captured_jobs, std::move(intersected_job_ids), clo.input_files,
-        [&](auto a) { return db.input_files_matching(wcl::make_canonical(wake_cwd + a)); });
-  }
+  // --label
+  make_and_group(clo.labels, "label", "", collect_ands);
 
-  if (!clo.output_files.empty()) {
-    intersected_job_ids = apply_inspection_query(
-        captured_jobs, std::move(intersected_job_ids), clo.output_files,
-        [&](auto a) { return db.output_files_matching(wcl::make_canonical(wake_cwd + a)); });
-  }
+  // --input_files
+  make_and_group(clo.input_files, "input_files", "<d>", collect_ands);
 
-  if (!clo.labels.empty()) {
-    intersected_job_ids =
-        apply_inspection_query(captured_jobs, std::move(intersected_job_ids), clo.labels,
-                               [&](auto a) { return db.labels_matching(a); });
-  }
+  // --output_file
+  make_and_group(clo.output_files, "output_files", "<d>", collect_ands);
 
-  if (!clo.tags.empty()) {
-    intersected_job_ids =
-        apply_inspection_query(captured_jobs, std::move(intersected_job_ids), clo.tags,
-                               [&](auto a) { return db.tags_matching(a); });
-  }
+  // --tag
+  make_and_group(clo.tags, "tags", "<d>", collect_ands);
 
-  if (clo.last_use) {
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.last_use());
-  }
-
+  // --last-exe
   if (clo.last_exe) {
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.last_exe());
+    collect_ands.push_back({"run_id == (select max(run_id) from jobs)"});
+    collect_ands.push_back({"substr(cast(commandline as text),1,1) <> '<'"});
+    collect_ands.push_back({"label <> '<hash>'"});
   }
 
+  // --last-use
+  if (clo.last_use) {
+    collect_ands.push_back({"use_id == (select max(run_id) from jobs)"});
+    collect_ands.push_back({"substr(cast(commandline as text),1,1) <> '<'"});
+    collect_ands.push_back({"label <> '<hash>'"});
+  }
+
+  // --failed
   if (clo.failed) {
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.failed());
+    collect_ands.push_back({"status <> 0"});
   }
 
+  // --canceled
   if (clo.canceled) {
-    intersected_job_ids =
-        upkeep_intersects(captured_jobs, std::move(intersected_job_ids), db.canceled());
+    collect_ands.push_back({"endtime = 0"});
   }
 
-  std::vector<JobReflection> intersected_jobs = {};
-  for (auto &it : captured_jobs) {
-    if (intersected_job_ids(it.first)) {
-      intersected_jobs.push_back(std::move(it.second));
-    }
-  }
-
-  if (intersected_jobs.empty()) {
-    std::cerr << "No jobs matched query" << std::endl;
+  // Convert the collected parts into a meaningful query
+  if (collect_ands.empty()) {
+    std::cout << "No filters were applied" << std::endl;
     exit(1);
   }
 
-  std::sort(intersected_jobs.begin(), intersected_jobs.end(),
-            [](JobReflection const &lhs, JobReflection const &rhs) { return lhs.job < rhs.job; });
-
-  describe(intersected_jobs, get_describe_policy(clo), db);
+  describe(db.matching(collect_ands), get_describe_policy(clo), db);
 }
 
 }  // namespace

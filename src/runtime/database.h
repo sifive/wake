@@ -158,24 +158,8 @@ struct Database {
 
   std::string get_hash(const std::string &file, long modified);
 
-  std::vector<JobReflection> failed();
-
-  std::vector<JobReflection> job_ids_matching(const std::string &glob);
-  std::vector<JobReflection> labels_matching(const std::string &glob);
-  std::vector<JobReflection> tags_matching(const std::string &uri_glob,
-                                           const std::string &content_glob);
-  std::vector<JobReflection> files_matching(const std::string &glob, int use);
-  std::vector<JobReflection> input_files_matching(const std::string &glob) {
-    return files_matching(glob, 1);
-  }
-  std::vector<JobReflection> output_files_matching(const std::string &glob) {
-    return files_matching(glob, 2);
-  }
-  // Helper function to split 'uri=content' into 'uri, content'
-  std::vector<JobReflection> tags_matching(const std::string &glob);
-  std::vector<JobReflection> last_exe();
-  std::vector<JobReflection> last_use();
-  std::vector<JobReflection> canceled();
+  // Outer is a set of filters to be AND'd together, inner is a set of queries to be OR'd together
+  std::vector<JobReflection> matching(const std::vector<std::vector<std::string>> &and_or_filters);
 
   std::vector<JobEdge> get_edges();
   std::vector<JobTag> get_tags();
