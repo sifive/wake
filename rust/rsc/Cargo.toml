@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 entity = { path = "../entity" }
 migration = { path = "../migration" }
-sea-orm = { version = "0.12.6", features = ["sqlx-postgres", "runtime-tokio-native-tls"]}
+sea-orm = { version = "0.12.15", features = ["sqlx-postgres", "runtime-tokio-native-tls"]}
 serde = "1.0.164"
 futures = "0.3.29"
 tokio = { version = "1.28.2", features = ["full"] }
