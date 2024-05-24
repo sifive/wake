@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use data_encoding::BASE64;
 use entity::prelude::{
-    Blob, BlobStore, Job, LocalBlobStore, OutputDir, OutputFile, OutputSymlink, VisibleFile,
+    Blob, BlobStore, LocalBlobStore, OutputDir, OutputFile, OutputSymlink, VisibleFile,
 };
 use entity::{
     api_key, blob, blob_store, job, local_blob_store, output_dir, output_file, output_symlink,
@@ -13,8 +13,7 @@ use rand_core::{OsRng, RngCore};
 use sea_orm::ExecResult;
 use sea_orm::{
     prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, DbBackend,
-    DbErr, DeleteResult, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
-    Statement,
+    DbErr, DeleteResult, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Statement,
 };
 use tracing;
 

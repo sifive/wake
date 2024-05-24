@@ -7,8 +7,7 @@ use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr, Trans
 use std::sync::Arc;
 use tracing;
 
-#[path = "../common/database.rs"]
-mod database;
+use rsc::database;
 
 #[tracing::instrument(skip_all)]
 pub async fn add_job(
