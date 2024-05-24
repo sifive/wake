@@ -77,6 +77,19 @@ export def empty: List a => Boolean = match _
     Nil -> True
     _ -> False
 
+
+# Wrap a given value in a single-element list.
+# Consider using '_, Nil' directly as it is more idiomatic.
+#
+# Examples:
+# ```
+#   single 1                 = 1, Nil
+#   single True              = "foo", Nil
+#   omap single (Some "foo") = Some ("foo", Nil)
+# ```
+export def single (element: a): List a =
+    element, Nil
+
 # Retrieve the first element of the list, else None.
 # If you find yourself using the function, consider using match instead.
 #
@@ -658,6 +671,23 @@ export def transpose: List (List a) => List (List a) =
 
     outer
 
+# Flatten a list of lists, adding the indicated values between every original list.
+#
+# Examples:
+# ```
+#   intercalate (0, Nil) ((1, 2, Nil), (3, Nil), (4, 5, Nil), Nil) = 1, 2, 0, 3, 0, 4, 5, Nil
+#   intercalate (0, Nil) Nil = Nil
+#   intercalate Nil (x, y, Nil) = x ++ y
+# ```
+export def intercalate (inter: List a) (list: List (List a)): List a =
+    def addElement = match _
+        Nil -> Nil
+        xs, xss -> inter, xs, addElement xss
+
+    addElement list
+    | drop 1
+    | flatten
+
 # Given a less-than comparison function, sort the list.
 # Elements which compare as EQ retain their order in the output list.
 #
@@ -789,6 +819,17 @@ export def tab (f: Integer => a): Integer => List a =
 # ```
 export def seq: Integer => List Integer =
     tab (_)
+
+# Create a list identical elements, with a given length.
+#
+# Example:
+# ```
+#   seq 5 "a" = "a", "a", "a", "a", "a", Nil
+#   seq (-1) "a" = Nil
+#   seq 0 "a" = Nil
+# ```
+export def replicate (n: Integer) (element: a): List a =
+    tab (\_ element) n
 
 # Take two Lists and turn them into a List of Pairs
 # The shortest length of the two input lists sets the output length.
