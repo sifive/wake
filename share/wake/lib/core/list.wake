@@ -77,7 +77,6 @@ export def empty: List a => Boolean = match _
     Nil -> True
     _ -> False
 
-
 # Wrap a given value in a single-element list.
 # Consider using '_, Nil' directly as it is more idiomatic.
 #
