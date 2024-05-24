@@ -1363,12 +1363,12 @@ std::vector<JobReflection> Database::matching(
     const std::vector<std::vector<std::string>> &and_or_filters) {
   // This query creates a subtable of the following shape:
   //
-  // | job_id | label | run_id | use_id | endtime | commandline | status |       input_files   |
-  // output_files  |       tags       |
+  // clang-format off
+  // | job_id | label | run_id | use_id | endtime | commandline | status | runtime |       input_files   |   output_files  |       tags       |
   // --------------------------------------------------------------------------------------------------------------------------------
-  // |    1   |  foo  |   1    |    1   |  1234   | ls lah .    |   0    | <d>a.txt<d>b.txt<d> |
-  // <d>c.o<d>d.o<d> | <d>a=b<d>c=d<d>  | |    1   |  foo  |   1    |    1   |  1234   | ls lah . |
-  // 0    | <d>a.txt<d>b.txt<d> | <d>c.o<d>d.o<d> | <d>a=b<d>c=d<d>  |
+  // |    1   |  foo  |   1    |    1   |  1234   | ls lah .    |   0    |   2.8   | <d>a.txt<d>b.txt<d> | <d>c.o<d>d.o<d> | <d>a=b<d>c=d<d>  |
+  // |    2   |  bar  |   1    |    1   |  0000   | cat f.txt   |   0    |   0.0   |       null          |      null       |      null        |
+  // clang-format on
   //
   // The subtable is constructed by joining the jobs table with the minimal set of other dependent
   // tables with the following extra processing.
@@ -1382,9 +1382,9 @@ std::vector<JobReflection> Database::matching(
   // the columns of the subtable for fine grain filters.
   //
   // For example, the query below will return all jobs that exited with status code 0 and output at
-  // least one .0 file.
+  // least one .o file.
   //   SELECT job_id FROM **SUBTABLE**
-  //   WHERE status = 0 AND label like '%<d>%.o<d>%'
+  //   WHERE status = 0 AND output_files like '%<d>%.o<d>%'
   std::string subtable = R"delim(
           SELECT 
               j.job_id, 
@@ -1394,12 +1394,13 @@ std::vector<JobReflection> Database::matching(
               j.endtime, 
               j.commandline, 
               s.status, 
+              s.runtime,
               '<d>' || group_concat(ft_input.path, '<d>') || '<d>' input_files, 
               '<d>' || group_concat(ft_output.path,'<d>') || '<d>' output_files, 
               '<d>' || group_concat(t.tag, '<d>') || '<d>' tags
           FROM jobs j
           LEFT JOIN (
-              SELECT stat_id, status FROM stats
+              SELECT stat_id, status, runtime FROM stats
           ) s
           ON j.stat_id=s.stat_id
           LEFT JOIN (

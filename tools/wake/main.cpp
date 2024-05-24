@@ -156,6 +156,11 @@ void make_and_group(const std::vector<std::vector<std::string>> &query, const st
   }
 }
 
+void hide_internal_jobs(std::vector<std::vector<std::string>> &out) {
+  out.push_back({"substr(cast(commandline as text),1,1) <> '<'"});
+  out.push_back({"label <> '<hash>'"});
+}
+
 void inspect_database(const CommandLineOptions &clo, Database &db, const std::string &wake_cwd) {
   // tagdag is technically a db inspection, but its very different from the
   // rest, just handle it and exit.
@@ -173,10 +178,10 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
   // --label
   make_and_group(clo.labels, "label", "", collect_ands);
 
-  // --input_files
+  // --input
   make_and_group(clo.input_files, "input_files", "<d>", collect_ands);
 
-  // --output_file
+  // --output
   make_and_group(clo.output_files, "output_files", "<d>", collect_ands);
 
   // --tag
@@ -185,15 +190,13 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
   // --last-exe
   if (clo.last_exe) {
     collect_ands.push_back({"run_id == (select max(run_id) from jobs)"});
-    collect_ands.push_back({"substr(cast(commandline as text),1,1) <> '<'"});
-    collect_ands.push_back({"label <> '<hash>'"});
+    hide_internal_jobs(collect_ands);
   }
 
   // --last-use
   if (clo.last_use) {
     collect_ands.push_back({"use_id == (select max(run_id) from jobs)"});
-    collect_ands.push_back({"substr(cast(commandline as text),1,1) <> '<'"});
-    collect_ands.push_back({"label <> '<hash>'"});
+    hide_internal_jobs(collect_ands);
   }
 
   // --failed
