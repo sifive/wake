@@ -19,8 +19,18 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(JobHistory::Hits).integer().not_null())
                     .col(ColumnDef::new(JobHistory::Misses).integer().not_null())
                     .col(ColumnDef::new(JobHistory::Evictions).integer().not_null())
-                    .col(ColumnDef::new(JobHistory::CreatedAt).timestamp().not_null().default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)))
-                    .col(ColumnDef::new(JobHistory::UpdatedAt).timestamp().not_null().default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)))
+                    .col(
+                        ColumnDef::new(JobHistory::CreatedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)),
+                    )
+                    .col(
+                        ColumnDef::new(JobHistory::UpdatedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)),
+                    )
                     .to_owned(),
             )
             .await
