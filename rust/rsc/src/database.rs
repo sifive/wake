@@ -263,10 +263,10 @@ where
     let hashes = JobHistoryHash::find_by_statement(Statement::from_sql_and_values(
         DbBackend::Postgres,
         r#"
-            DELETE FROM job 
-            WHERE created_at <= $1
-            RETURNING hash
-            "#,
+        DELETE FROM job 
+        WHERE created_at <= $1
+        RETURNING hash
+        "#,
         [ttl.into()],
     ))
     .all(db.as_ref())
