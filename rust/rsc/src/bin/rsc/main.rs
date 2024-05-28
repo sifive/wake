@@ -438,7 +438,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
     use entity::blob_store;
-    use sea_orm::{prelude::Uuid, ActiveModelTrait, PaginatorTrait};
+    use sea_orm::{prelude::Uuid, ActiveModelTrait, EntityTrait, PaginatorTrait};
     use std::sync::Arc;
 
     use axum::{
