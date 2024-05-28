@@ -823,9 +823,9 @@ export def seq: Integer => List Integer =
 #
 # Example:
 # ```
-#   seq 5 "a" = "a", "a", "a", "a", "a", Nil
-#   seq (-1) "a" = Nil
-#   seq 0 "a" = Nil
+#   replicate 5 "a" = "a", "a", "a", "a", "a", Nil
+#   replicate (-1) "a" = Nil
+#   replicate 0 "a" = Nil
 # ```
 export def replicate (n: Integer) (element: a): List a =
     tab (\_ element) n
