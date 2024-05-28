@@ -32,6 +32,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "status.h"
 #include "wcl/iterator.h"
@@ -70,14 +71,6 @@ struct Database::detail {
   sqlite3_stmt *find_prior;
   sqlite3_stmt *update_prior;
   sqlite3_stmt *delete_prior;
-  sqlite3_stmt *find_job;
-  sqlite3_stmt *find_owner;
-  sqlite3_stmt *find_last_exe;
-  sqlite3_stmt *find_last_use;
-  sqlite3_stmt *find_failed;
-  sqlite3_stmt *find_label;
-  sqlite3_stmt *find_tag;
-  sqlite3_stmt *find_canceled;
   sqlite3_stmt *fetch_hash;
   sqlite3_stmt *delete_jobs;
   sqlite3_stmt *delete_dups;
@@ -123,14 +116,6 @@ struct Database::detail {
         find_prior(0),
         update_prior(0),
         delete_prior(0),
-        find_job(0),
-        find_owner(0),
-        find_last_exe(0),
-        find_last_use(0),
-        find_failed(0),
-        find_label(0),
-        find_tag(0),
-        find_canceled(0),
         fetch_hash(0),
         delete_jobs(0),
         delete_dups(0),
@@ -384,63 +369,6 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "  where j1.job_id=?2 and j1.directory=j2.directory and j1.commandline=j2.commandline"
       "  and j1.environment=j2.environment and j1.stdin=j2.stdin and j1.is_atty=j2.is_atty and "
       "j2.job_id<>?2)";
-  const char *sql_find_job =
-      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
-      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
-      "s.membytes, s.ibytes, s.obytes"
-      " from  jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
-      " where cast(j.job_id as TEXT) like ? order by j.job_id";
-  const char *sql_find_owner =
-      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
-      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
-      "s.membytes, s.ibytes, s.obytes"
-      " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id join runs r on "
-      "j.run_id=r.run_id"
-      " where f.path like ? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id order by "
-      "j.job_id";
-  const char *sql_find_last_exe =
-      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
-      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
-      "s.membytes, s.ibytes, s.obytes"
-      " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
-      " where j.run_id==(select max(run_id) from jobs)"
-      " and substr(cast(commandline as text),1,1) <> '<'"
-      " and label <> '<hash>'"
-      " order by j.job_id";
-  const char *sql_find_last_use =
-      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
-      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
-      "s.membytes, s.ibytes, s.obytes"
-      " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
-      " where j.use_id==(select max(run_id) from jobs)"
-      " and substr(cast(commandline as text),1,1) <> '<'"
-      " and label <> '<hash>'"
-      " order by j.job_id";
-  const char *sql_find_failed =
-      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
-      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
-      "s.membytes, s.ibytes, s.obytes"
-      " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
-      " where s.status<>0 order by j.job_id";
-  const char *sql_find_label =
-      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
-      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
-      "s.membytes, s.ibytes, s.obytes"
-      " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
-      " where j.label like ? order by j.job_id";
-  const char *sql_find_tag =
-      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
-      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
-      "s.membytes, s.ibytes, s.obytes"
-      " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id "
-      "inner join tags t on j.job_id = t.job_id"
-      " where t.uri like ? AND t.content like ? order by j.job_id";
-  const char *sql_find_canceled =
-      "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
-      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
-      "s.membytes, s.ibytes, s.obytes"
-      " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
-      " where j.endtime = 0 order by j.job_id";
   const char *sql_fetch_hash = "select hash from files where path=? and modified=?";
   const char *sql_delete_jobs =
       "delete from jobs where job_id in"
@@ -533,14 +461,6 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_find_prior, find_prior);
   PREPARE(sql_update_prior, update_prior);
   PREPARE(sql_delete_prior, delete_prior);
-  PREPARE(sql_find_job, find_job);
-  PREPARE(sql_find_owner, find_owner);
-  PREPARE(sql_find_last_exe, find_last_exe);
-  PREPARE(sql_find_last_use, find_last_use);
-  PREPARE(sql_find_failed, find_failed);
-  PREPARE(sql_find_label, find_label);
-  PREPARE(sql_find_tag, find_tag);
-  PREPARE(sql_find_canceled, find_canceled);
   PREPARE(sql_fetch_hash, fetch_hash);
   PREPARE(sql_delete_jobs, delete_jobs);
   PREPARE(sql_delete_dups, delete_dups);
@@ -599,14 +519,6 @@ void Database::close() {
   FINALIZE(find_prior);
   FINALIZE(update_prior);
   FINALIZE(delete_prior);
-  FINALIZE(find_job);
-  FINALIZE(find_owner);
-  FINALIZE(find_last_exe);
-  FINALIZE(find_last_use);
-  FINALIZE(find_failed);
-  FINALIZE(find_label);
-  FINALIZE(find_tag);
-  FINALIZE(find_canceled);
   FINALIZE(fetch_hash);
   FINALIZE(delete_jobs);
   FINALIZE(delete_dups);
@@ -1407,49 +1319,143 @@ static std::vector<FileDependency> get_all_file_dependencies(const Database *db,
   return out;
 }
 
-std::vector<JobReflection> Database::failed() { return find_all(this, imp->find_failed); }
+std::string collapse_or(const std::vector<std::string> &ors) {
+  if (ors.empty()) {
+    return "";
+  }
 
-std::vector<JobReflection> Database::last_exe() { return find_all(this, imp->find_last_exe); }
+  if (ors.size() == 1) {
+    return ors.front();
+  }
 
-std::vector<JobReflection> Database::last_use() { return find_all(this, imp->find_last_use); }
+  std::string out = "(";
 
-std::vector<JobReflection> Database::canceled() { return find_all(this, imp->find_canceled); }
+  for (std::vector<std::string>::size_type i = 0; i < ors.size() - 1; i++) {
+    out += ors[i] + " OR ";
+  }
 
-std::vector<JobReflection> Database::labels_matching(const std::string &glob) {
-  const char *why = "Could not bind args";
-  bind_string(why, imp->find_label, 1, glob);
-  return find_all(this, imp->find_label);
+  out += ors.back() + ")";
+
+  return out;
 }
 
-std::vector<JobReflection> Database::job_ids_matching(const std::string &glob) {
-  const char *why = "Could not bind args";
-  bind_string(why, imp->find_job, 1, glob);
-  return find_all(this, imp->find_job);
+std::string collapse_and(const std::vector<std::vector<std::string>> &ands) {
+  if (ands.empty()) {
+    return "";
+  }
+
+  if (ands.size() == 1) {
+    return collapse_or(ands.front());
+  }
+
+  std::string out = "";
+
+  for (std::vector<std::vector<std::string>>::size_type i = 0; i < ands.size() - 1; i++) {
+    out += collapse_or(ands[i]) + "\nAND\n\t";
+  }
+
+  out += collapse_or(ands.back());
+
+  return out;
 }
 
-std::vector<JobReflection> Database::files_matching(const std::string &glob, int use) {
-  const char *why = "Could not bind args";
-  bind_string(why, imp->find_owner, 1, glob);
-  bind_integer(why, imp->find_owner, 2, use);
-  return find_all(this, imp->find_owner);
-}
+std::vector<JobReflection> Database::matching(
+    const std::vector<std::vector<std::string>> &and_or_filters) {
+  // This query creates a subtable of the following shape:
+  //
+  // clang-format off
+  // | job_id | label | run_id | use_id | endtime | commandline | status | runtime |       input_files   |   output_files  |       tags       |
+  // --------------------------------------------------------------------------------------------------------------------------------
+  // |    1   |  foo  |   1    |    1   |  1234   | ls lah .    |   0    |   2.8   | <d>a.txt<d>b.txt<d> | <d>c.o<d>d.o<d> | <d>a=b<d>c=d<d>  |
+  // |    2   |  bar  |   1    |    1   |  0000   | cat f.txt   |   0    |   0.0   |       null          |      null       |      null        |
+  // clang-format on
+  //
+  // The subtable is constructed by joining the jobs table with the minimal set of other dependent
+  // tables with the following extra processing.
+  // 1. files table is split into 2 columns, input_files & output_files
+  // 2. tags are flattened from two columns (uri, content) to one column (tags) with a = separator
+  // 3. input_files, output_files, and tags are group_concat'd into a single row per job. <d> is
+  //    used as a deliminator between each value. The deliminator is also places at the beginning
+  //    and end of each row so that queries don't need to special case the first/last entry.
+  //
+  // Any inspection flag/user code may add any WHERE expression conditions to the main query using
+  // the columns of the subtable for fine grain filters.
+  //
+  // For example, the query below will return all jobs that exited with status code 0 and output at
+  // least one .o file.
+  //   SELECT job_id FROM **SUBTABLE**
+  //   WHERE status = 0 AND output_files like '%<d>%.o<d>%'
+  std::string subtable = R"delim(
+          SELECT 
+              j.job_id, 
+              j.label, 
+              j.run_id, 
+              j.use_id, 
+              j.endtime, 
+              j.commandline, 
+              s.status, 
+              s.runtime,
+              '<d>' || group_concat(ft_input.path, '<d>') || '<d>' input_files, 
+              '<d>' || group_concat(ft_output.path,'<d>') || '<d>' output_files, 
+              '<d>' || group_concat(t.tag, '<d>') || '<d>' tags
+          FROM jobs j
+          LEFT JOIN (
+              SELECT stat_id, status, runtime FROM stats
+          ) s
+          ON j.stat_id=s.stat_id
+          LEFT JOIN (
+              SELECT job_id, uri || '=' || content tag FROM tags
+          ) t
+          ON j.job_id = t.job_id
+          LEFT JOIN (
+              SELECT filetree.job_id, files.path FROM filetree
+              INNER JOIN files
+              ON filetree.file_id=files.file_id
+              WHERE access = 1
+          ) ft_input
+          ON j.job_id=ft_input.job_id
+          LEFT JOIN (
+              SELECT filetree.job_id, files.path FROM filetree
+              INNER JOIN files
+              ON filetree.file_id=files.file_id
+              WHERE access = 2
+          ) ft_output
+          ON j.job_id=ft_output.job_id
+          GROUP BY
+              j.job_id
+)delim";
 
-std::vector<JobReflection> Database::tags_matching(const std::string &uri_glob,
-                                                   const std::string &content_glob) {
-  const char *why = "Could not bind args";
-  bind_string(why, imp->find_tag, 1, uri_glob);
-  bind_string(why, imp->find_tag, 2, content_glob);
-  return find_all(this, imp->find_tag);
-}
+  // This query wraps the subtable, applies the requested filters, and returns the matching jobs
+  std::string id_query = "SELECT job_id\nFROM (\n" + subtable + ")\nWHERE\n\t";
+  id_query += collapse_and(and_or_filters);
 
-std::vector<JobReflection> Database::tags_matching(const std::string &glob) {
-  std::vector<std::string> parts = wcl::split_by_fn(
-      '=', glob.begin(), glob.end(), [](auto a, auto b) { return std::string(a, b); });
-  if (parts.size() != 2) {
-    std::cerr << "Tag query must have exactly one '=' per tag" << std::endl;
+  // Adapts the id_query to match the columns needed to create a JobReflection
+  std::string query =
+      "SELECT j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, "
+      "j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, "
+      "s.membytes, s.ibytes, s.obytes\n"
+      "FROM jobs j\n"
+      "LEFT JOIN stats s\n"
+      "ON j.stat_id=s.stat_id\n"
+      "LEFT JOIN runs r\n"
+      "ON j.run_id=r.run_id\n"
+      "WHERE j.job_id IN (\n" +
+      id_query +
+      ")"
+      "ORDER BY j.job_id";
+
+  sqlite3_stmt *stmt;
+  if (sqlite3_prepare_v2(imp->db, query.c_str(), -1, &stmt, 0) != SQLITE_OK) {
+    std::string out = std::string("sqlite3_prepare_v2 (dyn matching): ") + sqlite3_errmsg(imp->db);
+    std::cerr << out << std::endl;
+    sqlite3_finalize(stmt);
     return {};
   }
-  return tags_matching(parts[0], parts[1]);
+
+  auto out = find_all(this, stmt);
+
+  sqlite3_finalize(stmt);
+  return out;
 }
 
 std::vector<JobEdge> Database::get_edges() {
