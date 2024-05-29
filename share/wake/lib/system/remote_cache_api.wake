@@ -206,7 +206,7 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
         require Fail err = check
         else check
 
-        require Some _ = getenv "DEBUG_WAKE_SHARED_CACHE"
+        require True = shouldDebugRemoteCache Unit
         else check
 
         printlnLevel
