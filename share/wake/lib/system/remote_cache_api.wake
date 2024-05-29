@@ -451,10 +451,6 @@ export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Resul
 #  rscApiGetFileBlob (RemoteCacheBlob "asdf" "https://...") "foo/bar" 0644 = Pass "foo/bar" 
 # ```
 export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: String) (mode: Integer): Result String Error =
-    # TODO: use "small blob" for this and also parse the schema out
-    # require False = id ==* "00000000-0000-0000-0000-000000000000"
-    # else Pass  ""
-
     require Pass downloadPath =
         buildHttpRequest uri
         | setMethod HttpMethodGet
@@ -499,8 +495,8 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
 def strToBytes (str: String): List Integer =
     str
     | explode
-    # FIXME: unicodeToInteger may return values larger than u8 which will break the serialization
-    | map (unicodeToInteger _)
+    # TODO: this only supports ASCII, not unicode. This needs to be enforced somewhere.
+    | map (byteToInteger _)
 
 # listFlattenWithNull ((1,2,3,), (4,5,6,), (7,8,9,),) = (1,2,3,0,4,5,6,0,7,8,9,0,)
 def listFlattenWithNull (parts: List (List Integer)): List Integer =
