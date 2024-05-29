@@ -214,7 +214,7 @@ def computeHashes (prefix: String) (files: List String): List String =
     def job =
         plan
         | runJobWith localRunner
-        | setJobTag "inspect.visibility" "hidden"
+        | setJobInspectVisibilityHidden
 
     require Exited 0 = getJobStatus job
     else mergeSelect which_files_to_hash (map (add _ "BadHash") to_hash) not_to_hash
@@ -264,7 +264,7 @@ target hashcode (f: String): String =
             hashPlan ("<hash>", f, Nil)
             | setPlanLabel "hash: {f}"
             | runJobWith localRunner
-            | setJobTag "inspect.visibility" "hidden"
+            | setJobInspectVisibilityHidden
 
         def hash =
             job.getJobStdout
@@ -285,7 +285,7 @@ export target markFileCleanable (filepath: String): Result Unit Error =
         | setPlanLabel "hash: {filepath}"
         | setPlanFnOutputs (\_ filepath, Nil)
         | runJobWith localRunner
-        | setJobTag "inspect.visibility" "hidden"
+        | setJobInspectVisibilityHidden
 
     if job.isJobOk then
         Pass Unit
