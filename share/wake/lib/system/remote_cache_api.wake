@@ -420,7 +420,6 @@ export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Resul
         else failWithError "rsc: Failed to parse bytes strings into bytes from db path: '{path}'"
 
         bytes
-        # TODO: this only supports ASCII, not unicode. This needs to be enforced somewhere.
         | map integerToByte
         | cat
         | Pass
@@ -495,7 +494,6 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
 def strToBytes (str: String): List Integer =
     str
     | explode
-    # TODO: this only supports ASCII, not unicode. This needs to be enforced somewhere.
     | map (byteToInteger _)
 
 # listFlattenWithNull ((1,2,3,), (4,5,6,), (7,8,9,),) = (1,2,3,0,4,5,6,0,7,8,9,0,)
