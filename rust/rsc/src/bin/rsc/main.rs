@@ -11,8 +11,8 @@ use rand_core::{OsRng, RngCore};
 use rlimit::Resource;
 use rsc::{config, database};
 use sea_orm::{
-    prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectOptions, ConnectionTrait,
-    Database, DatabaseConnection, EntityTrait, QueryFilter,
+    prelude::Uuid, ActiveModelTrait, ActiveValue::*, ConnectOptions, ConnectionTrait, Database,
+    DatabaseConnection,
 };
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
@@ -283,12 +283,8 @@ fn launch_job_eviction(conn: Arc<DatabaseConnection>, tick_interval: u64, ttl: u
 
             let ttl = (Utc::now() - Duration::from_secs(ttl)).naive_utc();
 
-            match entity::job::Entity::delete_many()
-                .filter(entity::job::Column::CreatedAt.lte(ttl))
-                .exec(conn.as_ref())
-                .await
-            {
-                Ok(res) => tracing::info!(%res.rows_affected, "Deleted jobs from database"),
+            match database::evict_jobs_ttl(conn.clone(), ttl).await {
+                Ok(res) => tracing::info!(%res, "Deleted jobs from database"),
                 Err(err) => tracing::error!(%err, "Failed to delete jobs for eviction"),
             };
         }
@@ -442,7 +438,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
     use entity::blob_store;
-    use sea_orm::{prelude::Uuid, ActiveModelTrait, PaginatorTrait};
+    use sea_orm::{prelude::Uuid, ActiveModelTrait, EntityTrait, PaginatorTrait};
     use std::sync::Arc;
 
     use axum::{

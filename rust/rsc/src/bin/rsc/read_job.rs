@@ -3,6 +3,7 @@ use crate::types::{Dir, ReadJobPayload, ReadJobResponse, ResolvedBlob, ResolvedB
 use axum::Json;
 use entity::{job, job_use, output_dir, output_file, output_symlink};
 use hyper::StatusCode;
+use rsc::database;
 use sea_orm::DatabaseTransaction;
 use sea_orm::{
     prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, DatabaseConnection, DbErr,
@@ -12,14 +13,20 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing;
 
-#[tracing::instrument(skip(conn))]
-async fn record_use(job_id: Uuid, conn: Arc<DatabaseConnection>) {
+#[tracing::instrument(skip(hash, conn))]
+async fn record_hit(job_id: Uuid, hash: String, conn: Arc<DatabaseConnection>) {
     let usage = job_use::ActiveModel {
         id: NotSet,
         created_at: NotSet,
         job_id: Set(job_id),
     };
     let _ = usage.insert(conn.as_ref()).await;
+    let _ = database::upsert_job_hit(conn.as_ref(), hash).await;
+}
+
+#[tracing::instrument(skip(hash, conn))]
+async fn record_miss(hash: String, conn: Arc<DatabaseConnection>) {
+    let _ = database::upsert_job_miss(conn.as_ref(), hash).await;
 }
 
 #[tracing::instrument(skip(db, stores))]
@@ -60,6 +67,7 @@ pub async fn read_job(
     let result = conn
         .as_ref()
         .transaction::<_, (Option<Uuid>, ReadJobResponse), DbErr>(|txn| {
+            let hash = hash.clone();
             Box::pin(async move {
                 let Some(matching_job) = job::Entity::find()
                     .filter(job::Column::Hash.eq(hash.clone()))
@@ -171,12 +179,18 @@ pub async fn read_job(
                 status = StatusCode::OK;
                 let shared_conn = conn.clone();
                 tokio::spawn(async move {
-                    record_use(job_id, shared_conn).await;
+                    record_hit(job_id, hash, shared_conn).await;
                 });
             }
             (status, Json(response))
         }
-        Ok((None, _)) => (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch)),
+        Ok((None, _)) => {
+            let shared_conn = conn.clone();
+            tokio::spawn(async move {
+                record_miss(hash, shared_conn).await;
+            });
+            (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch))
+        }
         Err(cause) => {
             tracing::error! {
               %cause,
