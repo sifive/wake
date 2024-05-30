@@ -419,6 +419,14 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
     | rscApiPostJob req
 
 # Determines if the user has requested that debug info be emitted from the cache
-target shouldDebugRemoteCache Unit: Boolean = match (getenv "DEBUG_WAKE_REMOTE_CACHE")
-    Some _ -> True
-    None -> False
+target shouldDebugRemoteCache Unit: Boolean =
+    match (Pair (getenv "DEBUG_WAKE_REMOTE_CACHE") (getenv "DEBUG_WAKE_SHARED_CACHE"))
+        Pair None None -> False
+        Pair (Some _) None ->
+            def _ =
+                printlnLevel
+                logWarning
+                "DEBUG_WAKE_REMOTE_CACHE is depreciated. Use DEBUG_WAKE_SHARED_CACHE instead"
+
+            True
+        _ -> True
