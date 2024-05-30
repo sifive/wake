@@ -37,6 +37,21 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
     def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
     def badlaunch job error = prim "job_fail_launch"
 
+    def runJobAndUpload job input hashKey =
+        # Run the job to get the results
+        require Pass output = baseDoIt job (Pass input)
+
+        # If pushing to the cache is not enabled don't bother
+        require True = rscApi.getRemoteCacheApiCanPush
+        else Pass output
+
+        # Post the job to the server. This is left as 'def _' so that wake won't block progess
+        # on it but it will stil be joined on before wake exits. Regardless of the result this
+        # call should return the passing output to allow the build to continue
+        def _ = postJob rscApi job wakeroot hashKey input output
+
+        Pass output
+
     def doit job runnerInput = match runnerInput
         Fail e ->
             def _ = badlaunch job e
@@ -46,6 +61,10 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
             def label = input.getRunnerInputLabel
 
             require Pass hashKey = hashFn runnerInput
+
+            # If pulling from the cache is not enabled don't bother searching.
+            require True = rscApi.getRemoteCacheApiCanPull
+            else runJobAndUpload job input hashKey
 
             # -------------------------------------
             # --- Search the cache for the job  ---
@@ -254,16 +273,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
             # -------------------------------------
             # --- Insert the job into the cache ---
             # -------------------------------------
-
-            # Run the job to get the results
-            require Pass output = baseDoIt job (Pass input)
-
-            # Post the job to the server. This is left as 'def _' so that wake won't block progess
-            # on it but it will stil be joined on before wake exits. Regardless of the result this
-            # call should return the passing output to allow the build to continue.
-            def _ = postJob rscApi job wakeroot hashKey input output
-
-            Pass output
+            runJobAndUpload job input hashKey
 
     Runner "remote-cache: {name}" score doit
 
