@@ -487,6 +487,7 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
         #   - The *path* must be listed as another jobs output to be available to the system 
         | setPlanFnOutputs (\_ Nil)
         | runJobWith localRunner
+        | setJobInspectVisibilityHidden
 
     require True = job.isJobOk
     else failWithError "Failed to cleanup downloaded file {path} from {downloadPath.getPathName}"

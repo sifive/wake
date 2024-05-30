@@ -124,6 +124,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                         | setPlanLabel "rsc: mkdir output dir {path}"
                         | setPlanPersistence Once
                         | runJobWith localRunner
+                        | setJobInspectVisibilityHidden
                         | isJobOk
                     else failWithError "rsc: Failed to mkdir output dir: {path}"
 
@@ -187,6 +188,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                         | setPlanLabel "rsc: symlink {link} to {path}"
                         | setPlanPersistence Once
                         | runJobWith localRunner
+                        | setJobInspectVisibilityHidden
                         | isJobOk
                     else failWithError "rsc: Failed to link {link} to {path}"
 
@@ -369,6 +371,7 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
             | setPlanLabel "rsc: readlink {link}"
             | setPlanPersistence Once
             | runJobWith localRunner
+            | setJobInspectVisibilityHidden
             | getJobStdout
 
         CachePostRequestOutputSymlink path link

@@ -157,8 +157,7 @@ void make_and_group(const std::vector<std::vector<std::string>> &query, const st
 }
 
 void hide_internal_jobs(std::vector<std::vector<std::string>> &out) {
-  out.push_back({"substr(cast(commandline as text),1,1) <> '<'"});
-  out.push_back({"label <> '<hash>'"});
+  out.push_back({"tags NOT LIKE '%<d>inspect.visibility=hidden<d>%'", "tags IS NULL"});
 }
 
 void inspect_database(const CommandLineOptions &clo, Database &db, const std::string &wake_cwd) {
