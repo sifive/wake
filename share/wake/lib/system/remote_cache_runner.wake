@@ -356,7 +356,6 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
         CachePostRequestOutputFile path (mode | mode2bits) id
         | Pass
 
-    # TODO: readlink may need to be a PRIM for performance reasons
     # The path output by the job itself is the created symlink. The contents of the symlink
     # is the original file on disk. This is reversed when downloading a job.
     def makeSymlink (Pair link _) =
