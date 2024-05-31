@@ -143,6 +143,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                         | setPlanLabel "rsc: mkdir output dir {path}"
                         | setPlanPersistence Once
                         | runJobWith localRunner
+                        | setJobInspectVisibilityHidden
                         | isJobOk
                     else failWithError "rsc: Failed to mkdir output dir: {path}"
 
@@ -206,6 +207,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
                         | setPlanLabel "rsc: symlink {link} to {path}"
                         | setPlanPersistence Once
                         | runJobWith localRunner
+                        | setJobInspectVisibilityHidden
                         | isJobOk
                     else failWithError "rsc: Failed to link {link} to {path}"
 
@@ -364,7 +366,6 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
         CachePostRequestOutputFile path (mode | mode2bits) id
         | Pass
 
-    # TODO: readlink may need to be a PRIM for performance reasons
     # The path output by the job itself is the created symlink. The contents of the symlink
     # is the original file on disk. This is reversed when downloading a job.
     def makeSymlink (Pair link _) =
@@ -379,6 +380,7 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
             | setPlanLabel "rsc: readlink {link}"
             | setPlanPersistence Once
             | runJobWith localRunner
+            | setJobInspectVisibilityHidden
             | getJobStdout
 
         CachePostRequestOutputSymlink path link
@@ -427,6 +429,14 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
     | rscApiPostJob req
 
 # Determines if the user has requested that debug info be emitted from the cache
-target shouldDebugRemoteCache Unit: Boolean = match (getenv "DEBUG_WAKE_REMOTE_CACHE")
-    Some _ -> True
-    None -> False
+target shouldDebugRemoteCache Unit: Boolean =
+    match (Pair (getenv "DEBUG_WAKE_REMOTE_CACHE") (getenv "DEBUG_WAKE_SHARED_CACHE"))
+        Pair None None -> False
+        Pair (Some _) None ->
+            def _ =
+                printlnLevel
+                logWarning
+                "DEBUG_WAKE_REMOTE_CACHE is depreciated. Use DEBUG_WAKE_SHARED_CACHE instead"
+
+            True
+        _ -> True

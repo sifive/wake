@@ -4,17 +4,21 @@ use entity::prelude::{
     Blob, BlobStore, LocalBlobStore, OutputDir, OutputFile, OutputSymlink, VisibleFile,
 };
 use entity::{
-    api_key, blob, blob_store, job, local_blob_store, output_dir, output_file, output_symlink,
-    visible_file,
+    api_key, blob, blob_store, job, job_history, local_blob_store, output_dir, output_file,
+    output_symlink, visible_file,
 };
 use itertools::Itertools;
 use migration::OnConflict;
 use rand_core::{OsRng, RngCore};
-use sea_orm::ExecResult;
 use sea_orm::{
-    prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, ConnectionTrait, DbBackend,
-    DbErr, DeleteResult, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Statement,
+    prelude::{Expr, Uuid},
+    ActiveModelTrait,
+    ActiveValue::*,
+    ColumnTrait, ConnectionTrait, DbBackend, DbErr, DeleteResult, EntityTrait, PaginatorTrait,
+    QueryFilter, QueryOrder, Statement,
 };
+use sea_orm::{ExecResult, FromQueryResult};
+use std::sync::Arc;
 use tracing;
 
 // The actual max is 65536, but adding an arbritrary buffer of 36 for any incidental parameters
@@ -247,6 +251,38 @@ pub async fn delete_job<T: ConnectionTrait>(
     job::Entity::delete_by_id(job.id).exec(db).await
 }
 
+#[derive(Debug, FromQueryResult)]
+pub struct JobHistoryHash {
+    hash: String,
+}
+
+pub async fn evict_jobs_ttl<T>(db: Arc<T>, ttl: NaiveDateTime) -> Result<usize, DbErr>
+where
+    T: ConnectionTrait + Send + 'static,
+{
+    let hashes = JobHistoryHash::find_by_statement(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        r#"
+        DELETE FROM job 
+        WHERE created_at <= $1
+        RETURNING hash
+        "#,
+        [ttl.into()],
+    ))
+    .all(db.as_ref())
+    .await?;
+
+    let count = hashes.len();
+
+    tokio::spawn(async move {
+        for hash in hashes {
+            let _ = upsert_job_evict(db.as_ref(), hash.hash).await;
+        }
+    });
+
+    Ok(count)
+}
+
 // --------------------------------------------------
 // ----------         Visible File         ----------
 // --------------------------------------------------
@@ -474,3 +510,92 @@ pub async fn delete_blobs_by_ids<T: ConnectionTrait>(db: &T, ids: Vec<Uuid>) -> 
 
     Ok(affected)
 }
+
+// --------------------------------------------------
+// ----------          JobHistory          ----------
+// --------------------------------------------------
+pub async fn upsert_job_hit<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+    let active_model = job_history::ActiveModel {
+        hash: Set(hash),
+        hits: Set(1),
+        misses: Set(0),
+        evictions: Set(0),
+        created_at: NotSet,
+        updated_at: NotSet,
+    };
+
+    let _ = job_history::Entity::insert(active_model)
+        .on_conflict(
+            OnConflict::column(job_history::Column::Hash)
+                .update_column(job_history::Column::UpdatedAt)
+                .value(
+                    job_history::Column::Hits,
+                    Expr::col(job_history::Column::Hits.as_column_ref()).add(1),
+                )
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn upsert_job_miss<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+    let active_model = job_history::ActiveModel {
+        hash: Set(hash),
+        hits: Set(0),
+        misses: Set(1),
+        evictions: Set(0),
+        created_at: NotSet,
+        updated_at: NotSet,
+    };
+
+    let _ = job_history::Entity::insert(active_model)
+        .on_conflict(
+            OnConflict::column(job_history::Column::Hash)
+                .update_column(job_history::Column::UpdatedAt)
+                .value(
+                    job_history::Column::Misses,
+                    Expr::col(job_history::Column::Misses.as_column_ref()).add(1),
+                )
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn upsert_job_evict<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+    let active_model = job_history::ActiveModel {
+        hash: Set(hash),
+        hits: Set(0),
+        misses: Set(0),
+        evictions: Set(1),
+        created_at: NotSet,
+        updated_at: NotSet,
+    };
+
+    let _ = job_history::Entity::insert(active_model)
+        .on_conflict(
+            OnConflict::column(job_history::Column::Hash)
+                .update_column(job_history::Column::UpdatedAt)
+                .value(
+                    job_history::Column::Evictions,
+                    Expr::col(job_history::Column::Evictions.as_column_ref()).add(1),
+                )
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
+
+    Ok(())
+}
+
+// ----------            Create            ----------
+
+// ----------             Read             ----------
+
+// ----------            Update            ----------
+
+// ----------            Delete            ----------

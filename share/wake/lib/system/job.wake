@@ -156,6 +156,11 @@ export def setJobTag (key: String) (value: String) (job: Job): Job =
 
     job
 
+# Set a special tag to tell db inspection that this job shouldn't be shown by default
+export def setJobInspectVisibilityHidden (job: Job): Job =
+    job
+    | setJobTag "inspect.visibility" "hidden"
+
 def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
     Usage status runtime cputime membytes ibytes obytes
 

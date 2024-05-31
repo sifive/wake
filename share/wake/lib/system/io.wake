@@ -179,6 +179,7 @@ target writeImp inputs mode path content =
     | setPlanOnce False
     | setPlanEnvironment Nil
     | runJobWith writeRunner
+    | setJobInspectVisibilityHidden
     | getJobOutput
 
 # Create all directories and the named file. The `content` string is written verbatim with no
@@ -277,6 +278,7 @@ def mkdirImp inputs mode path =
     | setPlanKeep False
     | setPlanEnvironment Nil
     | runJobWith mkdirRunner
+    | setJobInspectVisibilityHidden
     | getJobOutput
 
 # Create a directory in the parent
