@@ -18,14 +18,21 @@ package wake
 
 from http import _
 
+# RSC Policy on engaging with the cache. Can be configured to only push to the cache, only pull from
+# the cache, or both. Pushing requires an authorization key.
+export data RemoteCachePolicy =
+    RemoteCachePolicyPullOnly
+    RemoteCachePolicyPushPull String
+    RemoteCachePolicyPushOnly String
+
 # Configuration details required to connect to the remote shared cache.
 export tuple RemoteCacheApi =
     # The domain or ip address of the cache
     export Domain: String
     # The port serving the cache
     export Port: Integer
-    # The api key required for authenicated routes. Not required for all requests
-    export Authorization: Option String
+    # The remote cache policy, certain policies require authorization
+    export Policy: RemoteCachePolicy
 
 ## --- POST /job/matching types ---
 
@@ -176,30 +183,73 @@ tuple CachePostRequest =
     # The number of bytes written by the job
     OBytes: Integer
 
+# getRemoteCacheApiAuthorization: Extracts the auth string from RemoteCacheApi if present
+#
+# ```
+# api.getRemoteCacheApiAuthorization = Some "myauth"
+# api.getRemoteCacheApiAuthorization = None
+# ```
+export def getRemoteCacheApiAuthorization (api: RemoteCacheApi): Option String =
+    match (api.getRemoteCacheApiPolicy)
+        RemoteCachePolicyPullOnly -> None
+        RemoteCachePolicyPushOnly auth -> Some auth
+        RemoteCachePolicyPushPull auth -> Some auth
+
+# getRemoteCacheApiCanPush: Determines if the api is configured for pushing to the cache
+#
+# ```
+# api.getRemoteCacheApiCanPush = True
+# ```
+export def getRemoteCacheApiCanPush (api: RemoteCacheApi): Boolean =
+    match (api.getRemoteCacheApiPolicy)
+        RemoteCachePolicyPullOnly -> False
+        RemoteCachePolicyPushOnly _ -> True
+        RemoteCachePolicyPushPull _ -> True
+
+# getRemoteCacheApiCanPull: Determines if the api is configured for pulling from the cache
+#
+# ```
+# api.getRemoteCacheApiCanPull = True
+# ```
+export def getRemoteCacheApiCanPull (api: RemoteCacheApi): Boolean =
+    match (api.getRemoteCacheApiPolicy)
+        RemoteCachePolicyPullOnly -> True
+        RemoteCachePolicyPushOnly _ -> False
+        RemoteCachePolicyPushPull _ -> True
+
 # makeRemoteCacheApi: Parses config string into RemoteCacheApi
 #
 # ```
-#  makeRemoteCacheApi "local:1234:myauth" = Pass (RemoteCacheApi "local" 1234 (Some "myauth"))
-#  makeRemoteCacheApi "local:1234:" = Pass (RemoteCacheApi "local" 1234 None)
-#  makeRemoteCacheApi "local:1234" = Fail (...)
-#  makeRemoteCacheApi "local" = Fail (...)
-#  makeRemoteCacheApi "local:asdf:myauth" = Fail (...)
+#  makeRemoteCacheApi "pushpull:local:1234:myauth" = Pass (RemoteCacheApi "local" 1234 (PushPull "myauth"))
+#  makeRemoteCacheApi "push:local:1234:myauth" = Pass (RemoteCacheApi "local" 1234 (Push "myauth"))
+#  makeRemoteCacheApi "pull:local:1234:" = Pass (RemoteCacheApi "local" 1234 Pull)
+#  makeRemoteCacheApi "pull:local:1234:myauth" = Pass (RemoteCacheApi "local" 1234 Pull)
+#  makeRemoteCacheApi "push:local:1234" = Fail (...)
+#  makeRemoteCacheApi "push:local" = Fail (...)
+#  makeRemoteCacheApi "push:local:asdf:myauth" = Fail (...)
 # ```
 export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
-    require (domain, portStr, authStr, Nil) =
+    require (policyStr, domain, portStr, authStr, Nil) =
         config
         | tokenize `:`
     else
         failWithError
-        "Remote cache config was set with incorrect format. Saw: '{config}'. Expected 'domain:port:auth' (auth may be omitted)"
+        "Remote cache config was set with incorrect format. Saw: '{config}'. Expected 'policy:domain:port:auth' (auth may be omitted)"
 
     require Some (port) =
         portStr
         | int
     else failWithError "Remote cache config was set with non-integer port. Saw: {portStr}"
 
-    def auth = if authStr ==* "" then None else Some authStr
-    def api = RemoteCacheApi domain port auth
+    require Pass policy = match (policyStr; authStr)
+        "pull"; _ -> Pass (RemoteCachePolicyPullOnly)
+        "push"; "" -> failWithError "Policy 'push' requires authorization"
+        "pushpull"; "" -> failWithError "Policy 'pushpull' requires authorization"
+        "push"; auth -> Pass (RemoteCachePolicyPushOnly auth)
+        "pushpull"; auth -> Pass (RemoteCachePolicyPushPull auth)
+        p; _ -> failWithError "Policy '{p}' must be one of 'push', 'pull', 'pushpull'"
+
+    def api = RemoteCacheApi domain port policy
 
     # When in debug mode, allow server incompatible version.
     def overrideOnDebugCache check =
@@ -221,7 +271,7 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
         | overrideOnDebugCache
 
     # If auth is not set we are done. Just return the api
-    require Some _ = auth
+    require Some _ = api.getRemoteCacheApiAuthorization
     else Pass api
 
     # Auth was set so it must be validated.
@@ -267,7 +317,7 @@ export def rscApiPostFileBlob (name: String) (file: String) (api: RemoteCacheApi
 # ```
 export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result Unit Error =
     require Some auth = api.getRemoteCacheApiAuthorization
-    else failWithError "rsc: Posting a job requires authorization but none was provided"
+    else failWithError "rsc: RSC Client not configured for pushing to the server"
 
     def jsonStr =
         req
@@ -314,6 +364,9 @@ export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result U
 #  api | rscApiFindMatchingJob (CacheSearchRequest ...) = Pass (CacheSearchResponse ...)
 # ```
 export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi): Result CacheSearchResponse Error =
+    require True = api.getRemoteCacheApiCanPull
+    else failWithError "rsc: RSC Client not configured for pulling from the server"
+
     def jsonStr =
         req
         | getCacheSearchRequestJson
@@ -521,7 +574,7 @@ def makeRoute ((RemoteCacheApi domain port _)) (resource: String): String =
 # Helper function for uploading a blob.
 def uploadBlobRequest (api: RemoteCacheApi) (setBlob: HttpRequest => HttpRequest): Result String Error =
     require Some auth = api.getRemoteCacheApiAuthorization
-    else failWithError "rsc: Posting a blob requires authorization but none was provided"
+    else failWithError "rsc: RSC Client not configured for pushing to the server"
 
     require Pass response =
         makeRoute api "blob"
