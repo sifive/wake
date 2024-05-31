@@ -18,7 +18,7 @@ package wake
 
 from http import _
 
-# RSC Policy on engaging with the cache. Can be confired to only push to the cache, only pull from
+# RSC Policy on engaging with the cache. Can be configured to only push to the cache, only pull from
 # the cache, or both. Pushing requires an authorization key.
 export data RemoteCachePolicy =
     RemoteCachePolicyPullOnly
@@ -287,9 +287,6 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
 #  (RemoteCacheApi "foo" 1 None) | rscApiPostStringBlob "foo" "my foo contents" = Fail "authorization required"
 # ```
 export def rscApiPostStringBlob (name: String) (value: String) (api: RemoteCacheApi): Result String Error =
-    require True = api.getRemoteCacheApiCanPush
-    else failWithError "rsc: RSC Client not configured for pushing to the server"
-
     def contentType =
         if value.strlen < 95 then
             Some "blob/small"
@@ -308,9 +305,6 @@ export def rscApiPostStringBlob (name: String) (value: String) (api: RemoteCache
 #  (RemoteCacheApi "foo" 1 None) | rscApiPostFileBlob "foo" "/some/path/to/foo" = Fail "authorization required"
 # ```
 export def rscApiPostFileBlob (name: String) (file: String) (api: RemoteCacheApi): Result String Error =
-    require True = api.getRemoteCacheApiCanPush
-    else failWithError "rsc: RSC Client not configured for pushing to the server"
-
     # We must use unsafe here since we cannot elevate *file* to a Path without either copying it
     # or triggering the 'job output by multiple files' error.
     uploadBlobRequest api (unsafe_addFormData name file None)
@@ -322,11 +316,8 @@ export def rscApiPostFileBlob (name: String) (file: String) (api: RemoteCacheApi
 #  (RemoteCacheApi "foo" 1 None) | rscApiPostJob (CachePostRequest ...) = Fail "authorization required"
 # ```
 export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result Unit Error =
-    require True = api.getRemoteCacheApiCanPush
-    else failWithError "rsc: RSC Client not configured for pushing to the server"
-
     require Some auth = api.getRemoteCacheApiAuthorization
-    else failWithError "rsc: Posting a job requires authorization but none was provided"
+    else failWithError "rsc: RSC Client not configured for pushing to the server"
 
     def jsonStr =
         req
@@ -588,7 +579,7 @@ def makeRoute ((RemoteCacheApi domain port _)) (resource: String): String =
 # Helper function for uploading a blob.
 def uploadBlobRequest (api: RemoteCacheApi) (setBlob: HttpRequest => HttpRequest): Result String Error =
     require Some auth = api.getRemoteCacheApiAuthorization
-    else failWithError "rsc: Posting a blob requires authorization but none was provided"
+    else failWithError "rsc: RSC Client not configured for pushing to the server"
 
     require Pass response =
         makeRoute api "blob"
