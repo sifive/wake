@@ -1417,7 +1417,7 @@ std::vector<JobReflection> Database::matching(
   // Any inspection flag/user code may add any WHERE expression conditions to the main query using
   // the columns of the subtable for fine grain filters.
   //
-  // For example, the query below will return all jobs that exited with status code 0 and were
+  // For example, the query below will return all jobs that exited with status code 0 and where
   // tagged with key = foo, value = var
   //   SELECT job_id FROM **SUBTABLE**
   //   WHERE status = 0 AND tags like '%<d>foo=bar<d>%'
