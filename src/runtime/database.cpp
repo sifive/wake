@@ -1408,17 +1408,17 @@ std::vector<JobReflection> Database::matching(
   //
   // The subtable is constructed by joining the jobs table with the minimal set of other dependent
   // tables with the following extra processing excluding input_files and output_files which are
-  // too expensive to inlude.
+  // too expensive to include.
   // 1. tags are flattened from two columns (uri, content) to one column (tags) with a = separator
   // 2. tags are group_concat'd into a single row per job. <d> is
-  //    used as a deliminator between each value. The deliminator is also places at the beginning
+  //    used as a deliminator between each value. The deliminator is also placed at the beginning
   //    and end of each row so that queries don't need to special case the first/last entry.
   //
   // Any inspection flag/user code may add any WHERE expression conditions to the main query using
   // the columns of the subtable for fine grain filters.
   //
-  // For example, the query below will return all jobs that exited with status code 0 and output at
-  // least one .o file.
+  // For example, the query below will return all jobs that exited with status code 0 and were
+  // tagged with key = foo, value = var
   //   SELECT job_id FROM **SUBTABLE**
   //   WHERE status = 0 AND tags like '%<d>foo=bar<d>%'
   std::string core_table = R"delim(        (

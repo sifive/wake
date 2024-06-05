@@ -407,10 +407,18 @@ int main(int argc, char **argv) {
     clo.argv[1] = clo.shebang;
   }
 
-  bool is_db_inspection =
-      !clo.job_ids.empty() || !clo.output_files.empty() || !clo.input_files.empty() ||
-      !clo.labels.empty() || !clo.tags.empty() || clo.last_use || clo.last_exe || clo.failed ||
-      clo.tagdag || clo.timeline || clo.taguri || clo.simple || clo.simple_timeline || clo.canceled;
+  bool is_db_inspect_capture = !clo.job_ids.empty() || !clo.output_files.empty() ||
+                               !clo.input_files.empty() || !clo.labels.empty() ||
+                               !clo.tags.empty() || clo.last_use || clo.last_exe || clo.failed ||
+                               clo.tagdag || clo.canceled;
+
+  // DescribePolicy::human() is the default and doesn't have a flag.
+  // DescribePolicy::debug() is overloaded and can't be marked as a db flag
+  // DescribePolicy::verbose() is overloaded and can't be marked as a db flag
+  bool is_db_inspect_render =
+      clo.taguri || clo.script || clo.metadata || clo.timeline || clo.simple || clo.simple_timeline;
+
+  bool is_db_inspection = is_db_inspect_capture || is_db_inspect_render;
 
   // Arguments are forbidden with these options
   bool noargs =
