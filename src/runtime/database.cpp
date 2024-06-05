@@ -1134,7 +1134,6 @@ JAST JobReflection::to_structured_json() const {
   json.add("directory", directory);
 
   JAST &commandline_json = json.add("commandline", JSON_ARRAY);
-
   for (const std::string &line : commandline) {
     commandline_json.add("", line);
   }
@@ -1145,13 +1144,10 @@ JAST JobReflection::to_structured_json() const {
   }
 
   json.add("stack", stack);
-
   json.add("stdin_file", stdin_file);
-
   json.add("starttime", starttime.as_int64());
   json.add("endtime", endtime.as_int64());
   json.add("wake_start", wake_start.as_int64());
-
   json.add("wake_cmdline", wake_cmdline);
 
   std::string out_stream;
