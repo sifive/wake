@@ -1126,6 +1126,82 @@ JAST JobReflection::to_simple_json() const {
   return json;
 }
 
+JAST JobReflection::to_structured_json() const {
+  JAST json(JSON_OBJECT);
+  json.add("job", job);
+  json.add("label", label);
+  json.add("stale", stale);
+  json.add("directory", directory);
+
+  JAST &commandline_json = json.add("commandline", JSON_ARRAY);
+
+  for (const std::string &line : commandline) {
+    commandline_json.add("", line);
+  }
+
+  JAST &environment_json = json.add("environment", JSON_ARRAY);
+  for (const std::string &line : environment) {
+    environment_json.add("", line);
+  }
+
+  json.add("stack", stack);
+
+  json.add("stdin_file", stdin_file);
+
+  json.add("starttime", starttime.as_int64());
+  json.add("endtime", endtime.as_int64());
+  json.add("wake_start", wake_start.as_int64());
+
+  json.add("wake_cmdline", wake_cmdline);
+
+  std::string out_stream;
+  std::string err_stream;
+  for (auto &write : std_writes) {
+    if (write.second == 1) {
+      out_stream += write.first;
+    }
+    if (write.second == 2) {
+      err_stream += write.first;
+    }
+  }
+
+  json.add("stdout", out_stream);
+  json.add("stderr", err_stream);
+
+  JAST &usage_json = json.add("usage", JSON_OBJECT);
+  usage_json.add("status", usage.status);
+  usage_json.add("runtime", usage.runtime);
+  usage_json.add("cputime", usage.cputime);
+  usage_json.add("membytes", usage.membytes);
+  usage_json.add("ibytes", usage.ibytes);
+  usage_json.add("obytes", usage.obytes);
+
+  JAST &visible_json = json.add("visible_files", JSON_ARRAY);
+  for (const auto &visible_file : visible) {
+    visible_json.add("", visible_file.path);
+  }
+
+  JAST &input_json = json.add("input_files", JSON_ARRAY);
+  for (const auto &input : inputs) {
+    input_json.add("", input.path);
+  }
+
+  JAST &output_json = json.add("output_files", JSON_ARRAY);
+  for (const auto &output : outputs) {
+    output_json.add("", output.path);
+  }
+
+  JAST &tags_json = json.add("tags", JSON_ARRAY);
+  for (const auto &tag : tags) {
+    JAST &tag_json = tags_json.add("", JSON_OBJECT);
+    tag_json.add("uri", tag.uri);
+    tag_json.add("content", tag.content);
+  }
+
+  return json;
+}
+
+// TODO: Delete this and update --timeline to use to_structured_json()
 JAST JobReflection::to_json() const {
   JAST json(JSON_OBJECT);
   json.add("job", job);

@@ -111,6 +111,14 @@ DescribePolicy get_describe_policy(const CommandLineOptions &clo) {
     return DescribePolicy::metadata();
   }
 
+  if (clo.simple_metadata) {
+    return DescribePolicy::simple_metadata();
+  }
+
+  if (clo.json) {
+    return DescribePolicy::json();
+  }
+
   if (clo.script) {
     return DescribePolicy::script();
   }
@@ -267,6 +275,8 @@ void print_help(const char *argv0) {
     << "    --simple-timeline  Report simplified timeline of captured jobs as HTML"        << std::endl
     << "    --verbose  -v      Report metadata, stdout and stderr of captured jobs"        << std::endl
     << "    --metadata         Report metadata of captured jobs"                           << std::endl
+    << "    --simple-metadata  Report metadata of captured jobs without file list"         << std::endl
+    << "    --json             Report metadata, stdout and stderr of jobs as json"         << std::endl
     << "    --debug    -d      Report stack frame of captured jobs"                        << std::endl
     << "    --simple           Report only label, cmdline, and tags of captured jobs"      << std::endl
     << "    --script   -s      Format captured jobs as an executable shell script"         << std::endl

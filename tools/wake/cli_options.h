@@ -43,6 +43,8 @@ struct CommandLineOptions {
   bool failed;
   bool script;
   bool metadata;
+  bool simple_metadata;
+  bool json;
   bool version;
   bool html;
   bool global;
@@ -135,6 +137,8 @@ struct CommandLineOptions {
       {'f', "failed", GOPT_ARGUMENT_FORBIDDEN},
       {'s', "script", GOPT_ARGUMENT_FORBIDDEN},
       {0, "metadata", GOPT_ARGUMENT_FORBIDDEN},
+      {0, "simple-metadata", GOPT_ARGUMENT_FORBIDDEN},
+      {0, "json", GOPT_ARGUMENT_FORBIDDEN},
       {0, "init", GOPT_ARGUMENT_REQUIRED},
       {0, "version", GOPT_ARGUMENT_FORBIDDEN},
       {'g', "globals", GOPT_ARGUMENT_FORBIDDEN},
@@ -192,6 +196,8 @@ struct CommandLineOptions {
     failed = arg(options, "failed")->count;
     script = arg(options, "script")->count;
     metadata = arg(options, "metadata")->count;
+    simple_metadata = arg(options, "simple-metadata")->count;
+    json = arg(options, "json")->count;
     version = arg(options, "version")->count;
     html = arg(options, "html")->count;
     global = arg(options, "globals")->count;
