@@ -171,6 +171,7 @@ repeated key presses."
     (modify-syntax-entry ?\' "|" table)
     (modify-syntax-entry ?\{ "|" table)
     (modify-syntax-entry ?\} "|" table)
+    (modify-syntax-entry ?` "\"`" table)
     table))
 
 ;;;###autoload
