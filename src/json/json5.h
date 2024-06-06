@@ -111,6 +111,9 @@ struct JAST {
     else
       return add(std::move(key), JSON_FALSE, "false");
   }
+  JAST &add(std::string key, uint64_t value) {
+    return add(std::move(key), JSON_INTEGER, std::to_string(value));
+  }
   JAST &add(std::string key, int value) {
     return add(std::move(key), JSON_INTEGER, std::to_string(value));
   }

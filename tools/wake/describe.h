@@ -29,6 +29,8 @@ struct DescribePolicy {
     SCRIPT,
     HUMAN,
     METADATA,
+    SIMPLE_METADATA,
+    JSON,
     DEBUG,
     VERBOSE,
     TIMELINE,
@@ -54,6 +56,18 @@ struct DescribePolicy {
   static DescribePolicy metadata() {
     DescribePolicy policy;
     policy.type = METADATA;
+    return policy;
+  }
+
+  static DescribePolicy simple_metadata() {
+    DescribePolicy policy;
+    policy.type = SIMPLE_METADATA;
+    return policy;
+  }
+
+  static DescribePolicy json() {
+    DescribePolicy policy;
+    policy.type = JSON;
     return policy;
   }
 

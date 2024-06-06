@@ -55,7 +55,22 @@ static std::string describe_hash(const std::string &hash, bool verbose, bool sta
   return hash.substr(0, SHORT_HASH);
 }
 
-static void describe_metadata(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
+static void describe_json(const std::vector<JobReflection> &jobs) {
+  TermInfoBuf tbuf(std::cout.rdbuf());
+  std::ostream out(&tbuf);
+
+  JAST json(JSON_OBJECT);
+  JAST &job_array = json.add("jobs", JSON_ARRAY);
+
+  for (auto &job : jobs) {
+    job_array.add("", job.to_structured_json());
+  }
+
+  out << json;
+}
+
+static void describe_metadata(const std::vector<JobReflection> &jobs, bool debug, bool verbose,
+                              bool files) {
   TermInfoBuf tbuf(std::cout.rdbuf());
   std::ostream out(&tbuf);
 
@@ -82,12 +97,17 @@ static void describe_metadata(const std::vector<JobReflection> &jobs, bool debug
       for (auto &in : job.visible)
         out << "  " << describe_hash(in.hash, verbose, job.stale) << " " << in.path << std::endl;
     }
-    out << "Inputs:" << std::endl;
-    for (auto &in : job.inputs)
-      out << "  " << describe_hash(in.hash, verbose, job.stale) << " " << in.path << std::endl;
-    out << "Outputs:" << std::endl;
-    for (auto &output : job.outputs)
-      out << "  " << describe_hash(output.hash, verbose, false) << " " << output.path << std::endl;
+    if (files) {
+      out << "Inputs:" << std::endl;
+      for (auto &in : job.inputs) {
+        out << "  " << describe_hash(in.hash, verbose, job.stale) << " " << in.path << std::endl;
+      }
+      out << "Outputs:" << std::endl;
+      for (auto &output : job.outputs) {
+        out << "  " << describe_hash(output.hash, verbose, false) << " " << output.path
+            << std::endl;
+      }
+    }
     if (debug) {
       out << "Stack:";
       indent(out, "  ", job.stack);
@@ -359,15 +379,23 @@ void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy, con
       break;
     }
     case DescribePolicy::METADATA: {
-      describe_metadata(jobs, false, false);
+      describe_metadata(jobs, false, false, true);
+      break;
+    }
+    case DescribePolicy::SIMPLE_METADATA: {
+      describe_metadata(jobs, false, false, false);
+      break;
+    }
+    case DescribePolicy::JSON: {
+      describe_json(jobs);
       break;
     }
     case DescribePolicy::DEBUG: {
-      describe_metadata(jobs, true, true);
+      describe_metadata(jobs, true, true, true);
       break;
     }
     case DescribePolicy::VERBOSE: {
-      describe_metadata(jobs, false, true);
+      describe_metadata(jobs, false, true, true);
       break;
     }
     case DescribePolicy::TAG_URI: {
