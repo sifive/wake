@@ -1339,7 +1339,7 @@ std::string collapse_or(const std::vector<std::string> &ors) {
   return out;
 }
 
-std::string collapse_and(const std::vector<std::vector<std::string>> &ands) {
+std::string collapse_and(const std::vector<std::vector<std::string>> &ands, int nest) {
   if (ands.empty()) {
     return "";
   }
@@ -1350,8 +1350,14 @@ std::string collapse_and(const std::vector<std::vector<std::string>> &ands) {
 
   std::string out = "";
 
+  std::string indent = "";
+  for (int i = 0; i < nest; i++) {
+    indent += "    ";
+  }
+  std::string query_indent = indent + "    ";
+
   for (std::vector<std::vector<std::string>>::size_type i = 0; i < ands.size() - 1; i++) {
-    out += collapse_or(ands[i]) + "\nAND\n\t";
+    out += collapse_or(ands[i]) + "\n" + indent + "AND\n" + query_indent;
   }
 
   out += collapse_or(ands.back());
@@ -1360,74 +1366,102 @@ std::string collapse_and(const std::vector<std::vector<std::string>> &ands) {
 }
 
 std::vector<JobReflection> Database::matching(
-    const std::vector<std::vector<std::string>> &and_or_filters) {
+    const std::vector<std::vector<std::string>> &core_filters,
+    std::vector<std::vector<std::string>> input_file_filters,
+    std::vector<std::vector<std::string>> output_file_filters) {
+  std::string input_file_join = "";
+  if (!input_file_filters.empty()) {
+    input_file_filters.push_back({"access = 1"});
+    std::string conds = collapse_and(input_file_filters, 3);
+    input_file_join =
+        "        INNER JOIN (\n"
+        "            SELECT filetree.job_id FROM filetree\n"
+        "            INNER JOIN files\n"
+        "            ON filetree.file_id=files.file_id\n"
+        "            WHERE\n"
+        "                " +
+        conds + "\n" + "        ) ft_input ON core.job_id = ft_input.job_id\n";
+  }
+
+  std::string output_file_join = "";
+  if (!output_file_filters.empty()) {
+    output_file_filters.push_back({"access = 2"});
+    std::string conds = collapse_and(output_file_filters, 3);
+    output_file_join =
+        "        INNER JOIN (\n"
+        "            SELECT filetree.job_id FROM filetree\n"
+        "            INNER JOIN files\n"
+        "            ON filetree.file_id=files.file_id\n"
+        "            WHERE\n"
+        "                " +
+        conds + "\n" + "        ) ft_output ON core.job_id = ft_output.job_id\n";
+  }
+
   // This query creates a subtable of the following shape:
   //
   // clang-format off
-  // | job_id | label | run_id | use_id | endtime | commandline | status | runtime |       input_files   |   output_files  |       tags       |
-  // --------------------------------------------------------------------------------------------------------------------------------
-  // |    1   |  foo  |   1    |    1   |  1234   | ls lah .    |   0    |   2.8   | <d>a.txt<d>b.txt<d> | <d>c.o<d>d.o<d> | <d>a=b<d>c=d<d>  |
-  // |    2   |  bar  |   1    |    1   |  0000   | cat f.txt   |   0    |   0.0   |       null          |      null       |      null        |
+  // | job_id | label | run_id | use_id | endtime | commandline | status | runtime |       tags       |
+  // --------------------------------------------------------------------------------------------------
+  // |    1   |  foo  |   1    |    1   |  1234   | ls lah .    |   0    |   2.8   | <d>a=b<d>c=d<d>  |
+  // |    2   |  bar  |   1    |    1   |  0000   | cat f.txt   |   0    |   0.0   |      null        |
   // clang-format on
   //
   // The subtable is constructed by joining the jobs table with the minimal set of other dependent
-  // tables with the following extra processing.
-  // 1. files table is split into 2 columns, input_files & output_files
-  // 2. tags are flattened from two columns (uri, content) to one column (tags) with a = separator
-  // 3. input_files, output_files, and tags are group_concat'd into a single row per job. <d> is
-  //    used as a deliminator between each value. The deliminator is also places at the beginning
+  // tables with the following extra processing excluding input_files and output_files which are
+  // too expensive to include.
+  // 1. tags are flattened from two columns (uri, content) to one column (tags) with a = separator
+  // 2. tags are group_concat'd into a single row per job. <d> is
+  //    used as a deliminator between each value. The deliminator is also placed at the beginning
   //    and end of each row so that queries don't need to special case the first/last entry.
   //
   // Any inspection flag/user code may add any WHERE expression conditions to the main query using
   // the columns of the subtable for fine grain filters.
   //
-  // For example, the query below will return all jobs that exited with status code 0 and output at
-  // least one .o file.
+  // For example, the query below will return all jobs that exited with status code 0 and where
+  // tagged with key = foo, value = var
   //   SELECT job_id FROM **SUBTABLE**
-  //   WHERE status = 0 AND output_files like '%<d>%.o<d>%'
-  std::string subtable = R"delim(
-          SELECT 
-              j.job_id, 
-              j.label, 
-              j.run_id, 
-              j.use_id, 
-              j.endtime, 
-              j.commandline, 
-              s.status, 
-              s.runtime,
-              '<d>' || group_concat(ft_input.path, '<d>') || '<d>' input_files, 
-              '<d>' || group_concat(ft_output.path,'<d>') || '<d>' output_files, 
-              '<d>' || group_concat(t.tag, '<d>') || '<d>' tags
-          FROM jobs j
-          LEFT JOIN (
-              SELECT stat_id, status, runtime FROM stats
-          ) s
-          ON j.stat_id=s.stat_id
-          LEFT JOIN (
-              SELECT job_id, uri || '=' || content tag FROM tags
-          ) t
-          ON j.job_id = t.job_id
-          LEFT JOIN (
-              SELECT filetree.job_id, files.path FROM filetree
-              INNER JOIN files
-              ON filetree.file_id=files.file_id
-              WHERE access = 1
-          ) ft_input
-          ON j.job_id=ft_input.job_id
-          LEFT JOIN (
-              SELECT filetree.job_id, files.path FROM filetree
-              INNER JOIN files
-              ON filetree.file_id=files.file_id
-              WHERE access = 2
-          ) ft_output
-          ON j.job_id=ft_output.job_id
-          GROUP BY
-              j.job_id
+  //   WHERE status = 0 AND tags like '%<d>foo=bar<d>%'
+  std::string core_table = R"delim(        (
+            SELECT
+                j.job_id,
+                j.label,
+                j.run_id,
+                j.use_id,
+                j.endtime,
+                j.commandline,
+                s.status,
+                s.runtime,
+                '<d>' || group_concat(t.tag, '<d>') || '<d>' tags
+            FROM jobs j
+            LEFT JOIN (
+                SELECT stat_id, status, runtime FROM stats
+            ) s
+            ON j.stat_id=s.stat_id
+            LEFT JOIN (
+                SELECT job_id, uri || '=' || content tag FROM tags
+            ) t
+            ON j.job_id = t.job_id
+            GROUP BY
+                j.job_id
+        ) core
 )delim";
 
+  std::string subtable = core_table + input_file_join + output_file_join;
+
   // This query wraps the subtable, applies the requested filters, and returns the matching jobs
-  std::string id_query = "SELECT job_id\nFROM (\n" + subtable + ")\nWHERE\n\t";
-  id_query += collapse_and(and_or_filters);
+  std::string id_query =
+      "    SELECT core.job_id\n"
+      "    FROM\n"
+      "    (\n" +
+      subtable + "    )";
+
+  if (!core_filters.empty()) {
+    id_query +=
+        "\n"
+        "    WHERE\n"
+        "        " +
+        collapse_and(core_filters, 1);
+  }
 
   // Adapts the id_query to match the columns needed to create a JobReflection
   std::string query =
@@ -1441,7 +1475,7 @@ std::vector<JobReflection> Database::matching(
       "ON j.run_id=r.run_id\n"
       "WHERE j.job_id IN (\n" +
       id_query +
-      ")"
+      "\n)\n"
       "ORDER BY j.job_id";
 
   sqlite3_stmt *stmt;

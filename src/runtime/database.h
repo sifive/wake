@@ -158,8 +158,12 @@ struct Database {
 
   std::string get_hash(const std::string &file, long modified);
 
-  // Outer is a set of filters to be AND'd together, inner is a set of queries to be OR'd together
-  std::vector<JobReflection> matching(const std::vector<std::vector<std::string>> &and_or_filters);
+  // In core_filters, the outer vec is a set of filters to be AND'd together, inner vec is a set of
+  // queries to be OR'd together. This holds for input_file_filters and output_file_filters as well
+  // but is less useful as its restricted to the column 'path' in the files table.
+  std::vector<JobReflection> matching(const std::vector<std::vector<std::string>> &core_filters,
+                                      std::vector<std::vector<std::string>> input_file_filters,
+                                      std::vector<std::vector<std::string>> output_file_filters);
 
   std::vector<JobEdge> get_edges();
   std::vector<JobTag> get_tags();
