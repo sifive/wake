@@ -425,8 +425,8 @@ int main(int argc, char **argv) {
   // DescribePolicy::human() is the default and doesn't have a flag.
   // DescribePolicy::debug() is overloaded and can't be marked as a db flag
   // DescribePolicy::verbose() is overloaded and can't be marked as a db flag
-  bool is_db_inspect_render =
-      clo.taguri || clo.script || clo.metadata || clo.timeline || clo.simple || clo.simple_timeline;
+  bool is_db_inspect_render = clo.taguri || clo.script || clo.metadata || clo.timeline ||
+                              clo.simple || clo.simple_timeline || clo.json || clo.simple_metadata;
 
   bool is_db_inspection = is_db_inspect_capture || is_db_inspect_render;
 
