@@ -207,6 +207,16 @@ export def byteToInteger (firstByteToConvert: String): Integer =
 
     p firstByteToConvert
 
+export def unicodeToBytes (str: String): List Integer =
+    def p s = prim "str2bytes"
+
+    p str
+
+export def bytesToUnicode (bytes: List Integer): String =
+    bytes
+    | map integerToByte
+    | cat
+
 # Version of wake
 export def version: String =
     prim "version"
