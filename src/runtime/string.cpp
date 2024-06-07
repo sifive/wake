@@ -646,6 +646,30 @@ static PRIMFN(prim_str2bin) {
   RETURN(Integer::alloc(runtime.heap, out));
 }
 
+static PRIMTYPE(type_str2bytes) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(Data::typeInteger);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(list);
+}
+
+static PRIMFN(prim_str2bytes) {
+  EXPECT(1);
+  STRING(arg0, 0);
+
+  // worst-case estimate
+  size_t need = reserve_list(arg0->size()) + arg0->size() * Integer::reserve(1);
+  runtime.heap.reserve(need);
+
+  std::vector<Value *> vals;
+  for (size_t idx = 0; idx < arg0->size(); idx++) {
+    MPZ out(static_cast<unsigned char>(arg0->c_str()[idx]));
+    vals.push_back(Integer::claim(runtime.heap, out));
+  }
+
+  RETURN(claim_list(runtime.heap, vals.size(), vals.data()));
+}
+
 static PRIMTYPE(type_cwd) { return args.size() == 0 && out->unify(Data::typeString); }
 
 static PRIMFN(prim_cwd) {
@@ -832,4 +856,5 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "toupper", prim_to_upper, type_to_upper, PRIM_PURE);
   prim_register(pmap, "tolower", prim_to_lower, type_to_lower, PRIM_PURE);
   prim_register(pmap, "stat", prim_stat, type_stat, PRIM_ORDERED);
+  prim_register(pmap, "str2bytes", prim_str2bytes, type_str2bytes, PRIM_PURE);
 }
