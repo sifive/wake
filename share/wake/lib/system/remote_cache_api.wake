@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO: change this to package remote_cache and deal with all the churn
-package wake
+package remote_cache
 
 from http import _
+from wake import _
 
 # RSC Policy on engaging with the cache. Can be configured to only push to the cache, only pull from
 # the cache, or both. Pushing requires an authorization key.
@@ -543,6 +543,16 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
     Pass path
 
 ## --- Helper functions ---
+# TODO: Delete these once new json API is added to wake repo
+def jField (jvalue: JValue) (key: String) =
+    require JObject obj = jvalue
+    else failWithError "not an object"
+
+    require Some (Pair (Pair _ value) _) = find (_.getPairFirst ==~ key) obj
+    else failWithError "key '{key}' not found"
+
+    Pass value
+
 
 # strToBytes "foo" = (13, 14, 15, Nil)
 def strToBytes (str: String): List Integer =
@@ -561,10 +571,10 @@ def asBytesDelimedByNull (parts: List String): List Integer =
     | listFlattenWithNull
 
 # getPathAsJson (Path "foo" "asdf") = (JObject ...)
-def getPathAsJson (Path path hash) =
+def getPathAsJson path =
     JObject (
-        "path" :-> JString path,
-        "hash" :-> JString hash,
+        "path" :-> JString path.getPathName,
+        "hash" :-> JString path.getPathHash,
     )
 
 # Helper function for building the route for the resource
