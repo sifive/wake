@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package wake
+package remote_cache
+
+from wake import _
 
 # rscRunner: Creates a remote cache runner for a given api config
 #
