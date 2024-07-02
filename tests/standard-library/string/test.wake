@@ -1,5 +1,8 @@
-def unicodeStr = "[aɪ̯ pʰiː eɪ̯]"
-def unicodeBytes = 91, 97, 201, 170, 204, 175, 32, 112, 202, 176, 105, 203, 144, 32, 101, 201, 170, 204, 175, 93, Nil
+def unicodeStr =
+    "[aɪ̯ pʰiː eɪ̯]"
+
+def unicodeBytes =
+    91, 97, 201, 170, 204, 175, 32, 112, 202, 176, 105, 203, 144, 32, 101, 201, 170, 204, 175, 93, Nil
 
 export def testToBytes _ =
     unicodeStr
@@ -12,11 +15,11 @@ export def testToUnicode _ =
 export def testEquality _ =
     require True = (unicodeStr | unicodeToBytes | bytesToUnicode) ==* unicodeStr
 
-    require 91, 97, 201, 170, 204, 175, 32, 112, 202, 176, 105, 203, 144, 32, 101, 201, 170, 204, 175, 93, Nil = unicodeBytes | bytesToUnicode | unicodeToBytes
+    require 91, 97, 201, 170, 204, 175, 32, 112, 202, 176, 105, 203, 144, 32, 101, 201, 170, 204, 175, 93, Nil =
+        unicodeBytes
+        | bytesToUnicode
+        | unicodeToBytes
     else False
 
     True
 
-# export def testToUnicode = unicodeStr | unicodeToBytes
-
-# | unicodeToBytes | bytesToUnicode
