@@ -657,8 +657,8 @@ static PRIMFN(prim_str2bytes) {
   EXPECT(1);
   STRING(arg0, 0);
 
-  // worst-case estimate
-  size_t need = reserve_list(arg0->size()) + arg0->size() * Integer::reserve(1);
+  // Reserve memory for a list of size() elements + size() number of integers up to the value 255
+  size_t need = reserve_list(arg0->size()) + arg0->size() * Integer::reserve(255);
   runtime.heap.reserve(need);
 
   std::vector<Value *> vals;
