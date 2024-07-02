@@ -104,14 +104,6 @@ jobs:
               test_cmd: tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake -x Unit
               install_src_glob: build/wake-*/wake-static_*
 
-            - target: centos_7_6
-              dockerfile: centos-7.6
-              extra_docker_build_args: ''
-              extra_docker_run_args: ''
-              build_cmd: source scl_source enable devtoolset-9 && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-              test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
-              install_src_glob: build/x86_64/*.rpm
-
             - target: debian_bullseye
               dockerfile: debian-bullseye
               extra_docker_build_args: ''
@@ -311,12 +303,6 @@ jobs:
             name: release_debian_bullseye
             path: debian_bullseye
 
-        - name: Download CentOS 7.6
-          uses: actions/download-artifact@v3
-          with:
-            name: release_centos_7_6
-            path: centos_7_6
-
         - name: Download Rocky 8
           uses: actions/download-artifact@v3
           with:
@@ -345,7 +331,6 @@ jobs:
           run: |
             TAG="${{ github.ref_name }}"
             VERSION="${TAG:1}"
-            cp centos_7_6/wake-*-1.x86_64.rpm centos-7-6-wake-${VERSION}-1.x86_64.rpm
             cp rocky_8/wake-*-1.x86_64.rpm rocky_8-wake-${VERSION}-1.x86_64.rpm
             cp rocky_9/wake-*-1.x86_64.rpm rocky_9-wake-${VERSION}-1.x86_64.rpm
             cp debian_bullseye/wake_*-1_amd64.deb debian-bullseye-wake_${VERSION}-1_amd64.deb
@@ -361,7 +346,6 @@ jobs:
             files: |
               tarball/wake_*.tar.xz
               vscode/wake-*.vsix
-              centos-7-6-wake-*-1.x86_64.rpm
               rocky_8-wake-*-1.x86_64.rpm
               rocky_9-wake-*-1.x86_64.rpm
               debian-bullseye-wake_*-1_amd64.deb
