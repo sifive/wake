@@ -553,21 +553,11 @@ def jField (jvalue: JValue) (key: String) =
 
     Pass value
 
-# strToBytes "foo" = (13, 14, 15, Nil)
-def strToBytes (str: String): List Integer =
-    str
-    | explode
-    | map (byteToInteger _)
-
-# listFlattenWithNull ((1,2,3,), (4,5,6,), (7,8,9,),) = (1,2,3,0,4,5,6,0,7,8,9,0,)
-def listFlattenWithNull (parts: List (List Integer)): List Integer =
-    foldr (\x \acc x ++ (0, acc)) Nil parts
-
 # asBytesDelimedByNull ("a", "b", "cd",) = (15, 0, 16, 0, 17, 18, 0)
-def asBytesDelimedByNull (parts: List String): List Integer =
+export def asBytesDelimedByNull (parts: List String): List Integer =
     parts
-    | map strToBytes
-    | listFlattenWithNull
+    | map (\x unicodeToBytes x ++ (0,))
+    | flatten
 
 # getPathAsJson (Path "foo" "asdf") = (JObject ...)
 def getPathAsJson path =
