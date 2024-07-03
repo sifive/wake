@@ -207,6 +207,28 @@ export def byteToInteger (firstByteToConvert: String): Integer =
 
     p firstByteToConvert
 
+# unicodeToBytes: Convert a unicode string the to a list of the exact backing bytes. If you are
+# using this function you are probably using it wrong. Consider using unicodeToInteger. The only
+# safe way to use this function is when pairing it with bytesToUnicode without *any* modification
+# of the underlying bytes.
+#
+# unicodeToBytes "aɪ̯pʰi" =  97, 201, 170, 204, 175, 112, 202, 176, 105, Nil
+export def unicodeToBytes (str: String): List Integer =
+    def p s = prim "str2bytes"
+
+    p str
+
+# bytesToUnicode: Convert a list of exact backing bytes to the representative unicode string. If
+# you are using this function you are probably using it wrong. Consider using integerToUnicode.
+# The only safe way to use this function is when pairing it with unicodeToBytes without *any*
+# modification of the underlying bytes.
+#
+# bytesToUnicode (97, 201, 170, 204, 175, 112, 202, 176, 105, Nil) = "aɪ̯pʰi"
+export def bytesToUnicode (bytes: List Integer): String =
+    bytes
+    | map integerToByte
+    | cat
+
 # Version of wake
 export def version: String =
     prim "version"
