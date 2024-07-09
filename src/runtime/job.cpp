@@ -1272,11 +1272,11 @@ static PRIMFN(prim_job_virtual) {
 
   if (!stdout_payload->empty()) {
     // TODO: Add a job_id
-    status_get_generic_stream(job->stream_out.c_str()) << stdout_payload << std::endl;
+    status_get_generic_stream(job->stream_out.c_str()) << stdout_payload->c_str() << std::endl;
   }
   if (!stderr_payload->empty()) {
     // TODO: Add a job_id
-    status_get_generic_stream(job->stream_err.c_str()) << stdout_payload << std::endl;
+    status_get_generic_stream(job->stream_err.c_str()) << stdout_payload->c_str() << std::endl;
   }
 
   job->state = STATE_FORKED | STATE_STDOUT | STATE_STDERR | STATE_MERGED;
