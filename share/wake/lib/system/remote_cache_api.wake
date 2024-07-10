@@ -554,7 +554,7 @@ def jField (jvalue: JValue) (key: String) =
     Pass value
 
 # asBytesDelimedByNull ("a", "b", "cd",) = (15, 0, 16, 0, 17, 18, 0)
-export def asBytesDelimedByNull (parts: List String): List Integer =
+def asBytesDelimedByNull (parts: List String): List Integer =
     parts
     | map (\x unicodeToBytes x ++ (0,))
     | flatten
