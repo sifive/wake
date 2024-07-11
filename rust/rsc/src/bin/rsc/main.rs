@@ -416,8 +416,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let one_min_in_seconds = 60 * 1;
     let ten_mins_in_seconds = one_min_in_seconds * 10;
     let one_hour_in_seconds = one_min_in_seconds * 60;
-    let one_week_in_seconds = one_hour_in_seconds * 24 * 7;
-    launch_job_eviction(connection.clone(), ten_mins_in_seconds, one_week_in_seconds);
+    let one_day_in_seconds = one_hour_in_seconds * 24 * 1;
+    launch_job_eviction(connection.clone(), ten_mins_in_seconds, one_day_in_seconds);
     launch_blob_eviction(
         connection.clone(),
         one_min_in_seconds,
