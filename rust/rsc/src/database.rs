@@ -249,7 +249,7 @@ pub async fn oldest_jobs<T: ConnectionTrait>(db: &T) -> Result<Vec<OldestJobs>, 
         INNER JOIN job j
         ON j.hash = h.hash
         ORDER BY j.created_at
-        LIMIT 50
+        LIMIT 30
         "#,
     ))
     .all(db)
@@ -272,7 +272,111 @@ pub async fn most_reused_jobs<T: ConnectionTrait>(db: &T) -> Result<Vec<MostReus
         INNER JOIN job j
         ON j.hash = h.hash
         ORDER BY h.hits DESC
-        LIMIT 50
+        LIMIT 30
+        "#,
+    ))
+    .all(db)
+    .await
+}
+
+#[derive(Debug, FromQueryResult)]
+pub struct LostOpportunityJobs {
+    pub label: String,
+    pub reuses: i32,
+    pub misses: i32,
+    pub real_savings: i64,
+    pub potential_savings: i64,
+}
+
+pub async fn lost_opportuinty_jobs<T: ConnectionTrait>(
+    db: &T,
+) -> Result<Vec<LostOpportunityJobs>, DbErr> {
+    LostOpportunityJobs::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        SELECT
+            j.label,
+            h.hits as reuses,
+            h.misses - 1 as misses,
+            CAST(round(h.hits * j.runtime) as BIGINT) as real_savings,
+            CAST(round((h.hits + h.misses - 1) * j.runtime) as BIGINT) as potential_savings
+        FROM job_history h
+        INNER JOIN job j
+        ON j.hash = h.hash
+        ORDER BY potential_savings DESC
+        LIMIT 30;
+        "#,
+    ))
+    .all(db)
+    .await
+}
+
+#[derive(Debug, FromQueryResult)]
+pub struct SizeRuntimeValueJob {
+    pub label: String,
+    pub runtime: i64,
+    pub disk_usage: i64,
+    pub ms_saved_per_byte: i64,
+}
+
+pub async fn most_space_efficient_jobs<T: ConnectionTrait>(
+    db: &T,
+) -> Result<Vec<SizeRuntimeValueJob>, DbErr> {
+    SizeRuntimeValueJob::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        SELECT
+            j.label,
+            CAST(round(j.runtime) as BIGINT) as runtime,
+            CAST(b.blob_size + stdout.size + stderr.size as BIGINT) as disk_usage,
+            CAST(round(j.runtime / (b.blob_size + stdout.size + stderr.size) * 1000) as BIGINT) as ms_saved_per_byte
+        FROM (
+           SELECT o.job_id, sum(b.size) as blob_size
+           FROM output_file o
+           INNER JOIN blob b
+           ON o.blob_id = b.id
+           GROUP BY o.job_id
+        ) b
+        INNER JOIN job j
+        ON j.id = b.job_id
+        INNER JOIN blob stdout
+        ON j.stdout_blob_id= stdout.id
+        INNER JOIN blob stderr
+        ON j.stderr_blob_id= stderr.id
+        ORDER BY ms_saved_per_byte DESC
+        LIMIT 30;
+        "#,
+    ))
+    .all(db)
+    .await
+}
+
+pub async fn most_space_use_jobs<T: ConnectionTrait>(
+    db: &T,
+) -> Result<Vec<SizeRuntimeValueJob>, DbErr> {
+    SizeRuntimeValueJob::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        SELECT
+            j.label,
+            CAST(round(j.runtime) as BIGINT) as runtime,
+            CAST(b.blob_size + stdout.size + stderr.size as BIGINT) as disk_usage,
+            CAST(round(j.runtime / (b.blob_size + stdout.size + stderr.size) * 1000) as BIGINT) as ms_saved_per_byte
+        FROM (
+           SELECT o.job_id, sum(b.size) as blob_size
+           FROM output_file o
+           INNER JOIN blob b
+           ON o.blob_id = b.id
+           GROUP BY o.job_id
+        ) b
+        INNER JOIN job j
+        ON j.id = b.job_id
+        INNER JOIN blob stdout
+        ON j.stdout_blob_id= stdout.id
+        INNER JOIN blob stderr
+        ON j.stderr_blob_id= stderr.id
+        ORDER BY disk_usage DESC
+        LIMIT 30;
         "#,
     ))
     .all(db)
