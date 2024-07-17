@@ -62,6 +62,7 @@ pub async fn stats(db: Arc<DatabaseConnection>) -> Json<DashboardStatsResponse> 
                 out.push(DashboardStatsOldestJob {
                     label: item.label,
                     created_at: item.created_at,
+                    reuses: item.reuses,
                     savings: item.savings,
                 });
             }

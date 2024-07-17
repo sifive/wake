@@ -178,6 +178,7 @@ pub struct GetUploadUrlResponse {
 pub struct DashboardStatsOldestJob {
     pub label: String,
     pub created_at: DateTime,
+    pub reuses: i32,
     pub savings: i64,
 }
 

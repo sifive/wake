@@ -219,7 +219,7 @@ pub async fn time_saved<T: ConnectionTrait>(db: &T) -> Result<Option<TimeSaved>,
     TimeSaved::find_by_statement(Statement::from_string(
         DbBackend::Postgres,
         r#"
-        SELECT CAST(round(sum(savings)) as INT8) as savings
+        SELECT CAST(round(sum(savings)) as BIGINT) as savings
         FROM (
             SELECT h.hits * j.runtime as savings
             FROM job_history h
@@ -236,6 +236,7 @@ pub async fn time_saved<T: ConnectionTrait>(db: &T) -> Result<Option<TimeSaved>,
 pub struct OldestJobs {
     pub label: String,
     pub created_at: DateTime,
+    pub reuses: i32,
     pub savings: i64,
 }
 
@@ -243,7 +244,7 @@ pub async fn oldest_jobs<T: ConnectionTrait>(db: &T) -> Result<Vec<OldestJobs>, 
     OldestJobs::find_by_statement(Statement::from_string(
         DbBackend::Postgres,
         r#"
-        SELECT j.label, j.created_at, CAST(round(CAST(h.hits * j.runtime as numeric)) as INT8) as savings
+        SELECT j.label, j.created_at, h.hits as reuses, CAST(round(h.hits * j.runtime) as BIGINT) as savings
         FROM job_history h
         INNER JOIN job j
         ON j.hash = h.hash
@@ -266,7 +267,7 @@ pub async fn most_reused_jobs<T: ConnectionTrait>(db: &T) -> Result<Vec<MostReus
     MostReusedJob::find_by_statement(Statement::from_string(
         DbBackend::Postgres,
         r#"
-        SELECT j.label, h.hits as reuses, CAST(round(CAST(h.hits * j.runtime as numeric)) as INT8) as savings
+        SELECT j.label, h.hits as reuses, CAST(round(h.hits * j.runtime) as BIGINT) as savings
         FROM job_history h
         INNER JOIN job j
         ON j.hash = h.hash
@@ -560,7 +561,7 @@ pub async fn total_blob_size<T: ConnectionTrait>(db: &T) -> Result<Option<TotalB
     TotalBlobSize::find_by_statement(Statement::from_string(
         DbBackend::Postgres,
         r#"
-        SELECT CAST(sum(size) as INT8) as size
+        SELECT CAST(sum(size) as BIGINT) as size
         FROM blob
         "#,
     ))
