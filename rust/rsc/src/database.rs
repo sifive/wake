@@ -340,9 +340,9 @@ pub async fn most_space_efficient_jobs<T: ConnectionTrait>(
         INNER JOIN job j
         ON j.id = b.job_id
         INNER JOIN blob stdout
-        ON j.stdout_blob_id= stdout.id
+        ON j.stdout_blob_id = stdout.id
         INNER JOIN blob stderr
-        ON j.stderr_blob_id= stderr.id
+        ON j.stderr_blob_id = stderr.id
         ORDER BY ms_saved_per_byte DESC
         LIMIT 30;
         "#,
@@ -372,9 +372,9 @@ pub async fn most_space_use_jobs<T: ConnectionTrait>(
         INNER JOIN job j
         ON j.id = b.job_id
         INNER JOIN blob stdout
-        ON j.stdout_blob_id= stdout.id
+        ON j.stdout_blob_id = stdout.id
         INNER JOIN blob stderr
-        ON j.stderr_blob_id= stderr.id
+        ON j.stderr_blob_id = stderr.id
         ORDER BY disk_usage DESC
         LIMIT 30;
         "#,
