@@ -343,6 +343,7 @@ pub async fn most_space_efficient_jobs<T: ConnectionTrait>(
         ON j.stdout_blob_id = stdout.id
         INNER JOIN blob stderr
         ON j.stderr_blob_id = stderr.id
+        WHERE (b.blob_size + stdout.size + stderr.size) > 0
         ORDER BY ms_saved_per_byte DESC
         LIMIT 30;
         "#,
@@ -375,6 +376,7 @@ pub async fn most_space_use_jobs<T: ConnectionTrait>(
         ON j.stdout_blob_id = stdout.id
         INNER JOIN blob stderr
         ON j.stderr_blob_id = stderr.id
+        WHERE (b.blob_size + stdout.size + stderr.size) > 0
         ORDER BY disk_usage DESC
         LIMIT 30;
         "#,
