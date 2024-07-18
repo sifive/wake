@@ -1,7 +1,8 @@
 use chrono::NaiveDateTime;
 use data_encoding::BASE64;
 use entity::prelude::{
-    Blob, BlobStore, LocalBlobStore, OutputDir, OutputFile, OutputSymlink, VisibleFile,
+    ApiKey, Blob, BlobStore, Job, JobHistory, LocalBlobStore, OutputDir, OutputFile, OutputSymlink,
+    VisibleFile,
 };
 use entity::{
     api_key, blob, blob_store, job, job_history, local_blob_store, output_dir, output_file,
@@ -11,7 +12,7 @@ use itertools::Itertools;
 use migration::OnConflict;
 use rand_core::{OsRng, RngCore};
 use sea_orm::{
-    prelude::{Expr, Uuid},
+    prelude::{DateTime, Expr, Uuid},
     ActiveModelTrait,
     ActiveValue::*,
     ColumnTrait, ConnectionTrait, DbBackend, DbErr, DeleteResult, EntityTrait, PaginatorTrait,
@@ -60,11 +61,11 @@ pub async fn read_api_key<T: ConnectionTrait>(
     db: &T,
     id: Uuid,
 ) -> Result<Option<api_key::Model>, DbErr> {
-    api_key::Entity::find_by_id(id).one(db).await
+    ApiKey::find_by_id(id).one(db).await
 }
 
 pub async fn read_api_keys<T: ConnectionTrait>(db: &T) -> Result<Vec<api_key::Model>, DbErr> {
-    api_key::Entity::find().all(db).await
+    ApiKey::find().all(db).await
 }
 
 // ----------            Update            ----------
@@ -75,7 +76,7 @@ pub async fn delete_api_key<T: ConnectionTrait>(
     key: api_key::Model,
 ) -> Result<DeleteResult, DbErr> {
     tracing::info!("Deleting api key {}", key.key);
-    api_key::Entity::delete_by_id(key.id).exec(db).await
+    ApiKey::delete_by_id(key.id).exec(db).await
 }
 
 // --------------------------------------------------
@@ -128,7 +129,7 @@ pub async fn read_local_blob_store<T: ConnectionTrait>(
     db: &T,
     id: Uuid,
 ) -> Result<Option<local_blob_store::Model>, DbErr> {
-    local_blob_store::Entity::find_by_id(id).one(db).await
+    LocalBlobStore::find_by_id(id).one(db).await
 }
 
 pub async fn read_local_blob_stores<T: ConnectionTrait>(
@@ -145,10 +146,8 @@ pub async fn delete_local_blob_store<T: ConnectionTrait>(
     store: local_blob_store::Model,
 ) -> Result<DeleteResult, DbErr> {
     tracing::info!("Deleting local blob store {}", store.id);
-    local_blob_store::Entity::delete_by_id(store.id)
-        .exec(db)
-        .await?;
-    blob_store::Entity::delete_by_id(store.id).exec(db).await
+    LocalBlobStore::delete_by_id(store.id).exec(db).await?;
+    BlobStore::delete_by_id(store.id).exec(db).await
 }
 
 // --------------------------------------------------
@@ -176,7 +175,7 @@ pub fn read_dbonly_blob_store_id() -> Uuid {
 pub async fn read_dbonly_blob_store<T: ConnectionTrait>(
     db: &T,
 ) -> Result<Option<blob_store::Model>, DbErr> {
-    blob_store::Entity::find_by_id(read_dbonly_blob_store_id())
+    BlobStore::find_by_id(read_dbonly_blob_store_id())
         .one(db)
         .await
 }
@@ -193,19 +192,197 @@ pub async fn read_dbonly_blob_store<T: ConnectionTrait>(
 
 // ----------             Read             ----------
 pub async fn read_job<T: ConnectionTrait>(db: &T, id: Uuid) -> Result<Option<job::Model>, DbErr> {
-    job::Entity::find_by_id(id).one(db).await
+    Job::find_by_id(id).one(db).await
 }
 
 pub async fn search_jobs_by_label<T: ConnectionTrait>(
     db: &T,
     label: &String,
 ) -> Result<Vec<job::Model>, DbErr> {
-    job::Entity::find()
+    Job::find()
         .filter(job::Column::Label.like(label))
         .order_by_asc(job::Column::Label)
         .all(db)
         .await
 }
+
+pub async fn count_jobs<T: ConnectionTrait>(db: &T) -> Result<u64, DbErr> {
+    Job::find().count(db).await
+}
+
+#[derive(Debug, FromQueryResult)]
+pub struct TimeSaved {
+    pub savings: i64,
+}
+
+pub async fn time_saved<T: ConnectionTrait>(db: &T) -> Result<Option<TimeSaved>, DbErr> {
+    TimeSaved::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        SELECT CAST(round(sum(savings)) as BIGINT) as savings
+        FROM (
+            SELECT h.hits * j.runtime as savings
+            FROM job_history h
+            INNER JOIN job j
+            ON j.hash = h.hash
+        )
+        "#,
+    ))
+    .one(db)
+    .await
+}
+
+#[derive(Debug, FromQueryResult)]
+pub struct OldestJobs {
+    pub label: String,
+    pub created_at: DateTime,
+    pub reuses: i32,
+    pub savings: i64,
+}
+
+pub async fn oldest_jobs<T: ConnectionTrait>(db: &T) -> Result<Vec<OldestJobs>, DbErr> {
+    OldestJobs::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        SELECT j.label, j.created_at, h.hits as reuses, CAST(round(h.hits * j.runtime) as BIGINT) as savings
+        FROM job_history h
+        INNER JOIN job j
+        ON j.hash = h.hash
+        ORDER BY j.created_at
+        LIMIT 30
+        "#,
+    ))
+    .all(db)
+    .await
+}
+
+#[derive(Debug, FromQueryResult)]
+pub struct MostReusedJob {
+    pub label: String,
+    pub reuses: i32,
+    pub savings: i64,
+}
+
+pub async fn most_reused_jobs<T: ConnectionTrait>(db: &T) -> Result<Vec<MostReusedJob>, DbErr> {
+    MostReusedJob::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        SELECT j.label, h.hits as reuses, CAST(round(h.hits * j.runtime) as BIGINT) as savings
+        FROM job_history h
+        INNER JOIN job j
+        ON j.hash = h.hash
+        ORDER BY h.hits DESC
+        LIMIT 30
+        "#,
+    ))
+    .all(db)
+    .await
+}
+
+#[derive(Debug, FromQueryResult)]
+pub struct LostOpportunityJobs {
+    pub label: String,
+    pub reuses: i32,
+    pub misses: i32,
+    pub real_savings: i64,
+    pub potential_savings: i64,
+}
+
+pub async fn lost_opportuinty_jobs<T: ConnectionTrait>(
+    db: &T,
+) -> Result<Vec<LostOpportunityJobs>, DbErr> {
+    LostOpportunityJobs::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        SELECT
+            j.label,
+            h.hits as reuses,
+            h.misses - 1 as misses,
+            CAST(round(h.hits * j.runtime) as BIGINT) as real_savings,
+            CAST(round((h.hits + h.misses - 1) * j.runtime) as BIGINT) as potential_savings
+        FROM job_history h
+        INNER JOIN job j
+        ON j.hash = h.hash
+        ORDER BY potential_savings DESC
+        LIMIT 30;
+        "#,
+    ))
+    .all(db)
+    .await
+}
+
+#[derive(Debug, FromQueryResult)]
+pub struct SizeRuntimeValueJob {
+    pub label: String,
+    pub runtime: i64,
+    pub disk_usage: i64,
+    pub ms_saved_per_byte: i64,
+}
+
+pub async fn most_space_efficient_jobs<T: ConnectionTrait>(
+    db: &T,
+) -> Result<Vec<SizeRuntimeValueJob>, DbErr> {
+    SizeRuntimeValueJob::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        SELECT
+            j.label,
+            CAST(round(j.runtime) as BIGINT) as runtime,
+            CAST(b.blob_size + stdout.size + stderr.size as BIGINT) as disk_usage,
+            CAST(round(j.runtime / (b.blob_size + stdout.size + stderr.size) * 1000) as BIGINT) as ms_saved_per_byte
+        FROM (
+           SELECT o.job_id, sum(b.size) as blob_size
+           FROM output_file o
+           INNER JOIN blob b
+           ON o.blob_id = b.id
+           GROUP BY o.job_id
+        ) b
+        INNER JOIN job j
+        ON j.id = b.job_id
+        INNER JOIN blob stdout
+        ON j.stdout_blob_id = stdout.id
+        INNER JOIN blob stderr
+        ON j.stderr_blob_id = stderr.id
+        ORDER BY ms_saved_per_byte DESC
+        LIMIT 30;
+        "#,
+    ))
+    .all(db)
+    .await
+}
+
+pub async fn most_space_use_jobs<T: ConnectionTrait>(
+    db: &T,
+) -> Result<Vec<SizeRuntimeValueJob>, DbErr> {
+    SizeRuntimeValueJob::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        SELECT
+            j.label,
+            CAST(round(j.runtime) as BIGINT) as runtime,
+            CAST(b.blob_size + stdout.size + stderr.size as BIGINT) as disk_usage,
+            CAST(round(j.runtime / (b.blob_size + stdout.size + stderr.size) * 1000) as BIGINT) as ms_saved_per_byte
+        FROM (
+           SELECT o.job_id, sum(b.size) as blob_size
+           FROM output_file o
+           INNER JOIN blob b
+           ON o.blob_id = b.id
+           GROUP BY o.job_id
+        ) b
+        INNER JOIN job j
+        ON j.id = b.job_id
+        INNER JOIN blob stdout
+        ON j.stdout_blob_id = stdout.id
+        INNER JOIN blob stderr
+        ON j.stderr_blob_id = stderr.id
+        ORDER BY disk_usage DESC
+        LIMIT 30;
+        "#,
+    ))
+    .all(db)
+    .await
+}
+
 // ----------            Update            ----------
 
 // ----------            Delete            ----------
@@ -216,7 +393,7 @@ pub async fn delete_all_jobs<T: ConnectionTrait>(db: &T, chunk_size: u16) -> Res
         panic!("Chunk size must be larger than zero");
     }
 
-    let total = entity::job::Entity::find().count(db).await?;
+    let total = Job::find().count(db).await?;
     let mut affected = 0;
 
     loop {
@@ -248,7 +425,7 @@ pub async fn delete_job<T: ConnectionTrait>(
     job: job::Model,
 ) -> Result<DeleteResult, DbErr> {
     tracing::info!(%job.id, "Deleting job");
-    job::Entity::delete_by_id(job.id).exec(db).await
+    Job::delete_by_id(job.id).exec(db).await
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -418,11 +595,13 @@ pub async fn create_many_output_dirs<T: ConnectionTrait>(
 // --------------------------------------------------
 // ----------             Blob             ----------
 // --------------------------------------------------
+//
+// ----------            Create            ----------
 pub async fn upsert_blob<T: ConnectionTrait>(
     db: &T,
     blob: blob::ActiveModel,
 ) -> Result<Uuid, DbErr> {
-    let result = blob::Entity::insert(blob)
+    let result = Blob::insert(blob)
         .on_conflict(
             OnConflict::columns(vec![blob::Column::Key, blob::Column::StoreId])
                 .update_column(blob::Column::UpdatedAt)
@@ -433,8 +612,6 @@ pub async fn upsert_blob<T: ConnectionTrait>(
 
     Ok(result.last_insert_id)
 }
-
-// ----------            Create            ----------
 
 // ----------             Read             ----------
 
@@ -475,6 +652,27 @@ pub async fn read_unreferenced_blobs<T: ConnectionTrait>(
         .await
 }
 
+pub async fn count_blobs<T: ConnectionTrait>(db: &T) -> Result<u64, DbErr> {
+    Blob::find().count(db).await
+}
+
+#[derive(Debug, FromQueryResult)]
+pub struct TotalBlobSize {
+    pub size: i64,
+}
+
+pub async fn total_blob_size<T: ConnectionTrait>(db: &T) -> Result<Option<TotalBlobSize>, DbErr> {
+    TotalBlobSize::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        SELECT CAST(sum(size) as BIGINT) as size
+        FROM blob
+        "#,
+    ))
+    .one(db)
+    .await
+}
+
 // ----------            Update            ----------
 
 // ----------            Delete            ----------
@@ -493,7 +691,7 @@ pub async fn delete_blobs_by_ids<T: ConnectionTrait>(db: &T, ids: Vec<Uuid>) -> 
         .collect();
 
     for chunk in chunked {
-        let result = entity::blob::Entity::delete_many()
+        let result = Blob::delete_many()
             .filter(
                 entity::blob::Column::Id.in_subquery(
                     migration::Query::select()
@@ -524,7 +722,7 @@ pub async fn upsert_job_hit<T: ConnectionTrait>(db: &T, hash: String) -> Result<
         updated_at: NotSet,
     };
 
-    let _ = job_history::Entity::insert(active_model)
+    let _ = JobHistory::insert(active_model)
         .on_conflict(
             OnConflict::column(job_history::Column::Hash)
                 .update_column(job_history::Column::UpdatedAt)
@@ -550,7 +748,7 @@ pub async fn upsert_job_miss<T: ConnectionTrait>(db: &T, hash: String) -> Result
         updated_at: NotSet,
     };
 
-    let _ = job_history::Entity::insert(active_model)
+    let _ = JobHistory::insert(active_model)
         .on_conflict(
             OnConflict::column(job_history::Column::Hash)
                 .update_column(job_history::Column::UpdatedAt)
@@ -576,7 +774,7 @@ pub async fn upsert_job_evict<T: ConnectionTrait>(db: &T, hash: String) -> Resul
         updated_at: NotSet,
     };
 
-    let _ = job_history::Entity::insert(active_model)
+    let _ = JobHistory::insert(active_model)
         .on_conflict(
             OnConflict::column(job_history::Column::Hash)
                 .update_column(job_history::Column::UpdatedAt)

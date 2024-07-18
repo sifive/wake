@@ -24,6 +24,7 @@ mod add_job;
 mod api_key_check;
 mod blob;
 mod blob_store_impls;
+mod dashboard;
 mod read_job;
 mod types;
 
@@ -188,6 +189,13 @@ fn create_router(
             })),
         )
         // Unauthorized Routes
+        .route(
+            "/dashboard",
+            get({
+                let conn = conn.clone();
+                move || dashboard::stats(conn)
+            }),
+        )
         .route(
             "/job/matching",
             post({
