@@ -253,8 +253,7 @@ export def makeRequest (request: HttpRequest): Result HttpResponse Error =
         makeExecPlan cmd Nil
         | setPlanLabel "http: {method | methodToString} {url}"
         | setPlanStdout logNever
-        # Curl dumps download stats to stderr
-        | setPlanStderr logInfo
+        | setPlanStderr logNever
         # Web is unreliable and should never be reused
         | setPlanPersistence ReRun
         | setPlanFnOutputs (\_ Nil)
