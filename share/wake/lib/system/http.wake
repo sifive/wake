@@ -196,8 +196,8 @@ def makeCurlCmd ((HttpRequest url method headers body formData): HttpRequest) (e
     def headerToCurlFlag (HttpHeader name value) = "--header", "{name}:{value}", Nil
 
     def formDataToCurlFlag (HttpFormData name file contentType) = match contentType
-        Some ct -> "--form", "{name}=@{file};type={ct}", Nil
-        None -> "--form", "{name}=@{file}", Nil
+        Some ct -> "--form", "'{name}=@\"{file}\";type={ct}'", Nil
+        None -> "--form", "'{name}=@\"{file}\"'", Nil
 
     def bodyToCurlFlag body =
         require True = body.strlen >= 5000
