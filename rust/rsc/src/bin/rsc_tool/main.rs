@@ -2,11 +2,12 @@ use clap::{Parser, Subcommand};
 use inquire::{Confirm, Text};
 use is_terminal::IsTerminal;
 use migration::{DbErr, Migrator, MigratorTrait};
-use rsc::{config, database};
+use rsc::database;
 use sea_orm::{prelude::Uuid, DatabaseConnection};
 use std::io::{Error, ErrorKind};
 use tracing;
 
+mod config;
 mod table;
 
 async fn add_api_key(
@@ -243,14 +244,6 @@ async fn bootstrap_db(db: &DatabaseConnection) -> Result<(), Box<dyn std::error:
 #[command(author, version, about, long_about = None)]
 struct TopLevel {
     #[arg(
-        help = "Specify a config override file",
-        value_name = "CONFIG",
-        short,
-        long
-    )]
-    config_override: Option<String>,
-
-    #[arg(
         help = "Specify and override for the database url",
         value_name = "DATABASE_URL",
         long
@@ -396,10 +389,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = TopLevel::parse();
 
     // Gather our config
-    let config = config::RSCConfig::new(config::RSCConfigOverride {
-        config_override: args.config_override,
+    let config = config::RSCToolConfig::new(config::RSCToolConfigOverride {
         database_url: args.database_url,
-        ..Default::default()
     })?;
 
     if args.show_config {
