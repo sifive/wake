@@ -20,7 +20,7 @@ impl RSCConfig {
         // Gather the config
         let config = Config::builder()
             .add_source(Environment::with_prefix("WAKE_RSC_CONFIG"))
-            .add_source(File::with_name(".config"))
+            .add_source(File::with_name(".config").required(false))
             .set_override_option("database_url", overrides.database_url)?
             .set_override_option("server_addr", overrides.server_addr)?
             .set_override_option("active_store", overrides.active_store)?
