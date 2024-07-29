@@ -394,7 +394,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     if args.show_config {
-        println!("{}", serde_json::to_string(&config).unwrap());
+        println!("{}", serde_json::to_string_pretty(&config).unwrap());
         return Ok(());
     }
 
