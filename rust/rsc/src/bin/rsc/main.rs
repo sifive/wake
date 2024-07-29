@@ -319,7 +319,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = ServerOptions::parse();
 
     // Get the configuration
-    let config = config::RSCConfig::new(config::RSCConfigOverride { active_store: None })?;
+    let config = config::RSCConfig::new()?;
     let config = Arc::new(config);
 
     if args.show_config {
@@ -395,10 +395,12 @@ mod tests {
         Ok(inserted.id)
     }
 
-    fn create_config(store_id: Uuid) -> Result<config::RSCConfig, Box<dyn std::error::Error>> {
-        Ok(config::RSCConfig::new(config::RSCConfigOverride {
-            active_store: Some(store_id.to_string()),
-        })?)
+    fn create_config(store_id: Uuid) -> config::RSCConfig {
+        config::RSCConfig {
+            database_url: "test:0000".to_string(),
+            server_addr: "".to_string(),
+            active_store: store_id.to_string(),
+        }
     }
 
     async fn create_fake_blob(
@@ -455,7 +457,7 @@ mod tests {
         let store_id = create_test_store(&db).await.unwrap();
         let api_key = create_insecure_api_key(&db).await.unwrap();
         let blob_id = create_fake_blob(&db, store_id.clone()).await.unwrap();
-        let config = create_config(store_id.clone()).unwrap();
+        let config = create_config(store_id.clone());
         let db = Arc::new(db);
         let stores = activate_stores(db.clone()).await;
         let mut router = create_router(db.clone(), Arc::new(config), &stores);
