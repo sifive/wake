@@ -10,4 +10,3 @@ pub use super::local_blob_store::Entity as LocalBlobStore;
 pub use super::output_dir::Entity as OutputDir;
 pub use super::output_file::Entity as OutputFile;
 pub use super::output_symlink::Entity as OutputSymlink;
-pub use super::visible_file::Entity as VisibleFile;

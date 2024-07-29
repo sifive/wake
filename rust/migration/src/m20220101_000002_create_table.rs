@@ -70,35 +70,6 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Here we implicitly create two indexes, one on the job_id and one on the
-        // primary key.
-        manager
-            .create_table(
-                Table::create()
-                    .table(VisibleFile::Table)
-                    .col(
-                        ColumnDef::new(VisibleFile::Id)
-                            .uuid()
-                            .not_null()
-                            .primary_key()
-                            .default(SimpleExpr::FunctionCall(PgFunc::gen_random_uuid())),
-                    )
-                    .col(ColumnDef::new(VisibleFile::Path).string().not_null())
-                    .col(ColumnDef::new(VisibleFile::Hash).string().not_null())
-                    .col(ColumnDef::new(VisibleFile::JobId).uuid().not_null())
-                    .foreign_key(
-                        ForeignKeyCreateStatement::new()
-                            .name("fk-visible_file-job")
-                            .from_tbl(VisibleFile::Table)
-                            .from_col(VisibleFile::JobId)
-                            .to_tbl(Job::Table)
-                            .to_col(Job::Id)
-                            .on_delete(ForeignKeyAction::Cascade),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-
         manager
             .create_table(
                 Table::create()
@@ -210,13 +181,6 @@ impl MigrationTrait for Migration {
             )
             .await?;
         manager
-            .drop_table(
-                sea_query::Table::drop()
-                    .table(VisibleFile::Table)
-                    .to_owned(),
-            )
-            .await?;
-        manager
             .drop_table(sea_query::Table::drop().table(Job::Table).to_owned())
             .await?;
         Ok(())
@@ -249,15 +213,6 @@ enum OutputFile {
     Mode,
     JobId,
     BlobId,
-}
-
-#[derive(DeriveIden)]
-enum VisibleFile {
-    Table,
-    Id,
-    Path,
-    Hash,
-    JobId,
 }
 
 // Only output jobs are ever added. We only index by Hash

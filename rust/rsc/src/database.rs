@@ -2,11 +2,10 @@ use chrono::NaiveDateTime;
 use data_encoding::BASE64;
 use entity::prelude::{
     ApiKey, Blob, BlobStore, Job, JobHistory, LocalBlobStore, OutputDir, OutputFile, OutputSymlink,
-    VisibleFile,
 };
 use entity::{
     api_key, blob, blob_store, job, job_history, local_blob_store, output_dir, output_file,
-    output_symlink, visible_file,
+    output_symlink,
 };
 use itertools::Itertools;
 use migration::OnConflict;
@@ -461,39 +460,6 @@ where
 
     Ok(count)
 }
-
-// --------------------------------------------------
-// ----------         Visible File         ----------
-// --------------------------------------------------
-
-// ----------            Create            ----------
-pub async fn create_many_visible_files<T: ConnectionTrait>(
-    db: &T,
-    visible_files: Vec<visible_file::ActiveModel>,
-) -> Result<(), DbErr> {
-    if visible_files.len() == 0 {
-        return Ok(());
-    }
-
-    let chunked: Vec<Vec<visible_file::ActiveModel>> = visible_files
-        .into_iter()
-        .chunks((MAX_SQLX_PARAMS / 5).into())
-        .into_iter()
-        .map(|chunk| chunk.collect())
-        .collect();
-
-    for chunk in chunked {
-        VisibleFile::insert_many(chunk).exec(db).await?;
-    }
-
-    Ok(())
-}
-
-// ----------             Read             ----------
-
-// ----------            Update            ----------
-
-// ----------            Delete            ----------
 
 // --------------------------------------------------
 // ----------         Output File          ----------

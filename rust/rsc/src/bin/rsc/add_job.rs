@@ -1,7 +1,7 @@
 use crate::types::AddJobPayload;
 use axum::{http::StatusCode, Json};
 
-use entity::{job, output_dir, output_file, output_symlink, visible_file};
+use entity::{job, output_dir, output_file, output_symlink};
 
 use sea_orm::{ActiveModelTrait, ActiveValue::*, DatabaseConnection, DbErr, TransactionTrait};
 use std::sync::Arc;
@@ -18,7 +18,6 @@ pub async fn add_job(
     let hash = payload.hash();
     tracing::info!(hash);
 
-    let vis = payload.visible_files;
     let output_files = payload.output_files;
     let output_symlinks = payload.output_symlinks;
     let output_dirs = payload.output_dirs;
@@ -50,20 +49,6 @@ pub async fn add_job(
             Box::pin(async move {
                 let job = insert_job.save(txn).await?;
                 let job_id = job.id.unwrap();
-
-                database::create_many_visible_files(
-                    txn,
-                    vis.into_iter()
-                        .map(|vis_file| visible_file::ActiveModel {
-                            id: NotSet,
-                            created_at: NotSet,
-                            path: Set(vis_file.path),
-                            hash: Set(vis_file.hash),
-                            job_id: Set(job_id),
-                        })
-                        .collect(),
-                )
-                .await?;
 
                 database::create_many_output_files(
                     txn,
