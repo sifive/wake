@@ -110,12 +110,7 @@ fn create_router(
     config: Arc<config::RSCConfig>,
     blob_stores: &HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) -> Router {
-    // If we can't create a store, just exit. The config is wrong and must be rectified.
-    let Some(active_store_uuid) = config.active_store.clone() else {
-        panic!("Active store uuid not set in configuration");
-    };
-
-    let Ok(active_store_uuid) = Uuid::parse_str(&active_store_uuid) else {
+    let Ok(active_store_uuid) = Uuid::parse_str(&config.active_store) else {
         panic!("Failed to parse provided active store into uuid");
     };
 
@@ -324,11 +319,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = ServerOptions::parse();
 
     // Get the configuration
-    let config = config::RSCConfig::new(config::RSCConfigOverride {
-        server_addr: None,
-        database_url: None,
-        active_store: None,
-    })?;
+    let config = config::RSCConfig::new(config::RSCConfigOverride { active_store: None })?;
     let config = Arc::new(config);
 
     if args.show_config {
@@ -406,8 +397,6 @@ mod tests {
 
     fn create_config(store_id: Uuid) -> Result<config::RSCConfig, Box<dyn std::error::Error>> {
         Ok(config::RSCConfig::new(config::RSCConfigOverride {
-            server_addr: Some("test:0000".into()),
-            database_url: Some("".into()),
             active_store: Some(store_id.to_string()),
         })?)
     }
