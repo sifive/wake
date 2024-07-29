@@ -5,15 +5,10 @@ use axum::{
 };
 use chrono::Utc;
 use clap::Parser;
-use data_encoding::HEXLOWER;
 use migration::{Migrator, MigratorTrait};
-use rand_core::{OsRng, RngCore};
 use rlimit::Resource;
-use rsc::{config, database};
-use sea_orm::{
-    prelude::Uuid, ActiveModelTrait, ActiveValue::*, ConnectOptions, ConnectionTrait, Database,
-    DatabaseConnection,
-};
+use rsc::database;
+use sea_orm::{prelude::Uuid, ConnectOptions, Database, DatabaseConnection};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
@@ -24,34 +19,15 @@ mod add_job;
 mod api_key_check;
 mod blob;
 mod blob_store_impls;
+mod config;
 mod dashboard;
 mod read_job;
 mod types;
 
 #[derive(Debug, Parser)]
 struct ServerOptions {
-    #[arg(help = "Specify a config override file", value_name = "CONFIG", long)]
-    config_override: Option<String>,
-
     #[arg(help = "Shows the config and then exits", long)]
     show_config: bool,
-
-    #[arg(
-        help = "Specify an override for the bind address",
-        value_name = "SERVER_IP[:SERVER_PORT]",
-        long
-    )]
-    server_addr: Option<String>,
-
-    #[arg(
-        help = "Specify an override for the database url",
-        value_name = "DATABASE_URL",
-        long
-    )]
-    database_url: Option<String>,
-
-    #[arg(help = "Launches the cache without an external database", long)]
-    standalone: bool,
 }
 
 // Maps databse store uuid -> dyn blob::DebugBlobStore
@@ -134,12 +110,7 @@ fn create_router(
     config: Arc<config::RSCConfig>,
     blob_stores: &HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) -> Router {
-    // If we can't create a store, just exit. The config is wrong and must be rectified.
-    let Some(active_store_uuid) = config.active_store.clone() else {
-        panic!("Active store uuid not set in configuration");
-    };
-
-    let Ok(active_store_uuid) = Uuid::parse_str(&active_store_uuid) else {
+    let Ok(active_store_uuid) = Uuid::parse_str(&config.active_store) else {
         panic!("Failed to parse provided active store into uuid");
     };
 
@@ -215,22 +186,7 @@ fn create_router(
         .route("/version/check", get(check_version))
 }
 
-async fn create_standalone_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
-    let shim_db = Database::connect("postgres://127.0.0.1/shim").await?;
-    let mut buf = [0u8; 24];
-    OsRng.fill_bytes(&mut buf);
-    let rng_str = HEXLOWER.encode(&buf);
-    let db = format!("db_{}", rng_str);
-    shim_db
-        .execute_unprepared(&format!("CREATE DATABASE {}", db))
-        .await?;
-    drop(shim_db);
-    let db = Database::connect(format!("postgres://127.0.0.1/{}", db)).await?;
-    Migrator::up(&db, None).await?;
-    Ok(db)
-}
-
-async fn create_remote_db(
+async fn connect_to_database(
     config: &config::RSCConfig,
 ) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
     let mut opt = ConnectOptions::new(&config.database_url);
@@ -250,36 +206,6 @@ async fn create_remote_db(
     }
 
     Ok(connection)
-}
-
-async fn create_insecure_api_key(
-    db: &DatabaseConnection,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let active_key = entity::api_key::ActiveModel {
-        id: NotSet,
-        created_at: NotSet,
-        key: Set("InsecureKey".into()),
-        desc: Set("Generated Insecure Key".into()),
-    };
-
-    let inserted_key = active_key.insert(db).await?;
-
-    Ok(inserted_key.key)
-}
-
-async fn connect_to_database(
-    config: &config::RSCConfig,
-) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
-    if config.standalone {
-        tracing::warn!("Launching rsc in standalone mode, data will not persist.");
-        let db = create_standalone_db().await?;
-        let key = create_insecure_api_key(&db).await?;
-        tracing::info!(key, "Created insecure api key.");
-
-        return Ok(db);
-    }
-
-    create_remote_db(config).await
 }
 
 fn launch_job_eviction(conn: Arc<DatabaseConnection>, tick_interval: u64, ttl: u64) {
@@ -393,17 +319,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = ServerOptions::parse();
 
     // Get the configuration
-    let config = config::RSCConfig::new(config::RSCConfigOverride {
-        config_override: args.config_override,
-        server_addr: args.server_addr,
-        database_url: args.database_url,
-        standalone: if args.standalone {
-            Some(args.standalone)
-        } else {
-            None
-        },
-        active_store: None,
-    })?;
+    let config = config::RSCConfig::new()?;
     let config = Arc::new(config);
 
     if args.show_config {
@@ -446,8 +362,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use data_encoding::HEXLOWER;
     use entity::blob_store;
-    use sea_orm::{prelude::Uuid, ActiveModelTrait, EntityTrait, PaginatorTrait};
+    use rand_core::{OsRng, RngCore};
+    use sea_orm::{
+        prelude::Uuid, ActiveModelTrait, ActiveValue::*, ConnectionTrait, EntityTrait,
+        PaginatorTrait,
+    };
     use std::sync::Arc;
 
     use axum::{
@@ -474,14 +395,12 @@ mod tests {
         Ok(inserted.id)
     }
 
-    fn create_config(store_id: Uuid) -> Result<config::RSCConfig, Box<dyn std::error::Error>> {
-        Ok(config::RSCConfig::new(config::RSCConfigOverride {
-            config_override: Some("".into()),
-            server_addr: Some("test:0000".into()),
-            database_url: Some("".into()),
-            standalone: Some(true),
-            active_store: Some(store_id.to_string()),
-        })?)
+    fn create_config(store_id: Uuid) -> config::RSCConfig {
+        config::RSCConfig {
+            database_url: "test:0000".to_string(),
+            server_addr: "".to_string(),
+            active_store: store_id.to_string(),
+        }
     }
 
     async fn create_fake_blob(
@@ -502,13 +421,43 @@ mod tests {
         Ok(inserted_key.id)
     }
 
+    async fn create_insecure_api_key(
+        db: &DatabaseConnection,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let active_key = entity::api_key::ActiveModel {
+            id: NotSet,
+            created_at: NotSet,
+            key: Set("InsecureKey".into()),
+            desc: Set("Generated Insecure Key".into()),
+        };
+
+        let inserted_key = active_key.insert(db).await?;
+
+        Ok(inserted_key.key)
+    }
+
+    async fn create_standalone_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
+        let shim_db = Database::connect("postgres://127.0.0.1/shim").await?;
+        let mut buf = [0u8; 24];
+        OsRng.fill_bytes(&mut buf);
+        let rng_str = HEXLOWER.encode(&buf);
+        let db = format!("db_{}", rng_str);
+        shim_db
+            .execute_unprepared(&format!("CREATE DATABASE {}", db))
+            .await?;
+        drop(shim_db);
+        let db = Database::connect(format!("postgres://127.0.0.1/{}", db)).await?;
+        Migrator::up(&db, None).await?;
+        Ok(db)
+    }
+
     #[tokio::test]
     async fn nominal() {
         let db = create_standalone_db().await.unwrap();
         let store_id = create_test_store(&db).await.unwrap();
         let api_key = create_insecure_api_key(&db).await.unwrap();
         let blob_id = create_fake_blob(&db, store_id.clone()).await.unwrap();
-        let config = create_config(store_id.clone()).unwrap();
+        let config = create_config(store_id.clone());
         let db = Arc::new(db);
         let stores = activate_stores(db.clone()).await;
         let mut router = create_router(db.clone(), Arc::new(config), &stores);
