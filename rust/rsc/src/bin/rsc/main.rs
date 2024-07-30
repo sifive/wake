@@ -180,7 +180,7 @@ fn create_router(
             "/blob",
             get({
                 let config = config.clone();
-                move || blob::get_upload_url(config.server_addr.clone())
+                move || blob::get_upload_url(config.server_address.clone())
             }),
         )
         .route("/version/check", get(check_version))
@@ -310,11 +310,6 @@ fn request_max_fileno_limit() {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // setup a subscriber for logging
-    let file_appender = tracing_appender::rolling::daily("./rsc_logs", "rsc.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-    tracing_subscriber::fmt().with_writer(non_blocking).init();
-
     // Parse the arguments
     let args = ServerOptions::parse();
 
@@ -323,9 +318,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Arc::new(config);
 
     if args.show_config {
-        println!("{}", serde_json::to_string(&config).unwrap());
+        println!("{}", serde_json::to_string_pretty(&config).unwrap());
         return Ok(());
     }
+
+    // setup a subscriber for logging
+    let _guard = if let Some(log_directory) = config.log_directory.clone() {
+        let file_appender = tracing_appender::rolling::daily(log_directory, "rsc.log");
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+        tracing_subscriber::fmt().with_writer(non_blocking).init();
+        Some(guard)
+    } else {
+        let subscriber = tracing_subscriber::FmtSubscriber::new();
+        tracing::subscriber::set_global_default(subscriber)?;
+        None
+    };
 
     // Increase the number of allowed open files the the max
     request_max_fileno_limit();
@@ -338,21 +345,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stores = activate_stores(connection.clone()).await;
 
     // Launch evictions threads
-    let one_min_in_seconds = 60 * 1;
-    let ten_mins_in_seconds = one_min_in_seconds * 10;
-    let one_hour_in_seconds = one_min_in_seconds * 60;
-    let one_day_in_seconds = one_hour_in_seconds * 24 * 1;
-    launch_job_eviction(connection.clone(), ten_mins_in_seconds, one_day_in_seconds);
+    match &config.job_eviction {
+        config::RSCJobEvictionConfig::TTL(ttl) => {
+            launch_job_eviction(connection.clone(), ttl.tick_rate, ttl.ttl);
+        }
+        config::RSCJobEvictionConfig::LRU(_) => panic!("LRU not implemented"),
+    }
+
     launch_blob_eviction(
         connection.clone(),
-        one_min_in_seconds,
-        one_hour_in_seconds,
+        config.blob_eviction.tick_rate,
+        config.blob_eviction.ttl,
         stores.clone(),
     );
 
     // Launch the server
     let router = create_router(connection.clone(), config.clone(), &stores);
-    axum::Server::bind(&config.server_addr.parse()?)
+    axum::Server::bind(&config.server_address.parse()?)
         .serve(router.into_make_service())
         .await?;
 
@@ -398,8 +407,20 @@ mod tests {
     fn create_config(store_id: Uuid) -> config::RSCConfig {
         config::RSCConfig {
             database_url: "test:0000".to_string(),
-            server_addr: "".to_string(),
+            server_address: "".to_string(),
             active_store: store_id.to_string(),
+            connection_pool_timeout: 10,
+            log_directory: None,
+            blob_eviction: config::RSCTTLConfig {
+                tick_rate: 10,
+                ttl: 100,
+                chunk_size: 100,
+            },
+            job_eviction: config::RSCJobEvictionConfig::TTL(config::RSCTTLConfig {
+                tick_rate: 10,
+                ttl: 100,
+                chunk_size: 100,
+            }),
         }
     }
 
