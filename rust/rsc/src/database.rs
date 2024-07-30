@@ -626,6 +626,7 @@ pub async fn upsert_blob<T: ConnectionTrait>(
 pub async fn read_unreferenced_blobs<T: ConnectionTrait>(
     db: &T,
     ttl: NaiveDateTime,
+    chunk: u32,
 ) -> Result<Vec<blob::Model>, DbErr> {
     // Limit = 16k as the query is also subject to parameter max.
     // Blob has 4 params so (2^16)/4 = 16384. Also generally best to chunk blob eviction
@@ -648,7 +649,7 @@ pub async fn read_unreferenced_blobs<T: ConnectionTrait>(
             )
             LIMIT $2
             "#,
-            [ttl.into(), (MAX_SQLX_PARAMS / 4).into()],
+            [ttl.into(), chunk.into()],
         ))
         .all(db)
         .await
