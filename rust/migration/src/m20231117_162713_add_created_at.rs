@@ -25,7 +25,6 @@ impl MigrationTrait for Migration {
           (OutputDir::Table, OutputDir::CreatedAt),
           (OutputSymlink::Table, OutputSymlink::CreatedAt),
           (OutputFile::Table, OutputFile::CreatedAt),
-          (VisibleFile::Table, VisibleFile::CreatedAt),
           (ApiKey::Table, ApiKey::CreatedAt),
           (JobUses::Table, JobUses::CreatedAt),
           (Blob::Table, Blob::CreatedAt),
@@ -54,7 +53,6 @@ impl MigrationTrait for Migration {
           (OutputDir::Table, OutputDir::CreatedAt),
           (OutputSymlink::Table, OutputSymlink::CreatedAt),
           (OutputFile::Table, OutputFile::CreatedAt),
-          (VisibleFile::Table, VisibleFile::CreatedAt),
           (ApiKey::Table, ApiKey::CreatedAt),
           (JobUses::Table, JobUses::CreatedAt)
         } as (t, c) in {
@@ -91,12 +89,6 @@ enum OutputSymlink {
 
 #[derive(DeriveIden)]
 enum OutputFile {
-    Table,
-    CreatedAt,
-}
-
-#[derive(DeriveIden)]
-enum VisibleFile {
     Table,
     CreatedAt,
 }

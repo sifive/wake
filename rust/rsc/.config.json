@@ -3,7 +3,7 @@
   "server_address": "0.0.0.0:3002",
   "connection_pool_timeout": 60,
   "standalone": false,
-  "active_store": "bfa63b02-d41f-4eff-b0e3-f42bafb33a3d",
+  "active_store": "3446d287-1d6f-439f-bc8a-9e73ab34065d",
   "log_directory": null,
   "blob_eviction": {
     "tick_rate": 60,

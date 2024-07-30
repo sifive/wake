@@ -58,8 +58,6 @@ pub enum Relation {
     OutputFile,
     #[sea_orm(has_many = "super::output_symlink::Entity")]
     OutputSymlink,
-    #[sea_orm(has_many = "super::visible_file::Entity")]
-    VisibleFile,
 }
 
 impl Related<super::job_use::Entity> for Entity {
@@ -83,12 +81,6 @@ impl Related<super::output_file::Entity> for Entity {
 impl Related<super::output_symlink::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::OutputSymlink.def()
-    }
-}
-
-impl Related<super::visible_file::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::VisibleFile.def()
     }
 }
 
