@@ -1,6 +1,0 @@
-{
-  "eviction_config": {
-    "type": "ttl",
-    "seconds_to_live": 6,
-  }
-}
