@@ -189,8 +189,13 @@ fn create_router(
 async fn connect_to_database(
     config: &config::RSCConfig,
 ) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
+    let timeout = config.connection_pool_timeout;
     let mut opt = ConnectOptions::new(&config.database_url);
-    opt.sqlx_logging_level(tracing::log::LevelFilter::Debug);
+    opt.sqlx_logging_level(tracing::log::LevelFilter::Debug)
+        .acquire_timeout(std::time::Duration::from_secs(timeout));
+
+    tracing::info!(%timeout, "Max seconds to wait for connection from pool");
+
     let connection = Database::connect(opt).await?;
     let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
     if pending_migrations.len() != 0 {
@@ -227,33 +232,41 @@ fn launch_job_eviction(conn: Arc<DatabaseConnection>, tick_interval: u64, ttl: u
 
 fn launch_blob_eviction(
     conn: Arc<DatabaseConnection>,
-    tick_interval: u64,
-    setup_ttl: u64,
+    config: Arc<config::RSCConfig>,
     blob_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) {
-    // TODO: This should probably be a transaction so that a job can't add a new reference to a
-    // blob as we are deleting it.
-
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(tick_interval));
+        let mut interval =
+            tokio::time::interval(Duration::from_secs(config.blob_eviction.tick_rate));
+        let mut should_sleep = false;
         loop {
-            interval.tick().await;
             tracing::info!("Blob TTL eviction tick");
+            if should_sleep {
+                interval.tick().await;
+            }
 
             // Blobs must be at least this old to be considered for eviction.
             // This gives clients time to reference a blob before it gets evicted.
-            let setup_ttl = (Utc::now() - Duration::from_secs(setup_ttl)).naive_utc();
+            let ttl = (Utc::now() - Duration::from_secs(config.blob_eviction.ttl)).naive_utc();
 
-            let blobs = match database::read_unreferenced_blobs(conn.as_ref(), setup_ttl).await {
+            let blobs = match database::read_unreferenced_blobs(
+                conn.as_ref(),
+                ttl,
+                config.blob_eviction.chunk_size,
+            )
+            .await
+            {
                 Ok(b) => b,
                 Err(err) => {
                     tracing::error!(%err, "Failed to fetch blobs for eviction");
+                    should_sleep = true;
                     continue; // Try again on the next tick
                 }
             };
 
             let blob_ids: Vec<Uuid> = blobs.iter().map(|blob| blob.id).collect();
             let eligible = blob_ids.len();
+            should_sleep = eligible == 0;
 
             tracing::info!(%eligible, "At least N blobs eligible for eviction");
 
@@ -262,6 +275,7 @@ fn launch_blob_eviction(
                 Ok(deleted) => tracing::info!(%deleted, "Deleted blobs from database"),
                 Err(err) => {
                     tracing::error!(%err, "Failed to delete blobs from db for eviction");
+                    should_sleep = true;
                     continue; // Try again on the next tick
                 }
             };
@@ -317,11 +331,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = config::RSCConfig::new()?;
     let config = Arc::new(config);
 
-    if args.show_config {
-        println!("{}", serde_json::to_string_pretty(&config).unwrap());
-        return Ok(());
-    }
-
     // setup a subscriber for logging
     let _guard = if let Some(log_directory) = config.log_directory.clone() {
         let file_appender = tracing_appender::rolling::daily(log_directory, "rsc.log");
@@ -333,6 +342,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::subscriber::set_global_default(subscriber)?;
         None
     };
+
+    let config_json = serde_json::to_string_pretty(&config).unwrap();
+    if args.show_config {
+        println!("{}", config_json);
+        return Ok(());
+    }
+    tracing::info!(%config_json, "Launching RSC with config");
 
     // Increase the number of allowed open files the the max
     request_max_fileno_limit();
@@ -352,12 +368,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config::RSCJobEvictionConfig::LRU(_) => panic!("LRU not implemented"),
     }
 
-    launch_blob_eviction(
-        connection.clone(),
-        config.blob_eviction.tick_rate,
-        config.blob_eviction.ttl,
-        stores.clone(),
-    );
+    launch_blob_eviction(connection.clone(), config.clone(), stores.clone());
 
     // Launch the server
     let router = create_router(connection.clone(), config.clone(), &stores);
