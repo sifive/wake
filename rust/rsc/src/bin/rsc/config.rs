@@ -38,7 +38,7 @@ pub struct RSCConfig {
     // The address the that server should bind to
     pub server_address: String,
     // The amount of time a query should wait for a connection before timing out in seconds
-    pub connection_pool_timeout: u32,
+    pub connection_pool_timeout: u64,
     // The blob store that new blobs should be written into
     pub active_store: String,
     // The directory that server logs should be written to. If None logs are written to stdout

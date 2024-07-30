@@ -189,8 +189,13 @@ fn create_router(
 async fn connect_to_database(
     config: &config::RSCConfig,
 ) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
+    let timeout = config.connection_pool_timeout;
     let mut opt = ConnectOptions::new(&config.database_url);
-    opt.sqlx_logging_level(tracing::log::LevelFilter::Debug);
+    opt.sqlx_logging_level(tracing::log::LevelFilter::Debug)
+        .acquire_timeout(std::time::Duration::from_secs(timeout));
+
+    tracing::info!(%timeout, "Max seconds to wait for connection from pool");
+
     let connection = Database::connect(opt).await?;
     let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
     if pending_migrations.len() != 0 {
