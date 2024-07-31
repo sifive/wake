@@ -10,9 +10,9 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute_unprepared(
                 "
-            CREATE INDEX IF NOT EXISTS blob_updated_at_idx
-            ON blob(updated_at)
-            ",
+                CREATE INDEX IF NOT EXISTS blob_updated_at_idx
+                ON blob(updated_at)
+                ",
             )
             .await?;
 
@@ -20,9 +20,9 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute_unprepared(
                 "
-            CREATE INDEX IF NOT EXISTS job_created_at_idx
-            ON job(created_at)
-            ",
+                CREATE INDEX IF NOT EXISTS job_created_at_idx
+                ON job(created_at)
+                ",
             )
             .await?;
 
@@ -34,8 +34,8 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute_unprepared(
                 "
-            DROP INDEX IF EXISTS job_created_at_idx
-            ",
+                DROP INDEX IF EXISTS job_created_at_idx
+                ",
             )
             .await?;
 
@@ -43,8 +43,8 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute_unprepared(
                 "
-            DROP INDEX IF EXISTS blob_updated_at_idx 
-            ",
+                DROP INDEX IF EXISTS blob_updated_at_idx
+                ",
             )
             .await?;
 
