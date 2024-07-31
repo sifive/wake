@@ -2,6 +2,14 @@ use config::{Config, ConfigError, Environment, File};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct RSCCronLoopConfig {
+    // How often to run the loop in seconds
+    pub tick_rate: u64,
+    // Maximum number of objects to procss per tick. Must be 1 >= x <= 16000
+    pub chunk_size: i32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RSCTTLConfig {
     // How often to run the eviction check in seconds
     pub tick_rate: u64,
@@ -47,6 +55,8 @@ pub struct RSCConfig {
     pub blob_eviction: RSCTTLConfig,
     // The config to control job eviction
     pub job_eviction: RSCJobEvictionConfig,
+    // The config to control job size calculation
+    pub job_size_calculate: RSCCronLoopConfig,
 }
 
 impl RSCConfig {
