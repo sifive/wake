@@ -464,6 +464,10 @@ mod tests {
                 ttl: 100,
                 chunk_size: 100,
             }),
+            job_size_calculate: config::RSCCronLoopConfig {
+                tick_rate: 10,
+                chunk_size: 100,
+            },
         }
     }
 
@@ -820,6 +824,7 @@ mod tests {
             i_bytes: Set(100000),
             o_bytes: Set(1000),
             label: Set("".to_string()),
+            size: NotSet,
         };
 
         insert_job.save(conn.clone().as_ref()).await.unwrap();
@@ -844,6 +849,7 @@ mod tests {
             i_bytes: Set(100000),
             o_bytes: Set(1000),
             label: Set("".to_string()),
+            size: NotSet,
         };
 
         insert_job.save(conn.clone().as_ref()).await.unwrap();
