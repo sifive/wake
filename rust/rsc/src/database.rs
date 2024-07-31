@@ -583,44 +583,6 @@ pub async fn upsert_blob<T: ConnectionTrait>(
 
 // ----------             Read             ----------
 
-// Reads blobs from the database that are unreferenced and have surpassed the allocated grace
-// period to be referenced.
-//
-// For new blobs this allows the client to create several blobs and then reference them all at
-// once. Existing blobs whose job was just evicted will likely be well past the grace period and
-// thus quickly evicted themselves.
-pub async fn read_unreferenced_blobs<T: ConnectionTrait>(
-    db: &T,
-    ttl: NaiveDateTime,
-    chunk: u32,
-) -> Result<Vec<blob::Model>, DbErr> {
-    // Limit = 16k as the query is also subject to parameter max.
-    // Blob has 4 params so (2^16)/4 = 16384. Also generally best to chunk blob eviction
-    // to avoid large eviction stalls.
-    Blob::find()
-        .from_raw_sql(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            r#"
-            SELECT * FROM blob
-            WHERE updated_at <= $1
-            AND id IN
-            (
-                SELECT id FROM blob
-                EXCEPT
-                (
-                    SELECT blob_id FROM output_file
-                    UNION SELECT stdout_blob_id FROM job
-                    UNION SELECT stderr_blob_id FROM job
-                )
-            )
-            LIMIT $2
-            "#,
-            [ttl.into(), chunk.into()],
-        ))
-        .all(db)
-        .await
-}
-
 pub async fn count_blobs<T: ConnectionTrait>(db: &T) -> Result<u64, DbErr> {
     Blob::find().count(db).await
 }
@@ -645,37 +607,45 @@ pub async fn total_blob_size<T: ConnectionTrait>(db: &T) -> Result<Option<TotalB
 // ----------            Update            ----------
 
 // ----------            Delete            ----------
-pub async fn delete_blobs_by_ids<T: ConnectionTrait>(db: &T, ids: Vec<Uuid>) -> Result<u64, DbErr> {
-    if ids.len() == 0 {
-        return Ok(0);
-    }
+#[derive(Clone, Debug, FromQueryResult)]
+pub struct DeletedBlob {
+    pub store_id: Uuid,
+    pub key: String,
+}
 
-    let mut affected = 0;
-
-    let chunked: Vec<Vec<Uuid>> = ids
-        .into_iter()
-        .chunks((MAX_SQLX_PARAMS / 1).into())
-        .into_iter()
-        .map(|chunk| chunk.collect())
-        .collect();
-
-    for chunk in chunked {
-        let result = Blob::delete_many()
-            .filter(
-                entity::blob::Column::Id.in_subquery(
-                    migration::Query::select()
-                        .column(migration::Asterisk)
-                        .from_values(chunk, migration::Alias::new("foo"))
-                        .take(),
-                ),
+// Deletes blobs from the database that are unreferenced and have surpassed the allocated grace
+// period to be referenced.
+//
+// For new blobs this allows the client to create several blobs and then reference them all at
+// once. Existing blobs whose job was just evicted will likely be well past the grace period and
+// thus quickly evicted themselves.
+pub async fn delete_unreferenced_blobs<T: ConnectionTrait>(
+    db: &T,
+    ttl: NaiveDateTime,
+    chunk: u32,
+) -> Result<Vec<DeletedBlob>, DbErr> {
+    DeletedBlob::find_by_statement(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        r#"
+            WITH
+            eligible_blob_ids as (
+                SELECT id FROM blob
+                WHERE updated_at <= $1
+                EXCEPT (
+                    SELECT blob_id FROM output_file
+                    UNION SELECT stdout_blob_id FROM job
+                    UNION SELECT stderr_blob_id FROM job
+                )
+                LIMIT $2
             )
-            .exec(db)
-            .await?;
-
-        affected += result.rows_affected;
-    }
-
-    Ok(affected)
+            DELETE from blob b
+            WHERE b.id IN (SELECT id FROM eligible_blob_ids)
+            RETURNING b.store_id, b.key
+            "#,
+        [ttl.into(), chunk.into()],
+    ))
+    .all(db)
+    .await
 }
 
 // --------------------------------------------------
