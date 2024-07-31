@@ -1,20 +1,26 @@
 use crate::blob::*;
 use async_trait::async_trait;
-use data_encoding::BASE64URL;
 use futures::stream::BoxStream;
 use rand_core::{OsRng, RngCore};
 use sea_orm::prelude::Uuid;
+use std::fmt::Write;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::io::BufWriter;
 use tokio_util::bytes::Bytes;
 use tokio_util::io::StreamReader;
 
-fn create_temp_filename() -> String {
-    let mut key = [0u8; 16];
-    OsRng.fill_bytes(&mut key);
-    // URL must be used as files can't contain /
-    BASE64URL.encode(&key)
+fn create_random_blob_path() -> std::path::PathBuf {
+    let mut parts = [0u8; 32];
+    OsRng.fill_bytes(&mut parts);
+    let mut buf = std::path::PathBuf::from("");
+    for part in parts {
+        let mut s = String::new();
+        write!(&mut s, "{:02X}", part).unwrap();
+        buf.push(s);
+    }
+
+    return buf;
 }
 
 #[derive(Debug, Clone)]
@@ -36,18 +42,27 @@ impl BlobStore for LocalBlobStore {
         let reader = StreamReader::new(stream);
         futures::pin_mut!(reader);
 
-        let key = create_temp_filename();
-        let path = std::path::Path::new(&self.root).join(key.clone());
-        let mut file = BufWriter::new(File::create(path).await?);
+        let rel_path = create_random_blob_path();
+        let path = std::path::Path::new(&self.root).join(rel_path.clone());
+        tokio::fs::create_dir_all(path.parent().unwrap()).await?;
 
+        let mut file = BufWriter::new(File::create(path).await?);
         let written = tokio::io::copy(&mut reader, &mut file).await?;
 
         let size = match i64::try_from(written) {
-            Err(_) => {
-                tracing::error!(%written, "Size overflows i64, setting to i64::MAX instead");
+            Err(err) => {
+                tracing::error!(%err, %written, "Size overflows i64, setting to i64::MAX instead");
                 i64::MAX
             }
             Ok(size) => size,
+        };
+
+        let key = match rel_path.into_os_string().into_string() {
+            Err(path) => {
+                tracing::error!("Cannot convert path to string, returning loosy path instead");
+                path.to_string_lossy().to_string()
+            }
+            Ok(s) => s,
         };
 
         Ok((key, size))
@@ -80,7 +95,7 @@ impl BlobStore for TestBlobStore {
         &self,
         _stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
     ) -> Result<(String, i64), std::io::Error> {
-        Ok((create_temp_filename(), 0xDEADBEEF))
+        Ok(("TestTestTest".to_string(), 0xDEADBEEF))
     }
 
     async fn download_url(&self, key: String) -> String {
