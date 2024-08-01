@@ -94,6 +94,50 @@ pub async fn read_test_blob_stores<T: ConnectionTrait>(
         .await
 }
 
+#[derive(Debug, FromQueryResult)]
+pub struct BlobUseByStore {
+    pub store_id: Uuid,
+    pub store_type: String,
+    pub refs: i64,
+    pub blob_count: i64,
+}
+
+pub async fn blob_use_by_store<T: ConnectionTrait>(db: &T) -> Result<Vec<BlobUseByStore>, DbErr> {
+    BlobUseByStore::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        WITH
+        reference_count AS (
+            SELECT b.store_id, count(b.store_id) refs
+            FROM blob b
+            INNER JOIN (
+                SELECT blob_id id FROM output_file
+                UNION ALL SELECT stdout_blob_id FROM job
+                UNION ALL SELECT stderr_blob_id FROM job
+            ) rbi
+            on b.id = rbi.id
+            GROUP BY b.store_id
+        ),
+        blob_count AS (
+            SELECT bs.id, bs.type, bbs.count as blob_count
+            FROM blob_store bs
+            INNER JOIN (
+                SELECT store_id, count(store_id)
+                FROM blob
+                GROUP BY store_id
+            ) bbs
+            ON bbs.store_id = bs.id
+        )
+        SELECT b.id store_id, b.type store_type, r.refs, b.blob_count
+        FROM reference_count r
+        INNER JOIN blob_count b
+        ON r.store_id = b.id
+        "#,
+    ))
+    .all(db)
+    .await
+}
+
 // ----------            Update            ----------
 
 // ----------            Delete            ----------
@@ -296,12 +340,29 @@ pub async fn most_reused_jobs<T: ConnectionTrait>(db: &T) -> Result<Vec<MostReus
     .await
 }
 
+pub async fn most_time_saved_jobs<T: ConnectionTrait>(db: &T) -> Result<Vec<MostReusedJob>, DbErr> {
+    MostReusedJob::find_by_statement(Statement::from_string(
+        DbBackend::Postgres,
+        r#"
+        SELECT j.label, h.hits as reuses, CAST(round(h.hits * j.runtime) as BIGINT) as savings
+        FROM job_history h
+        INNER JOIN job j
+        ON j.hash = h.hash
+        ORDER BY savings DESC
+        LIMIT 30
+        "#,
+    ))
+    .all(db)
+    .await
+}
+
 #[derive(Debug, FromQueryResult)]
 pub struct LostOpportunityJobs {
     pub label: String,
     pub reuses: i32,
     pub misses: i32,
     pub real_savings: i64,
+    pub lost_savings: i64,
     pub potential_savings: i64,
 }
 
@@ -316,11 +377,12 @@ pub async fn lost_opportuinty_jobs<T: ConnectionTrait>(
             h.hits as reuses,
             h.misses - 1 as misses,
             CAST(round(h.hits * j.runtime) as BIGINT) as real_savings,
+            CAST(round((h.misses - 1) * j.runtime) as BIGINT) as lost_savings,
             CAST(round((h.hits + h.misses - 1) * j.runtime) as BIGINT) as potential_savings
         FROM job_history h
         INNER JOIN job j
         ON j.hash = h.hash
-        ORDER BY potential_savings DESC
+        ORDER BY lost_savings DESC
         LIMIT 30;
         "#,
     ))
@@ -333,7 +395,7 @@ pub struct SizeRuntimeValueJob {
     pub label: String,
     pub runtime: i64,
     pub disk_usage: i64,
-    pub ms_saved_per_byte: i64,
+    pub ns_saved_per_byte: i64,
 }
 
 pub async fn most_space_efficient_jobs<T: ConnectionTrait>(
@@ -346,10 +408,10 @@ pub async fn most_space_efficient_jobs<T: ConnectionTrait>(
             j.label,
             CAST(round(j.runtime) as BIGINT) as runtime,
             j.size as disk_usage,
-            CAST(round(j.runtime / (j.size) * 1000) as BIGINT) as ms_saved_per_byte
+            CAST(round(j.runtime / (j.size) * 1000000000) as BIGINT) as ns_saved_per_byte
         FROM job j
         WHERE size IS NOT NULL
-        ORDER BY ms_saved_per_byte DESC
+        ORDER BY ns_saved_per_byte DESC
         LIMIT 30;
         "#,
     ))
@@ -367,7 +429,7 @@ pub async fn most_space_use_jobs<T: ConnectionTrait>(
             j.label,
             CAST(round(j.runtime) as BIGINT) as runtime,
             j.size as disk_usage,
-            CAST(round(j.runtime / (j.size) * 1000) as BIGINT) as ms_saved_per_byte
+            CAST(round(j.runtime / (j.size) * 1000000000) as BIGINT) as ns_saved_per_byte
         FROM job j
         WHERE size IS NOT NULL
         ORDER BY disk_usage DESC

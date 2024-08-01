@@ -193,6 +193,7 @@ pub struct DashboardStatsLostOpportunityJob {
     pub reuses: i32,
     pub misses: i32,
     pub real_savings: i64,
+    pub lost_savings: i64,
     pub potential_savings: i64,
 }
 
@@ -201,7 +202,15 @@ pub struct DashboardStatsSizeRuntimeValueJob {
     pub label: String,
     pub runtime: i64,
     pub disk_usage: i64,
-    pub ms_saved_per_byte: i64,
+    pub ns_saved_per_byte: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DashboardStatsBlobUseByStore {
+    pub store_id: String,
+    pub store_type: String,
+    pub refs: i64,
+    pub blob_count: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -212,7 +221,9 @@ pub struct DashboardStatsResponse {
     pub savings: i64,
     pub oldest_jobs: Vec<DashboardStatsOldestJob>,
     pub most_reused_jobs: Vec<DashboardStatsMostReusedJob>,
+    pub most_time_saved_jobs: Vec<DashboardStatsMostReusedJob>,
     pub lost_opportunity_jobs: Vec<DashboardStatsLostOpportunityJob>,
     pub most_space_efficient_jobs: Vec<DashboardStatsSizeRuntimeValueJob>,
     pub most_space_use_jobs: Vec<DashboardStatsSizeRuntimeValueJob>,
+    pub blob_use_by_store: Vec<DashboardStatsBlobUseByStore>,
 }
