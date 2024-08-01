@@ -210,6 +210,24 @@ pub async fn count_jobs<T: ConnectionTrait>(db: &T) -> Result<u64, DbErr> {
 }
 
 #[derive(Debug, FromQueryResult)]
+pub struct ProcRowsUpdated {
+    pub updated_count: i32,
+}
+// Finds at most chunk number of jobs with unknown size then calculates and sets it
+pub async fn calculate_job_size<T: ConnectionTrait>(
+    db: &T,
+    chunk: i32,
+) -> Result<Option<ProcRowsUpdated>, DbErr> {
+    ProcRowsUpdated::find_by_statement(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "call calculate_job_size($1, NULL)",
+        [chunk.into()],
+    ))
+    .one(db)
+    .await
+}
+
+#[derive(Debug, FromQueryResult)]
 pub struct TimeSaved {
     pub savings: i64,
 }
@@ -327,22 +345,10 @@ pub async fn most_space_efficient_jobs<T: ConnectionTrait>(
         SELECT
             j.label,
             CAST(round(j.runtime) as BIGINT) as runtime,
-            CAST(b.blob_size + stdout.size + stderr.size as BIGINT) as disk_usage,
-            CAST(round(j.runtime / (b.blob_size + stdout.size + stderr.size) * 1000) as BIGINT) as ms_saved_per_byte
-        FROM (
-           SELECT o.job_id, sum(b.size) as blob_size
-           FROM output_file o
-           INNER JOIN blob b
-           ON o.blob_id = b.id
-           GROUP BY o.job_id
-        ) b
-        INNER JOIN job j
-        ON j.id = b.job_id
-        INNER JOIN blob stdout
-        ON j.stdout_blob_id = stdout.id
-        INNER JOIN blob stderr
-        ON j.stderr_blob_id = stderr.id
-        WHERE (b.blob_size + stdout.size + stderr.size) > 0
+            j.size as disk_usage,
+            CAST(round(j.runtime / (j.size) * 1000) as BIGINT) as ms_saved_per_byte
+        FROM job j
+        WHERE size IS NOT NULL
         ORDER BY ms_saved_per_byte DESC
         LIMIT 30;
         "#,
@@ -360,22 +366,10 @@ pub async fn most_space_use_jobs<T: ConnectionTrait>(
         SELECT
             j.label,
             CAST(round(j.runtime) as BIGINT) as runtime,
-            CAST(b.blob_size + stdout.size + stderr.size as BIGINT) as disk_usage,
-            CAST(round(j.runtime / (b.blob_size + stdout.size + stderr.size) * 1000) as BIGINT) as ms_saved_per_byte
-        FROM (
-           SELECT o.job_id, sum(b.size) as blob_size
-           FROM output_file o
-           INNER JOIN blob b
-           ON o.blob_id = b.id
-           GROUP BY o.job_id
-        ) b
-        INNER JOIN job j
-        ON j.id = b.job_id
-        INNER JOIN blob stdout
-        ON j.stdout_blob_id = stdout.id
-        INNER JOIN blob stderr
-        ON j.stderr_blob_id = stderr.id
-        WHERE (b.blob_size + stdout.size + stderr.size) > 0
+            j.size as disk_usage,
+            CAST(round(j.runtime / (j.size) * 1000) as BIGINT) as ms_saved_per_byte
+        FROM job j
+        WHERE size IS NOT NULL
         ORDER BY disk_usage DESC
         LIMIT 30;
         "#,
