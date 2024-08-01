@@ -70,7 +70,7 @@ impl BlobStore for LocalBlobStore {
 
         let key = match rel_path.into_os_string().into_string() {
             Err(path) => {
-                tracing::error!("Cannot convert path to string, returning loosy path instead");
+                tracing::error!("Cannot convert path to string, returning lossy path instead");
                 path.to_string_lossy().to_string()
             }
             Ok(s) => s,
