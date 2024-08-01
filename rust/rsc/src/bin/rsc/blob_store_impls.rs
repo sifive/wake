@@ -11,14 +11,25 @@ use tokio_util::bytes::Bytes;
 use tokio_util::io::StreamReader;
 
 fn create_random_blob_path() -> std::path::PathBuf {
-    let mut parts = [0u8; 32];
+    // 2 deep @ 8 bytes wide
+    let mut parts = [0u8; 10];
     OsRng.fill_bytes(&mut parts);
+
     let mut buf = std::path::PathBuf::from("");
-    for part in parts {
+
+    // First 2 bytes represent the containing directories
+    for i in 0..2 {
         let mut s = String::new();
-        write!(&mut s, "{:02X}", part).unwrap();
+        write!(&mut s, "{:02X}", parts[i]).unwrap();
         buf.push(s);
     }
+
+    // Next 8 bytes represent the file name
+    let mut s = String::new();
+    for i in 2..10 {
+        write!(&mut s, "{:02X}", parts[i]).unwrap();
+    }
+    buf.push(s);
 
     return buf;
 }
