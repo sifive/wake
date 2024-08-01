@@ -246,7 +246,7 @@ fn launch_blob_eviction(
             // This gives clients time to reference a blob before it gets evicted.
             let ttl = (Utc::now() - Duration::from_secs(config.blob_eviction.ttl)).naive_utc();
 
-            let blobs = match database::read_unreferenced_blobs(
+            let blobs = match database::delete_unreferenced_blobs(
                 conn.as_ref(),
                 ttl,
                 config.blob_eviction.chunk_size,
@@ -255,27 +255,17 @@ fn launch_blob_eviction(
             {
                 Ok(b) => b,
                 Err(err) => {
-                    tracing::error!(%err, "Failed to fetch blobs for eviction");
+                    tracing::error!(%err, "Failed to delete blobs for eviction");
                     should_sleep = true;
                     continue; // Try again on the next tick
                 }
             };
 
-            let blob_ids: Vec<Uuid> = blobs.iter().map(|blob| blob.id).collect();
-            let eligible = blob_ids.len();
-            should_sleep = eligible == 0;
+            let deleted = blobs.len();
 
-            tracing::info!(%eligible, "At least N blobs eligible for eviction");
+            should_sleep = deleted == 0;
 
-            // Delete blobs from database
-            match database::delete_blobs_by_ids(conn.as_ref(), blob_ids).await {
-                Ok(deleted) => tracing::info!(%deleted, "Deleted blobs from database"),
-                Err(err) => {
-                    tracing::error!(%err, "Failed to delete blobs from db for eviction");
-                    should_sleep = true;
-                    continue; // Try again on the next tick
-                }
-            };
+            tracing::info!(%deleted, "N blobs deleted for eviction");
 
             // Delete blobs from blob store
             for blob in blobs {
@@ -283,7 +273,7 @@ fn launch_blob_eviction(
                     Some(s) => s.clone(),
                     None => {
                         let blob = blob.clone();
-                        tracing::info!(%blob.id, %blob.store_id, %blob.key, "Blob has been orphaned!");
+                        tracing::info!(%blob.store_id, %blob.key, "Blob has been orphaned!");
                         tracing::error!(%blob.store_id, "Blob's store id missing from activated stores");
                         continue;
                     }
@@ -292,7 +282,7 @@ fn launch_blob_eviction(
                 tokio::spawn(async move {
                     store.delete_key(blob.key.clone()).await.unwrap_or_else(|err| {
                         let blob = blob.clone();
-                        tracing::info!(%blob.id, %blob.store_id, %blob.key, "Blob has been orphaned!");
+                        tracing::info!(%blob.store_id, %blob.key, "Blob has been orphaned!");
                         tracing::error!(%err, "Failed to delete blob from store for eviction. See above for blob info");
                     });
                 });
