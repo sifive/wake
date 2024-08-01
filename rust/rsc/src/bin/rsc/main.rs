@@ -218,8 +218,6 @@ fn launch_job_eviction(conn: Arc<DatabaseConnection>, tick_interval: u64, ttl: u
         let mut interval = tokio::time::interval(Duration::from_secs(tick_interval));
         loop {
             interval.tick().await;
-            tracing::info!("Job TTL eviction tick");
-
             let ttl = (Utc::now() - Duration::from_secs(ttl)).naive_utc();
 
             match database::evict_jobs_ttl(conn.clone(), ttl).await {
@@ -240,7 +238,6 @@ fn launch_blob_eviction(
             tokio::time::interval(Duration::from_secs(config.blob_eviction.tick_rate));
         let mut should_sleep = false;
         loop {
-            tracing::info!("Blob TTL eviction tick");
             if should_sleep {
                 interval.tick().await;
             }
@@ -280,8 +277,6 @@ fn launch_blob_eviction(
                 }
             };
 
-            tracing::info!("Spawning blob deletion from stores");
-
             // Delete blobs from blob store
             for blob in blobs {
                 let store = match blob_stores.get(&blob.store_id) {
@@ -302,6 +297,42 @@ fn launch_blob_eviction(
                     });
                 });
             }
+        }
+    });
+}
+
+fn launch_job_size_calculate(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) {
+    tokio::spawn(async move {
+        let mut interval =
+            tokio::time::interval(Duration::from_secs(config.job_size_calculate.tick_rate));
+        let mut should_sleep = false;
+        loop {
+            if should_sleep {
+                interval.tick().await;
+            }
+
+            let count = match database::calculate_job_size(
+                conn.as_ref(),
+                config.job_size_calculate.chunk_size,
+            )
+            .await
+            {
+                Ok(Some(c)) => c.updated_count,
+                Ok(None) => {
+                    tracing::error!("Failed to extract result from calculating job size");
+                    should_sleep = true;
+                    continue; // Try again on the next tick
+                }
+                Err(err) => {
+                    tracing::error!(%err, "Failed to calculate and update job size");
+                    should_sleep = true;
+                    continue; // Try again on the next tick
+                }
+            };
+
+            should_sleep = count == 0;
+
+            tracing::info!(%count, "Calculated and updated size for jobs");
         }
     });
 }
@@ -360,7 +391,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Activate blob stores
     let stores = activate_stores(connection.clone()).await;
 
-    // Launch evictions threads
+    // Launch long running concurrent threads
     match &config.job_eviction {
         config::RSCJobEvictionConfig::TTL(ttl) => {
             launch_job_eviction(connection.clone(), ttl.tick_rate, ttl.ttl);
@@ -369,6 +400,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     launch_blob_eviction(connection.clone(), config.clone(), stores.clone());
+    launch_job_size_calculate(connection.clone(), config.clone());
 
     // Launch the server
     let router = create_router(connection.clone(), config.clone(), &stores);
@@ -432,6 +464,10 @@ mod tests {
                 ttl: 100,
                 chunk_size: 100,
             }),
+            job_size_calculate: config::RSCCronLoopConfig {
+                tick_rate: 10,
+                chunk_size: 100,
+            },
         }
     }
 
@@ -788,6 +824,7 @@ mod tests {
             i_bytes: Set(100000),
             o_bytes: Set(1000),
             label: Set("".to_string()),
+            size: NotSet,
         };
 
         insert_job.save(conn.clone().as_ref()).await.unwrap();
@@ -812,6 +849,7 @@ mod tests {
             i_bytes: Set(100000),
             o_bytes: Set(1000),
             label: Set("".to_string()),
+            size: NotSet,
         };
 
         insert_job.save(conn.clone().as_ref()).await.unwrap();

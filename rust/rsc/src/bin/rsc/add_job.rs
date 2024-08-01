@@ -40,6 +40,7 @@ pub async fn add_job(
         i_bytes: Set(payload.ibytes as i64),
         o_bytes: Set(payload.obytes as i64),
         label: Set(payload.label.unwrap_or("".to_string())),
+        size: NotSet,
     };
 
     // Now perform the insert as a single transaction

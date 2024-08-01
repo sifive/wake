@@ -44,6 +44,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Job::Memory).big_unsigned().not_null())
                     .col(ColumnDef::new(Job::IBytes).big_unsigned().not_null())
                     .col(ColumnDef::new(Job::OBytes).big_unsigned().not_null())
+                    .col(ColumnDef::new(Job::Size).big_unsigned())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("fk-stdout_blob_id-blob")
@@ -240,6 +241,7 @@ pub enum Job {
     Memory,
     IBytes,
     OBytes,
+    Size,
 }
 
 #[derive(DeriveIden)]
