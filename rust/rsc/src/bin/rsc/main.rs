@@ -218,8 +218,6 @@ fn launch_job_eviction(conn: Arc<DatabaseConnection>, tick_interval: u64, ttl: u
         let mut interval = tokio::time::interval(Duration::from_secs(tick_interval));
         loop {
             interval.tick().await;
-            tracing::info!("Job TTL eviction tick");
-
             let ttl = (Utc::now() - Duration::from_secs(ttl)).naive_utc();
 
             match database::evict_jobs_ttl(conn.clone(), ttl).await {
@@ -240,7 +238,6 @@ fn launch_blob_eviction(
             tokio::time::interval(Duration::from_secs(config.blob_eviction.tick_rate));
         let mut should_sleep = false;
         loop {
-            tracing::info!("Blob TTL eviction tick");
             if should_sleep {
                 interval.tick().await;
             }
@@ -249,7 +246,7 @@ fn launch_blob_eviction(
             // This gives clients time to reference a blob before it gets evicted.
             let ttl = (Utc::now() - Duration::from_secs(config.blob_eviction.ttl)).naive_utc();
 
-            let blobs = match database::read_unreferenced_blobs(
+            let blobs = match database::delete_unreferenced_blobs(
                 conn.as_ref(),
                 ttl,
                 config.blob_eviction.chunk_size,
@@ -258,29 +255,17 @@ fn launch_blob_eviction(
             {
                 Ok(b) => b,
                 Err(err) => {
-                    tracing::error!(%err, "Failed to fetch blobs for eviction");
+                    tracing::error!(%err, "Failed to delete blobs for eviction");
                     should_sleep = true;
                     continue; // Try again on the next tick
                 }
             };
 
-            let blob_ids: Vec<Uuid> = blobs.iter().map(|blob| blob.id).collect();
-            let eligible = blob_ids.len();
-            should_sleep = eligible == 0;
+            let deleted = blobs.len();
 
-            tracing::info!(%eligible, "At least N blobs eligible for eviction");
+            should_sleep = deleted == 0;
 
-            // Delete blobs from database
-            match database::delete_blobs_by_ids(conn.as_ref(), blob_ids).await {
-                Ok(deleted) => tracing::info!(%deleted, "Deleted blobs from database"),
-                Err(err) => {
-                    tracing::error!(%err, "Failed to delete blobs from db for eviction");
-                    should_sleep = true;
-                    continue; // Try again on the next tick
-                }
-            };
-
-            tracing::info!("Spawning blob deletion from stores");
+            tracing::info!(%deleted, "N blobs deleted for eviction");
 
             // Delete blobs from blob store
             for blob in blobs {
@@ -288,7 +273,7 @@ fn launch_blob_eviction(
                     Some(s) => s.clone(),
                     None => {
                         let blob = blob.clone();
-                        tracing::info!(%blob.id, %blob.store_id, %blob.key, "Blob has been orphaned!");
+                        tracing::info!(%blob.store_id, %blob.key, "Blob has been orphaned!");
                         tracing::error!(%blob.store_id, "Blob's store id missing from activated stores");
                         continue;
                     }
@@ -297,11 +282,47 @@ fn launch_blob_eviction(
                 tokio::spawn(async move {
                     store.delete_key(blob.key.clone()).await.unwrap_or_else(|err| {
                         let blob = blob.clone();
-                        tracing::info!(%blob.id, %blob.store_id, %blob.key, "Blob has been orphaned!");
+                        tracing::info!(%blob.store_id, %blob.key, "Blob has been orphaned!");
                         tracing::error!(%err, "Failed to delete blob from store for eviction. See above for blob info");
                     });
                 });
             }
+        }
+    });
+}
+
+fn launch_job_size_calculate(conn: Arc<DatabaseConnection>, config: Arc<config::RSCConfig>) {
+    tokio::spawn(async move {
+        let mut interval =
+            tokio::time::interval(Duration::from_secs(config.job_size_calculate.tick_rate));
+        let mut should_sleep = false;
+        loop {
+            if should_sleep {
+                interval.tick().await;
+            }
+
+            let count = match database::calculate_job_size(
+                conn.as_ref(),
+                config.job_size_calculate.chunk_size,
+            )
+            .await
+            {
+                Ok(Some(c)) => c.updated_count,
+                Ok(None) => {
+                    tracing::error!("Failed to extract result from calculating job size");
+                    should_sleep = true;
+                    continue; // Try again on the next tick
+                }
+                Err(err) => {
+                    tracing::error!(%err, "Failed to calculate and update job size");
+                    should_sleep = true;
+                    continue; // Try again on the next tick
+                }
+            };
+
+            should_sleep = count == 0;
+
+            tracing::info!(%count, "Calculated and updated size for jobs");
         }
     });
 }
@@ -360,7 +381,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Activate blob stores
     let stores = activate_stores(connection.clone()).await;
 
-    // Launch evictions threads
+    // Launch long running concurrent threads
     match &config.job_eviction {
         config::RSCJobEvictionConfig::TTL(ttl) => {
             launch_job_eviction(connection.clone(), ttl.tick_rate, ttl.ttl);
@@ -369,6 +390,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     launch_blob_eviction(connection.clone(), config.clone(), stores.clone());
+    launch_job_size_calculate(connection.clone(), config.clone());
 
     // Launch the server
     let router = create_router(connection.clone(), config.clone(), &stores);
@@ -432,6 +454,10 @@ mod tests {
                 ttl: 100,
                 chunk_size: 100,
             }),
+            job_size_calculate: config::RSCCronLoopConfig {
+                tick_rate: 10,
+                chunk_size: 100,
+            },
         }
     }
 
@@ -788,6 +814,7 @@ mod tests {
             i_bytes: Set(100000),
             o_bytes: Set(1000),
             label: Set("".to_string()),
+            size: NotSet,
         };
 
         insert_job.save(conn.clone().as_ref()).await.unwrap();
@@ -812,6 +839,7 @@ mod tests {
             i_bytes: Set(100000),
             o_bytes: Set(1000),
             label: Set("".to_string()),
+            size: NotSet,
         };
 
         insert_job.save(conn.clone().as_ref()).await.unwrap();

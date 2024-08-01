@@ -40,8 +40,7 @@ pub struct AddJobPayload {
     pub cwd: String,
     pub stdin: String,
     pub is_atty: bool,
-    #[serde(with = "serde_bytes")]
-    pub hidden_info: Vec<u8>,
+    pub hidden_info: String,
     pub visible_files: Vec<VisibleFile>,
     pub output_dirs: Vec<Dir>,
     pub output_symlinks: Vec<Symlink>,
@@ -73,7 +72,7 @@ impl AddJobPayload {
         hasher.update(&self.stdin.len().to_le_bytes());
         hasher.update(self.stdin.as_bytes());
         hasher.update(&self.hidden_info.len().to_le_bytes());
-        hasher.update(self.hidden_info.as_slice());
+        hasher.update(self.hidden_info.as_bytes());
         hasher.update(&[self.is_atty as u8]);
         hasher.update(&self.visible_files.len().to_le_bytes());
         for file in &self.visible_files {
@@ -93,8 +92,7 @@ pub struct ReadJobPayload {
     pub cwd: String,
     pub stdin: String,
     pub is_atty: bool,
-    #[serde(with = "serde_bytes")]
-    pub hidden_info: Vec<u8>,
+    pub hidden_info: String,
     pub visible_files: Vec<VisibleFile>,
 }
 
@@ -111,7 +109,7 @@ impl ReadJobPayload {
         hasher.update(&self.stdin.len().to_le_bytes());
         hasher.update(self.stdin.as_bytes());
         hasher.update(&self.hidden_info.len().to_le_bytes());
-        hasher.update(self.hidden_info.as_slice());
+        hasher.update(self.hidden_info.as_bytes());
         hasher.update(&[self.is_atty as u8]);
         hasher.update(&self.visible_files.len().to_le_bytes());
         for file in &self.visible_files {

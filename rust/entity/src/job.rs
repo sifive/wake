@@ -16,8 +16,7 @@ pub struct Model {
     pub cwd: String,
     pub stdin: String,
     pub is_atty: bool,
-    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
-    pub hidden_info: Vec<u8>,
+    pub hidden_info: String,
     pub stdout_blob_id: Uuid,
     pub stderr_blob_id: Uuid,
     pub status: i32,
@@ -28,6 +27,7 @@ pub struct Model {
     pub memory: i64,
     pub i_bytes: i64,
     pub o_bytes: i64,
+    pub size: Option<i64>,
     pub created_at: DateTime,
     pub label: String,
 }

@@ -16,5 +16,9 @@
       "ttl": 86400,
       "chunk_size": 16000
     }
+  },
+  "job_size_calculate": {
+    "tick_rate": 60,
+    "chunk_size": 100
   }
 }
