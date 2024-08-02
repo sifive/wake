@@ -1,6 +1,6 @@
 use crate::types::{
-    DashboardStatsLostOpportunityJob, DashboardStatsMostReusedJob, DashboardStatsOldestJob,
-    DashboardStatsResponse, DashboardStatsSizeRuntimeValueJob,
+    DashboardStatsBlobUseByStore, DashboardStatsLostOpportunityJob, DashboardStatsMostReusedJob,
+    DashboardStatsOldestJob, DashboardStatsResponse, DashboardStatsSizeRuntimeValueJob,
 };
 use axum::Json;
 use rsc::database;
@@ -16,9 +16,11 @@ pub async fn stats(db: Arc<DatabaseConnection>) -> Json<DashboardStatsResponse> 
         savings: 0,
         oldest_jobs: Vec::new(),
         most_reused_jobs: Vec::new(),
+        most_time_saved_jobs: Vec::new(),
         lost_opportunity_jobs: Vec::new(),
         most_space_efficient_jobs: Vec::new(),
         most_space_use_jobs: Vec::new(),
+        blob_use_by_store: Vec::new(),
     };
 
     let job_count = match database::count_jobs(db.as_ref()).await {
@@ -98,6 +100,24 @@ pub async fn stats(db: Arc<DatabaseConnection>) -> Json<DashboardStatsResponse> 
         }
     };
 
+    let most_time_saved_jobs = match database::most_time_saved_jobs(db.as_ref()).await {
+        Ok(items) => {
+            let mut out = Vec::new();
+            for item in items {
+                out.push(DashboardStatsMostReusedJob {
+                    label: item.label,
+                    reuses: item.reuses,
+                    savings: item.savings,
+                });
+            }
+            out
+        }
+        Err(err) => {
+            tracing::error! {%err, "Failed to lookup most time saved jobs"};
+            return Json(empty);
+        }
+    };
+
     let lost_opportunity_jobs = match database::lost_opportuinty_jobs(db.as_ref()).await {
         Ok(items) => {
             let mut out = Vec::new();
@@ -107,6 +127,7 @@ pub async fn stats(db: Arc<DatabaseConnection>) -> Json<DashboardStatsResponse> 
                     reuses: item.reuses,
                     misses: item.misses,
                     real_savings: item.real_savings,
+                    lost_savings: item.lost_savings,
                     potential_savings: item.potential_savings,
                 });
             }
@@ -126,7 +147,7 @@ pub async fn stats(db: Arc<DatabaseConnection>) -> Json<DashboardStatsResponse> 
                     label: item.label,
                     runtime: item.runtime,
                     disk_usage: item.disk_usage,
-                    ms_saved_per_byte: item.ms_saved_per_byte,
+                    ns_saved_per_byte: item.ns_saved_per_byte,
                 });
             }
             out
@@ -145,13 +166,32 @@ pub async fn stats(db: Arc<DatabaseConnection>) -> Json<DashboardStatsResponse> 
                     label: item.label,
                     runtime: item.runtime,
                     disk_usage: item.disk_usage,
-                    ms_saved_per_byte: item.ms_saved_per_byte,
+                    ns_saved_per_byte: item.ns_saved_per_byte,
                 });
             }
             out
         }
         Err(err) => {
             tracing::error! {%err, "Failed to lookup most space use jobs"};
+            return Json(empty);
+        }
+    };
+
+    let blob_use_by_store = match database::blob_use_by_store(db.as_ref()).await {
+        Ok(items) => {
+            let mut out = Vec::new();
+            for item in items {
+                out.push(DashboardStatsBlobUseByStore {
+                    store_id: item.store_id.to_string(),
+                    store_type: item.store_type,
+                    refs: item.refs,
+                    blob_count: item.blob_count,
+                });
+            }
+            out
+        }
+        Err(err) => {
+            tracing::error! {%err, "Failed to lookup blob use by store"};
             return Json(empty);
         }
     };
@@ -163,8 +203,10 @@ pub async fn stats(db: Arc<DatabaseConnection>) -> Json<DashboardStatsResponse> 
         savings,
         oldest_jobs,
         most_reused_jobs,
+        most_time_saved_jobs,
         lost_opportunity_jobs,
         most_space_efficient_jobs,
         most_space_use_jobs,
+        blob_use_by_store,
     })
 }
