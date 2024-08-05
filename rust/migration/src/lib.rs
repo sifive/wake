@@ -12,6 +12,7 @@ mod m20240517_195757_add_updated_at_to_blob;
 mod m20240522_185420_create_job_history;
 mod m20240731_152842_create_job_size_proc;
 mod m20240731_201632_create_job_blob_timestamp_index;
+mod m20240805_163520_create_blob_id_fk_indexes;
 
 pub struct Migrator;
 
@@ -31,6 +32,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20240522_185420_create_job_history::Migration),
             Box::new(m20240731_152842_create_job_size_proc::Migration),
             Box::new(m20240731_201632_create_job_blob_timestamp_index::Migration),
+            Box::new(m20240805_163520_create_blob_id_fk_indexes::Migration),
         ]
     }
 }
