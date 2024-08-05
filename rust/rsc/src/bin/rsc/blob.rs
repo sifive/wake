@@ -66,16 +66,18 @@ pub async fn create_blob(
             })))
             .await;
 
-        if let Err(msg) = result {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(PostBlobResponse::Error {
-                    message: msg.to_string(),
-                }),
-            );
-        }
-
-        let (blob_key, blob_size) = result.unwrap();
+        let (blob_key, blob_size) = match result {
+            Err(err) => {
+                tracing::error! {%err, "Failed to stream blob to store"};
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(PostBlobResponse::Error {
+                        message: err.to_string(),
+                    }),
+                );
+            }
+            Ok(resp) => resp,
+        };
 
         let active_blob = blob::ActiveModel {
             id: NotSet,
@@ -87,13 +89,14 @@ pub async fn create_blob(
         };
 
         match database::upsert_blob(db.as_ref(), active_blob).await {
-            Err(msg) => {
+            Err(err) => {
+                tracing::error! {%err, "Failed to upsert blob"};
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(PostBlobResponse::Error {
-                        message: msg.to_string(),
+                        message: err.to_string(),
                     }),
-                )
+                );
             }
             Ok(id) => parts.push(PostBlobResponsePart { id, name }),
         }
