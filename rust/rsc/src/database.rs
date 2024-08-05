@@ -410,7 +410,7 @@ pub async fn most_space_efficient_jobs<T: ConnectionTrait>(
             j.size as disk_usage,
             CAST(round(j.runtime / (j.size) * 1000000000) as BIGINT) as ns_saved_per_byte
         FROM job j
-        WHERE size IS NOT NULL
+        WHERE size IS NOT NULL AND size > 0
         ORDER BY ns_saved_per_byte DESC
         LIMIT 30;
         "#,
@@ -431,7 +431,7 @@ pub async fn most_space_use_jobs<T: ConnectionTrait>(
             j.size as disk_usage,
             CAST(round(j.runtime / (j.size) * 1000000000) as BIGINT) as ns_saved_per_byte
         FROM job j
-        WHERE size IS NOT NULL
+        WHERE size IS NOT NULL AND size > 0
         ORDER BY disk_usage DESC
         LIMIT 30;
         "#,
