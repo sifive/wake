@@ -43,7 +43,7 @@ pub enum RSCJobEvictionConfig {
 pub struct RSCLoadShedConfig {
     // How often to refresh the system load
     pub tick_rate: u64,
-    // Load value after which load should be statisically shed
+    // Load value after which load should be statistically shed
     pub target: f64,
 }
 

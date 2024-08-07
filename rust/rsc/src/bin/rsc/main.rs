@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-
 use tracing;
 
 mod add_job;
