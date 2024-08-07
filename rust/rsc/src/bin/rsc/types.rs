@@ -122,6 +122,51 @@ impl ReadJobPayload {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AllowJobPayload {
+    pub cmd: Vec<u8>,
+    pub env: Vec<u8>,
+    pub cwd: String,
+    pub stdin: String,
+    pub is_atty: bool,
+    pub hidden_info: String,
+    pub visible_files: Vec<VisibleFile>,
+    // Above is the job key and required.
+    // Below is optional and used for determining allowability
+    pub status: i32,
+    pub runtime: f64,
+    pub cputime: f64,
+    pub memory: u64,
+    pub obytes: u64,
+    pub label: String,
+}
+
+impl AllowJobPayload {
+    // TODO: Figure out a way to de-dup this with AddJobPayload somehow
+    pub fn hash(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&self.cmd.len().to_le_bytes());
+        hasher.update(&self.cmd);
+        hasher.update(&self.env.len().to_le_bytes());
+        hasher.update(&self.env);
+        hasher.update(&self.cwd.len().to_le_bytes());
+        hasher.update(self.cwd.as_bytes());
+        hasher.update(&self.stdin.len().to_le_bytes());
+        hasher.update(self.stdin.as_bytes());
+        hasher.update(&self.hidden_info.len().to_le_bytes());
+        hasher.update(self.hidden_info.as_bytes());
+        hasher.update(&[self.is_atty as u8]);
+        hasher.update(&self.visible_files.len().to_le_bytes());
+        for file in &self.visible_files {
+            hasher.update(&file.path.len().to_le_bytes());
+            hasher.update(file.path.as_bytes());
+            hasher.update(&file.hash.len().to_le_bytes());
+            hasher.update(file.hash.as_bytes());
+        }
+        hasher.finalize().to_string()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PostBlobResponsePart {
     pub id: Uuid,

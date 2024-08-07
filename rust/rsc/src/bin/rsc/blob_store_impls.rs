@@ -1,7 +1,7 @@
 use crate::blob::*;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use rand_core::{OsRng, RngCore};
+use rand::{thread_rng, RngCore};
 use sea_orm::prelude::Uuid;
 use std::fmt::Write;
 use tokio::fs::File;
@@ -13,7 +13,7 @@ use tokio_util::io::StreamReader;
 fn create_random_blob_path() -> std::path::PathBuf {
     // 2 deep @ 8 bytes wide
     let mut parts = [0u8; 10];
-    OsRng.fill_bytes(&mut parts);
+    thread_rng().fill_bytes(&mut parts);
 
     let mut buf = std::path::PathBuf::from("");
 

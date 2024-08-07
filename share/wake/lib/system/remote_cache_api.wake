@@ -183,6 +183,35 @@ tuple CachePostRequest =
     # The number of bytes written by the job
     OBytes: Integer
 
+# A request to the remote server to check if a job is allowed to be cached
+tuple CacheAllowedRequest =
+    # The label for the job. Not part of the key, used only for inspection
+    Label: String
+    # The command line of the job
+    Cmd: List String
+    # The directory of the job
+    Cwd: String
+    # The environment of the job
+    Env: List String
+    # User provided string to mark two jobs as different even if wake considers them the same
+    HiddenInfo: String
+    # If the job was ran as if a user was running it from a terminal
+    IsAtty: Boolean
+    # The stdin of the job
+    Stdin: String
+    # The list of files the job is allowed to read in the sandbox
+    VisibleFiles: List Path
+    # The code that the job return on exit
+    Status: Integer
+    # The total runtime of the job
+    Runtime: Double
+    # The total cputime of the job
+    Cputime: Double
+    # The total memory of the job
+    Memory: Integer
+    # The number of bytes written by the job
+    OBytes: Integer
+
 # getRemoteCacheApiAuthorization: Extracts the auth string from RemoteCacheApi if present
 #
 # ```
@@ -355,6 +384,65 @@ export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result U
     else failWithError "rsc: post job failed with code {response.getHttpResponseStatusCode | format}"
 
     Pass Unit
+
+# rscApiCheckJobAllowed: Checks if the remote server is willing to accept a completed job as
+#                        described by *req*. If not then the job should not be posted.
+#
+# ```
+#  api | rscApiCheckJobAllowed (CacheAllowedRequest ...) = Pass True
+# ```
+export def rscApiCheckJobAllowed (req: CacheAllowedRequest) (api: RemoteCacheApi): Result Boolean Error =
+    require True = api.getRemoteCacheApiCanPush
+    else failWithError "rsc: RSC Client not configured for pushing to the server"
+
+    def jsonStr =
+        req
+        | getCacheAllowedRequestJson
+        | formatJSON
+
+    def _ =
+        require True = shouldDebugRemoteCache Unit
+
+        def _ =
+            writeTempFile
+            "remote.cache.api.allowedJob.req"
+            "label: {req.getCacheAllowedRequestLabel}\nreq: {jsonStr}"
+
+        True
+
+    require Pass response =
+        makeRoute api "job/allowed"
+        | buildHttpRequest
+        | setMethod HttpMethodPost
+        | addContentTypeJsonHeader
+        | setBody jsonStr
+        | makeRequest
+
+    def _ =
+        require True = shouldDebugRemoteCache Unit
+
+        def _ =
+            writeTempFile
+            "remote.cache.api.allowedJob.res.{response.getHttpResponseStatusCode | format}"
+            "label: {req.getCacheAllowedRequestLabel}\nres: {response | format}"
+
+        True
+
+    match response.getHttpResponseStatusCode
+        # Allowed
+        Some 200 -> Pass True
+        # Denied due to job contents
+        Some 406 -> Pass False
+        # Denied because already cached
+        Some 409 -> Pass False
+        # Denied because server needs to shed load
+        Some 429 -> Pass False
+        # Allowed for unknown reason
+        Some code if code > 199 && code < 300 -> Pass True
+        # Denied for unknown reason
+        Some _ -> Pass False
+        # Failed to parse status code from request
+        None -> failWithError "Missing status code from request"
 
 # rscApiFindMatchingJob: Searches the remote server defined by *api* for a cached job that matches 
 #                        the job key provided by *req*. Returns a response that may or may not have
@@ -622,6 +710,40 @@ def getCacheSearchRequestJson (req: CacheSearchRequest): JValue =
         "is_atty" :-> JBoolean isAtty,
         "stdin" :-> JString stdin,
         "visible_files" :-> JArray (visibleFiles | map getPathAsJson),
+    )
+
+def getCacheAllowedRequestJson (req: CacheAllowedRequest): JValue =
+    def (
+        CacheAllowedRequest
+        label
+        cmd
+        cwd
+        env
+        hiddenInfo
+        isAtty
+        stdin
+        visibleFiles
+        status
+        runtime
+        cputime
+        memory
+        obytes
+    ) = req
+
+    JObject (
+        "cmd" :-> JArray (cmd.asBytesDelimedByNull | map JInteger),
+        "cwd" :-> JString cwd,
+        "env" :-> JArray (env.asBytesDelimedByNull | map JInteger),
+        "hidden_info" :-> JString hiddenInfo,
+        "is_atty" :-> JBoolean isAtty,
+        "stdin" :-> JString stdin,
+        "visible_files" :-> JArray (visibleFiles | map getPathAsJson),
+        "status" :-> JInteger status,
+        "runtime" :-> JDouble runtime,
+        "cputime" :-> JDouble cputime,
+        "memory" :-> JInteger memory,
+        "obytes" :-> JInteger obytes,
+        "label" :-> JString label,
     )
 
 # Converts a CachePostJobRequest to JSON

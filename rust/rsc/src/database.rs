@@ -9,7 +9,7 @@ use entity::{
 };
 use itertools::Itertools;
 use migration::OnConflict;
-use rand_core::{OsRng, RngCore};
+use rand::{thread_rng, RngCore};
 use sea_orm::{
     prelude::{DateTime, Expr, Uuid},
     ActiveModelTrait,
@@ -38,7 +38,7 @@ pub async fn create_api_key<T: ConnectionTrait>(
     let key = match key {
         None => {
             let mut buf = [0u8; 24];
-            OsRng.fill_bytes(&mut buf);
+            thread_rng().fill_bytes(&mut buf);
             BASE64.encode(&buf)
         }
         Some(key) => key,

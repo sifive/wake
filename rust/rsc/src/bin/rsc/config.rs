@@ -40,6 +40,14 @@ pub enum RSCJobEvictionConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct RSCLoadShedConfig {
+    // How often to refresh the system load
+    pub tick_rate: u64,
+    // Load value after which load should be statisically shed
+    pub target: f64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RSCConfig {
     // The url used to connect to the postgres database
     pub database_url: String,
@@ -57,6 +65,8 @@ pub struct RSCConfig {
     pub job_eviction: RSCJobEvictionConfig,
     // The config to control job size calculation
     pub job_size_calculate: RSCCronLoopConfig,
+    // The config to control load shed
+    pub load_shed: RSCLoadShedConfig,
 }
 
 impl RSCConfig {

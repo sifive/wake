@@ -1,8 +1,11 @@
 use crate::blob;
-use crate::types::{Dir, ReadJobPayload, ReadJobResponse, ResolvedBlob, ResolvedBlobFile, Symlink};
+use crate::types::{
+    AllowJobPayload, Dir, ReadJobPayload, ReadJobResponse, ResolvedBlob, ResolvedBlobFile, Symlink,
+};
 use axum::Json;
 use entity::{job, job_use, output_dir, output_file, output_symlink};
 use hyper::StatusCode;
+use rand::{thread_rng, Rng};
 use rsc::database;
 use sea_orm::DatabaseTransaction;
 use sea_orm::{
@@ -10,7 +13,7 @@ use sea_orm::{
     EntityTrait, ModelTrait, QueryFilter, TransactionTrait,
 };
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tracing;
 
 #[tracing::instrument(skip(hash, conn))]
@@ -202,4 +205,59 @@ pub async fn read_job(
             )
         }
     }
+}
+
+#[tracing::instrument(skip_all)]
+pub async fn allow_job(
+    Json(payload): Json<AllowJobPayload>,
+    conn: Arc<DatabaseConnection>,
+    target_load: f64,
+    system_load: Arc<RwLock<f64>>,
+) -> StatusCode {
+    let hash = payload.hash();
+
+    match job::Entity::find()
+        .filter(job::Column::Hash.eq(hash.clone()))
+        .one(conn.as_ref())
+        .await
+    {
+        // Unable to run the query to lookup the job
+        Err(err) => {
+            tracing::error!(%err, "Failed to search for cached job");
+            return StatusCode::INTERNAL_SERVER_ERROR;
+        }
+        // Job is cached, don't try again
+        Ok(Some(_)) => return StatusCode::CONFLICT,
+        // Job is not cached, use the other deciding factors
+        Ok(None) => {}
+    }
+
+    // Reject a subset of jobs that are never worth caching
+    if payload.runtime < 0.1 {
+        return StatusCode::NOT_ACCEPTABLE;
+    }
+
+    // Statistically reject jobs when the system should shed load
+    let current_load = match system_load.read() {
+        Ok(lock) => *lock,
+        Err(err) => {
+            tracing::error!(%err, "Unable to lock system load for reading. Returning target load");
+            target_load
+        }
+    };
+
+    // Determine the chance of shedding the job and clamp to 0.0-1.0
+    let mut shed_chance = current_load / target_load - 1.0;
+    shed_chance = f64::min(shed_chance, 1.0);
+    shed_chance = f64::max(shed_chance, 0.0);
+
+    if shed_chance > 0.5 {
+        tracing::warn!(%shed_chance, "Machine is highly loaded and more likely than not to shed a job");
+    }
+
+    if thread_rng().gen_bool(shed_chance) {
+        return StatusCode::TOO_MANY_REQUESTS;
+    }
+
+    return StatusCode::OK;
 }
