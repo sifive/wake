@@ -215,27 +215,6 @@ pub async fn allow_job(
     target_load: f64,
     system_load: Arc<RwLock<f64>>,
 ) -> StatusCode {
-    let hash = payload.hash();
-
-    match job::Entity::find()
-        .filter(job::Column::Hash.eq(hash.clone()))
-        .one(conn.as_ref())
-        .await
-    {
-        // Unable to run the query to lookup the job
-        Err(err) => {
-            tracing::error!(%err, "Failed to search for cached job");
-            return StatusCode::INTERNAL_SERVER_ERROR;
-        }
-        // Job is cached, don't try again
-        Ok(Some(_)) => {
-            tracing::warn!(%hash, "Rejecting job push for already cached job");
-            return StatusCode::CONFLICT;
-        }
-        // Job is not cached, use the other deciding factors
-        Ok(None) => {}
-    }
-
     // Reject a subset of jobs that are never worth caching
     if payload.runtime < 0.1 {
         return StatusCode::NOT_ACCEPTABLE;
@@ -267,5 +246,24 @@ pub async fn allow_job(
         return StatusCode::TOO_MANY_REQUESTS;
     }
 
-    return StatusCode::OK;
+    // Reject jobs that are already cached
+    let hash = payload.hash();
+    match job::Entity::find()
+        .filter(job::Column::Hash.eq(hash.clone()))
+        .one(conn.as_ref())
+        .await
+    {
+        // Unable to run the query to lookup the job
+        Err(err) => {
+            tracing::error!(%err, "Failed to search for cached job");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+        // Job is cached, don't try again
+        Ok(Some(_)) => {
+            tracing::warn!(%hash, "Rejecting job push for already cached job");
+            StatusCode::CONFLICT
+        }
+        // Job is not cached, use the other deciding factors
+        Ok(None) => StatusCode::OK,
+    }
 }
