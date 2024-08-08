@@ -11,7 +11,7 @@ use rsc::database;
 use sea_orm::{prelude::Uuid, ConnectOptions, Database, DatabaseConnection};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tracing;
 
@@ -109,6 +109,7 @@ fn create_router(
     conn: Arc<DatabaseConnection>,
     config: Arc<config::RSCConfig>,
     blob_stores: &HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
+    system_load: Arc<RwLock<f64>>,
 ) -> Router {
     let Ok(active_store_uuid) = Uuid::parse_str(&config.active_store) else {
         panic!("Failed to parse provided active store into uuid");
@@ -173,6 +174,15 @@ fn create_router(
                 let conn = conn.clone();
                 let blob_stores = blob_stores.clone();
                 move |body| read_job::read_job(body, conn, blob_stores)
+            })
+            .layer(DefaultBodyLimit::disable()),
+        )
+        .route(
+            "/job/allowed",
+            post({
+                let conn = conn.clone();
+                let target = config.load_shed.target.clone();
+                move |body| read_job::allow_job(body, conn, target, system_load)
             })
             .layer(DefaultBodyLimit::disable()),
         )
@@ -327,6 +337,28 @@ fn launch_job_size_calculate(conn: Arc<DatabaseConnection>, config: Arc<config::
     });
 }
 
+fn launch_system_usage_refresh(config: Arc<config::RSCConfig>, system_load: Arc<RwLock<f64>>) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(config.load_shed.tick_rate));
+        loop {
+            interval.tick().await;
+            let local_load = sysinfo::System::load_average().one;
+
+            match system_load.write() {
+                Ok(mut lock) => {
+                    *lock = local_load;
+                }
+                Err(err) => {
+                    tracing::error!(%err, "Failed to aquire write lock for system load");
+                    continue;
+                }
+            };
+
+            tracing::info!(%local_load, "System load");
+        }
+    });
+}
+
 fn request_max_fileno_limit() {
     let Ok((current, max)) = Resource::NOFILE.get() else {
         tracing::warn!("Unable to discover fileno limits. Using default");
@@ -381,6 +413,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Activate blob stores
     let stores = activate_stores(connection.clone()).await;
 
+    // Create the resouce needed to track the current system utilization
+    let system_load = Arc::new(RwLock::new(0.0));
+
     // Launch long running concurrent threads
     match &config.job_eviction {
         config::RSCJobEvictionConfig::TTL(ttl) => {
@@ -391,9 +426,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     launch_blob_eviction(connection.clone(), config.clone(), stores.clone());
     launch_job_size_calculate(connection.clone(), config.clone());
+    launch_system_usage_refresh(config.clone(), system_load.clone());
 
     // Launch the server
-    let router = create_router(connection.clone(), config.clone(), &stores);
+    let router = create_router(connection.clone(), config.clone(), &stores, system_load);
     axum::Server::bind(&config.server_address.parse()?)
         .serve(router.into_make_service())
         .await?;
@@ -406,7 +442,7 @@ mod tests {
     use super::*;
     use data_encoding::HEXLOWER;
     use entity::blob_store;
-    use rand_core::{OsRng, RngCore};
+    use rand::{thread_rng, RngCore};
     use sea_orm::{
         prelude::Uuid, ActiveModelTrait, ActiveValue::*, ConnectionTrait, EntityTrait,
         PaginatorTrait,
@@ -458,6 +494,10 @@ mod tests {
                 tick_rate: 10,
                 chunk_size: 100,
             },
+            load_shed: config::RSCLoadShedConfig {
+                tick_rate: 10,
+                target: 10.0,
+            },
         }
     }
 
@@ -497,7 +537,7 @@ mod tests {
     async fn create_standalone_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
         let shim_db = Database::connect("postgres://127.0.0.1/shim").await?;
         let mut buf = [0u8; 24];
-        OsRng.fill_bytes(&mut buf);
+        thread_rng().fill_bytes(&mut buf);
         let rng_str = HEXLOWER.encode(&buf);
         let db = format!("db_{}", rng_str);
         shim_db
@@ -518,7 +558,8 @@ mod tests {
         let config = create_config(store_id.clone());
         let db = Arc::new(db);
         let stores = activate_stores(db.clone()).await;
-        let mut router = create_router(db.clone(), Arc::new(config), &stores);
+        let system_load = Arc::new(RwLock::new(0.0));
+        let mut router = create_router(db.clone(), Arc::new(config), &stores, system_load);
 
         // Non-existant route should 404
         let res = router

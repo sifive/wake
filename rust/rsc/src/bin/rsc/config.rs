@@ -40,6 +40,14 @@ pub enum RSCJobEvictionConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct RSCLoadShedConfig {
+    // How often to refresh the system load
+    pub tick_rate: u64,
+    // Load value after which load should be statistically shed
+    pub target: f64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RSCConfig {
     // The url used to connect to the postgres database
     pub database_url: String,
@@ -57,6 +65,8 @@ pub struct RSCConfig {
     pub job_eviction: RSCJobEvictionConfig,
     // The config to control job size calculation
     pub job_size_calculate: RSCCronLoopConfig,
+    // The config to control load shed
+    pub load_shed: RSCLoadShedConfig,
 }
 
 impl RSCConfig {
@@ -67,6 +77,14 @@ impl RSCConfig {
             .add_source(File::with_name(".config"))
             .build()?;
 
-        config.try_deserialize()
+        let config: RSCConfig = config.try_deserialize()?;
+
+        if config.load_shed.target == 0.0 {
+            return Err(ConfigError::Message(
+                "Load shed target must not be zero".to_string(),
+            ));
+        }
+
+        Ok(config)
     }
 }

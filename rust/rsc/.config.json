@@ -20,5 +20,9 @@
   "job_size_calculate": {
     "tick_rate": 60,
     "chunk_size": 100
+  },
+  "load_shed": {
+    "tick_rate": 30,
+    "target": 16.0
   }
 }

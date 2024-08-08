@@ -47,6 +47,11 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
         require True = rscApi.getRemoteCacheApiCanPush
         else Pass output
 
+        # If the server denies caching the job then skip
+        require Pass True =
+            (rscApi | rscApiCheckJobAllowed (mkCacheAllowedRequest input output hashKey))
+        else Pass output
+
         # Post the job to the server. This is left as 'def _' so that wake won't block progess
         # on it but it will stil be joined on before wake exits. Regardless of the result this
         # call should return the passing output to allow the build to continue
@@ -311,6 +316,12 @@ def mkPostJobRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _ is
     mem
     ibytes
     obytes
+
+# Creates a CacheAllowedRequest from the various inputs and outputs of a runner
+def mkCacheAllowedRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (output: RunnerOutput) (hidden: String) =
+    def Usage status runtime cputime mem _ibytes obytes = output.getRunnerOutputUsage
+
+    CacheAllowedRequest label cmd dir env hidden isAtty stdin vis status runtime cputime mem obytes
 
 data ThirdByGroup =
     ThirdByGroupFirst
