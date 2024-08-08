@@ -259,8 +259,7 @@ pub async fn allow_job(
     // 1: The logs will get very spammy, 2: The act of logging will increase the load
     // This creates the opportunity of a feedback loop so we dampen the log rate based on the
     // current load. shed_chance = 0.5 log_chance = 0.51. shed_chance = 1.0, log_chance = 0.01
-    let should_log = thread_rng().gen_bool(0.01 + (1.0 - shed_chance));
-    if shed_chance > 0.5 && should_log {
+    if shed_chance > 0.5 && thread_rng().gen_bool(0.01 + (1.0 - shed_chance)) {
         tracing::warn!(%shed_chance, "Machine is highly loaded and more likely than not to shed a job");
     }
 
