@@ -8,6 +8,39 @@ use serde::{Deserialize, Serialize};
 //   Without the implementation of a macro, we need to manually maintain the number of
 //   parameters in each type.
 
+pub trait JobKeyHash {
+    fn cmd(&self) -> &Vec<u8>;
+    fn env(&self) -> &Vec<u8>;
+    fn cwd(&self) -> &String;
+    fn stdin(&self) -> &String;
+    fn is_atty(&self) -> bool;
+    fn hidden_info(&self) -> &String;
+    fn visible_files(&self) -> &Vec<VisibleFile>;
+
+    fn hash(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&self.cmd().len().to_le_bytes());
+        hasher.update(self.cmd());
+        hasher.update(&self.env().len().to_le_bytes());
+        hasher.update(self.env());
+        hasher.update(&self.cwd().len().to_le_bytes());
+        hasher.update(self.cwd().as_bytes());
+        hasher.update(&self.stdin().len().to_le_bytes());
+        hasher.update(self.stdin().as_bytes());
+        hasher.update(&self.hidden_info().len().to_le_bytes());
+        hasher.update(self.hidden_info().as_bytes());
+        hasher.update(&[self.is_atty() as u8]);
+        hasher.update(&self.visible_files().len().to_le_bytes());
+        for file in self.visible_files() {
+            hasher.update(&file.path.len().to_le_bytes());
+            hasher.update(file.path.as_bytes());
+            hasher.update(&file.hash.len().to_le_bytes());
+            hasher.update(file.hash.as_bytes());
+        }
+        hasher.finalize().to_string()
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct VisibleFile {
     pub path: String,
@@ -60,28 +93,33 @@ pub struct AddJobPayload {
     pub label: Option<String>,
 }
 
-impl AddJobPayload {
-    pub fn hash(&self) -> String {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&self.cmd.len().to_le_bytes());
-        hasher.update(&self.cmd);
-        hasher.update(&self.env.len().to_le_bytes());
-        hasher.update(&self.env);
-        hasher.update(&self.cwd.len().to_le_bytes());
-        hasher.update(self.cwd.as_bytes());
-        hasher.update(&self.stdin.len().to_le_bytes());
-        hasher.update(self.stdin.as_bytes());
-        hasher.update(&self.hidden_info.len().to_le_bytes());
-        hasher.update(self.hidden_info.as_bytes());
-        hasher.update(&[self.is_atty as u8]);
-        hasher.update(&self.visible_files.len().to_le_bytes());
-        for file in &self.visible_files {
-            hasher.update(&file.path.len().to_le_bytes());
-            hasher.update(file.path.as_bytes());
-            hasher.update(&file.hash.len().to_le_bytes());
-            hasher.update(file.hash.as_bytes());
-        }
-        hasher.finalize().to_string()
+impl JobKeyHash for AddJobPayload {
+    fn cmd(&self) -> &Vec<u8> {
+        &self.cmd
+    }
+
+    fn env(&self) -> &Vec<u8> {
+        &self.env
+    }
+
+    fn cwd(&self) -> &String {
+        &self.cwd
+    }
+
+    fn stdin(&self) -> &String {
+        &self.stdin
+    }
+
+    fn is_atty(&self) -> bool {
+        self.is_atty
+    }
+
+    fn hidden_info(&self) -> &String {
+        &self.hidden_info
+    }
+
+    fn visible_files(&self) -> &Vec<VisibleFile> {
+        &self.visible_files
     }
 }
 
@@ -96,29 +134,33 @@ pub struct ReadJobPayload {
     pub visible_files: Vec<VisibleFile>,
 }
 
-impl ReadJobPayload {
-    // TODO: Figure out a way to de-dup this with AddJobPayload somehow
-    pub fn hash(&self) -> String {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&self.cmd.len().to_le_bytes());
-        hasher.update(&self.cmd);
-        hasher.update(&self.env.len().to_le_bytes());
-        hasher.update(&self.env);
-        hasher.update(&self.cwd.len().to_le_bytes());
-        hasher.update(self.cwd.as_bytes());
-        hasher.update(&self.stdin.len().to_le_bytes());
-        hasher.update(self.stdin.as_bytes());
-        hasher.update(&self.hidden_info.len().to_le_bytes());
-        hasher.update(self.hidden_info.as_bytes());
-        hasher.update(&[self.is_atty as u8]);
-        hasher.update(&self.visible_files.len().to_le_bytes());
-        for file in &self.visible_files {
-            hasher.update(&file.path.len().to_le_bytes());
-            hasher.update(file.path.as_bytes());
-            hasher.update(&file.hash.len().to_le_bytes());
-            hasher.update(file.hash.as_bytes());
-        }
-        hasher.finalize().to_string()
+impl JobKeyHash for ReadJobPayload {
+    fn cmd(&self) -> &Vec<u8> {
+        &self.cmd
+    }
+
+    fn env(&self) -> &Vec<u8> {
+        &self.env
+    }
+
+    fn cwd(&self) -> &String {
+        &self.cwd
+    }
+
+    fn stdin(&self) -> &String {
+        &self.stdin
+    }
+
+    fn is_atty(&self) -> bool {
+        self.is_atty
+    }
+
+    fn hidden_info(&self) -> &String {
+        &self.hidden_info
+    }
+
+    fn visible_files(&self) -> &Vec<VisibleFile> {
+        &self.visible_files
     }
 }
 
@@ -141,29 +183,33 @@ pub struct AllowJobPayload {
     pub label: String,
 }
 
-impl AllowJobPayload {
-    // TODO: Figure out a way to de-dup this with AddJobPayload somehow
-    pub fn hash(&self) -> String {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&self.cmd.len().to_le_bytes());
-        hasher.update(&self.cmd);
-        hasher.update(&self.env.len().to_le_bytes());
-        hasher.update(&self.env);
-        hasher.update(&self.cwd.len().to_le_bytes());
-        hasher.update(self.cwd.as_bytes());
-        hasher.update(&self.stdin.len().to_le_bytes());
-        hasher.update(self.stdin.as_bytes());
-        hasher.update(&self.hidden_info.len().to_le_bytes());
-        hasher.update(self.hidden_info.as_bytes());
-        hasher.update(&[self.is_atty as u8]);
-        hasher.update(&self.visible_files.len().to_le_bytes());
-        for file in &self.visible_files {
-            hasher.update(&file.path.len().to_le_bytes());
-            hasher.update(file.path.as_bytes());
-            hasher.update(&file.hash.len().to_le_bytes());
-            hasher.update(file.hash.as_bytes());
-        }
-        hasher.finalize().to_string()
+impl JobKeyHash for AllowJobPayload {
+    fn cmd(&self) -> &Vec<u8> {
+        &self.cmd
+    }
+
+    fn env(&self) -> &Vec<u8> {
+        &self.env
+    }
+
+    fn cwd(&self) -> &String {
+        &self.cwd
+    }
+
+    fn stdin(&self) -> &String {
+        &self.stdin
+    }
+
+    fn is_atty(&self) -> bool {
+        self.is_atty
+    }
+
+    fn hidden_info(&self) -> &String {
+        &self.hidden_info
+    }
+
+    fn visible_files(&self) -> &Vec<VisibleFile> {
+        &self.visible_files
     }
 }
 

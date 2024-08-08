@@ -1,4 +1,4 @@
-use crate::types::AddJobPayload;
+use crate::types::{AddJobPayload, JobKeyHash};
 use axum::{http::StatusCode, Json};
 
 use entity::{job, output_dir, output_file, output_symlink};

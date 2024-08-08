@@ -77,6 +77,14 @@ impl RSCConfig {
             .add_source(File::with_name(".config"))
             .build()?;
 
-        config.try_deserialize()
+        let config: RSCConfig = config.try_deserialize()?;
+
+        if config.load_shed.target == 0.0 {
+            return Err(ConfigError::Message(
+                "Load shed target must not be zero".to_string(),
+            ));
+        }
+
+        Ok(config)
     }
 }

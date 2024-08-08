@@ -1,6 +1,7 @@
 use crate::blob;
 use crate::types::{
-    AllowJobPayload, Dir, ReadJobPayload, ReadJobResponse, ResolvedBlob, ResolvedBlobFile, Symlink,
+    AllowJobPayload, Dir, JobKeyHash, ReadJobPayload, ReadJobResponse, ResolvedBlob,
+    ResolvedBlobFile, Symlink,
 };
 use axum::Json;
 use entity::{job, job_use, output_dir, output_file, output_symlink};
@@ -227,7 +228,10 @@ pub async fn allow_job(
             return StatusCode::INTERNAL_SERVER_ERROR;
         }
         // Job is cached, don't try again
-        Ok(Some(_)) => return StatusCode::CONFLICT,
+        Ok(Some(_)) => {
+            tracing::warn!(%hash, "Rejecting job push for already cached job");
+            return StatusCode::CONFLICT;
+        }
         // Job is not cached, use the other deciding factors
         Ok(None) => {}
     }
@@ -241,8 +245,8 @@ pub async fn allow_job(
     let current_load = match system_load.read() {
         Ok(lock) => *lock,
         Err(err) => {
-            tracing::error!(%err, "Unable to lock system load for reading. Returning target load");
-            target_load
+            tracing::error!(%err, "Unable to lock system load for reading. Returning load with 50% shed chance");
+            target_load + target_load / 2.0
         }
     };
 
