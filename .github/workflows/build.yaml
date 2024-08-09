@@ -291,11 +291,11 @@ jobs:
         # We don't actually release/upload wake_static. Wake is unsupported on old versions
         # of alpine, and releasing a "wake_static" artifact is very misleading and prone to
         # user error and confusion
-        - name: Download Alpine
-          uses: actions/download-artifact@v3
-          with:
-            name: release_alpine
-            path: alpine
+        # - name: Download Alpine
+        #   uses: actions/download-artifact@v3
+        #   with:
+        #     name: release_alpine
+        #     path: alpine
 
         - name: Download Debian Bullseye
           uses: actions/download-artifact@v3
