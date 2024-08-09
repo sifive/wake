@@ -25,12 +25,12 @@ async fn record_hit(job_id: Uuid, hash: String, conn: Arc<DatabaseConnection>) {
         job_id: Set(job_id),
     };
     let _ = usage.insert(conn.as_ref()).await;
-    let _ = database::upsert_job_hit(conn.as_ref(), hash).await;
+    let _ = database::record_job_hit(conn.as_ref(), hash).await;
 }
 
 #[tracing::instrument(skip(hash, conn))]
 async fn record_miss(hash: String, conn: Arc<DatabaseConnection>) {
-    let _ = database::upsert_job_miss(conn.as_ref(), hash).await;
+    let _ = database::record_job_miss(conn.as_ref(), hash).await;
 }
 
 #[tracing::instrument(skip(db, stores))]
@@ -217,6 +217,8 @@ pub async fn allow_job(
     system_load: Arc<RwLock<f64>>,
     min_runtime: f64,
 ) -> StatusCode {
+    // TODO: Add all the audit messages
+
     // Reject a subset of jobs that are never worth caching
     if payload.runtime < min_runtime {
         return StatusCode::NOT_ACCEPTABLE;
