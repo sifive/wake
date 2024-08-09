@@ -45,6 +45,8 @@ pub struct RSCLoadShedConfig {
     pub tick_rate: u64,
     // Load value after which load should be statistically shed
     pub target: f64,
+    // The minimum amount of time a job must take to complete in order to be cached
+    pub min_runtime: f64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
