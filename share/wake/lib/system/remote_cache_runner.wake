@@ -267,10 +267,8 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
             # If a match was found use it
             require NoMatch = response
             else
-                def hydrated = rehydrateJob response label input job
-
-                match hydrated
-                    Pass _ -> hydrated
+                match (rehydrateJob response label input job)
+                    Pass x -> Pass x
                     # If the job hydration fails for any reason just run the job as normal.
                     # There is no point in attempting to push since the server just said its cached
                     Fail _ -> baseDoIt job (Pass input)
