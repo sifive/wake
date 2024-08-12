@@ -498,6 +498,7 @@ mod tests {
             load_shed: config::RSCLoadShedConfig {
                 tick_rate: 10,
                 target: 10.0,
+                min_runtime: 0.5,
             },
         }
     }
