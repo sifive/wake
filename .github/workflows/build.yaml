@@ -144,13 +144,13 @@ jobs:
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
-            - target: vscode
-              dockerfile: wasm
-              extra_docker_build_args: ''
-              extra_docker_run_args: -u build
-              build_cmd: make -C wake-* vscode
-              test_cmd: ls # no-op
-              install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
+            # - target: vscode
+            #   dockerfile: wasm
+            #   extra_docker_build_args: ''
+            #   extra_docker_run_args: -u build
+            #   build_cmd: make -C wake-* vscode
+            #   test_cmd: ls # no-op
+            #   install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
 
             # Two confounding bugs are breaking the latest emsdk build. We can't really work around them
             # so for now, disable the latest target and track them closely.
@@ -345,7 +345,6 @@ jobs:
             repo_token: '${{ secrets.GITHUB_TOKEN }}'
             files: |
               tarball/wake_*.tar.xz
-              vscode/wake-*.vsix
               rocky_8-wake-*-1.x86_64.rpm
               rocky_9-wake-*-1.x86_64.rpm
               debian-bullseye-wake_*-1_amd64.deb
