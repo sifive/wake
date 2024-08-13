@@ -282,11 +282,11 @@ jobs:
             name: tarball
             path: tarball
 
-        - name: Download VSCode
-          uses: actions/download-artifact@v3
-          with:
-            name: release_vscode
-            path: vscode
+        # - name: Download VSCode
+        #   uses: actions/download-artifact@v3
+        #   with:
+        #     name: release_vscode
+        #     path: vscode
 
         # We don't actually release/upload wake_static. Wake is unsupported on old versions
         # of alpine, and releasing a "wake_static" artifact is very misleading and prone to
