@@ -182,7 +182,8 @@ fn create_router(
             post({
                 let conn = conn.clone();
                 let target = config.load_shed.target.clone();
-                move |body| read_job::allow_job(body, conn, target, system_load)
+                let min_runtime = config.load_shed.min_runtime.clone();
+                move |body| read_job::allow_job(body, conn, target, system_load, min_runtime)
             })
             .layer(DefaultBodyLimit::disable()),
         )
@@ -497,6 +498,7 @@ mod tests {
             load_shed: config::RSCLoadShedConfig {
                 tick_rate: 10,
                 target: 10.0,
+                min_runtime: 0.5,
             },
         }
     }

@@ -214,9 +214,10 @@ pub async fn allow_job(
     conn: Arc<DatabaseConnection>,
     target_load: f64,
     system_load: Arc<RwLock<f64>>,
+    min_runtime: f64,
 ) -> StatusCode {
     // Reject a subset of jobs that are never worth caching
-    if payload.runtime < 0.1 {
+    if payload.runtime < min_runtime {
         return StatusCode::NOT_ACCEPTABLE;
     }
 
