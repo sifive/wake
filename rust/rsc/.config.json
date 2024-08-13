@@ -23,6 +23,7 @@
   },
   "load_shed": {
     "tick_rate": 30,
-    "target": 16.0
+    "target": 16.0,
+    "min_runtime": 0.1
   }
 }
