@@ -305,7 +305,7 @@ export def makeBinaryRequest (request: HttpRequest): Result Path Error =
     # it from being overwritten. To work around this we need for force remove the file before
     # downloading over the path. After removing the file, it is touched so that the job always
     # outputs a file even if curl fails to download the target. Without this wake-hash fails to
-    # hash a non-existant file.
+    # hash a non-existant file, in the curl failure case.
     def cleanupScript =
         """
         rm -f %{destination}
