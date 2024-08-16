@@ -1,4 +1,4 @@
-# Copyright 2021 SiFive, Inc.
+# Copyright 2024 SiFive, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,38 +17,10 @@ package build_wake
 
 from wake import _
 
-def installRO path =
-    def dest = "{@here}/{path.getPathName}"
-
-    require Pass destDir =
-        simplify "{dest}/.."
-        | mkdir
-
-    def inputs = destDir, path, Nil
-
-    "install -m 444 {path.getPathName} {dest}"
-    | makePlan "install: {dest}" inputs
-    | runJobWith defaultRunner
-    | getJobOutput
-
-def createStdlibJSON (stdlibSources: List Path): Result Path Error =
-    def formatPath path =
-        getPathName path
-        | replace `share/wake/lib` ""
-
-    def formattedPaths = map formatPath stdlibSources
-    def content = JObject ("files" :-> JArray (map JString formattedPaths), Nil)
-
-    write "{@here}/stdlib.json" (prettyJSON content)
+# TODO: ADD wasm build
+# TODO: Add npm build (can probably just use the WASM docker image)
 
 export def vscode _: Result Path Error =
-    require Pass variant = Pass (Pair "wasm-cpp14-release" "wasm-c11-release")
-    require Pass files = buildLSP variant
-
-    require js, Nil = filter (matches `.*\.wasm-.*` _.getPathName) files
-    else failWithError "Did not find empscripten javascript output; got: {format files}"
-
-    require Pass jsFile = installAs "{@here}/lsp-server/wasm/lsp-wake.js" js
     require Pass packageLockJSON = source "{@here}/package-lock.json"
     require Pass release = buildAs Unit
     require Pass packageJSON = setVersion (replace `~` "-" release) "{@here}/package.json"
@@ -57,54 +29,55 @@ export def vscode _: Result Path Error =
         whichInEnvPath "npm"
         | getOrFail "Unable to find npm in $PATH".makeError
 
-    def emsdkBinDir = dirname npm
+    def nodeBinDir = dirname npm
 
     require Pass nodeModules =
         makeExecPlan (npm, "ci", Nil) (packageJSON, packageLockJSON, Nil)
         | setPlanLabel "npm ci: Install npm dependencies"
-        | editPlanEnvironment (addEnvironmentPath emsdkBinDir)
+        # npm expects to be able to do "which node" so we need to add the entire bin dir to env
+        | editPlanEnvironment (addEnvironmentPath nodeBinDir)
+        # npm writes ./node_modules, cwd to @here so they are in the correct location
         | setPlanDirectory @here
-        # NPM installs its dependencies from the web, and so can't be fully sandboxed.
+        # npm installs its dependencies from the web, and so can't be fully sandboxed.
         | setPlanShare False
         | runJobWith defaultRunner
         | getJobOutputs
 
-    require Pass stdlibSources = sources "share/wake/lib" `.*`
-
-    require Pass stdlib =
-        stdlibSources
-        | findFailFn installRO
-
-    require Pass stdlibJSON = createStdlibJSON stdlibSources
-    require Pass currentDirSources = sources @here `[^/]*`
-    require Pass imagesSources = sources @here `images/.*`
-    require Pass clientSources = sources @here `lsp-client/.*`
-    require Pass serverSources = sources @here `lsp-server/.*`
-    require Pass syntaxSources = sources @here `syntaxes/.*`
+    require Pass images = sources @here `images/.*`
+    require Pass onlineImages = sources @here `online_images/.*`
+    require Pass srcs = sources @here `src/.*`
+    require Pass syntaxes = sources @here `syntaxes/.*`
     require Pass vsceStdin = source "{@here}/vsce-stdin"
+    require Pass tsConfig = source "{@here}/tsconfig.json"
+    require Pass vsCodeIgnore = source "{@here}/.vscodeignore"
+    require Pass license = source "{@here}/LICENSE.txt"
+    require Pass readme = source "{@here}/README.md"
+    require Pass esbuild = source "{@here}/esbuild.js"
+    require Pass languageConfiguration = source "{@here}/language-configuration.json"
 
     def vsceFiles =
+        esbuild,
         vsceStdin,
-        jsFile,
+        tsConfig,
         packageJSON,
-        stdlibJSON,
-        currentDirSources ++
-        imagesSources ++
-        clientSources ++
-        serverSources ++
-        syntaxSources ++
-        stdlib ++
-        nodeModules
+        vsCodeIgnore,
+        license,
+        readme,
+        languageConfiguration,
+        images ++ onlineImages ++ srcs ++ syntaxes ++ nodeModules
 
     require Pass npx =
         whichInEnvPath "npx"
         | getOrFail "Unable to find npx in $PATH".makeError
 
     require Pass outputs =
-        makeExecPlan (npx, "@vscode/vsce@2.15.0", "package", Nil) vsceFiles
+        makeExecPlan (npx, "@vscode/vsce", "package", Nil) vsceFiles
         | setPlanLabel "vsce: Package vsix extension"
-        | editPlanEnvironment (addEnvironmentPath emsdkBinDir)
+        # npx expects to be able to do "which node" so we need to add the entire bin dir to env
+        | editPlanEnvironment (addEnvironmentPath nodeBinDir)
+        # npx looks for ./node_modules so set cwd to @here
         | setPlanDirectory @here
+        # npx asks the user y/n if it should download the program we want to run
         | setPlanStdin (relative @here vsceStdin.getPathName)
         | setPlanIsAtty True
         | runJobWith defaultRunner
