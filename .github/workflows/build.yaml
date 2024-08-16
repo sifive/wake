@@ -145,7 +145,7 @@ jobs:
               install_src_glob: build/x86_64/*.rpm
 
             - target: vscode
-              dockerfile: wasm
+              dockerfile: node
               extra_docker_build_args: ''
               extra_docker_run_args: -u build
               build_cmd: make -C wake-* vscode
