@@ -152,6 +152,14 @@ jobs:
               test_cmd: ls # no-op
               install_src_glob: build/wake-*/extensions/vscode/wake-*.vsix
 
+            - target: wasm
+              dockerfile: wasm
+              extra_docker_build_args: ''
+              extra_docker_run_args: -u build
+              build_cmd: make -C wake-* wasm
+              test_cmd: ls # no-op
+              install_src_glob: build/wake-*/lib/wake/lsp-wake.wasm*
+
       steps:
         - name: Create target directories
           run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
@@ -272,6 +280,13 @@ jobs:
           with:
             name: release_vscode
             path: vscode
+
+        # We don't actually release/upload wasm. It's build to maintain buildabilty
+        # - name: Download wasm
+        #   uses: actions/download-artifact@v3
+        #   with:
+        #     name: release_wasm
+        #     path: wasm
 
         # We don't actually release/upload wake_static. Wake is unsupported on old versions
         # of alpine, and releasing a "wake_static" artifact is very misleading and prone to

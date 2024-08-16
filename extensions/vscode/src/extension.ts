@@ -21,7 +21,6 @@ export async function activate(context: vscode.ExtensionContext) {
     return;
   }
 
-  // TODO: also check if the path is valid
   if (wakePath === '') {
     const selection = await vscode.window.showWarningMessage('The path to the wake binary is set but not valid. Highlighting will work but the LSP will not!', 'Configure', 'Dismiss');
 

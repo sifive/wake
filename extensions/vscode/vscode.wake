@@ -17,9 +17,6 @@ package build_wake
 
 from wake import _
 
-# TODO: ADD wasm build
-# TODO: Add npm build (can probably just use the WASM docker image)
-
 export def vscode _: Result Path Error =
     require Pass packageLockJSON = source "{@here}/package-lock.json"
     require Pass release = buildAs Unit
