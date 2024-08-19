@@ -35,15 +35,15 @@
       "title": "Wake",
       "type": "object",
       "properties": {
-        "wakeLanguageServer.standardLibrary": {
-          "default": null,
-          "description": "The path to the wake standard library. By default the version bundled with wake is used.",
-          "scope": "window",
-          "type": "string"
-        },
         "wakeLanguageServer.path": {
           "default": null,
           "description": "The path to the wake binary. Required for the LSP to function correctly.",
+          "scope": "window",
+          "type": "string"
+        },
+        "wakeLanguageServer.standardLibrary": {
+          "default": null,
+          "description": "The path to the wake standard library. By default the version bundled with wake from the path setting is used.",
           "scope": "window",
           "type": "string"
         },
