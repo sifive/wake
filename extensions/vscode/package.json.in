@@ -1,128 +1,107 @@
 {
-	"name": "wake",
-	"displayName": "Wake",
-	"description": "A language server for the SiFive wake build tool",
-	"icon": "images/sifive_icon.png",
-	"author": "SiFive",
-	"license": "Apache-2.0",
-	"version": "@VERSION@",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/sifive/wake.git"
-	},
-	"bugs": {
-		"url": "https://github.com/sifive/wake/issues"
-	},
-	"publisher": "SiFive",
-	"categories": [
-		"Programming Languages"
-	],
-	"keywords": [
-		"wake",
-		"build tool",
-		"sifive"
-	],
-	"engines": {
-		"vscode": "^1.70.0"
-	},
-	"activationEvents": [
-		"onLanguage:wake",
-		"onCommand:timeline.create",
-		"onCommand:timeline.refresh",
-		"onWebviewPanel:timeline"
-	],
-	"main": "./lsp-client/out/clientNode",
-	"browser": "./lsp-client/out/clientWeb",
-	"contributes": {
-		"configuration": {
-			"id": "wakeLanguageServer",
-			"title": "Wake",
-			"type": "object",
-			"properties": {
-				"wakeLanguageServer.pathToWakeStandardLibrary": {
-					"default": "",
-					"description": "If there is a valid share/wake/lib/ at the root of your project, that library is used to provide diagnostics. If not, the path that you provide here is used.\nWith no path provided, the library that comes with the extension is used.\n\nThis setting has no effect when running in a browser.",
-					"scope": "window",
-					"type": "string"
-				},
-				"wakeLanguageServer.trace.server": {
-					"default": "off",
-					"description": "Traces the communication between VS Code and the language server.",
-					"enum": [
-						"off",
-						"messages",
-						"verbose"
-					],
-					"scope": "window",
-					"type": "string"
-				},
-				"wakeTimeline.pathToWakeBinary": {
-					"default": "",
-					"description": "The path to the wake binary that is used to create the timeline. If invalid, the timeline functionality is not provided.",
-					"scope": "window",
-					"type": "string"
-				}
-			}
-		},
-		"grammars": [
-			{
-				"language": "wake",
-				"path": "./syntaxes/wake.tmLanguage.json",
-				"scopeName": "source.wake"
-			}
-		],
-		"languages": [
-			{
-				"aliases": [
-					"wake",
-					"wake"
-				],
-				"configuration": "./language-configuration.json",
-				"extensions": [
-					".wake"
-				],
-				"id": "wake"
-			}
-		],
-		"commands": [
-			{
-				"command": "timeline.create",
-				"title": "Create",
-				"category": "Timeline"
-			},
-			{
-				"command": "timeline.refresh",
-				"title": "Refresh",
-				"category": "Timeline"
-			}
-		]
-	},
-	"scripts": {
-		"vscode:prepublish": "npm run package",
-		"package": "webpack --mode production --devtool hidden-source-map",
-		"compile": "webpack",
-		"watch": "webpack --watch",
-		"open-in-browser": "vscode-test-web --browserType=chromium --extensionDevelopmentPath=."
-	},
-	"dependencies": {
-		"vscode-languageclient": "^7.0.0",
-		"vscode-languageserver": "^8.0.1",
-		"ts-mutex": "^1.0.0"
-	},
-	"devDependencies": {
-		"@types/node": "^15.14.9",
-		"@types/vscode": "^1.70.0",
-		"@types/webpack-env": "^1.17.0",
-		"@vscode/test-web": "^0.0.24",
-		"eslint": "^7.32.0",
-		"path-browserify": "^1.0.1",
-		"process": "^0.11.10",
-		"util": "^0.12.4",
-		"crypto-browserify": "^3.12.0",
-		"ts-loader": "^9.3.0",
-		"typescript": "^4.4.4",
-		"webpack": "^5.72.1",
-		"webpack-cli": "^4.9.2",
-		"@types/emscripten": "^1.39.5"
-	}
+  "name": "wake",
+  "displayName": "Wake",
+  "description": "A language server for the SiFive wake build tool",
+  "icon": "images/sifive_icon.png",
+  "author": "SiFive",
+  "license": "Apache-2.0",
+  "version": "@VERSION@",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sifive/wake.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sifive/wake/issues"
+  },
+  "publisher": "SiFive",
+  "engines": {
+    "vscode": "^1.92.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "wake",
+    "build tool",
+    "sifive"
+  ],
+  "activationEvents": [
+    "onLanguage:wake"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "id": "wakeLanguageServer",
+      "title": "Wake",
+      "type": "object",
+      "properties": {
+        "wakeLanguageServer.path": {
+          "default": null,
+          "description": "The path to the wake binary. Required for the LSP to function correctly.",
+          "scope": "window",
+          "type": "string"
+        },
+        "wakeLanguageServer.standardLibrary": {
+          "default": null,
+          "description": "The path to the wake standard library. By default the version bundled with wake from the path setting is used.",
+          "scope": "window",
+          "type": "string"
+        },
+        "wakeLanguageServer.trace.server": {
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server.",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "scope": "window",
+          "type": "string"
+        }
+      }
+    },
+    "grammars": [
+      {
+        "language": "wake",
+        "path": "./syntaxes/wake.tmLanguage.json",
+        "scopeName": "source.wake"
+      }
+    ],
+    "languages": [
+      {
+        "aliases": [
+          "wake"
+        ],
+        "configuration": "./language-configuration.json",
+        "extensions": [
+          ".wake"
+        ],
+        "id": "wake"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "npm run check-types && node esbuild.js",
+    "check-types": "tsc --noEmit",
+    "vscode:prepublish": "npm run package",
+    "package": "npm run check-types && node esbuild.js --production",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.7",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.92.0",
+    "@typescript-eslint/eslint-plugin": "^7.14.1",
+    "@typescript-eslint/parser": "^7.11.0",
+    "@vscode/test-cli": "^0.0.9",
+    "@vscode/test-electron": "^2.4.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "esbuild": "^0.23.0",
+    "vscode-languageclient": "^9.0.1"
+  }
 }
