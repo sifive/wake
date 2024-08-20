@@ -1,21 +1,24 @@
 use crate::blob::*;
 use async_trait::async_trait;
+use blake3;
 use futures::stream::BoxStream;
+use futures::StreamExt;
 use rand::{thread_rng, RngCore};
 use sea_orm::prelude::Uuid;
 use std::fmt::Write;
+use std::io::Read;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::io::BufWriter;
 use tokio_util::bytes::Bytes;
 use tokio_util::io::StreamReader;
 
-fn create_random_blob_path() -> std::path::PathBuf {
+fn create_temporary_blob_path() -> std::path::PathBuf {
     // 2 deep @ 8 bytes wide
     let mut parts = [0u8; 10];
     thread_rng().fill_bytes(&mut parts);
 
-    let mut buf = std::path::PathBuf::from("");
+    let mut buf = std::path::PathBuf::from("tmp");
 
     // First 2 bytes represent the containing directories
     for i in 0..2 {
@@ -27,6 +30,32 @@ fn create_random_blob_path() -> std::path::PathBuf {
     // Next 8 bytes represent the file name
     let mut s = String::new();
     for i in 2..10 {
+        write!(&mut s, "{:02X}", parts[i]).unwrap();
+    }
+    buf.push(s);
+
+    return buf;
+}
+
+fn create_path_from_hash(hash: &blake3::Hash) -> std::path::PathBuf {
+    // bc 1b b8 50 a5 b6 1e 20 6f e3 32 48 fa 31 53 38 4e 49 53 46 65 4b 0c 48 7e 21 a1 c9 5f ca c2 19
+    // There are 32 bytes in the file hash. The first two are used to specify the directory
+    // while the remaining 30 specify the file name.
+
+    let parts: &[u8; 32] = hash.as_bytes();
+
+    let mut buf = std::path::PathBuf::from("");
+
+    // First 2 bytes represent the containing directories
+    for i in 0..2 {
+        let mut s = String::new();
+        write!(&mut s, "{:02X}", parts[i]).unwrap();
+        buf.push(s);
+    }
+
+    // Next 30 bytes represent the file name
+    let mut s = String::new();
+    for i in 2..32 {
         write!(&mut s, "{:02X}", parts[i]).unwrap();
     }
     buf.push(s);
@@ -46,18 +75,37 @@ impl BlobStore for LocalBlobStore {
         self.id
     }
 
+    // hash the bytes
+    // hash the size
+    // if file exists
+    //   spawn task to delete temp file
+    //   return hash as key
+    // else
+    //   move file to correct location (has to be done before return)
+    //   return hash as key
     async fn stream<'a>(
         &self,
         stream: BoxStream<'a, Result<Bytes, std::io::Error>>,
     ) -> Result<(String, i64), std::io::Error> {
+        let mut hasher = blake3::Hasher::new();
+
+        let stream = stream.inspect(|x| {
+            if let Ok(bytes) = x {
+                let mut vec: Vec<u8> = Vec::with_capacity(bytes.len());
+                for byte in bytes.bytes() {
+                    vec.push(byte.unwrap());
+                }
+                hasher.update(&vec);
+            };
+        });
         let reader = StreamReader::new(stream);
         futures::pin_mut!(reader);
 
-        let rel_path = create_random_blob_path();
-        let path = std::path::Path::new(&self.root).join(rel_path.clone());
-        tokio::fs::create_dir_all(path.parent().unwrap()).await?;
+        let tmp_key_path = create_temporary_blob_path();
+        let tmp_full_path = std::path::Path::new(&self.root).join(tmp_key_path.clone());
+        tokio::fs::create_dir_all(tmp_full_path.parent().unwrap()).await?;
 
-        let mut file = BufWriter::new(File::create(path).await?);
+        let mut file = BufWriter::new(File::create(tmp_full_path.clone()).await?);
         let written = tokio::io::copy(&mut reader, &mut file).await?;
 
         let size = match i64::try_from(written) {
@@ -68,7 +116,14 @@ impl BlobStore for LocalBlobStore {
             Ok(size) => size,
         };
 
-        let key = match rel_path.into_os_string().into_string() {
+        hasher.update(&size.to_le_bytes());
+
+        let final_key_path = create_path_from_hash(&hasher.finalize());
+        let final_full_path = std::path::Path::new(&self.root).join(final_key_path.clone());
+        tokio::fs::create_dir_all(final_full_path.parent().unwrap()).await?;
+        tokio::fs::rename(tmp_full_path, final_full_path).await?;
+
+        let key = match final_key_path.into_os_string().into_string() {
             Err(path) => {
                 tracing::error!("Cannot convert path to string, returning lossy path instead");
                 path.to_string_lossy().to_string()
