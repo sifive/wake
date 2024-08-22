@@ -685,12 +685,12 @@ pub async fn delete_unreferenced_blobs<T: ConnectionTrait>(
         r#"
             WITH
             eligible_blob_ids as (
-                SELECT id FROM blob
+                SELECT DISTINCT id FROM blob
                 WHERE updated_at <= $1
                 EXCEPT (
                     SELECT blob_id FROM output_file
-                    UNION SELECT stdout_blob_id FROM job
-                    UNION SELECT stderr_blob_id FROM job
+                    UNION ALL SELECT stdout_blob_id FROM job
+                    UNION ALL SELECT stderr_blob_id FROM job
                 )
                 LIMIT $2
             )
