@@ -316,11 +316,7 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
 #  (RemoteCacheApi "foo" 1 None) | rscApiPostStringBlob "foo" "my foo contents" = Fail "authorization required"
 # ```
 export def rscApiPostStringBlob (name: String) (value: String) (api: RemoteCacheApi): Result String Error =
-    def contentType =
-        if value.strlen < 95 then
-            Some "blob/small"
-        else
-            None
+    def contentType = contentTypeFromSize value.strlen
 
     require Pass temp = writeTempFile name value
 
@@ -336,7 +332,12 @@ export def rscApiPostStringBlob (name: String) (value: String) (api: RemoteCache
 export def rscApiPostFileBlob (name: String) (file: String) (api: RemoteCacheApi): Result String Error =
     # We must use unsafe here since we cannot elevate *file* to a Path without either copying it
     # or triggering the 'job output by multiple files' error.
-    uploadBlobRequest api (unsafe_addFormData name file None)
+
+    def contentType = match (unsafe_stat file)
+        Pass (Stat _ _ size) -> contentTypeFromSize size
+        Fail _ -> None
+
+    uploadBlobRequest api (unsafe_addFormData name file contentType)
 
 # rscApiPostJob: Posts a job defined by *req* to the remote cache server. Requires authorization.
 #
@@ -631,6 +632,10 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
     Pass path
 
 ## --- Helper functions ---
+
+def contentTypeFromSize size =
+    if size < 95 then Some "blob/small" else None
+
 # TODO: Delete these once new json API is added to wake repo
 def jField (jvalue: JValue) (key: String) =
     require JObject obj = jvalue
