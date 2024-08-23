@@ -574,7 +574,7 @@ def uriSchemeFn dbBlobFn dbFileFn: String => Result a Error =
         def parts = extract `([a-zA-Z][a-zA-Z0-9+.-]*)://(.*)` uri
 
         match parts
-            scheme, _, Nil -> (schemeFn scheme) scheme uri
+            scheme, path, Nil -> (schemeFn scheme) scheme path
             _ -> failWithError "rsc: uri has unexpected format: '{uri}'"
 
     uriFn
