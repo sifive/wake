@@ -533,40 +533,57 @@ export target rscApiCheckAuthorization (api: RemoteCacheApi): Result Unit Error 
         Some x -> failWithError "Invalid auth key. Status code: {str x}"
         None -> failWithError "Invalid auth key. Unable to determine status code"
 
+# Converts db only blob uris into actual data
+# maps path = "%46%6F%6F" to content = "foo"
+def rscDbBlobToContent path =
+    # If path is empty we have the empty string
+    require True = path.strlen > 0
+    else Pass ""
+
+    # If not empty then it must as least be %00
+    require True = path.strlen >= 3
+    else failWithError "rsc: Invalid db path: '{path}'"
+
+    require "", byteStrs = tokenize `%` path
+    else failWithError "rsc: Failed to extract bytes from db path: '{path}'"
+
+    require Some bytes =
+        byteStrs
+        | map (intbase 16)
+        | findNone
+    else failWithError "rsc: Failed to parse bytes strings into bytes from db path: '{path}'"
+
+    bytes
+    | map integerToByte
+    | cat
+    | Pass
+
+# Wrap scheme dispatch behind uri interface
+def uriSchemeFn dbBlobFn dbFileFn: String => Result a Error =
+    def unsupportedScheme scheme uri =
+        failWithError "rsc: scheme '{scheme}' from uri '{uri}' is not supported"
+
+    def schemeFn scheme = match scheme
+        "db" -> dbBlobFn
+        "file" -> dbFileFn
+        "http" -> dbFileFn
+        "https" -> dbFileFn
+        _ -> (\s unsupportedScheme s)
+
+    def uriFn (uri:String): Result a Error =
+        def parts = extract `([a-zA-Z][a-zA-Z0-9+.-]*)://(.*)` uri
+        match parts
+          scheme, _, Nil -> (schemeFn scheme) scheme uri
+          _ -> failWithError "rsc: uri has unexpected format: '{uri}'"
+    uriFn
+
 # rscApiGetStringBlob: Downloads a blob and returns the contents as a string 
 #
 # ```
 #  rscApiGetStringBlob (RemoteCacheBlob "asdf" "https://...") = Pass "foo\nbar\nbat" 
 # ```
 export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Result String Error =
-    require scheme, path, Nil = extract `([a-zA-Z][a-zA-Z0-9+.-]*)://(.*)` uri
-    else failWithError "rsc: uri has unexpected format: '{uri}'"
-
-    # maps path = "%46%6F%6F" to content = "foo"
-    def dbScheme _scheme path =
-        # If path is empty we have the empty string
-        require True = path.strlen > 0
-        else Pass ""
-
-        # If not empty then it must as least be %00
-        require True = path.strlen >= 3
-        else failWithError "rsc: Invalid db path: '{path}'"
-
-        require "", byteStrs = tokenize `%` path
-        else failWithError "rsc: Failed to extract bytes from db path: '{path}'"
-
-        require Some bytes =
-            byteStrs
-            | map (intbase 16)
-            | findNone
-        else failWithError "rsc: Failed to parse bytes strings into bytes from db path: '{path}'"
-
-        bytes
-        | map integerToByte
-        | cat
-        | Pass
-
-    def fileScheme scheme path =
+    def dbFileScheme scheme path =
         require Pass response =
             buildHttpRequest "{scheme}://{path}"
             | setMethod HttpMethodGet
@@ -574,17 +591,12 @@ export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Resul
 
         Pass response.getHttpResponseBody
 
-    def unsupportedScheme scheme path =
-        failWithError "rsc: scheme '{scheme}' from uri '{uri}' is not supported"
+    def dbBlobScheme _scheme path =
+        rscDbBlobToContent path
 
-    def schemeFn = match scheme
-        "db" -> dbScheme
-        "file" -> fileScheme
-        "http" -> fileScheme
-        "https" -> fileScheme
-        _ -> unsupportedScheme
+    def schemeFn = uriSchemeFn dbBlobScheme dbFileScheme
 
-    schemeFn scheme path
+    schemeFn uri
 
 # rscApiGetFileBlob: Downloads a blob to *path* with *mode* permisssions and return *path*
 #
@@ -592,10 +604,18 @@ export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Resul
 #  rscApiGetFileBlob (RemoteCacheBlob "asdf" "https://...") "foo/bar" 0644 = Pass "foo/bar" 
 # ```
 export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: String) (mode: Integer): Result String Error =
-    require Pass downloadPath =
-        buildHttpRequest uri
+    def dbBlobScheme _scheme uripath =
+        require Pass content = rscDbBlobToContent uripath
+        writeTempFile "rsc.output_file.blob" content
+
+    def dbFileScheme scheme uripath =
+        buildHttpRequest "{scheme}://{uripath}"
         | setMethod HttpMethodGet
         | makeBinaryRequest
+
+    def schemeFn = uriSchemeFn dbBlobScheme dbFileScheme
+
+    require Pass blobPath = schemeFn uri
 
     def fixupScript =
         """
@@ -604,7 +624,7 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
         # 2. Remove the old rsctmp file if it exists
         rm -f '%{path}.rsctmp'
         # 3. Hardlink the file to not use 2x disk space
-        cp -l %{downloadPath.getPathName} '%{path}.rsctmp'
+        cp -l %{blobPath.getPathName} '%{path}.rsctmp'
         # 4. Set the permissions as specified
         chmod %{mode | strOctal} '%{path}.rsctmp'
         # 5. If the file was previously created with the exact inode by the rsc but not cleaned up
@@ -615,8 +635,8 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
         """
 
     def job =
-        makeShellPlan fixupScript (downloadPath, Nil)
-        | setPlanLabel "rsc: fixup blob {path} from {downloadPath.getPathName}"
+        makeShellPlan fixupScript (blobPath, Nil)
+        | setPlanLabel "rsc: fixup blob {path} from {blobPath.getPathName}"
         | setPlanPersistence Once
         # We need to copy the file over another jobs output space so:
         #   - We must run with the localRunner
@@ -627,7 +647,7 @@ export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: S
         | setJobInspectVisibilityHidden
 
     require True = job.isJobOk
-    else failWithError "Failed to cleanup downloaded file {path} from {downloadPath.getPathName}"
+    else failWithError "Failed to cleanup downloaded file {path} from {blobPath.getPathName}"
 
     Pass path
 
