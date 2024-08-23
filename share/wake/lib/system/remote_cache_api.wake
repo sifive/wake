@@ -570,11 +570,13 @@ def uriSchemeFn dbBlobFn dbFileFn: String => Result a Error =
         "https" -> dbFileFn
         _ -> (\s unsupportedScheme s)
 
-    def uriFn (uri:String): Result a Error =
+    def uriFn (uri: String): Result a Error =
         def parts = extract `([a-zA-Z][a-zA-Z0-9+.-]*)://(.*)` uri
+
         match parts
-          scheme, _, Nil -> (schemeFn scheme) scheme uri
-          _ -> failWithError "rsc: uri has unexpected format: '{uri}'"
+            scheme, _, Nil -> (schemeFn scheme) scheme uri
+            _ -> failWithError "rsc: uri has unexpected format: '{uri}'"
+
     uriFn
 
 # rscApiGetStringBlob: Downloads a blob and returns the contents as a string 
@@ -591,9 +593,7 @@ export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Resul
 
         Pass response.getHttpResponseBody
 
-    def dbBlobScheme _scheme path =
-        rscDbBlobToContent path
-
+    def dbBlobScheme _scheme path = rscDbBlobToContent path
     def schemeFn = uriSchemeFn dbBlobScheme dbFileScheme
 
     schemeFn uri
@@ -606,6 +606,7 @@ export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Resul
 export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: String) (mode: Integer): Result String Error =
     def dbBlobScheme _scheme uripath =
         require Pass content = rscDbBlobToContent uripath
+
         writeTempFile "rsc.output_file.blob" content
 
     def dbFileScheme scheme uripath =
