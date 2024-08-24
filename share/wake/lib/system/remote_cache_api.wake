@@ -535,7 +535,7 @@ export target rscApiCheckAuthorization (api: RemoteCacheApi): Result Unit Error 
 
 # Converts db only blob uris into actual data
 # maps path = "%46%6F%6F" to content = "foo"
-def rscDbBlobToContent path =
+def resolveDbScheme _scheme path =
     # If path is empty we have the empty string
     require True = path.strlen > 0
     else Pass ""
@@ -558,26 +558,24 @@ def rscDbBlobToContent path =
     | cat
     | Pass
 
-# Wrap scheme dispatch behind uri interface
-def uriSchemeFn dbBlobFn dbFileFn: String => Result a Error =
-    def unsupportedScheme scheme uri =
+# Dispatches the content resolution for uri based on its scheme
+def resolveUriResponse (dbSchemeFn: (String => String => Result a Error)) (fileSchemeFn: (String => String => Result a Error))  (uri: String) =
+    require scheme, path, Nil = (uri | extract `([a-zA-Z][a-zA-Z0-9+.-]*)://(.*)`)
+    else failWithError "rsc: uri has unexpected format: '{uri}'"
+    
+    def unsupportedSchemeFn s p =
         failWithError "rsc: scheme '{scheme}' from uri '{uri}' is not supported"
 
-    def schemeFn scheme = match scheme
-        "db" -> dbBlobFn
-        "file" -> dbFileFn
-        "http" -> dbFileFn
-        "https" -> dbFileFn
-        _ -> (\s unsupportedScheme s)
+    def schemeFn = 
+        match scheme
+            "db" -> dbSchemeFn
+            "file" -> fileSchemeFn
+            "http" -> fileSchemeFn
+            "https" -> fileSchemeFn
+            _ -> unsupportedSchemeFn
 
-    def uriFn (uri: String): Result a Error =
-        def parts = extract `([a-zA-Z][a-zA-Z0-9+.-]*)://(.*)` uri
+    schemeFn scheme path
 
-        match parts
-            scheme, path, Nil -> (schemeFn scheme) scheme path
-            _ -> failWithError "rsc: uri has unexpected format: '{uri}'"
-
-    uriFn
 
 # rscApiGetStringBlob: Downloads a blob and returns the contents as a string 
 #
@@ -585,18 +583,14 @@ def uriSchemeFn dbBlobFn dbFileFn: String => Result a Error =
 #  rscApiGetStringBlob (RemoteCacheBlob "asdf" "https://...") = Pass "foo\nbar\nbat" 
 # ```
 export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Result String Error =
-    def dbFileScheme scheme path =
-        require Pass response =
-            buildHttpRequest "{scheme}://{path}"
-            | setMethod HttpMethodGet
-            | makeRequest
+    def resolveStringFileScheme scheme path =
+        buildHttpRequest "{scheme}://{path}"
+        | setMethod HttpMethodGet
+        | makeRequest
+        |< getHttpResponseBody
 
-        Pass response.getHttpResponseBody
-
-    def dbBlobScheme _scheme path = rscDbBlobToContent path
-    def schemeFn = uriSchemeFn dbBlobScheme dbFileScheme
-
-    schemeFn uri
+    uri
+    | resolveUriResponse resolveDbScheme resolveStringFileScheme
 
 # rscApiGetFileBlob: Downloads a blob to *path* with *mode* permisssions and return *path*
 #
@@ -604,19 +598,16 @@ export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Resul
 #  rscApiGetFileBlob (RemoteCacheBlob "asdf" "https://...") "foo/bar" 0644 = Pass "foo/bar" 
 # ```
 export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: String) (mode: Integer): Result String Error =
-    def dbBlobScheme _scheme uripath =
-        require Pass content = rscDbBlobToContent uripath
+    def resolveDbSchemeToFile scheme path =
+        resolveDbScheme scheme path
+        |> writeTempFile "rsc.output_file.blob"
 
-        writeTempFile "rsc.output_file.blob" content
-
-    def dbFileScheme scheme uripath =
-        buildHttpRequest "{scheme}://{uripath}"
+    def resolveBlobFileScheme scheme path =
+        buildHttpRequest "{scheme}://{path}"
         | setMethod HttpMethodGet
         | makeBinaryRequest
 
-    def schemeFn = uriSchemeFn dbBlobScheme dbFileScheme
-
-    require Pass blobPath = schemeFn uri
+    require Pass blobPath = (uri | resolveUriResponse resolveDbSchemeToFile resolveBlobFileScheme)
 
     def fixupScript =
         """
