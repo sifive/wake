@@ -559,23 +559,21 @@ def resolveDbScheme _scheme path =
     | Pass
 
 # Dispatches the content resolution for uri based on its scheme
-def resolveUriResponse (dbSchemeFn: (String => String => Result a Error)) (fileSchemeFn: (String => String => Result a Error))  (uri: String) =
+def resolveUriResponse (dbSchemeFn: (String => String => Result a Error)) (fileSchemeFn: (String => String => Result a Error)) (uri: String) =
     require scheme, path, Nil = (uri | extract `([a-zA-Z][a-zA-Z0-9+.-]*)://(.*)`)
     else failWithError "rsc: uri has unexpected format: '{uri}'"
-    
+
     def unsupportedSchemeFn s p =
         failWithError "rsc: scheme '{scheme}' from uri '{uri}' is not supported"
 
-    def schemeFn = 
-        match scheme
-            "db" -> dbSchemeFn
-            "file" -> fileSchemeFn
-            "http" -> fileSchemeFn
-            "https" -> fileSchemeFn
-            _ -> unsupportedSchemeFn
+    def schemeFn = match scheme
+        "db" -> dbSchemeFn
+        "file" -> fileSchemeFn
+        "http" -> fileSchemeFn
+        "https" -> fileSchemeFn
+        _ -> unsupportedSchemeFn
 
     schemeFn scheme path
-
 
 # rscApiGetStringBlob: Downloads a blob and returns the contents as a string 
 #
@@ -583,6 +581,8 @@ def resolveUriResponse (dbSchemeFn: (String => String => Result a Error)) (fileS
 #  rscApiGetStringBlob (RemoteCacheBlob "asdf" "https://...") = Pass "foo\nbar\nbat" 
 # ```
 export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Result String Error =
+    # TODO: This off is needed due to a formatter bug. Remove when resolved.
+    # wake-format off
     def resolveStringFileScheme scheme path =
         buildHttpRequest "{scheme}://{path}"
         | setMethod HttpMethodGet
