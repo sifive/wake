@@ -145,7 +145,7 @@ export def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers
         label
         isatty
 
-export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers res usage finputs foutputs isatty) =
+export def runJobWith (Runner _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers res usage finputs foutputs isatty) =
     runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run echo stdout stderr isatty
 
 # Set the value of a tag on a Job

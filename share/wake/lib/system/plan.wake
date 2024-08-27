@@ -16,7 +16,7 @@
 package wake
 
 export data Persistence =
-    # Job should be re-executed on every runJob call.
+    # Job should be re-executed on every runJobWith call.
     #
     # In this case, no job deduplication is performed and so it must
     # *not* write any files (stdout/stderr are fine) or be guaranteed to only be

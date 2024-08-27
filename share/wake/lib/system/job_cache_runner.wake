@@ -55,7 +55,7 @@ def getPath input =
 
 # wakeroot is the absolute sandbox-path from which input and output files will
 # be interpreted as being relative to if they're in fact relative.
-export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String Error) (wakeroot: String) ((Runner name score baseDoIt): Runner): Runner =
+export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String Error) (wakeroot: String) ((Runner name baseDoIt): Runner): Runner =
     def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
     def badlaunch job error = prim "job_fail_launch"
     def job_cache_read str = prim "job_cache_read"
@@ -250,4 +250,4 @@ export def mkJobCacheRunner (hashFn: Result RunnerInput Error => Result String E
 
             Pass (RunnerOutput (map getPathName vis) outputs useage)
 
-    Runner "job-cache: {name}" score doit
+    Runner "job-cache: {name}" doit

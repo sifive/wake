@@ -35,7 +35,7 @@ export target rscRunner (rscApi: RemoteCacheApi): Runner =
 # ```
 # mkRemoteCacheRunner (RemoteCacheApi ...) (\_ Pass "") "" baseRunner = (Runner ...)
 # ```
-export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerInput Error => Result String Error) (wakeroot: String) ((Runner name score baseDoIt): Runner): Runner =
+export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerInput Error => Result String Error) (wakeroot: String) ((Runner name baseDoIt): Runner): Runner =
     def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
     def badlaunch job error = prim "job_fail_launch"
 
@@ -288,7 +288,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: Result RunnerIn
             # -------------------------------------
             runJobAndUpload job input hashKey
 
-    Runner "remote-cache: {name}" score doit
+    Runner "remote-cache: {name}" doit
 
 ## --- Helper functions ---
 
