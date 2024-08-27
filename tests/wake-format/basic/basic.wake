@@ -1498,3 +1498,4 @@ def a = a |> b |> c
 def a = a |< b |< c 
 def a = a |> b |< c 
 def a = a |< b |> c 
+def a = a | b |> c | c |< d 
