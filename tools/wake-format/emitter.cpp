@@ -1391,7 +1391,8 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
     if (is_binop_matching_str(op_token, TOKEN_OP_OR, "|>") ||
         is_binop_matching_str(op_token, TOKEN_OP_OR, "|<") ||
         is_binop_matching_str(op_token, TOKEN_OP_OR, "|")) {
-      parts = collect_left_binary({{TOKEN_OP_OR, "|>"}, {TOKEN_OP_OR, "|<"}, {TOKEN_OP_OR, "|"}}, node);
+      parts =
+          collect_left_binary({{TOKEN_OP_OR, "|>"}, {TOKEN_OP_OR, "|<"}, {TOKEN_OP_OR, "|"}}, node);
     } else {
       parts = collect_left_binary({{op_token.id(), op_token.fragment().segment().str()}}, node);
     }
