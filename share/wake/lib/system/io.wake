@@ -137,10 +137,8 @@ target writeImp inputs mode path content =
             (\_ \_ \_ prim "write") mode path content
 
         def run (job: Job) ((RunnerInput _ _ vis _ _ _ _ _ predict _): RunnerInput): Result RunnerOutput Error =
-            def Usage status runtime cputime mem in out = predict
-
             # Insert the <write> job into the database
-            def _ = primJobVirtual job "" "" status runtime cputime mem in out
+            def _ = primJobVirtual job "" "" predict
 
             # Wait for the virtual job to complete
             require Pass reality = job.getJobReality
@@ -272,10 +270,8 @@ def mkdirRunner: Runner =
         require "<mkdir>", "-m", smode, path, Nil = cmd
         else panic "mkdirImp violated command-line contract"
 
-        def Usage status runtime cputime mem in out = predict
-
         # Insert the <mkdir> job into the database
-        def _ = primJobVirtual job "" "" status runtime cputime mem in out
+        def _ = primJobVirtual job "" "" predict
 
         # Wait for the virtual job to complete
         require Pass reality = job.getJobReality

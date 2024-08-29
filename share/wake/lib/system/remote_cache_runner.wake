@@ -213,7 +213,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
             | findFail
             | addErrorContext "rsc: Failed to create a symlink"
 
-        def _ = primJobVirtual job stdout stderr status runtime cputime mem ibytes obytes
+        def _ = primJobVirtual job stdout stderr predict
 
         Pass (RunnerOutput inputs outputs predict)
 
