@@ -232,13 +232,16 @@ export def makeJSONRunner ((JSONRunnerPlan rawScript extraArgs extraEnv estimate
         def cmd = script, "-I", "-p", specFile, "-o", resultFile, extraArgs
 
         # Rewrite input so that the local runner can run the job with a configured sandbox
-        def localInput = RunnerInput label cmd Nil (extraEnv ++ environment) "." "" Nil prefix (estimate record) isatty
+        def localInput =
+            RunnerInput label cmd Nil (extraEnv ++ environment) "." "" Nil prefix (estimate record) isatty
 
         # Dispatch to the local runner via composition and get the outputs
         def (Runner _ localRun) = localRunner
+
         require Pass localOutput = localRun job (Pass localInput)
 
         def statusCode = localOutput.getRunnerOutputUsage.getUsageStatus
+
         require 0 = statusCode
         else failWithError "Non-zero exit status ({str statusCode}) for JSON runner {script} on {specFile}"
 
@@ -248,8 +251,7 @@ export def makeJSONRunner ((JSONRunnerPlan rawScript extraArgs extraEnv estimate
 
         def field name = match _ _
             _ (Fail f) -> Fail f
-            None (Pass fn) ->
-                Fail "{script} produced {resultFile}, which is missing usage/{name}"
+            None (Pass fn) -> Fail "{script} produced {resultFile}, which is missing usage/{name}"
             (Some x) (Pass fn) -> Pass (fn x)
 
         def usage = content // `usage`

@@ -269,9 +269,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
             require True = shouldDebugRemoteCache Unit
 
             def _ = breadcrumb "{label}: Did not find a match"
-
-            def _ =
-                writeTempFile "remote.cache.lookup.miss" "label: {input.getRunnerInputLabel}"
+            def _ = writeTempFile "remote.cache.lookup.miss" "label: {input.getRunnerInputLabel}"
 
             True
 

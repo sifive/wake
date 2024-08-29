@@ -151,7 +151,9 @@ target writeImp inputs mode path content =
 
             match (primWrite mode path content)
                 Fail f -> failWithError f
-                Pass path -> RunnerOutput (vis | map getPathName) (path,) reality | Pass
+                Pass path ->
+                    RunnerOutput (vis | map getPathName) (path,) reality
+                    | Pass
 
         makeRunner "write" run
 
@@ -288,7 +290,9 @@ def mkdirRunner: Runner =
 
         match (primMkdir mode path)
             Fail f -> failWithError f
-            Pass path -> RunnerOutput (vis | map getPathName) (path,) reality | Pass
+            Pass path ->
+                RunnerOutput (vis | map getPathName) (path,) reality
+                | Pass
 
     makeRunner "mkdir" run
 

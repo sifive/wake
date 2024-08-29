@@ -17,15 +17,48 @@ package wake
 
 # Create/reserve a job handle, parameters aren't necessarily finalized
 export def primJobCreate (label: String) (dir: String) (stdin: String) (env: String) (cmd: String) (signature: Integer) (visible: String) (keep: Integer) (echo: String) (stdout: String) (stderr: String) (isatty: Integer): Job =
-    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_create") label dir stdin env cmd signature visible keep echo stdout stderr isatty
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_create")
+    label
+    dir
+    stdin
+    env
+    cmd
+    signature
+    visible
+    keep
+    echo
+    stdout
+    stderr
+    isatty
 
 # Imediatly complete a job with the provided ouputs without launching a process
 export def primJobVirtual (job: Job) (stdout: String) (stderr: String) (status: Integer) (runtime: Double) (cputime: Double) (membytes: Integer) (ibytes: Integer) (obytes: Integer): Unit =
-    (\_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_virtual") job stdout stderr status runtime cputime membytes ibytes obytes
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_virtual")
+    job
+    stdout
+    stderr
+    status
+    runtime
+    cputime
+    membytes
+    ibytes
+    obytes
 
 # Launch the job via a child process. Values such as command or environment can be freely changed from the initial reservation.
 export def primJobLaunch (job: Job) (dir: String) (stdin: String) (env: String) (cmd: String) (status: Integer) (runtime: Double) (cputime: Double) (membytes: Integer) (ibytes: Integer) (obytes: Integer) (isatty: Integer): Unit =
-    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_launch") job dir stdin env cmd status runtime cputime membytes ibytes obytes isatty
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_launch")
+    job
+    dir
+    stdin
+    env
+    cmd
+    status
+    runtime
+    cputime
+    membytes
+    ibytes
+    obytes
+    isatty
 
 # Complete a job before launch with userland defined failure
 export def primJobFailLaunch (job: Job) (error: Error): Unit =
@@ -37,7 +70,17 @@ export def primJobFailFinish (job: Job) (error: Error): Unit =
 
 # Complete a job successfully by providing to the runtime the inputs/outputs/usage of the job
 export def primJobFinish (job: Job) (inputs: String) (outputs: String) (all_outputs: String) (status: Integer) (runtime: Double) (cputime: Double) (membytes: Integer) (ibytes: Integer) (obytes: Integer): Unit =
-    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_finish") job inputs outputs all_outputs status runtime cputime membytes ibytes obytes
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_finish")
+    job
+    inputs
+    outputs
+    all_outputs
+    status
+    runtime
+    cputime
+    membytes
+    ibytes
+    obytes
 
 # Look up a job in the local database. Returns a completed Job handle with outputs already resolved if it is already cached
 export def primJobCache (dir: String) (stdin: String) (env: String) (cmd: String) (signature: Integer) (visible: String) (isatty: Integer): Pair (List Job) (List (Pair String String)) =
@@ -123,12 +166,22 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
 
         job
 
-    match keep
-        False -> build Unit
-        True ->
-            match (primJobCache dir stdin env.implode cmd.implode hash (map getPathName vis).implode (booleanToInteger isatty))
-                Pair (job, _) last -> confirm True last job
-                Pair Nil last -> confirm False last (build Unit)
+    require True = keep
+    else build Unit
+
+    def cache =
+        primJobCache
+        dir
+        stdin
+        env.implode
+        cmd.implode
+        hash
+        (map getPathName vis).implode
+        (booleanToInteger isatty)
+
+    match cache
+        Pair (job, _) last -> confirm True last job
+        Pair Nil last -> confirm False last (build Unit)
 
 # Only run if the first four arguments differ
 target runOnce cmd env dir stdin vis isatty run \ res usage finputs foutputs keep echo stdout stderr label =
