@@ -58,12 +58,6 @@ export tuple Runner =
     export Name: String
     Fn: Job => Result RunnerInput Error => Result RunnerOutput Error
 
-# TODO: Move these to prim.wake
-def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
-def launch job dir stdin env cmd status runtime cputime membytes ibytes obytes isatty =
-    prim "job_launch"
-def badlaunch job error = prim "job_fail_launch"
-
 # makeRunner: Hides some of the boiler plate required to create a runner
 #
 # This function requires very advanced wake expierence and should be used with the greatest amount of caution.
@@ -74,7 +68,7 @@ def badlaunch job error = prim "job_fail_launch"
 export def makeRunner2 (name: String) (run: Job => RunnerInput => Result RunnerOutput Error): Runner =
     def do job maybeInput = match maybeInput
         Fail e ->
-            def _ = badlaunch job e
+            def _ = primJobFailLaunch job e
 
             Fail e
         Pass input -> run job input
@@ -90,7 +84,7 @@ export def localRunner: Runner =
         def Usage status runtime cputime mem in out = predict
 
         def _ =
-            launch
+            primJobLaunch
             job
             dir
             stdin
@@ -115,7 +109,7 @@ export def virtualRunner: Runner =
         def Usage status runtime cputime mem in out = predict
 
         # sets predict+reality
-        def _ = virtual job "" "" status runtime cputime mem in out
+        def _ = primJobVirtual job "" "" status runtime cputime mem in out
 
         job
         | getJobReality

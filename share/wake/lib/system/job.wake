@@ -15,28 +15,55 @@
 
 package wake
 
+# Create/reserve a job handle, parameters aren't necessarily finalized
+export def primJobCreate (label: String) (dir: String) (stdin: String) (env: String) (cmd: String) (signature: Integer) (visible: String) (keep: Integer) (echo: String) (stdout: String) (stderr: String) (isatty: Integer): Job =
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_create") label dir stdin env cmd signature visible keep echo stdout stderr isatty
+
+# Imediatly complete a job with the provided ouputs without launching a process
+export def primJobVirtual (job: Job) (stdout: String) (stderr: String) (status: Integer) (runtime: Double) (cputime: Double) (membytes: Integer) (ibytes: Integer) (obytes: Integer): Unit =
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_virtual") job stdout stderr status runtime cputime membytes ibytes obytes
+
+# Launch the job via a child process. Values such as command or environment can be freely changed from the initial reservation.
+export def primJobLaunch (job: Job) (dir: String) (stdin: String) (env: String) (cmd: String) (status: Integer) (runtime: Double) (cputime: Double) (membytes: Integer) (ibytes: Integer) (obytes: Integer) (isatty: Integer): Unit =
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_launch") job dir stdin env cmd status runtime cputime membytes ibytes obytes isatty
+
+# Complete a job before launch with userland defined failure
+export def primJobFailLaunch (job: Job) (error: Error): Unit =
+    (\_ \_ prim "job_fail_launch") job error
+
+# Complete a job after launch with userland defined failure
+export def primJobFailFinish (job: Job) (error: Error): Unit =
+    (\_ \_ prim "job_fail_finish") job error
+
+# Complete a job successfully by providing to the runtime the inputs/outputs/usage of the job
+export def primJobFinish (job: Job) (inputs: String) (outputs: String) (all_outputs: String) (status: Integer) (runtime: Double) (cputime: Double) (membytes: Integer) (ibytes: Integer) (obytes: Integer): Unit =
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_finish") job inputs outputs all_outputs status runtime cputime membytes ibytes obytes
+
+# Look up a job in the local database. Returns a completed Job handle with outputs already resolved if it is already cached
+export def primJobCache (dir: String) (stdin: String) (env: String) (cmd: String) (signature: Integer) (visible: String) (isatty: Integer): Pair (List Job) (List (Pair String String)) =
+    (\_ \_ \_ \_ \_ \_ \_ prim "job_cache") dir stdin env cmd signature visible isatty
+
+# Creates a hash of 5 elements
+export def primHash5 a b c d e: Integer =
+    (\_ \_ \_ \_ \_ prim "hash") a b c d e
+
 # Helper function similar to cat with that adds a null byte after each string then combines them.
 # Leaves a null byte as the last character of the string
 def implode strings =
     cat (foldr (_, "\0", _) Nil strings)
 
+# Helper function that hashs the signature parts of a job
+def jobSignature cmd res fni fno keep =
+    primHash5 cmd res fni fno keep
+
 def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo stdout stderr label isatty: Job =
-    def create label dir stdin env cmd signature visible keep echo stdout stderr isatty =
-        prim "job_create"
-
-    def finish job inputs outputs all_outputs status runtime cputime membytes ibytes obytes =
-        prim "job_finish"
-
-    def badfinish job error = prim "job_fail_finish"
-    def cache dir stdin env cmd signature visible isatty = prim "job_cache"
-    def signature cmd res fni fno keep = prim "hash"
-    def hash = signature cmd res finputs foutputs keep
+    def hash = jobSignature cmd res finputs foutputs keep
 
     def build Unit =
         def visStrings = map getPathName vis
 
         def job =
-            create
+            primJobCreate
             label
             dir
             stdin
@@ -60,7 +87,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
             run job (Pass (RunnerInput label cmd vis env dir stdin res prefix usage isatty))
 
         def final _ = match output
-            Fail e -> badfinish job e
+            Fail e -> primJobFailLaunch job e
             Pass (RunnerOutput inputs outputs (Usage status runtime cputime mem in out)) ->
                 def input =
                     finputs inputs
@@ -72,7 +99,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
                     | computeHashes prefix
                     | implode
 
-                finish job input output (implode outputs) status runtime cputime mem in out
+                primJobFinish job input output (implode outputs) status runtime cputime mem in out
 
         # Make sure we don't hash files before the job has stopped running
         def _ = waitJobMerged final job
@@ -99,7 +126,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
     match keep
         False -> build Unit
         True ->
-            match (cache dir stdin env.implode cmd.implode hash (map getPathName vis).implode (booleanToInteger isatty))
+            match (primJobCache dir stdin env.implode cmd.implode hash (map getPathName vis).implode (booleanToInteger isatty))
                 Pair (job, _) last -> confirm True last job
                 Pair Nil last -> confirm False last (build Unit)
 

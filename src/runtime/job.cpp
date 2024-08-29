@@ -1880,12 +1880,12 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   // job_virtual.
   prim_register(pmap, "job_reality", prim_job_reality, type_job_reality, PRIM_PURE);
 
-  // The useage reported to job_finish. This is useful because a remote machine or a job
+  // The usage reported to job_finish. This is useful because a remote machine or a job
   // that uses caching might appear from observation (e.g. job_reality) to consume far
   // fewer resources than what we actully care about.
   prim_register(pmap, "job_report", prim_job_report, type_job_report, PRIM_PURE);
 
-  // Previous useage (returns Option Usage if no prior use exists) if previouslly in the database
+  // Previous usage (returns Option Usage if no prior use exists) if previouslly in the database
   prim_register(pmap, "job_record", prim_job_record, type_job_record, PRIM_PURE);
 
   /*****************************************************************************************
@@ -1907,7 +1907,7 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   // the created job.
   prim_register(pmap, "job_virtual", prim_job_virtual, type_job_virtual, PRIM_IMPURE, jobtable);
 
-  // This is where you "finish" a job by explaining what its inputs, outputs, useage etc...
+  // This is where you "finish" a job by explaining what its inputs, outputs, usage etc...
   // are. This call unblocks things like `job_output` for instance.
   prim_register(pmap, "job_finish", prim_job_finish, type_job_finish, PRIM_IMPURE);
 
@@ -1920,7 +1920,7 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   // a pre-step of a runner fails in someway for instance.
   prim_register(pmap, "job_fail_launch", prim_job_fail_launch, type_job_fail, PRIM_IMPURE);
 
-  // Explain to the wake runtime that the job failed to finihs. This can happen if a
+  // Explain to the wake runtime that the job failed to finish. This can happen if a
   // post-step of a runner fails in someway for instance.
   prim_register(pmap, "job_fail_finish", prim_job_fail_finish, type_job_fail, PRIM_IMPURE);
 
