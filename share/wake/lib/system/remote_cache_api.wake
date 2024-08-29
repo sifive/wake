@@ -581,8 +581,6 @@ def resolveUriResponse (dbSchemeFn: (String => String => Result a Error)) (fileS
 #  rscApiGetStringBlob (RemoteCacheBlob "asdf" "https://...") = Pass "foo\nbar\nbat" 
 # ```
 export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Result String Error =
-    # TODO: This off is needed due to a formatter bug. Remove when resolved.
-    # wake-format off
     def resolveStringFileScheme scheme path =
         buildHttpRequest "{scheme}://{path}"
         | setMethod HttpMethodGet
