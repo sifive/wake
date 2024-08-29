@@ -104,6 +104,9 @@ export def localRunner: Runner =
 
     makeRunner2 "local" run
 
+# virtualRunner: A runner that immediatly marks the job as complete using the predicted usage
+#
+# This runner is useful for tracking a unit of work that is job like but not launched as a process
 export def virtualRunner: Runner =
     def run (job: Job) ((RunnerInput _ _ vis _ _ _ _ _ predict _): RunnerInput): Result RunnerOutput Error =
         def Usage status runtime cputime mem in out = predict
