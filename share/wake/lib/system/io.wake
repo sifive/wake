@@ -130,20 +130,30 @@ export def read (path: Path): Result String Error =
         Fail f -> Fail (makeError f)
 
 target writeImp inputs mode path content =
+    # TODO: move this runner out of writeImp and don't directly depent on the parameters passed in to writeImp
+    #       See mkdirRunner for example of proper implementation
     def writeRunner =
-        def imp m p c = prim "write"
-        def pre input = Pair input Unit
+        def primWrite (mode: Integer) (path: String) (content: String): Result String String =
+            (\_ \_ \_ prim "write") mode path content
 
-        def post = match _
-            Pair (Fail f) _ -> Fail f
-            Pair (Pass output) Unit ->
-                if mode < 0 || mode > 0x1ff then
-                    Fail (makeError "write {path}: Invalid mode ({strOctal mode})")
-                else match (imp mode path content)
-                    Fail f -> Fail (makeError f)
-                    Pass path -> Pass (editRunnerOutputOutputs (path, _) output)
+        def run (job: Job) ((RunnerInput _ _ vis _ _ _ _ _ predict _): RunnerInput): Result RunnerOutput Error =
+            def Usage status runtime cputime mem in out = predict
 
-        makeRunner "write" pre post virtualRunner
+            # Insert the <write> job into the database
+            def _ = primJobVirtual job "" "" status runtime cputime mem in out
+
+            # Wait for the virtual job to complete
+            require Pass reality = job.getJobReality
+
+            # Actually trigger the effects required by the job
+            require True = mode >= 0 && mode <= 0x1ff
+            else failWithError "write {path}: Invalid mode ({strOctal mode})"
+
+            match (primWrite mode path content)
+                Fail f -> failWithError f
+                Pass path -> RunnerOutput (vis | map getPathName) (path,) reality | Pass
+
+        makeRunner2 "write" run
 
     # There are a couple likely bad paths that we don't want the user writing to
     # so we give good error messages for these cases
@@ -248,29 +258,39 @@ export def installIn (toRoot: String) (fromRoot: String) (sourcePath: Path): Res
     else
         installAs (in toRoot rel) sourcePath
 
+# mkdirRunner: A runner that processes special mkdir jobs
+#
+# Allows for calls to the mkdir prim to be tracked in the database as any other job
 def mkdirRunner: Runner =
-    def imp m p = prim "mkdir"
+    def primMkdir (mode: Integer) (path: String): Result String String =
+        (\_ \_ prim "mkdir") mode path
 
-    def pre = match _
-        Fail f -> Pair (Fail f) (Pair "" "")
-        Pass input -> match input.getRunnerInputCommand
-            _, _, mode, dir, Nil -> Pair (Pass input) (Pair mode dir)
-            _ -> unreachable "mkdirImp violated command-line contract"
+    def run (job: Job) ((RunnerInput _ cmd vis _ _ _ _ _ predict _): RunnerInput): Result RunnerOutput Error =
+        # Command must be ("<mkdir>", "-m", "{string mode}", "{string path}", Nil)
+        require "<mkdir>", "-m", smode, path, Nil = cmd
+        else panic "mkdirImp violated command-line contract"
 
-    def post = match _
-        Pair (Fail f) _ -> Fail f
-        Pair (Pass output) (Pair smode dir) ->
-            def mode =
-                int smode
-                | getOrElse 0x200
+        def Usage status runtime cputime mem in out = predict
 
-            if mode < 0 || mode > 0x1ff then
-                Fail (makeError "mkdir {dir}: Invalid mode ({smode})")
-            else match (imp mode dir)
-                Fail f -> Fail (makeError f)
-                Pass path -> Pass (editRunnerOutputOutputs (path, _) output)
+        # Insert the <mkdir> job into the database
+        def _ = primJobVirtual job "" "" status runtime cputime mem in out
 
-    makeRunner "mkdir" pre post virtualRunner
+        # Wait for the virtual job to complete
+        require Pass reality = job.getJobReality
+
+        # Actually trigger the effects required by the job
+        def mode =
+            int smode
+            | getOrElse 0x200
+
+        require True = mode >= 0 && mode <= 0x1ff
+        else failWithError "mkdir {path}: Invalid mode ({smode})"
+
+        match (primMkdir mode path)
+            Fail f -> failWithError f
+            Pass path -> RunnerOutput (vis | map getPathName) (path,) reality | Pass
+
+    makeRunner2 "mkdir" run
 
 def mkdirImp inputs mode path =
     makeExecPlan ("<mkdir>", "-m", "0{strOctal mode}", path, Nil) inputs
