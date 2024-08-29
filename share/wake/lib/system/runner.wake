@@ -65,7 +65,7 @@ export tuple Runner =
 # Runners should not wrap other runners instead they should precisely do what they need to complete their task.
 #
 # localRunner is a good reference implementation.
-export def makeRunner2 (name: String) (run: Job => RunnerInput => Result RunnerOutput Error): Runner =
+export def makeRunner (name: String) (run: Job => RunnerInput => Result RunnerOutput Error): Runner =
     def do job maybeInput = match maybeInput
         Fail e ->
             def _ = primJobFailLaunch job e
@@ -102,7 +102,7 @@ export def localRunner: Runner =
         | getJobReality
         |< (\reality RunnerOutput (vis | map getPathName) Nil reality)
 
-    makeRunner2 "local" run
+    makeRunner "local" run
 
 # virtualRunner: A runner that immediatly marks the job as complete using the predicted usage
 #
@@ -118,17 +118,10 @@ export def virtualRunner: Runner =
         | getJobReality
         |< (\reality RunnerOutput (vis | map getPathName) Nil reality)
 
-    makeRunner2 "virtual" run
+    makeRunner "virtual" run
 
-# Create new Runner given pre- and post-hooks around an existing Runner
-# param name: String
-# param pre: type Result RunnerInput Error → Pair (Result RunnerInput Error) a
-#   Called before the job is run, allowing the runner to modify the input to provide the requested resources.
-# param post: type Pair (Result RunnerOutput Error) a → Result RunnerOutput Error
-#   Similar to the pre function but called after the job has run. post is for editing the reported outputs/inputs/usage of the job.
-# param (Runner _ _ run): base runner that the current runner is built on top of
-#   i.e. JSONRunner is built on localRunner.
-export def makeRunner name pre post (Runner _ run) =
+# depreMakeRunner: Deprecated. Do not use
+export def depreMakeRunner name pre post (Runner _ run) =
     def doit job preInput = match (pre preInput)
         Pair runInput state ->
             def runOutput = run job runInput
@@ -280,4 +273,4 @@ export def makeJSONRunner ((JSONRunnerPlan rawScript extraArgs extraEnv estimate
             Fail f -> Fail (makeError f)
             Pass usage -> Pass (RunnerOutput (getK `inputs`) (getK `outputs`) usage)
 
-    makeRunner2 "json-{script}" run
+    makeRunner "json-{script}" run

@@ -245,4 +245,4 @@ export def mkJobCacheRunner (hashFn: RunnerInput => Result String Error) (wakero
 
         Pass (RunnerOutput (map getPathName vis) outputs useage)
 
-    makeRunner2 "job-cache: {name}" run
+    makeRunner "job-cache: {name}" run

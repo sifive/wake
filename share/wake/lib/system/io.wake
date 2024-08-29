@@ -153,7 +153,7 @@ target writeImp inputs mode path content =
                 Fail f -> failWithError f
                 Pass path -> RunnerOutput (vis | map getPathName) (path,) reality | Pass
 
-        makeRunner2 "write" run
+        makeRunner "write" run
 
     # There are a couple likely bad paths that we don't want the user writing to
     # so we give good error messages for these cases
@@ -290,7 +290,7 @@ def mkdirRunner: Runner =
             Fail f -> failWithError f
             Pass path -> RunnerOutput (vis | map getPathName) (path,) reality | Pass
 
-    makeRunner2 "mkdir" run
+    makeRunner "mkdir" run
 
 def mkdirImp inputs mode path =
     makeExecPlan ("<mkdir>", "-m", "0{strOctal mode}", path, Nil) inputs

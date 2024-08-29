@@ -280,7 +280,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
         # -------------------------------------
         runJobAndUpload job input hashKey
 
-    makeRunner2 "remote-cache: {name}" run
+    makeRunner "remote-cache: {name}" run
 
 ## --- Helper functions ---
 
