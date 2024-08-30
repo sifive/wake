@@ -14,9 +14,7 @@ def mkTestPlan (s: String): Result Plan Error =
     | Pass
 
 def resourceAwareCacheRunner =
-    def hashResource x =
-        require Pass input = x
-
+    def hashResource input =
         Pass (catWith "." input.getRunnerInputResources)
 
     mkJobCacheRunner hashResource "/workspace" fuseRunner
