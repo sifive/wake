@@ -109,7 +109,7 @@ jobs:
               extra_docker_build_args: ''
               extra_docker_run_args: -w /$(ls -d build/wake-*)
               build_cmd: debuild -us -uc
-              test_cmd: dpkg -i *.deb && cd tests && wake runTests
+              test_cmd: dpkg -i *.deb && cd tests && ls -lah . && wake runTests
               install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
 
             - target: rocky_8
@@ -133,7 +133,7 @@ jobs:
               extra_docker_build_args: ''
               extra_docker_run_args: -w /$(ls -d build/wake-*)
               build_cmd: debuild -us -uc
-              test_cmd: dpkg -i *.deb && cd tests && wake runTests
+              test_cmd: dpkg -i *.deb && cd tests && ls -lah . && wake runTests
               install_src_glob: build/*.deb build/*.xz build/*.changes build/*.dsc
 
             - target: fedora_38
