@@ -60,11 +60,15 @@ export tuple Runner =
 
 # makeRunner: Hides some of the boiler plate required to create a runner
 #
-# This function requires very advanced wake expierence and should be used with the greatest amount of caution.
-# Callers must ensure at the very least than run calls primJobLaunch and one of the many job "wait" functions.
-# Runners should not wrap other runners instead they should precisely do what they need to complete their task.
+# This function requires very advanced wake experience and should be used with the greatest amount
+# of caution. Callers must ensure at the very least that `run` calls primJobLaunch and one of the
+# many job "wait" functions. Historically runners allowed dispatching to an arbirary "base" or
+# "inner" runner. This significantly complicated the system and led to very unexpected interactions.
+# It is recomennded that runners don't accept an "inner" runner and instead directly call the job
+# primatives. If wrapping is unavoidable then the specific runner being wrapped should be named
+# instead of accepting an arbitrary runner parameter.
 #
-# localRunner is a good reference implementation.
+# localRunner is a good reference implementation of the run function.
 export def makeRunner (name: String) (run: Job => RunnerInput => Result RunnerOutput Error): Runner =
     def do job maybeInput = match maybeInput
         Fail e ->
@@ -84,9 +88,8 @@ export def localRunner: Runner =
         def jobKey = JobKey dir stdin env.implode cmd.implode 0 "" isatty.booleanToInteger
         def _ = primJobLaunch job jobKey predict
 
-        job
-        | getJobReality
-        |< (\reality RunnerOutput (vis | map getPathName) Nil reality)
+        job.getJobReality
+        |< RunnerOutput (vis | map getPathName) Nil
 
     makeRunner "local" run
 
@@ -97,14 +100,15 @@ export def virtualRunner: Runner =
     def run (job: Job) ((RunnerInput _ _ vis _ _ _ _ _ predict _): RunnerInput): Result RunnerOutput Error =
         def _ = primJobVirtual job "" "" predict
 
-        job
-        | getJobReality
-        |< (\reality RunnerOutput (vis | map getPathName) Nil reality)
+        job.getJobReality
+        |< RunnerOutput (vis | map getPathName) Nil
 
     makeRunner "virtual" run
 
-# depreMakeRunner: Deprecated. Do not use
-export def depreMakeRunner name pre post (Runner _ run) =
+# wrapRunner: Deprecated. Do not use this function.
+#
+# It will be deleted in the next release. See makeRunner for migration
+export def wrapRunner name pre post (Runner _ run) =
     def doit job preInput = match (pre preInput)
         Pair runInput state ->
             def runOutput = run job runInput

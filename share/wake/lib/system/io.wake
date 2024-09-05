@@ -129,32 +129,43 @@ export def read (path: Path): Result String Error =
         Pass body -> Pass body
         Fail f -> Fail (makeError f)
 
+# writeRunner: A runner that processes special write jobs
+#
+# Allows for calls to the write prim to be tracked in the database as any other job.
+# Ideally content would be part of RunnerInputCmd however this gets tracked exactly in the database
+# which means all writes would cost 2x the total amount.
+def writeRunner (content: String) =
+    def primWrite (mode: Integer) (path: String) (content: String): Result String String =
+        (\_ \_ \_ prim "write") mode path content
+
+    def run (job: Job) ((RunnerInput _ cmd vis _ _ _ _ _ predict _): RunnerInput): Result RunnerOutput Error =
+        # Command must be ("<write>", "-m", "{string mode}", "{string path}", Nil)
+        require "<write>", "-m", smode, path, Nil = cmd
+        else panic "writeImp violated command-line contract"
+
+        # Insert the <write> job into the database
+        def _ = primJobVirtual job "" "" predict
+
+        # Wait for the virtual job to complete
+        require Pass reality = job.getJobReality
+
+        # Actually trigger the effects required by the job
+        def mode =
+            int smode
+            | getOrElse 0x200
+
+        require True = mode >= 0 && mode <= 0x1ff
+        else failWithError "write {path}: Invalid mode ({strOctal mode})"
+
+        match (primWrite mode path content)
+            Fail f -> failWithError f
+            Pass path ->
+                RunnerOutput (vis | map getPathName) (path,) reality
+                | Pass
+
+    makeRunner "write" run
+
 target writeImp inputs mode path content =
-    # TODO: move this runner out of writeImp and don't directly depent on the parameters passed in to writeImp
-    #       See mkdirRunner for example of proper implementation
-    def writeRunner =
-        def primWrite (mode: Integer) (path: String) (content: String): Result String String =
-            (\_ \_ \_ prim "write") mode path content
-
-        def run (job: Job) ((RunnerInput _ _ vis _ _ _ _ _ predict _): RunnerInput): Result RunnerOutput Error =
-            # Insert the <write> job into the database
-            def _ = primJobVirtual job "" "" predict
-
-            # Wait for the virtual job to complete
-            require Pass reality = job.getJobReality
-
-            # Actually trigger the effects required by the job
-            require True = mode >= 0 && mode <= 0x1ff
-            else failWithError "write {path}: Invalid mode ({strOctal mode})"
-
-            match (primWrite mode path content)
-                Fail f -> failWithError f
-                Pass path ->
-                    RunnerOutput (vis | map getPathName) (path,) reality
-                    | Pass
-
-        makeRunner "write" run
-
     # There are a couple likely bad paths that we don't want the user writing to
     # so we give good error messages for these cases
     require False = path ==* ""
@@ -184,11 +195,11 @@ target writeImp inputs mode path content =
 
     # If all those checks pass we go ahead and perform the write. The write will
     # overwrite single files but it will not overwrite a whole directory with a file.
-    makeExecPlan ("<write>", "0{strOctal mode}", path, Nil) inputs
+    makeExecPlan ("<write>", "-m", "0{strOctal mode}", path, Nil) inputs
     | setPlanLabel "write: {path} 0{strOctal mode}"
     | setPlanOnce False
     | setPlanEnvironment Nil
-    | runJobWith writeRunner
+    | runJobWith (writeRunner content)
     | setJobInspectVisibilityHidden
     | getJobOutput
 

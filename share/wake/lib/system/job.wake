@@ -25,7 +25,9 @@ export tuple JobKey =
     export isatty: Integer
 
 # Create/reserve a job handle, parameters aren't necessarily finalized
-export def primJobCreate (label: String) ((JobKey dir stdin env cmd signature visible isatty): JobKey) (keep: Integer) (echo: String) (stdout: String) (stderr: String): Job =
+export def primJobCreate (label: String) (jobKey: JobKey) (keep: Integer) (echo: String) (stdout: String) (stderr: String): Job =
+    def JobKey dir stdin env cmd signature visible isatty = jobKey
+
     (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_create")
     label
     dir
@@ -41,7 +43,9 @@ export def primJobCreate (label: String) ((JobKey dir stdin env cmd signature vi
     isatty
 
 # Imediatly complete a job with the provided ouputs without launching a process
-export def primJobVirtual (job: Job) (stdout: String) (stderr: String) ((Usage status runtime cputime membytes ibytes obytes): Usage): Unit =
+export def primJobVirtual (job: Job) (stdout: String) (stderr: String) (usage: Usage): Unit =
+    def Usage status runtime cputime membytes ibytes obytes = usage
+
     (\_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_virtual")
     job
     stdout
@@ -54,7 +58,10 @@ export def primJobVirtual (job: Job) (stdout: String) (stderr: String) ((Usage s
     obytes
 
 # Launch the job via a child process. Values such as command or environment can be freely changed from the initial reservation.
-export def primJobLaunch (job: Job) ((JobKey dir stdin env cmd signature visible isatty): JobKey) ((Usage status runtime cputime membytes ibytes obytes): Usage): Unit =
+export def primJobLaunch (job: Job) (jobKey: JobKey) (usage: Usage): Unit =
+    def JobKey dir stdin env cmd _signature _visible isatty = jobKey
+    def Usage status runtime cputime membytes ibytes obytes = usage
+
     (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_launch")
     job
     dir
@@ -78,7 +85,9 @@ export def primJobFailFinish (job: Job) (error: Error): Unit =
     (\_ \_ prim "job_fail_finish") job error
 
 # Complete a job successfully by providing to the runtime the inputs/outputs/usage of the job
-export def primJobFinish (job: Job) (inputs: String) (outputs: String) (all_outputs: String) ((Usage status runtime cputime membytes ibytes obytes): Usage): Unit =
+export def primJobFinish (job: Job) (inputs: String) (outputs: String) (all_outputs: String) (usage: Usage): Unit =
+    def Usage status runtime cputime membytes ibytes obytes = usage
+
     (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_finish")
     job
     inputs
@@ -92,7 +101,9 @@ export def primJobFinish (job: Job) (inputs: String) (outputs: String) (all_outp
     obytes
 
 # Look up a job in the local database. Returns a completed Job handle with outputs already resolved if it is already cached
-export def primJobCache ((JobKey dir stdin env cmd signature visible isatty): JobKey): Pair (List Job) (List (Pair String String)) =
+export def primJobCache (jobKey: JobKey): Pair (List Job) (List (Pair String String)) =
+    def JobKey dir stdin env cmd signature visible isatty = jobKey
+
     (\_ \_ \_ \_ \_ \_ \_ prim "job_cache") dir stdin env cmd signature visible isatty
 
 # Creates a hash of 5 elements
