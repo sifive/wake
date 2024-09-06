@@ -176,7 +176,7 @@ export def mkJobCacheRunner (hashFn: RunnerInput => Result String Error) (wakero
             True
 
         # Now we need to run the job
-        require Pass (RunnerOutput inputs outputs useage) = baseDoIt job (Pass input)
+        require Pass (RunnerOutput inputs outputs usage) = baseDoIt job (Pass input)
 
         def Usage status runtime cputime mem ibytes obytes = useage
         def inputsTree = listToTree scmpCanonical inputs

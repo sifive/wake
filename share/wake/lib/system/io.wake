@@ -133,7 +133,7 @@ export def read (path: Path): Result String Error =
 #
 # Allows for calls to the write prim to be tracked in the database as any other job.
 # Ideally content would be part of RunnerInputCmd however this gets tracked exactly in the database
-# which means all writes would cost 2x the total amount.
+# which means all writes would use 2x the total storage in the database.
 def writeRunner (content: String) =
     def primWrite (mode: Integer) (path: String) (content: String): Result String String =
         (\_ \_ \_ prim "write") mode path content
