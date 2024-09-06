@@ -40,6 +40,10 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
         # Run the job to get the results
         require Pass output = baseDoIt job (Pass input)
 
+        # Don't cache failing jobs
+        require True = output.getRunnerOutputUsage.getUsageStatus == 0
+        else Pass output
+
         # If pushing to the cache is not enabled don't bother
         require True = rscApi.getRemoteCacheApiCanPush
         else Pass output
