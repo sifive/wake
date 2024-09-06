@@ -146,9 +146,6 @@ def writeRunner (content: String) =
         # Insert the <write> job into the database
         def _ = primJobVirtual job "" "" predict
 
-        # Wait for the virtual job to complete
-        require Pass reality = job.getJobReality
-
         # Actually trigger the effects required by the job
         require Some mode = int smode
         else failWithError "write {path}: Unable to convert mode to Integer ({smode})"
@@ -156,7 +153,12 @@ def writeRunner (content: String) =
         require True = mode >= 0 && mode <= 0x1ff
         else failWithError "write {path}: Invalid mode ({strOctal mode})"
 
-        match (primWrite mode path content)
+        def writeTask = primWrite mode path content
+
+        # Wait for the virtual job to complete
+        require Pass reality = job.getJobReality
+
+        match writeTask
             Fail f -> failWithError f
             Pass path ->
                 RunnerOutput (vis | map getPathName) (path,) reality
@@ -283,9 +285,6 @@ def mkdirRunner: Runner =
         # Insert the <mkdir> job into the database
         def _ = primJobVirtual job "" "" predict
 
-        # Wait for the virtual job to complete
-        require Pass reality = job.getJobReality
-
         # Actually trigger the effects required by the job
         require Some mode = int smode
         else failWithError "write {path}: Unable to convert mode to Integer ({smode})"
@@ -293,7 +292,12 @@ def mkdirRunner: Runner =
         require True = mode >= 0 && mode <= 0x1ff
         else failWithError "mkdir {path}: Invalid mode ({smode})"
 
-        match (primMkdir mode path)
+        def mkdirTask = primMkdir mode path
+
+        # Wait for the virtual job to complete
+        require Pass reality = job.getJobReality
+
+        match mkdirTask
             Fail f -> failWithError f
             Pass path ->
                 RunnerOutput (vis | map getPathName) (path,) reality
