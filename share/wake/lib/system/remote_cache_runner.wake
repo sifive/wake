@@ -56,10 +56,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
 
         Pass output
 
-    def rehydrateJob response label input job =
-        require (Match details) = response
-        else unreachable "two-constructor tuple must have one value"
-
+    def rehydrateJob details label input job =
         def _ =
             require True = shouldDebugRemoteCache Unit
 
@@ -226,20 +223,8 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
         require True = rscApi.getRemoteCacheApiCanPull
         else runJobAndUpload job input hashKey
 
-        # -------------------------------------
-        # --- Search the cache for the job  ---
-        # -------------------------------------
-
-        # Search the cache for a match
-        def requestTask =
-            rscApi
-            | rscApiFindMatchingJob (mkSearchRequest input hashKey)
-
-        require Pass response = requestTask
-        else
-            require Fail err = requestTask
-            else unreachable "Result must be either Pass or Fail"
-
+        # If the cache server is down or the response is invalid gracefully fallback
+        def cacheLookupFailed err =
             # Always leave a breadcrumb since this should be a rare error.
             def _ = breadcrumb "{label}: Failed to search for job in the cache"
 
@@ -256,27 +241,32 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
             # request failed but good to keep in mind.
             baseDoIt job (Pass input)
 
-        # If a match was found use it
-        require NoMatch = response
-        else
-            match (rehydrateJob response label input job)
+        # If a valid response is received from the server then handle it
+        def cacheLookupSucceeded response = match response
+            NoMatch ->
+                def _ =
+                    require True = shouldDebugRemoteCache Unit
+
+                    def _ = breadcrumb "{label}: Did not find a match"
+
+                    def _ =
+                        writeTempFile "remote.cache.lookup.miss" "label: {input.getRunnerInputLabel}"
+
+                    True
+
+                # Run the job locally then insert it into the remote cache
+                runJobAndUpload job input hashKey
+            Match details -> match (rehydrateJob details label input job)
+                # If the rehydration succeeds return the job directly
                 Pass x -> Pass x
-                # If the job hydration fails for any reason just run the job as normal.
+                # Otherwise if hydration fails for any reason just run the job as normal.
                 # There is no point in attempting to push since the server just said its cached
                 Fail _ -> baseDoIt job (Pass input)
 
-        def _ =
-            require True = shouldDebugRemoteCache Unit
-
-            def _ = breadcrumb "{label}: Did not find a match"
-            def _ = writeTempFile "remote.cache.lookup.miss" "label: {input.getRunnerInputLabel}"
-
-            True
-
-        # -------------------------------------
-        # --- Insert the job into the cache ---
-        # -------------------------------------
-        runJobAndUpload job input hashKey
+        # Search the remote cache for the job
+        match (rscApi | rscApiFindMatchingJob (mkSearchRequest input hashKey))
+            Pass response -> cacheLookupSucceeded response
+            Fail err -> cacheLookupFailed err
 
     makeRunner "remote-cache: {name}" run
 

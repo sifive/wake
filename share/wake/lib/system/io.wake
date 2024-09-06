@@ -150,9 +150,8 @@ def writeRunner (content: String) =
         require Pass reality = job.getJobReality
 
         # Actually trigger the effects required by the job
-        def mode =
-            int smode
-            | getOrElse 0x200
+        require Some mode = int smode
+        else failWithError "write {path}: Unable to convert mode to Integer ({smode})"
 
         require True = mode >= 0 && mode <= 0x1ff
         else failWithError "write {path}: Invalid mode ({strOctal mode})"
@@ -288,9 +287,8 @@ def mkdirRunner: Runner =
         require Pass reality = job.getJobReality
 
         # Actually trigger the effects required by the job
-        def mode =
-            int smode
-            | getOrElse 0x200
+        require Some mode = int smode
+        else failWithError "write {path}: Unable to convert mode to Integer ({smode})"
 
         require True = mode >= 0 && mode <= 0x1ff
         else failWithError "mkdir {path}: Invalid mode ({smode})"

@@ -178,7 +178,7 @@ export def mkJobCacheRunner (hashFn: RunnerInput => Result String Error) (wakero
         # Now we need to run the job
         require Pass (RunnerOutput inputs outputs usage) = baseDoIt job (Pass input)
 
-        def Usage status runtime cputime mem ibytes obytes = useage
+        def Usage status runtime cputime mem ibytes obytes = usage
         def inputsTree = listToTree scmpCanonical inputs
 
         def mkOutputFileJson src =
@@ -243,6 +243,6 @@ export def mkJobCacheRunner (hashFn: RunnerInput => Result String Error) (wakero
 
             job_cache_add jobCacheAddJson
 
-        Pass (RunnerOutput (map getPathName vis) outputs useage)
+        Pass (RunnerOutput (map getPathName vis) outputs usage)
 
     makeRunner "job-cache: {name}" run
