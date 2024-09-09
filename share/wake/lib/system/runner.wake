@@ -48,10 +48,32 @@ export tuple RunnerInput =
     # Determines if job should run in psuedoterminal
     export IsAtty: Boolean
     # Modify the Runner's reported inputs (files read).
-    # May only be called once for a given job. Wrapping runners are required to maintain this invariant
+    # Must be called exactly once for a given job.
+    #
+    # FnInputs may only be called once as the user provided function may not be idempotent.
+    # Ex: FnInputs = tail being called multiple times would drop an extra file each time its called
+    #     while the user only intentded for the very first file to be dropped
+    #
+    # Note for wrapping runners:
+    #     It is expected that a wrapping runner maintain this invariant. What that looks like will
+    #     depend heavily on the wrapper and requires due diligence. A cache wrapper for example
+    #     should pass it along unmodified since it doesn't care about the actual inputs while
+    #     a smart wrapper tracking file reads must pass a no-op function to the inner runner
+    #     so that it can apply filtering after collecting the files read.
     export FnInputs: (List String => List String)
     # Modify the Runner's reported outputs (files created).
-    # May only be called once for a given job. Wrapping runners are required to maintain this invariant
+    # Must be called exactly once for a given job.
+    #
+    # FnOutputs may only be called once as the user provided function may not be idempotent.
+    # Ex: FnOutputs = tail being called multiple times would drop an extra file each time its called
+    #     while the user only intentded for the very first file to be dropped
+    #
+    # Note for wrapping runners:
+    #     It is expected that a wrapping runner maintain this invariant. What that looks like will
+    #     depend heavily on the wrapper and requires due diligence. A cache wrapper for example
+    #     should pass it along unmodified since it doesn't care about the actual outputs while
+    #     a smart wrapper tracking file writes must pass a no-op function to the inner runner
+    #     so that it can apply filtering after collecting the files written.
     export FnOutputs: (List String => List String)
 
 export tuple RunnerOutput =
