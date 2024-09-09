@@ -47,6 +47,12 @@ export tuple RunnerInput =
     export Record: Usage
     # Determines if job should run in psuedoterminal
     export IsAtty: Boolean
+    # Modify the Runner's reported inputs (files read).
+    # May only be called once for a given job. Wrapping runners are required to maintain this invariant
+    export FnInputs: (List String => List String)
+    # Modify the Runner's reported outputs (files created).
+    # May only be called once for a given job. Wrapping runners are required to maintain this invariant
+    export FnOutputs: (List String => List String)
 
 export tuple RunnerOutput =
     export Inputs: List String
@@ -84,12 +90,20 @@ export def makeRunner (name: String) (run: Job => RunnerInput => Result RunnerOu
 # You must use Fn{Inputs,Outputs} to fill in this information for wake to maintain safety and reusability
 # Advanced usage only, proceed with caution
 export def localRunner: Runner =
-    def run (job: Job) ((RunnerInput _ cmd vis env dir stdin _ _ predict isatty): RunnerInput): Result RunnerOutput Error =
-        def jobKey = JobKey dir stdin env.implode cmd.implode 0 "" isatty.booleanToInteger
+    def run (job: Job) ((RunnerInput _ cmd vis env dir stdin _ _ predict isAtty fnInputs fnOutputs): RunnerInput): Result RunnerOutput Error =
+        def jobKey = JobKey dir stdin env.implode cmd.implode 0 "" isAtty.booleanToInteger
         def _ = primJobLaunch job jobKey predict
 
+        def fileInputs =
+            vis
+            | map getPathName
+            | fnInputs
+
+        # Caller need to fill this in from nothing
+        def fileOutputs = fnOutputs Nil
+
         job.getJobReality
-        |< RunnerOutput (vis | map getPathName) Nil
+        |< RunnerOutput fileInputs fileOutputs
 
     makeRunner "local" run
 
@@ -97,11 +111,19 @@ export def localRunner: Runner =
 #
 # This runner is useful for tracking a unit of work that is job like but not launched as a process
 export def virtualRunner: Runner =
-    def run (job: Job) ((RunnerInput _ _ vis _ _ _ _ _ predict _): RunnerInput): Result RunnerOutput Error =
+    def run (job: Job) ((RunnerInput _ _ vis _ _ _ _ _ predict _ fnInputs fnOutputs): RunnerInput): Result RunnerOutput Error =
         def _ = primJobVirtual job "" "" predict
 
+        def fileInputs =
+            vis
+            | map getPathName
+            | fnInputs
+
+        # Caller need to fill this in from nothing
+        def fileOutputs = fnOutputs Nil
+
         job.getJobReality
-        |< RunnerOutput (vis | map getPathName) Nil
+        |< RunnerOutput fileInputs fileOutputs
 
     makeRunner "virtual" run
 
@@ -172,7 +194,7 @@ export def makeJSONRunner ((JSONRunnerPlan rawScript extraArgs extraEnv estimate
     def script = which (simplify rawScript)
     def executeOk = access script xOK
 
-    def run (job: Job) ((RunnerInput label command visible environment directory stdin res prefix record isatty): RunnerInput): Result RunnerOutput Error =
+    def run (job: Job) ((RunnerInput label command visible environment directory stdin res prefix record isatty fnInputs fnOutputs): RunnerInput): Result RunnerOutput Error =
         require True = executeOk
         else failWithError "Runner {script} is not executable"
 
@@ -219,8 +241,21 @@ export def makeJSONRunner ((JSONRunnerPlan rawScript extraArgs extraEnv estimate
         def cmd = script, "-I", "-p", specFile, "-o", resultFile, extraArgs
 
         # Rewrite input so that the local runner can run the job with a configured sandbox
+        # The identity function is passsed to the file input/output filters so no info is lost
         def localInput =
-            RunnerInput label cmd Nil (extraEnv ++ environment) "." "" Nil prefix (estimate record) isatty
+            RunnerInput
+            label
+            cmd
+            Nil
+            (extraEnv ++ environment)
+            "."
+            ""
+            Nil
+            prefix
+            (estimate record)
+            isatty
+            identity
+            identity
 
         # Dispatch to the local runner via composition and get the outputs
         def (Runner _ localRun) = localRunner
@@ -258,8 +293,13 @@ export def makeJSONRunner ((JSONRunnerPlan rawScript extraArgs extraEnv estimate
             | getOrElse Nil
             | mapPartial getJString
 
+        def jsonInputs = getK `inputs`
+        def jsonOutputs = getK `outputs`
+        def filteredInputs = fnInputs jsonInputs
+        def filteredOutputs = fnOutputs jsonOutputs
+
         match usageResult
             Fail f -> Fail (makeError f)
-            Pass usage -> Pass (RunnerOutput (getK `inputs`) (getK `outputs`) usage)
+            Pass usage -> Pass (RunnerOutput filteredInputs filteredOutputs usage)
 
     makeRunner "json-{script}" run
