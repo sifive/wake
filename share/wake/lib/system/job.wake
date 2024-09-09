@@ -15,41 +15,134 @@
 
 package wake
 
+# JobKey: The values that the database uses to discern a unique job
+#
+# If all values of two jobs are identical, then the jobs are considered identical.
+# Used to determine reuse eligibility.
+export tuple JobKey =
+    # The working directory of the job
+    export dir: String
+    # A string path to a file which should be passed as the stdin to a job
+    export stdin: String
+    # The environement that the job runs in
+    export env: String
+    # The commmand of the job
+    export cmd: String
+    # A unique hash used to discern two nearly identical jobs with some environmental change
+    export signature: Integer
+    # The list of files (separated by \0) that the job can see when running
+    export visible: String
+    # Boolean integer representing if the job should be launched such that it appears to be
+    # launched directly by a human (ie launched interactively)
+    export isatty: Integer
+
+# Create/reserve a job handle, parameters aren't necessarily finalized
+export def primJobCreate (label: String) (jobKey: JobKey) (keep: Integer) (echo: String) (stdout: String) (stderr: String): Job =
+    def JobKey dir stdin env cmd signature visible isatty = jobKey
+
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_create")
+    label
+    dir
+    stdin
+    env
+    cmd
+    signature
+    visible
+    keep
+    echo
+    stdout
+    stderr
+    isatty
+
+# Imediatly complete a job with the provided ouputs without launching a process
+export def primJobVirtual (job: Job) (stdout: String) (stderr: String) (usage: Usage): Unit =
+    def Usage status runtime cputime membytes ibytes obytes = usage
+
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_virtual")
+    job
+    stdout
+    stderr
+    status
+    runtime
+    cputime
+    membytes
+    ibytes
+    obytes
+
+# Launch the job via a child process. Values such as command or environment can be freely changed from the initial reservation.
+export def primJobLaunch (job: Job) (jobKey: JobKey) (usage: Usage): Unit =
+    def JobKey dir stdin env cmd _signature _visible isatty = jobKey
+    def Usage status runtime cputime membytes ibytes obytes = usage
+
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_launch")
+    job
+    dir
+    stdin
+    env
+    cmd
+    status
+    runtime
+    cputime
+    membytes
+    ibytes
+    obytes
+    isatty
+
+# Complete a job before launch with userland defined failure
+export def primJobFailLaunch (job: Job) (error: Error): Unit =
+    (\_ \_ prim "job_fail_launch") job error
+
+# Complete a job after launch with userland defined failure
+export def primJobFailFinish (job: Job) (error: Error): Unit =
+    (\_ \_ prim "job_fail_finish") job error
+
+# Complete a job successfully by providing to the runtime the inputs/outputs/usage of the job
+export def primJobFinish (job: Job) (inputs: String) (outputs: String) (all_outputs: String) (usage: Usage): Unit =
+    def Usage status runtime cputime membytes ibytes obytes = usage
+
+    (\_ \_ \_ \_ \_ \_ \_ \_ \_ \_ prim "job_finish")
+    job
+    inputs
+    outputs
+    all_outputs
+    status
+    runtime
+    cputime
+    membytes
+    ibytes
+    obytes
+
+# Look up a job in the local database. Returns a completed Job handle with outputs already resolved if it is already cached
+export def primJobCache (jobKey: JobKey): Pair (List Job) (List (Pair String String)) =
+    def JobKey dir stdin env cmd signature visible isatty = jobKey
+
+    (\_ \_ \_ \_ \_ \_ \_ prim "job_cache") dir stdin env cmd signature visible isatty
+
+# Creates a hash of 5 elements
+export def primHash5 a b c d e: Integer =
+    (\_ \_ \_ \_ \_ prim "hash") a b c d e
+
 # Helper function similar to cat with that adds a null byte after each string then combines them.
 # Leaves a null byte as the last character of the string
 def implode strings =
     cat (foldr (_, "\0", _) Nil strings)
 
+# Helper function that hashs the signature parts of a job
+def jobSignature cmd res fni fno keep =
+    primHash5 cmd res fni fno keep
+
 def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo stdout stderr label isatty: Job =
-    def create label dir stdin env cmd signature visible keep echo stdout stderr isatty =
-        prim "job_create"
+    def hash = jobSignature cmd res finputs foutputs keep
 
-    def finish job inputs outputs all_outputs status runtime cputime membytes ibytes obytes =
-        prim "job_finish"
+    def visKey =
+        vis
+        | map getPathName
+        | implode
 
-    def badfinish job error = prim "job_fail_finish"
-    def cache dir stdin env cmd signature visible isatty = prim "job_cache"
-    def signature cmd res fni fno keep = prim "hash"
-    def hash = signature cmd res finputs foutputs keep
+    def jobKey = JobKey dir stdin env.implode cmd.implode hash visKey isatty.booleanToInteger
 
     def build Unit =
-        def visStrings = map getPathName vis
-
-        def job =
-            create
-            label
-            dir
-            stdin
-            env.implode
-            cmd.implode
-            hash
-            visStrings.implode
-            (booleanToInteger keep)
-            echo
-            stdout
-            stderr
-            (booleanToInteger isatty)
-
+        def job = primJobCreate label jobKey keep.booleanToInteger echo stdout stderr
         def prefix = str (getJobId job)
 
         def usage =
@@ -60,8 +153,8 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
             run job (Pass (RunnerInput label cmd vis env dir stdin res prefix usage isatty))
 
         def final _ = match output
-            Fail e -> badfinish job e
-            Pass (RunnerOutput inputs outputs (Usage status runtime cputime mem in out)) ->
+            Fail e -> primJobFailLaunch job e
+            Pass (RunnerOutput inputs outputs reality) ->
                 def input =
                     finputs inputs
                     | map simplify
@@ -72,7 +165,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
                     | computeHashes prefix
                     | implode
 
-                finish job input output (implode outputs) status runtime cputime mem in out
+                primJobFinish job input output (implode outputs) reality
 
         # Make sure we don't hash files before the job has stopped running
         def _ = waitJobMerged final job
@@ -96,12 +189,14 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
 
         job
 
-    match keep
-        False -> build Unit
-        True ->
-            match (cache dir stdin env.implode cmd.implode hash (map getPathName vis).implode (booleanToInteger isatty))
-                Pair (job, _) last -> confirm True last job
-                Pair Nil last -> confirm False last (build Unit)
+    require True = keep
+    else build Unit
+
+    def cache = primJobCache jobKey
+
+    match cache
+        Pair (job, _) last -> confirm True last job
+        Pair Nil last -> confirm False last (build Unit)
 
 # Only run if the first four arguments differ
 target runOnce cmd env dir stdin vis isatty run \ res usage finputs foutputs keep echo stdout stderr label =
@@ -145,7 +240,7 @@ export def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers
         label
         isatty
 
-export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers res usage finputs foutputs isatty) =
+export def runJobWith (Runner _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers res usage finputs foutputs isatty) =
     runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run echo stdout stderr isatty
 
 # Set the value of a tag on a Job

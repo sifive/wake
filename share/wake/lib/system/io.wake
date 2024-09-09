@@ -129,22 +129,44 @@ export def read (path: Path): Result String Error =
         Pass body -> Pass body
         Fail f -> Fail (makeError f)
 
+# writeRunner: A runner that processes special write jobs
+#
+# Allows for calls to the write prim to be tracked in the database as any other job.
+# Ideally content would be part of RunnerInputCmd however this gets tracked exactly in the database
+# which means all writes would use 2x the total storage in the database.
+def writeRunner (content: String) =
+    def primWrite (mode: Integer) (path: String) (content: String): Result String String =
+        (\_ \_ \_ prim "write") mode path content
+
+    def run (job: Job) ((RunnerInput _ cmd vis _ _ _ _ _ predict _): RunnerInput): Result RunnerOutput Error =
+        # Command must be ("<write>", "-m", "{string mode}", "{string path}", Nil)
+        require "<write>", "-m", smode, path, Nil = cmd
+        else panic "writeImp violated command-line contract"
+
+        # Insert the <write> job into the database
+        def _ = primJobVirtual job "" "" predict
+
+        # Actually trigger the effects required by the job
+        require Some mode = int smode
+        else failWithError "write {path}: Unable to convert mode to Integer ({smode})"
+
+        require True = mode >= 0 && mode <= 0x1ff
+        else failWithError "write {path}: Invalid mode ({strOctal mode})"
+
+        def writeTask = primWrite mode path content
+
+        # Wait for the virtual job to complete
+        require Pass reality = job.getJobReality
+
+        match writeTask
+            Fail f -> failWithError f
+            Pass path ->
+                RunnerOutput (vis | map getPathName) (path,) reality
+                | Pass
+
+    makeRunner "write" run
+
 target writeImp inputs mode path content =
-    def writeRunner =
-        def imp m p c = prim "write"
-        def pre input = Pair input Unit
-
-        def post = match _
-            Pair (Fail f) _ -> Fail f
-            Pair (Pass output) Unit ->
-                if mode < 0 || mode > 0x1ff then
-                    Fail (makeError "write {path}: Invalid mode ({strOctal mode})")
-                else match (imp mode path content)
-                    Fail f -> Fail (makeError f)
-                    Pass path -> Pass (editRunnerOutputOutputs (path, _) output)
-
-        makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
-
     # There are a couple likely bad paths that we don't want the user writing to
     # so we give good error messages for these cases
     require False = path ==* ""
@@ -174,11 +196,11 @@ target writeImp inputs mode path content =
 
     # If all those checks pass we go ahead and perform the write. The write will
     # overwrite single files but it will not overwrite a whole directory with a file.
-    makeExecPlan ("<write>", "0{strOctal mode}", path, Nil) inputs
+    makeExecPlan ("<write>", "-m", "0{strOctal mode}", path, Nil) inputs
     | setPlanLabel "write: {path} 0{strOctal mode}"
     | setPlanOnce False
     | setPlanEnvironment Nil
-    | runJobWith writeRunner
+    | runJobWith (writeRunner content)
     | setJobInspectVisibilityHidden
     | getJobOutput
 
@@ -248,29 +270,40 @@ export def installIn (toRoot: String) (fromRoot: String) (sourcePath: Path): Res
     else
         installAs (in toRoot rel) sourcePath
 
+# mkdirRunner: A runner that processes special mkdir jobs
+#
+# Allows for calls to the mkdir prim to be tracked in the database as any other job
 def mkdirRunner: Runner =
-    def imp m p = prim "mkdir"
+    def primMkdir (mode: Integer) (path: String): Result String String =
+        (\_ \_ prim "mkdir") mode path
 
-    def pre = match _
-        Fail f -> Pair (Fail f) (Pair "" "")
-        Pass input -> match input.getRunnerInputCommand
-            _, _, mode, dir, Nil -> Pair (Pass input) (Pair mode dir)
-            _ -> unreachable "mkdirImp violated command-line contract"
+    def run (job: Job) ((RunnerInput _ cmd vis _ _ _ _ _ predict _): RunnerInput): Result RunnerOutput Error =
+        # Command must be ("<mkdir>", "-m", "{string mode}", "{string path}", Nil)
+        require "<mkdir>", "-m", smode, path, Nil = cmd
+        else panic "mkdirImp violated command-line contract"
 
-    def post = match _
-        Pair (Fail f) _ -> Fail f
-        Pair (Pass output) (Pair smode dir) ->
-            def mode =
-                int smode
-                | getOrElse 0x200
+        # Insert the <mkdir> job into the database
+        def _ = primJobVirtual job "" "" predict
 
-            if mode < 0 || mode > 0x1ff then
-                Fail (makeError "mkdir {dir}: Invalid mode ({smode})")
-            else match (imp mode dir)
-                Fail f -> Fail (makeError f)
-                Pass path -> Pass (editRunnerOutputOutputs (path, _) output)
+        # Actually trigger the effects required by the job
+        require Some mode = int smode
+        else failWithError "write {path}: Unable to convert mode to Integer ({smode})"
 
-    makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
+        require True = mode >= 0 && mode <= 0x1ff
+        else failWithError "mkdir {path}: Invalid mode ({smode})"
+
+        def mkdirTask = primMkdir mode path
+
+        # Wait for the virtual job to complete
+        require Pass reality = job.getJobReality
+
+        match mkdirTask
+            Fail f -> failWithError f
+            Pass path ->
+                RunnerOutput (vis | map getPathName) (path,) reality
+                | Pass
+
+    makeRunner "mkdir" run
 
 def mkdirImp inputs mode path =
     makeExecPlan ("<mkdir>", "-m", "0{strOctal mode}", path, Nil) inputs
