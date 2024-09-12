@@ -166,11 +166,10 @@ def writeRunner (content: String) =
                     | map getPathName
                     | fnInputs
 
-                def fileOutputs =
-                    (path, Nil)
-                    | fnOutputs
+                def cleanable = (path, Nil)
+                def fileOutputs = fnOutputs cleanable
 
-                RunnerOutput fileInputs fileOutputs reality
+                RunnerOutput fileInputs fileOutputs cleanable reality
                 | Pass
 
     makeRunner "write" run
@@ -314,11 +313,10 @@ def mkdirRunner: Runner =
                     | map getPathName
                     | fnInputs
 
-                def fileOutputs =
-                    (path, Nil)
-                    | fnOutputs
+                def cleanable = (path, Nil)
+                def fileOutputs = fnOutputs cleanable
 
-                RunnerOutput fileInputs fileOutputs reality
+                RunnerOutput fileInputs fileOutputs cleanable reality
                 | Pass
 
     makeRunner "mkdir" run

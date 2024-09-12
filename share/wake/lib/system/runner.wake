@@ -76,9 +76,17 @@ export tuple RunnerInput =
     #     so that it can apply filtering after collecting the files written.
     export FnOutputs: (List String => List String)
 
+# The result returned by a Runner after running a job
 export tuple RunnerOutput =
+    # The filtered list of files actually read by the job. It can be used for more precise reruns
     export Inputs: List String
+    # The filtered list of files output by the job. These files are hashed and elevated to Path
     export Outputs: List String
+    # The list of files output by the job that should be deleted by wake --clean. May include files
+    # listed in Outputs as they will be removed later. The files in the list that are not in
+    # Outputs will not be hashed, published, or elevated to Path but will be deleted by wake --clean
+    export CleanableOutputs: List String
+    # The actual resource usage of the job that will be written to the database
     export Usage: Usage
 
 # A Runner describes a way to invoke a Plan to get a Job
@@ -121,11 +129,12 @@ export def localRunner: Runner =
             | map getPathName
             | fnInputs
 
-        # Caller need to fill this in from nothing
-        def fileOutputs = fnOutputs Nil
+        # Caller needs to fill this in from nothing
+        def cleanable = Nil
+        def fileOutputs = fnOutputs cleanable
 
         job.getJobReality
-        |< RunnerOutput fileInputs fileOutputs
+        |< RunnerOutput fileInputs fileOutputs cleanable
 
     makeRunner "local" run
 
@@ -141,11 +150,12 @@ export def virtualRunner: Runner =
             | map getPathName
             | fnInputs
 
-        # Caller need to fill this in from nothing
-        def fileOutputs = fnOutputs Nil
+        # Caller needs to fill this in from nothing
+        def cleanable = Nil
+        def fileOutputs = fnOutputs cleanable
 
         job.getJobReality
-        |< RunnerOutput fileInputs fileOutputs
+        |< RunnerOutput fileInputs fileOutputs cleanable
 
     makeRunner "virtual" run
 
@@ -322,6 +332,6 @@ export def makeJSONRunner ((JSONRunnerPlan rawScript extraArgs extraEnv estimate
 
         match usageResult
             Fail f -> Fail (makeError f)
-            Pass usage -> Pass (RunnerOutput filteredInputs filteredOutputs usage)
+            Pass usage -> Pass (RunnerOutput filteredInputs filteredOutputs jsonOutputs usage)
 
     makeRunner "json-{script}" run

@@ -216,7 +216,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
 
         def _ = primJobVirtual job stdout stderr predict
 
-        Pass (RunnerOutput inputs outputs predict)
+        Pass (RunnerOutput inputs outputs outputs predict)
 
     def run (job: Job) (input: RunnerInput): Result RunnerOutput Error =
         def label = input.getRunnerInputLabel

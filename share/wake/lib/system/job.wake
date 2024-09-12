@@ -154,14 +154,13 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
 
         def final _ = match output
             Fail e -> primJobFailLaunch job e
-            Pass (RunnerOutput inputs outputs reality) ->
+            Pass (RunnerOutput inputs outputs cleanable reality) ->
                 def hashedOutputs =
                     outputs
                     | computeHashes prefix
                     | implode
 
-                # TODO: Determine the effect of all_outputs being filtered
-                primJobFinish job inputs.implode hashedOutputs hashedOutputs reality
+                primJobFinish job inputs.implode hashedOutputs cleanable.implode reality
 
         # Make sure we don't hash files before the job has stopped running
         def _ = waitJobMerged final job
