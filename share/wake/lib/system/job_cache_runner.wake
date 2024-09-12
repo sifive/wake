@@ -166,7 +166,7 @@ export def mkJobCacheRunner (hashFn: RunnerInput => Result String Error) (wakero
             def predict = Usage status runtime cputime mem ibytes obytes
             def _ = primJobVirtual job stdout stderr predict
 
-            Pass (RunnerOutput inputs outputs outputs predict)
+            Pass (RunnerOutput inputs outputs Nil predict)
 
         def _ =
             require True = isDebugOn
