@@ -216,7 +216,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
 
         def _ = primJobVirtual job stdout stderr predict
 
-        Pass (RunnerOutput inputs outputs predict)
+        Pass (RunnerOutput inputs outputs Nil predict)
 
     def run (job: Job) (input: RunnerInput): Result RunnerOutput Error =
         def label = input.getRunnerInputLabel
@@ -237,7 +237,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
                 require True = shouldDebugRemoteCache Unit
 
                 def _ =
-                    writeTempFile "remote.cache.lookup.fail" "label: {input.getRunnerInputLabel}\nerror: {err | format}"
+                    writeTempFile "remote.cache.lookup.fail" "label: {label}\nerror: {err | format}"
 
                 True
 
@@ -252,9 +252,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
                     require True = shouldDebugRemoteCache Unit
 
                     def _ = breadcrumb "{label}: Did not find a match"
-
-                    def _ =
-                        writeTempFile "remote.cache.lookup.miss" "label: {input.getRunnerInputLabel}"
+                    def _ = writeTempFile "remote.cache.lookup.miss" "label: {label}"
 
                     True
 
@@ -277,11 +275,11 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
 ## --- Helper functions ---
 
 # Creates a CacheSearchRequest from the various inputs to a runner
-def mkSearchRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _usage isAtty): RunnerInput) (hidden: String) =
+def mkSearchRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _usage isAtty _ _): RunnerInput) (hidden: String) =
     CacheSearchRequest label cmd dir env hidden isAtty stdin vis
 
 # Creates a CachePostJobRequest from the various inputs and outputs of a runner
-def mkPostJobRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (output: RunnerOutput) (hidden: String) (stdoutBlobId: String) (stderrBlobId: String) (files: List CachePostRequestOutputFile) (directories: List CachePostRequestOutputDirectory) (symlinks: List CachePostRequestOutputSymlink) =
+def mkPostJobRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _ isAtty _ _): RunnerInput) (output: RunnerOutput) (hidden: String) (stdoutBlobId: String) (stderrBlobId: String) (files: List CachePostRequestOutputFile) (directories: List CachePostRequestOutputDirectory) (symlinks: List CachePostRequestOutputSymlink) =
     def Usage status runtime cputime mem ibytes obytes = output.getRunnerOutputUsage
 
     CachePostRequest
@@ -306,7 +304,7 @@ def mkPostJobRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _ is
     obytes
 
 # Creates a CacheAllowedRequest from the various inputs and outputs of a runner
-def mkCacheAllowedRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _ isAtty): RunnerInput) (output: RunnerOutput) (hidden: String) =
+def mkCacheAllowedRequest ((RunnerInput label cmd vis env dir stdin _res _prefix _ isAtty _ _): RunnerInput) (output: RunnerOutput) (hidden: String) =
     def Usage status runtime cputime mem _ibytes obytes = output.getRunnerOutputUsage
 
     CacheAllowedRequest label cmd dir env hidden isAtty stdin vis status runtime cputime mem obytes
