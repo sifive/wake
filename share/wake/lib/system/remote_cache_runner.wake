@@ -216,6 +216,26 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
 
         def _ = primJobVirtual job stdout stderr predict
 
+        ## ----------------------------- Filtered Output Commentary ----------------------------- ##
+        # outputs below is currently filtered via FnOutputs. This is done to drastically decrease
+        # the number of output files uploaded to the remote server. It causes several side effects
+        # worth highlighing. Specifically there are certain "hidden" outputs that a job may
+        # generate. The most obvious once is the job `mkdir foo && touch foo/bar.txt` with
+        # FnOutputs = (\_ "foo/bar.txt", Nil). As this job does *not* list the OutputDirectory foo
+        # we can't expect it to exist via normal rehydration so special handling is required. A
+        # less obvious hidden outputs is a symlink that points to a file, both created by the same
+        # job where only the symlink is output. The symlink would be retored but would be invalid
+        # since the target file doesn't exists.
+        #
+        # The current implementation does the following:
+        #   - When uploading a job, check for a "hidden" directory output then add it as hidden
+        #   - When uploading a symlink, panic if the target was created by the job but not output
+        #
+        # Since these cases are rare, a more ideal future implementation may be the following
+        #   - When uploading a job, check all output symlinks to see if their target was output
+        #     by the same job. If so, upload the target as a "hidden" output file. On rehydration
+        #     retore the file as normal but don't list it in the outputs.
+        ## -------------------------------------------------------------------------------------- ##
         Pass (RunnerOutput inputs outputs Nil predict)
 
     def run (job: Job) (input: RunnerInput): Result RunnerOutput Error =
@@ -407,6 +427,32 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
     def stderrUpload =
         rscApi
         | rscApiPostStringBlob "stderr" stderr
+
+    # Due to a side effect of filtering outputs its possible for a job to create both a file
+    # and a symlink to that file, but the only output said file. This will break the build
+    # and is explicitly disallowed. Panic if it occurs.
+    require True =
+        require False = symlinksUpload.len == 0
+        else True
+
+        # Get the list of potential targets the job may have uploaded
+        require Pass symlinkTargets =
+            symlinksUpload
+            | findFail
+            |< map getCachePostRequestOutputSymlinkPath
+        else True
+
+        # Get the list of files created by this job that are also referenced by symlinks created by this job
+        def symlinkTargetsCreated =
+            def created = output.getRunnerOutputCleanableOutputs
+
+            symlinkTargets
+            | intersect scmp created
+
+        # symlinkTargetsCreated must be a subset of the list of published outputs otherwise the job
+        # is breaking the contract.
+        subset scmp symlinkTargetsCreated output.getRunnerOutputOutputs
+    else panic "Job may not create both a symlink and file, then output only the symlink"
 
     require Pass stdoutId = stdoutUpload
     require Pass stderrId = stderrUpload
