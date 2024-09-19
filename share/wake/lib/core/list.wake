@@ -889,3 +889,62 @@ export def groupBy (cmpFn: a => a => Order) (list: List a): List (List a) =
         _ -> (elem, Nil), acc
 
     foldr combo Nil sorted
+
+# Returns a list of items where each item was a memeber of the two parameter lists.
+# The returned list will not be the same order as the parameters.
+#
+# Guarantees:
+#  - Output list length will be <= the length of the smaller input list
+#  - All items in output list will be present in both input lists
+#  - Performance is considered and exceeds the naive N^2 algorithm
+#
+# Examples:
+# ```
+#   intersect icmp (seq 3) (seq 4) = (0, 1, 2, Nil)
+#   intersect icmp (seq 3) (seq 3) = (0, 1, 2, Nil)
+#   intersect icmp (seq 3) (4, 2, 0, Nil) = (0, 2, Nil)
+#   intersect scmp ("", "bar", "bat", Nil) ("", "foo", "bat", Nil) = ("", "bat", Nil)
+# ```
+export def intersect (cmpFn: a => a => Order) (lhs: List a) (rhs: List a): List a =
+    def lhsSort = sortBy cmpFn lhs
+    def rhsSort = sortBy cmpFn rhs
+
+    match lhsSort rhsSort
+        # If either list is exhuasted then no more matches are possible
+        Nil _ -> Nil
+        _ Nil -> Nil
+        (lh, lt) (rh, rt) -> match (cmpFn lh rh)
+            # lh is smaller so drop it
+            LT -> intersect cmpFn lt (rh, rt)
+            # rh is smaller so drop it
+            GT -> intersect cmpFn (lh, lt) rt
+            # equal, grab and continue
+            EQ -> lh, (intersect cmpFn lt rt)
+
+# Returns a Boolean determining if all items in lhs are also item in rhs.
+#
+# Guarantees:
+#  - True is returned only when all items of lhs are present in rhs
+#  - Performance is considered and exceeds the naive N^2 algorithm
+#
+# Examples:
+#   subset icmp (seq 3) (seq 4) = True
+#   subset icmp (seq 3) (seq 3) = True
+#   subset icmp (seq 3) (seq 2) = False
+#   subset icmp (seq 3) (4, 2, 0, Nil) = False
+#   subset icmp Nil Nil = True
+#   subset icmp Nil (seq 1) = True
+#   subset icmp (seq 1) Nil = False
+#   subset scmp ("", Nil) ("", "foo", "bar", Nil) = True
+#   subset scmp ("", "bat", Nil) ("", "foo", "bar", Nil) = False
+export def subset (cmpFn: a => a => Order) (lhs: List a) (rhs: List a): Boolean =
+    def lhsSort = sortBy cmpFn lhs
+    def rhsSort = sortBy cmpFn rhs
+
+    match lhsSort rhsSort
+        Nil _ -> True
+        _ Nil -> False
+        (lh, lt) (rh, rt) -> match (cmpFn lh rh)
+            LT -> False
+            GT -> subset cmpFn (lh, lt) rt
+            EQ -> subset cmpFn lt rt

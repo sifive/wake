@@ -1,1 +1,19 @@
-export def test _ = seq 11 | groupBy (\l\r icmp (l/3) (r/3))
+# groupBy tests
+export def test1 _ = seq 11 | groupBy (\l\r icmp (l/3) (r/3))
+
+# intersect tests
+export def test2 _ = intersect icmp (seq 3) (seq 4)
+export def test3 _ = intersect icmp (seq 3) (seq 3)
+export def test4 _ = intersect icmp (seq 3) (4, 2, 0, Nil)
+export def test5 _ = intersect scmp ("", "bar", "bat", Nil) ("", "foo", "bat", Nil)
+
+# subset tests
+export def test6 _ = subset icmp (seq 3) (seq 4)
+export def test7 _ = subset icmp (seq 3) (seq 3)
+export def test8 _ = subset icmp (seq 3) (seq 2)
+export def test9 _ = subset icmp (seq 3) (4, 2, 0, Nil)
+export def test10 _ = subset icmp Nil Nil
+export def test11 _ = subset icmp Nil (seq 1)
+export def test12 _ = subset icmp (seq 1) Nil
+export def test13 _ = subset scmp ("", Nil) ("", "foo", "bar", Nil)
+export def test14 _ = subset scmp ("", "bat", Nil) ("", "foo", "bar", Nil)
