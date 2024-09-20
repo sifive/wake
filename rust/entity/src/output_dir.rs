@@ -11,6 +11,7 @@ pub struct Model {
     pub mode: i32,
     pub job_id: Uuid,
     pub created_at: DateTime,
+    pub hidden: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

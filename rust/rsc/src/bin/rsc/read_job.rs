@@ -134,6 +134,7 @@ pub async fn read_job(
                     .map(|m| Dir {
                         path: m.path,
                         mode: m.mode,
+                        hidden: Some(m.hidden),
                     })
                     .collect();
 

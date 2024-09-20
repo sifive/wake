@@ -14,6 +14,7 @@ mod m20240731_152842_create_job_size_proc;
 mod m20240731_201632_create_job_blob_timestamp_index;
 mod m20240805_163520_create_blob_id_fk_indexes;
 mod m20240819_193352_add_output_indexes;
+mod m20240919_214610_add_hidden_to_output_dir;
 
 pub struct Migrator;
 
@@ -35,6 +36,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20240731_201632_create_job_blob_timestamp_index::Migration),
             Box::new(m20240805_163520_create_blob_id_fk_indexes::Migration),
             Box::new(m20240819_193352_add_output_indexes::Migration),
+            Box::new(m20240919_214610_add_hidden_to_output_dir::Migration),
         ]
     }
 }

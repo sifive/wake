@@ -77,6 +77,8 @@ tuple CacheSearchOutputDirectory =
     Path: String
     # The mode on disk of the directory
     Mode: Integer
+    # If the directory is hidden or published to downstream users
+    Hidden: Boolean
 
 # A symlink created by a cached job
 tuple CacheSearchOutputSymlink =
@@ -134,6 +136,8 @@ tuple CachePostRequestOutputDirectory =
     Path: String
     # The mode on disk of the directory
     Mode: Integer
+    # If the directory is hidden or published to downstream users
+    Hidden: Boolean
 
 # A symlink created by a job
 tuple CachePostRequestOutputSymlink =
@@ -793,10 +797,11 @@ def getCachePostRequestJson (req: CachePostRequest): JValue =
             "blob_id" :-> JString blobId,
         )
 
-    def mkOutputDirJson (CachePostRequestOutputDirectory path mode) =
+    def mkOutputDirJson (CachePostRequestOutputDirectory path mode hidden) =
         JObject (
             "path" :-> JString path,
             "mode" :-> JInteger mode,
+            "hidden" :-> JBoolean hidden,
         )
 
     def mkOutputSymlinkJson (CachePostRequestOutputSymlink path link) =
@@ -906,7 +911,12 @@ def mkCacheSearchResponse (json: JValue): Result CacheSearchResponse Error =
             failWithError
             "rsc: JSON response has incorrect schema. output_directories[x] must have integer key 'mode'"
 
-        CacheSearchOutputDirectory path mode
+        require Pass (JBoolean hidden) = jField v "hidden"
+        else
+            failWithError
+            "rsc: JSON response has incorrect schema. output_directories[x] must have boolean key 'hidden'"
+
+        CacheSearchOutputDirectory path mode hidden
         | Pass
 
     def mkOutputFile (v: JValue): Result CacheSearchOutputFile Error =
