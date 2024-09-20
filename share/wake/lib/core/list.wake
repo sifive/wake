@@ -906,20 +906,19 @@ export def groupBy (cmpFn: a => a => Order) (list: List a): List (List a) =
 #   intersect scmp ("", "bar", "bat", Nil) ("", "foo", "bat", Nil) = ("", "bat", Nil)
 # ```
 export def intersect (cmpFn: a => a => Order) (lhs: List a) (rhs: List a): List a =
-    def lhsSort = sortBy cmpFn lhs
-    def rhsSort = sortBy cmpFn rhs
-
-    match lhsSort rhsSort
+    def intersectImp cmpFn lhsSort rhsSort = match lhsSort rhsSort
         # If either list is exhuasted then no more matches are possible
         Nil _ -> Nil
         _ Nil -> Nil
         (lh, lt) (rh, rt) -> match (cmpFn lh rh)
             # lh is smaller so drop it
-            LT -> intersect cmpFn lt (rh, rt)
+            LT -> intersectImp cmpFn lt (rh, rt)
             # rh is smaller so drop it
-            GT -> intersect cmpFn (lh, lt) rt
+            GT -> intersectImp cmpFn (lh, lt) rt
             # equal, grab and continue
-            EQ -> lh, (intersect cmpFn lt rt)
+            EQ -> lh, (intersectImp cmpFn lt rt)
+
+    intersectImp cmpFn (sortBy cmpFn lhs) (sortBy cmpFn rhs)
 
 # Returns a Boolean determining if all items in lhs are also item in rhs.
 #
@@ -938,13 +937,12 @@ export def intersect (cmpFn: a => a => Order) (lhs: List a) (rhs: List a): List 
 #   subset scmp ("", Nil) ("", "foo", "bar", Nil) = True
 #   subset scmp ("", "bat", Nil) ("", "foo", "bar", Nil) = False
 export def subset (cmpFn: a => a => Order) (lhs: List a) (rhs: List a): Boolean =
-    def lhsSort = sortBy cmpFn lhs
-    def rhsSort = sortBy cmpFn rhs
-
-    match lhsSort rhsSort
+    def subsetImp cmpFn lhsSort rhsSort = match lhsSort rhsSort
         Nil _ -> True
         _ Nil -> False
         (lh, lt) (rh, rt) -> match (cmpFn lh rh)
             LT -> False
-            GT -> subset cmpFn (lh, lt) rt
-            EQ -> subset cmpFn lt rt
+            GT -> subsetImp cmpFn (lh, lt) rt
+            EQ -> subsetImp cmpFn lt rt
+
+    subsetImp cmpFn (sortBy cmpFn lhs) (sortBy cmpFn rhs)
