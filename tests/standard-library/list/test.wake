@@ -17,3 +17,9 @@ export def test11 _ = subset icmp Nil (seq 1)
 export def test12 _ = subset icmp (seq 1) Nil
 export def test13 _ = subset scmp ("", Nil) ("", "foo", "bar", Nil)
 export def test14 _ = subset scmp ("", "bat", Nil) ("", "foo", "bar", Nil)
+
+# difference tests
+export def test15 _ = difference icmp (seq 4) (seq 3)
+export def test16 _ = difference icmp (seq 3) (seq 3)
+export def test17 _ = difference icmp (seq 3) (2, Nil)
+export def test18 _ = difference scmp ("", "bar", "bat", Nil) ("", "foo", "bat", Nil)

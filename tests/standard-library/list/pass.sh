@@ -16,3 +16,7 @@ WAKE="${1:+$1/wake}"
 "${WAKE:-wake}" --stdout=warning,report test12
 "${WAKE:-wake}" --stdout=warning,report test13
 "${WAKE:-wake}" --stdout=warning,report test14
+"${WAKE:-wake}" --stdout=warning,report test15
+"${WAKE:-wake}" --stdout=warning,report test16
+"${WAKE:-wake}" --stdout=warning,report test17
+"${WAKE:-wake}" --stdout=warning,report test18

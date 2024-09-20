@@ -12,3 +12,7 @@ True
 False
 True
 False
+3, Nil
+Nil
+0, 1, Nil
+"bar", Nil

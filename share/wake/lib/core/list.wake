@@ -900,10 +900,10 @@ export def groupBy (cmpFn: a => a => Order) (list: List a): List (List a) =
 #
 # Examples:
 # ```
-#   intersect icmp (seq 3) (seq 4) = (0, 1, 2, Nil)
-#   intersect icmp (seq 3) (seq 3) = (0, 1, 2, Nil)
-#   intersect icmp (seq 3) (4, 2, 0, Nil) = (0, 2, Nil)
-#   intersect scmp ("", "bar", "bat", Nil) ("", "foo", "bat", Nil) = ("", "bat", Nil)
+#   intersect icmp (seq 3) (seq 4) = 0, 1, 2, Nil
+#   intersect icmp (seq 3) (seq 3) = 0, 1, 2, Nil
+#   intersect icmp (seq 3) (4, 2, 0, Nil) = 0, 2, Nil
+#   intersect scmp ("", "bar", "bat", Nil) ("", "foo", "bat", Nil) = "", "bat", Nil
 # ```
 export def intersect (cmpFn: a => a => Order) (lhs: List a) (rhs: List a): List a =
     def intersectImp cmpFn lhsSort rhsSort = match lhsSort rhsSort
@@ -946,3 +946,35 @@ export def subset (cmpFn: a => a => Order) (lhs: List a) (rhs: List a): Boolean 
             EQ -> subsetImp cmpFn lt rt
 
     subsetImp cmpFn (sortBy cmpFn lhs) (sortBy cmpFn rhs)
+
+# Returns a list of items where each item was a memeber of lhs but not rhs
+# The returned list will not be the same order as the parameters.
+#
+# Guarantees:
+#  - Output list length will be <= the length of lhs
+#  - All items in output list will be present in lhs
+#  - No items in output list will be present in rhs
+#  - Performance is considered and exceeds the naive N^2 algorithm
+#
+# Examples:
+# ```
+#   difference icmp (seq 4) (seq 3) = 3, Nil
+#   difference icmp (seq 3) (seq 3) = Nil
+#   difference icmp (seq 3) (2, Nil) = 0, 1, Nil
+#   difference scmp ("", "bar", "bat", Nil) ("", "foo", "bat", Nil) = "bar", Nil
+# ```
+export def difference (cmpFn: a => a => Order) (lhs: List a) (rhs: List a): List a =
+    def differenceImp cmpFn lhsSort rhsSort = match lhsSort rhsSort
+        # lhs is empty so the result will always be empty
+        Nil _ -> Nil
+        # rhs is empty nothing else to subtract so result will always be lhs
+        l Nil -> l
+        (lh, lt) (rh, rt) -> match (cmpFn lh rh)
+            # lh is smaller, add it to the output set then continue looking in lt
+            LT -> lh, (differenceImp cmpFn lt (rh, rt))
+            # rh is smaller so drop it, then continue looking in (lh, lt)
+            GT -> differenceImp cmpFn (lh, lt) rt
+            # item is in both sets. Remove it then continue looking
+            EQ -> differenceImp cmpFn lt rt
+
+    differenceImp cmpFn (sortBy cmpFn lhs) (sortBy cmpFn rhs)
