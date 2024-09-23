@@ -889,3 +889,92 @@ export def groupBy (cmpFn: a => a => Order) (list: List a): List (List a) =
         _ -> (elem, Nil), acc
 
     foldr combo Nil sorted
+
+# Returns a list of items where each item was a member of the two parameter lists.
+# The returned list will not be the same order as the parameters.
+#
+# Guarantees:
+#  - Output list length will be <= the length of the smaller input list
+#  - All items in output list will be present in both input lists
+#  - Performance is considered and exceeds the naive N^2 algorithm
+#
+# Examples:
+# ```
+#   intersect icmp (seq 3) (seq 4) = 0, 1, 2, Nil
+#   intersect icmp (seq 3) (seq 3) = 0, 1, 2, Nil
+#   intersect icmp (seq 3) (4, 2, 0, Nil) = 0, 2, Nil
+#   intersect scmp ("", "bar", "bat", Nil) ("", "foo", "bat", Nil) = "", "bat", Nil
+# ```
+export def intersect (cmpFn: a => a => Order) (left: List a) (right: List a): List a =
+    def intersectImp cmpFn leftSort rightSort = match leftSort rightSort
+        # If either list is exhuasted then no more matches are possible
+        Nil _ -> Nil
+        _ Nil -> Nil
+        (lh, lt) (rh, rt) -> match (cmpFn lh rh)
+            # lh is smaller so drop it
+            LT -> intersectImp cmpFn lt (rh, rt)
+            # rh is smaller so drop it
+            GT -> intersectImp cmpFn (lh, lt) rt
+            # equal, grab and continue
+            EQ -> lh, (intersectImp cmpFn lt rt)
+
+    intersectImp cmpFn (sortBy cmpFn left) (sortBy cmpFn right)
+
+# Returns a Boolean determining if all items in left are also item in right.
+#
+# Guarantees:
+#  - True is returned only when all items of left are present in right
+#  - Performance is considered and exceeds the naive N^2 algorithm
+#
+# Examples:
+#   subset icmp (seq 3) (seq 4) = True
+#   subset icmp (seq 3) (seq 3) = True
+#   subset icmp (seq 3) (seq 2) = False
+#   subset icmp (seq 3) (4, 2, 0, Nil) = False
+#   subset icmp Nil Nil = True
+#   subset icmp Nil (seq 1) = True
+#   subset icmp (seq 1) Nil = False
+#   subset scmp ("", Nil) ("", "foo", "bar", Nil) = True
+#   subset scmp ("", "bat", Nil) ("", "foo", "bar", Nil) = False
+export def subset (cmpFn: a => a => Order) (left: List a) (right: List a): Boolean =
+    def subsetImp cmpFn leftSort rightSort = match leftSort rightSort
+        Nil _ -> True
+        _ Nil -> False
+        (lh, lt) (rh, rt) -> match (cmpFn lh rh)
+            LT -> False
+            GT -> subsetImp cmpFn (lh, lt) rt
+            EQ -> subsetImp cmpFn lt rt
+
+    subsetImp cmpFn (sortBy cmpFn left) (sortBy cmpFn right)
+
+# Remove all items from the left list which occur in the right.
+# The returned list will not be the same order as the parameters.
+#
+# Guarantees:
+#  - Output list length will be <= the length of left
+#  - All items in output list will be present in left
+#  - No items in output list will be present in right
+#  - Performance is considered and exceeds the naive N^2 algorithm
+#
+# Examples:
+# ```
+#   subtract icmp (seq 4) (seq 3) = 3, Nil
+#   subtract icmp (seq 3) (seq 3) = Nil
+#   subtract icmp (seq 3) (2, Nil) = 0, 1, Nil
+#   subtract scmp ("", "bar", "bat", Nil) ("", "foo", "bat", Nil) = "bar", Nil
+# ```
+export def subtract (cmpFn: a => a => Order) (left: List a) (right: List a): List a =
+    def subtractImp cmpFn leftSort rightSort = match leftSort rightSort
+        # left is empty so the result will always be empty
+        Nil _ -> Nil
+        # right is empty nothing else to subtract so result will always be left
+        l Nil -> l
+        (lh, lt) (rh, rt) -> match (cmpFn lh rh)
+            # lh is smaller, add it to the output set then continue looking in lt
+            LT -> lh, (subtractImp cmpFn lt (rh, rt))
+            # rh is smaller so drop it, then continue looking in (lh, lt)
+            GT -> subtractImp cmpFn (lh, lt) rt
+            # item is in both sets. Remove it then continue looking
+            EQ -> subtractImp cmpFn lt rt
+
+    subtractImp cmpFn (sortBy cmpFn left) (sortBy cmpFn right)
