@@ -224,7 +224,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
         # FnOutputs = (\_ "foo/bar.txt", Nil). As this job does *not* list the OutputDirectory foo
         # we can't expect it to exist via normal rehydration so special handling is required. A
         # less obvious hidden outputs is a symlink that points to a file, both created by the same
-        # job where only the symlink is output. The symlink would be retored but would be invalid
+        # job where only the symlink is output. The symlink would be restored but would be invalid
         # since the target file doesn't exists.
         #
         # The current implementation does the following:
