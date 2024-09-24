@@ -91,6 +91,7 @@ pub async fn add_job(
                             created_at: NotSet,
                             path: Set(dir.path),
                             mode: Set(dir.mode),
+                            hidden: Set(dir.hidden.unwrap_or(false)),
                             job_id: Set(job_id),
                         })
                         .collect(),

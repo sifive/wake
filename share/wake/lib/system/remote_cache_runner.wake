@@ -88,7 +88,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
         def stdoutDownload = rscApiGetStringBlob stdoutBlob
         def stderrDownload = rscApiGetStringBlob stderrBlob
 
-        def doMakeDirectory (CacheSearchOutputDirectory path mode) =
+        def doMakeDirectory (CacheSearchOutputDirectory path mode _hidden) =
             # wake-format off
             def cmd =
                 "mkdir",
@@ -188,6 +188,7 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
 
         def resolvedDirectories =
             outputDirs
+            | filter (!_.getCacheSearchOutputDirectoryHidden)
             | map getCacheSearchOutputDirectoryPath
 
         def outputs = resolvedOutputs ++ resolvedDirectories ++ resolvedSymlinks
@@ -350,20 +351,9 @@ def thirdBy (acceptFn: a => ThirdByGroup): (list: List a) => Triple (one: List a
 
 # Posts a completed job to the remote cache
 def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: String) (input: RunnerInput) (output: RunnerOutput): Result Unit Error =
-    require Pass stdout = job.getJobFailedStdoutRaw
-    require Pass stderr = job.getJobFailedStderrRaw
-
-    def allOutputs = output.getRunnerOutputOutputs
-
-    def rmapStat path = match (unsafe_stat path)
-        Fail x -> Fail x
-        Pass x -> Pass (Pair path x)
-
-    require Pass outputsStat =
-        allOutputs
-        | map rmapStat
-        | findFail
-        | addErrorContext "rsc: Failed to stat files to upload"
+    def filteredOutputs = output.getRunnerOutputOutputs
+    def cleanableOutputs = output.getRunnerOutputCleanableOutputs
+    def hiddenOutputs = subtract scmp cleanableOutputs filteredOutputs
 
     def statToGroup (Stat t _ _) = match t
         PathTypeRegularFile -> ThirdByGroupFirst
@@ -371,9 +361,15 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
         PathTypeSymlink -> ThirdByGroupThird
         _ -> panic "rsc: unsuported filetype: {format t}"
 
-    def (Triple regFiles directories symlinks) =
-        outputsStat
-        | thirdBy (\x x.getPairSecond.statToGroup)
+    def makeStatTripleThunk paths =
+        paths
+        | map (\p unsafe_stat p |< Pair p)
+        | findFail
+        | addErrorContext "rsc: Failed to stat files"
+        |< thirdBy (_.getPairSecond.statToGroup)
+
+    def filteredOutputsStatThunk = makeStatTripleThunk filteredOutputs
+    def hiddenOutputsStatThunk = makeStatTripleThunk hiddenOutputs
 
     def uploadAndMakeFile (Pair path (Stat _ mode _)) =
         def doUpload =
@@ -405,8 +401,10 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
         CachePostRequestOutputSymlink path link
         | Pass
 
-    def makeDirectory (Pair path (Stat _ mode _)) =
-        CachePostRequestOutputDirectory path (mode | mode2bits)
+    def makeDirectory hidden (Pair path (Stat _ mode _)) =
+        CachePostRequestOutputDirectory path (mode | mode2bits) hidden
+
+    require Pass (Triple regFiles directories symlinks) = filteredOutputsStatThunk
 
     def fileUploads =
         regFiles
@@ -416,9 +414,20 @@ def postJob (rscApi: RemoteCacheApi) (job: Job) (_wakeroot: String) (hidden: Str
         symlinks
         | map makeSymlink
 
-    def directoriesUpload =
+    def publishedDirectoriesUpload =
         directories
-        | map makeDirectory
+        | map (makeDirectory False)
+
+    require Pass (Triple _ hiddenDirs _) = hiddenOutputsStatThunk
+
+    def hiddenDirectoriesUpload =
+        hiddenDirs
+        | map (makeDirectory True)
+
+    def directoriesUpload = publishedDirectoriesUpload ++ hiddenDirectoriesUpload
+
+    require Pass stdout = job.getJobFailedStdoutRaw
+    require Pass stderr = job.getJobFailedStderrRaw
 
     def stdoutUpload =
         rscApi
