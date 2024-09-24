@@ -5,9 +5,10 @@ use axum::{
 };
 use chrono::Utc;
 use clap::Parser;
+use itertools::Itertools;
 use migration::{Migrator, MigratorTrait};
 use rlimit::Resource;
-use rsc::database;
+use rsc::database::{self, DeletedBlob};
 use sea_orm::{prelude::Uuid, ConnectOptions, Database, DatabaseConnection};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
@@ -279,23 +280,34 @@ fn launch_blob_eviction(
             tracing::info!(%deleted, "N blobs deleted for eviction");
 
             // Delete blobs from blob store
-            for blob in blobs {
-                let store = match blob_stores.get(&blob.store_id) {
-                    Some(s) => s.clone(),
-                    None => {
-                        let blob = blob.clone();
-                        tracing::info!(%blob.store_id, %blob.key, "Blob has been orphaned!");
-                        tracing::error!(%blob.store_id, "Blob's store id missing from activated stores");
-                        continue;
-                    }
-                };
+            let chunked: Vec<Vec<DeletedBlob>> = blobs
+                .into_iter()
+                .chunks(config.blob_eviction.file_chunk_size)
+                .into_iter()
+                .map(|chunk| chunk.collect())
+                .collect();
+
+            for chunk in chunked {
+                let thread_store = blob_stores.clone();
 
                 tokio::spawn(async move {
-                    store.delete_key(blob.key.clone()).await.unwrap_or_else(|err| {
-                        let blob = blob.clone();
-                        tracing::info!(%blob.store_id, %blob.key, "Blob has been orphaned!");
-                        tracing::error!(%err, "Failed to delete blob from store for eviction. See above for blob info");
-                    });
+                    for blob in chunk {
+                        let store = match thread_store.get(&blob.store_id) {
+                            Some(s) => s.clone(),
+                            None => {
+                                let blob = blob.clone();
+                                tracing::info!(%blob.store_id, %blob.key, "Blob has been orphaned!");
+                                tracing::error!(%blob.store_id, "Blob's store id missing from activated stores");
+                                continue;
+                            }
+                        };
+
+                        store.delete_key(blob.key.clone()).await.unwrap_or_else(|err| {
+                            let blob = blob.clone();
+                            tracing::info!(%blob.store_id, %blob.key, "Blob has been orphaned!");
+                            tracing::error!(%err, "Failed to delete blob from store for eviction. See above for blob info");
+                        });
+                    }
                 });
             }
         }
@@ -481,10 +493,11 @@ mod tests {
             active_store: store_id.to_string(),
             connection_pool_timeout: 10,
             log_directory: None,
-            blob_eviction: config::RSCTTLConfig {
+            blob_eviction: config::RSCBlobTTLConfig {
                 tick_rate: 10,
                 ttl: 100,
                 chunk_size: 100,
+                file_chunk_size: 1,
             },
             job_eviction: config::RSCJobEvictionConfig::TTL(config::RSCTTLConfig {
                 tick_rate: 10,

@@ -58,6 +58,11 @@ pub struct File {
 pub struct Dir {
     pub path: String,
     pub mode: i32,
+<<<<<<< Updated upstream
+=======
+    // Optional member to allow for soft migration
+    pub hidden: Option<bool>,
+>>>>>>> Stashed changes
 }
 
 #[derive(Debug, Deserialize, Serialize)]

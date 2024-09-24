@@ -8,7 +8,8 @@
   "blob_eviction": {
     "tick_rate": 60,
     "ttl": 3600,
-    "chunk_size": 16000
+    "chunk_size": 16000,
+    "file_chunk_size": 100
   },
   "job_eviction": {
     "ttl": {
