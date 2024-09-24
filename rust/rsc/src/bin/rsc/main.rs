@@ -8,7 +8,7 @@ use clap::Parser;
 use itertools::Itertools;
 use migration::{Migrator, MigratorTrait};
 use rlimit::Resource;
-use rsc::database::{self, DeletedBlob};
+use rsc::database;
 use sea_orm::{prelude::Uuid, ConnectOptions, Database, DatabaseConnection};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
@@ -280,7 +280,7 @@ fn launch_blob_eviction(
             tracing::info!(%deleted, "N blobs deleted for eviction");
 
             // Delete blobs from blob store
-            let chunked: Vec<Vec<DeletedBlob>> = blobs
+            let chunked: Vec<Vec<database::DeletedBlob>> = blobs
                 .into_iter()
                 .chunks(config.blob_eviction.file_chunk_size)
                 .into_iter()
