@@ -204,7 +204,8 @@ async fn connect_to_database(
     let timeout = config.connection_pool_timeout;
     let mut opt = ConnectOptions::new(&config.database_url);
     opt.sqlx_logging_level(tracing::log::LevelFilter::Debug)
-        .acquire_timeout(std::time::Duration::from_secs(timeout));
+        .acquire_timeout(std::time::Duration::from_secs(timeout))
+        .max_connections(config.connection_pool_max_connect);
 
     tracing::info!(%timeout, "Max seconds to wait for connection from pool");
 
@@ -491,6 +492,7 @@ mod tests {
             database_url: "test:0000".to_string(),
             server_address: "".to_string(),
             active_store: store_id.to_string(),
+            connection_pool_max_connect: 10,
             connection_pool_timeout: 10,
             log_directory: None,
             blob_eviction: config::RSCBlobTTLConfig {

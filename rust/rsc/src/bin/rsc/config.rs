@@ -67,6 +67,9 @@ pub struct RSCConfig {
     pub database_url: String,
     // The address the that server should bind to
     pub server_address: String,
+    // The max number of connnections to open in the connection pool. Value must consider the
+    // postgres server max
+    pub connection_pool_max_connect: u32,
     // The amount of time a query should wait for a connection before timing out in seconds
     pub connection_pool_timeout: u64,
     // The blob store that new blobs should be written into

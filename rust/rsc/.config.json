@@ -1,6 +1,7 @@
 {
   "database_url": "postgres://localhost:5433/test",
   "server_address": "0.0.0.0:3002",
+  "connection_pool_max_connect": 90,
   "connection_pool_timeout": 60,
   "standalone": false,
   "active_store": "5eed6ba4-d65f-46ca-b4a6-eff98b00857d",
