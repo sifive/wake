@@ -202,12 +202,14 @@ async fn connect_to_database(
     config: &config::RSCConfig,
 ) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
     let timeout = config.connection_pool_timeout;
+    let max_connect = config.connection_pool_max_connect;
     let mut opt = ConnectOptions::new(&config.database_url);
     opt.sqlx_logging_level(tracing::log::LevelFilter::Debug)
         .acquire_timeout(std::time::Duration::from_secs(timeout))
-        .max_connections(config.connection_pool_max_connect);
+        .max_connections(max_connect);
 
     tracing::info!(%timeout, "Max seconds to wait for connection from pool");
+    tracing::info!(%max_connect, "Max number of connections in pool");
 
     let connection = Database::connect(opt).await?;
     let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
