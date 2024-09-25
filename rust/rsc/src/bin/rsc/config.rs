@@ -25,7 +25,7 @@ pub struct RSCBlobTTLConfig {
     pub tick_rate: u64,
     // How long an object is allowed to live
     pub ttl: u64,
-    // Maximum number of objects to delete from the db at a time. Must be 1 >= x <= 16000
+    // Maximum number of blobs to delete from the db at a time. Must be 1 >= x <= 64000
     pub chunk_size: u32,
     // Maximum number of files to delete from the disk per task
     pub file_chunk_size: usize,
