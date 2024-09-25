@@ -15,8 +15,20 @@ pub struct RSCTTLConfig {
     pub tick_rate: u64,
     // How long an object is allowed to live
     pub ttl: u64,
-    // Maximum number of objects to delete at a time. Must be 1 >= x <= 16000
+    // Maximum number of objects to delete from the db at a time. Must be 1 >= x <= 16000
     pub chunk_size: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RSCBlobTTLConfig {
+    // How often to run the eviction check in seconds
+    pub tick_rate: u64,
+    // How long an object is allowed to live
+    pub ttl: u64,
+    // Maximum number of blobs to delete from the db at a time. Must be 1 >= x <= 64000
+    pub chunk_size: u32,
+    // Maximum number of files to delete from the disk per task
+    pub file_chunk_size: usize,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -62,7 +74,7 @@ pub struct RSCConfig {
     // The directory that server logs should be written to. If None logs are written to stdout
     pub log_directory: Option<String>,
     // The config to control blob eviction
-    pub blob_eviction: RSCTTLConfig,
+    pub blob_eviction: RSCBlobTTLConfig,
     // The config to control job eviction
     pub job_eviction: RSCJobEvictionConfig,
     // The config to control job size calculation
