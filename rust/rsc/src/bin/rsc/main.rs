@@ -202,11 +202,14 @@ async fn connect_to_database(
     config: &config::RSCConfig,
 ) -> Result<DatabaseConnection, Box<dyn std::error::Error>> {
     let timeout = config.connection_pool_timeout;
+    let max_connect = config.connection_pool_max_connect;
     let mut opt = ConnectOptions::new(&config.database_url);
     opt.sqlx_logging_level(tracing::log::LevelFilter::Debug)
-        .acquire_timeout(std::time::Duration::from_secs(timeout));
+        .acquire_timeout(std::time::Duration::from_secs(timeout))
+        .max_connections(max_connect);
 
     tracing::info!(%timeout, "Max seconds to wait for connection from pool");
+    tracing::info!(%max_connect, "Max number of connections in pool");
 
     let connection = Database::connect(opt).await?;
     let pending_migrations = Migrator::get_pending_migrations(&connection).await?;
@@ -491,6 +494,7 @@ mod tests {
             database_url: "test:0000".to_string(),
             server_address: "".to_string(),
             active_store: store_id.to_string(),
+            connection_pool_max_connect: 10,
             connection_pool_timeout: 10,
             log_directory: None,
             blob_eviction: config::RSCBlobTTLConfig {
