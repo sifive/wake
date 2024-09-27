@@ -129,12 +129,15 @@ export def localRunner: Runner =
             | map getPathName
             | fnInputs
 
+        # Wait for the job to complete before calling fnOutputs
+        require Pass reality = job.getJobReality
+
         # Caller needs to fill this in from nothing
         def cleanable = Nil
         def fileOutputs = fnOutputs cleanable
 
-        job.getJobReality
-        |< RunnerOutput fileInputs fileOutputs cleanable
+        RunnerOutput fileInputs fileOutputs cleanable reality
+        | Pass
 
     makeRunner "local" run
 
@@ -150,12 +153,15 @@ export def virtualRunner: Runner =
             | map getPathName
             | fnInputs
 
+        # Wait for the job to complete before calling fnOutputs
+        require Pass reality = job.getJobReality
+
         # Caller needs to fill this in from nothing
         def cleanable = Nil
         def fileOutputs = fnOutputs cleanable
 
-        job.getJobReality
-        |< RunnerOutput fileInputs fileOutputs cleanable
+        RunnerOutput fileInputs fileOutputs cleanable reality
+        | Pass
 
     makeRunner "virtual" run
 
