@@ -1,0 +1,13 @@
+export def testRunnerFailFinish _ =
+    def run job input =
+        def (Runner _ virtRun) = virtualRunner
+        require Pass _ = virtRun job (Pass input)
+
+        # Force a failure outside of the actual job
+        failWithError "Mark job as failure"
+
+    def testRunner = makeRunner "" run
+
+    makeExecPlan ("<test>", Nil) Nil
+    | runJobWith testRunner
+    | isJobOk
