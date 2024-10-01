@@ -153,7 +153,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
             run job (Pass (RunnerInput label cmd vis env dir stdin res prefix usage isatty finputs foutputs))
 
         def final _ = match output
-            Fail e -> primJobFailLaunch job e
+            Fail e -> primJobFailFinish job e
             Pass (RunnerOutput inputs outputs cleanable reality) ->
                 def hashedOutputs =
                     outputs
