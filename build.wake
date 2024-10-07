@@ -91,6 +91,7 @@ def bootstrapTarget targetFn variant =
 # Build all wake targets
 def targets =
     buildWake,
+    buildWakeUnit,
     buildWakeBox,
     buildFuseDaemon,
     buildShim,
