@@ -1,17 +1,18 @@
 use chrono::NaiveDateTime;
 use data_encoding::BASE64;
 use entity::prelude::{
-    ApiKey, Blob, BlobStore, Job, JobAudit, LocalBlobStore, OutputDir, OutputFile, OutputSymlink,
+    ApiKey, Blob, BlobStore, Job, JobAudit, JobHistory, LocalBlobStore, OutputDir, OutputFile,
+    OutputSymlink,
 };
 use entity::{
-    api_key, blob, blob_store, job, job_audit, local_blob_store, output_dir, output_file,
-    output_symlink,
+    api_key, blob, blob_store, job, job_audit, job_history, local_blob_store, output_dir,
+    output_file, output_symlink,
 };
 use itertools::Itertools;
 use migration::OnConflict;
 use rand::{thread_rng, RngCore};
 use sea_orm::{
-    prelude::{DateTime, Uuid},
+    prelude::{DateTime, Expr, Uuid},
     ActiveModelTrait,
     ActiveValue::*,
     ColumnTrait, ConnectionTrait, DbBackend, DbErr, DeleteResult, EntityTrait, PaginatorTrait,
@@ -709,15 +710,87 @@ pub async fn delete_unreferenced_blobs<T: ConnectionTrait>(
 // --------------------------------------------------
 // ----------            Create            ----------
 pub async fn record_job_hit<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
-    record_job_event(db, hash, "hit".to_string()).await
+    record_job_event(db, hash.clone(), "hit".to_string()).await?;
+
+    let active_model = job_history::ActiveModel {
+        hash: Set(hash),
+        hits: Set(1),
+        misses: Set(0),
+        evictions: Set(0),
+        created_at: NotSet,
+        updated_at: NotSet,
+    };
+
+    let _ = JobHistory::insert(active_model)
+        .on_conflict(
+            OnConflict::column(job_history::Column::Hash)
+                .update_column(job_history::Column::UpdatedAt)
+                .value(
+                    job_history::Column::Hits,
+                    Expr::col(job_history::Column::Hits.as_column_ref()).add(1),
+                )
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
+
+    Ok(())
 }
 
 pub async fn record_job_miss<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
-    record_job_event(db, hash, "miss".to_string()).await
+    record_job_event(db, hash.clone(), "miss".to_string()).await?;
+
+    let active_model = job_history::ActiveModel {
+        hash: Set(hash),
+        hits: Set(0),
+        misses: Set(1),
+        evictions: Set(0),
+        created_at: NotSet,
+        updated_at: NotSet,
+    };
+
+    let _ = JobHistory::insert(active_model)
+        .on_conflict(
+            OnConflict::column(job_history::Column::Hash)
+                .update_column(job_history::Column::UpdatedAt)
+                .value(
+                    job_history::Column::Misses,
+                    Expr::col(job_history::Column::Misses.as_column_ref()).add(1),
+                )
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
+
+    Ok(())
 }
 
 pub async fn record_job_evict<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
-    record_job_event(db, hash, "evict".to_string()).await
+    record_job_event(db, hash.clone(), "evict".to_string()).await?;
+
+    let active_model = job_history::ActiveModel {
+        hash: Set(hash),
+        hits: Set(0),
+        misses: Set(0),
+        evictions: Set(1),
+        created_at: NotSet,
+        updated_at: NotSet,
+    };
+
+    let _ = JobHistory::insert(active_model)
+        .on_conflict(
+            OnConflict::column(job_history::Column::Hash)
+                .update_column(job_history::Column::UpdatedAt)
+                .value(
+                    job_history::Column::Evictions,
+                    Expr::col(job_history::Column::Evictions.as_column_ref()).add(1),
+                )
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
+
+    Ok(())
 }
 
 pub async fn record_job_denied<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
