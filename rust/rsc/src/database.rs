@@ -1,18 +1,17 @@
 use chrono::NaiveDateTime;
 use data_encoding::BASE64;
 use entity::prelude::{
-    ApiKey, Blob, BlobStore, Job, JobAudit, JobHistory, LocalBlobStore, OutputDir, OutputFile,
-    OutputSymlink,
+    ApiKey, Blob, BlobStore, Job, JobAudit, LocalBlobStore, OutputDir, OutputFile, OutputSymlink,
 };
 use entity::{
-    api_key, blob, blob_store, job, job_audit, job_history, local_blob_store, output_dir,
-    output_file, output_symlink,
+    api_key, blob, blob_store, job, job_audit, local_blob_store, output_dir, output_file,
+    output_symlink,
 };
 use itertools::Itertools;
 use migration::OnConflict;
 use rand::{thread_rng, RngCore};
 use sea_orm::{
-    prelude::{DateTime, Expr, Uuid},
+    prelude::{DateTime, Uuid},
     ActiveModelTrait,
     ActiveValue::*,
     ColumnTrait, ConnectionTrait, DbBackend, DbErr, DeleteResult, EntityTrait, PaginatorTrait,

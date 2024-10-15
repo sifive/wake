@@ -217,10 +217,14 @@ pub async fn allow_job(
     system_load: Arc<RwLock<f64>>,
     min_runtime: f64,
 ) -> StatusCode {
-    // TODO: Add all the audit messages
+    let hash = payload.hash();
 
     // Reject a subset of jobs that are never worth caching
     if payload.runtime < min_runtime {
+        let denied_hash = hash.clone();
+        tokio::spawn(async move {
+            let _ = database::record_job_denied(conn.as_ref(), denied_hash).await;
+        });
         return StatusCode::NOT_ACCEPTABLE;
     }
 
@@ -247,11 +251,14 @@ pub async fn allow_job(
     }
 
     if thread_rng().gen_bool(shed_chance) {
+        let shed_hash = hash.clone();
+        tokio::spawn(async move {
+            let _ = database::record_job_shed(conn.as_ref(), shed_hash).await;
+        });
         return StatusCode::TOO_MANY_REQUESTS;
     }
 
     // Reject jobs that are already cached
-    let hash = payload.hash();
     match job::Entity::find()
         .filter(job::Column::Hash.eq(hash.clone()))
         .one(conn.as_ref())
@@ -265,6 +272,9 @@ pub async fn allow_job(
         // Job is cached, don't try again
         Ok(Some(_)) => {
             tracing::warn!(%hash, "Rejecting job push for already cached job");
+            tokio::spawn(async move {
+                let _ = database::record_job_conflict(conn.as_ref(), hash).await;
+            });
             StatusCode::CONFLICT
         }
         // Job is not cached, use the other deciding factors
