@@ -1691,33 +1691,32 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
     MEMO_RET(fits_no_nl);
   }
 
-  MEMO_RET(
-      fmt()
-          .token(TOKEN_KW_IF)
-          .consume_wsnlc()
-          .space()
-          .ctx([](ctx_t ctx) { return ctx.binop(); },
-               fmt().walk(is_expression, WALK_NODE))  // if cond
-          .consume_wsnlc()
-          .space()
-          .token(TOKEN_KW_THEN)
-          .consume_wsnlc()
-          .nest(fmt().freshline().walk(is_expression, WALK_NODE))  // true body
-          .consume_wsnlc()
-          .freshline()
-          .token(TOKEN_KW_ELSE)
-          .consume_wsnlc()
-          // clang-format off
-          // False body
-          .match(
-            pred(ConstPredicate(false), fmt())
-            // For an 'else if' block, we explode in the explode case to prevent partial flat emission
-           .pred({CST_IF, CST_MATCH}, fmt().space().prefer_explode(fmt().walk(WALK_NODE)))
-           .pred(is_expression, fmt().nest(fmt().freshline().walk(WALK_NODE)))
-           // fallthrough is fail
-          )
-          // clang-format on
-          .format(ctx, node.firstChildElement(), token_traits));
+  MEMO_RET(fmt()
+               .token(TOKEN_KW_IF)
+               .consume_wsnlc()
+               .space()
+               .ctx([](ctx_t ctx) { return ctx.binop(); },
+                    fmt().walk(is_expression, WALK_NODE))  // if cond
+               .consume_wsnlc()
+               .space()
+               .token(TOKEN_KW_THEN)
+               .consume_wsnlc()
+               .nest(fmt().freshline().walk(is_expression, WALK_NODE))  // true body
+               .consume_wsnlc()
+               .freshline()
+               .token(TOKEN_KW_ELSE)
+               .consume_wsnlc()
+               // clang-format off
+               // False body
+               .match(
+                    pred(ConstPredicate(false), fmt())
+                    // For an 'else if' block, we explode in the explode case to prevent partial flat emission
+                   .pred({CST_IF, CST_MATCH}, fmt().space().prefer_explode(fmt().walk(WALK_NODE)))
+                   .pred(is_expression, fmt().nest(fmt().freshline().walk(WALK_NODE)))
+                    // fallthrough is fail
+               )
+               // clang-format on
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
@@ -1726,26 +1725,25 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
   auto id_list_fmt = fmt().walk(WALK_NODE).fmt_if(TOKEN_WS, fmt().ws());
 
-  MEMO_RET(
-      fmt()
-          .token(TOKEN_KW_FROM)
-          .ws()
-          .walk(CST_ID, WALK_NODE)
-          .ws()
-          .token(TOKEN_KW_IMPORT)
-          .ws()
-          .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
-          .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
-          // clang-format off
-          .fmt_if_else(
-              TOKEN_P_HOLE,
-              fmt().walk(WALK_TOKEN),
-              fmt().fmt_while(
-                  CST_IDEQ,
-                  id_list_fmt))
-          // clang-format on
-          .consume_wsnlc()
-          .format(ctx, node.firstChildElement(), token_traits));
+  MEMO_RET(fmt()
+               .token(TOKEN_KW_FROM)
+               .ws()
+               .walk(CST_ID, WALK_NODE)
+               .ws()
+               .token(TOKEN_KW_IMPORT)
+               .ws()
+               .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
+               .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
+               // clang-format off
+               .fmt_if_else(
+                   TOKEN_P_HOLE,
+                   fmt().walk(WALK_TOKEN),
+                   fmt().fmt_while(
+                       CST_IDEQ,
+                       id_list_fmt))
+               // clang-format on
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
@@ -2163,25 +2161,24 @@ wcl::doc Emitter::walk_tuple(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_TUPLE, node, "Expected CST_TUPLE");
 
-  MEMO_RET(
-      fmt()
-          .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
-          .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
-          .token(TOKEN_KW_TUPLE)
-          .ws()
-          .walk(is_expression, WALK_NODE)
-          .consume_wsnlc()
-          .space()
-          .token(TOKEN_P_EQUALS)
-          .consume_wsnlc()
-          // clang-format off
-          .nest(fmt().fmt_while({CST_TUPLE_ELT}, fmt()
-                  .freshline()
-                  .walk(WALK_NODE)
-                  .consume_wsnlc()))
-          // clang-format on
-          .consume_wsnlc()
-          .format(ctx, node.firstChildElement(), token_traits));
+  MEMO_RET(fmt()
+               .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
+               .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
+               .token(TOKEN_KW_TUPLE)
+               .ws()
+               .walk(is_expression, WALK_NODE)
+               .consume_wsnlc()
+               .space()
+               .token(TOKEN_P_EQUALS)
+               .consume_wsnlc()
+               // clang-format off
+               .nest(fmt().fmt_while({CST_TUPLE_ELT}, fmt()
+                   .freshline()
+                   .walk(WALK_NODE)
+                   .consume_wsnlc()))
+               // clang-format on
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_tuple_elt(ctx_t ctx, CSTElement node) {
