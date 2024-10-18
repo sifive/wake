@@ -599,10 +599,10 @@ export def rscApiGetStringBlob ((CacheSearchBlob _ uri): CacheSearchBlob): Resul
 # ```
 #  rscApiGetFileBlob (RemoteCacheBlob "asdf" "https://...") "foo/bar" 0644 = Pass "foo/bar" 
 # ```
-export def rscApiGetFileBlob ((CacheSearchBlob _ uri): CacheSearchBlob) (path: String) (mode: Integer): Result String Error =
+export def rscApiGetFileBlob ((CacheSearchBlob blobId uri): CacheSearchBlob) (path: String) (mode: Integer): Result String Error =
     def resolveDbSchemeToFile scheme path =
         resolveDbScheme scheme path
-        |> writeTempFile "rsc.output_file.blob"
+        |> writeTempFile "rsc.output_file.blob.{blobId}"
 
     def resolveBlobFileScheme scheme path =
         buildHttpRequest "{scheme}://{path}"
