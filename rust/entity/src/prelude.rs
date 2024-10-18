@@ -4,6 +4,7 @@ pub use super::api_key::Entity as ApiKey;
 pub use super::blob::Entity as Blob;
 pub use super::blob_store::Entity as BlobStore;
 pub use super::job::Entity as Job;
+pub use super::job_audit::Entity as JobAudit;
 pub use super::job_history::Entity as JobHistory;
 pub use super::job_use::Entity as JobUse;
 pub use super::local_blob_store::Entity as LocalBlobStore;

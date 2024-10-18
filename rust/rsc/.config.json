@@ -4,7 +4,7 @@
   "connection_pool_max_connect": 90,
   "connection_pool_timeout": 60,
   "standalone": false,
-  "active_store": "5eed6ba4-d65f-46ca-b4a6-eff98b00857d",
+  "active_store": "ac9b4685-f36e-4726-9073-c992597ec134",
   "log_directory": null,
   "blob_eviction": {
     "tick_rate": 60,
