@@ -168,16 +168,14 @@ void hide_internal_jobs(std::vector<std::vector<std::string>> &out) {
   out.push_back({"tags NOT LIKE '%<d>inspect.visibility=hidden<d>%'", "tags IS NULL"});
 }
 
-void query_runs(Database &db)
-{
+void query_runs(Database &db) {
   const auto runs = db.get_runs();
-  for (const auto run : runs)
-  {
-    std::cout << run.time.as_string() << " " << run.cmdline << std::endl; 
+  for (const auto run : runs) {
+    std::cout << run.time.as_string() << " " << run.cmdline << std::endl;
   }
 }
 
-void query_jobs(const CommandLineOptions &clo, Database &db){
+void query_jobs(const CommandLineOptions &clo, Database &db) {
   std::vector<std::vector<std::string>> collect_ands = {};
   std::vector<std::vector<std::string>> collect_input_ands = {};
   std::vector<std::vector<std::string>> collect_output_ands = {};
@@ -234,12 +232,10 @@ void inspect_database(const CommandLineOptions &clo, Database &db) {
     JAST json = create_tagdag(db, clo.tagdag);
     std::cout << json << std::endl;
     return;
-  }
-  else if (clo.history) {
+  } else if (clo.history) {
     query_runs(db);
-  }
-  else {
-    query_jobs(clo,db);
+  } else {
+    query_jobs(clo, db);
   }
 }
 
