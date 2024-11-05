@@ -168,15 +168,16 @@ void hide_internal_jobs(std::vector<std::vector<std::string>> &out) {
   out.push_back({"tags NOT LIKE '%<d>inspect.visibility=hidden<d>%'", "tags IS NULL"});
 }
 
-void inspect_database(const CommandLineOptions &clo, Database &db, const std::string &wake_cwd) {
-  // tagdag is technically a db inspection, but its very different from the
-  // rest, just handle it and exit.
-  if (clo.tagdag) {
-    JAST json = create_tagdag(db, clo.tagdag);
-    std::cout << json << std::endl;
-    return;
+void query_runs(Database &db)
+{
+  const auto runs = db.get_runs();
+  for (const auto run : runs)
+  {
+    std::cout << run.time.as_string() << " " << run.cmdline << std::endl; 
   }
+}
 
+void query_jobs(const CommandLineOptions &clo, Database &db){
   std::vector<std::vector<std::string>> collect_ands = {};
   std::vector<std::vector<std::string>> collect_input_ands = {};
   std::vector<std::vector<std::string>> collect_output_ands = {};
@@ -228,6 +229,20 @@ void inspect_database(const CommandLineOptions &clo, Database &db, const std::st
   describe(matching_jobs, get_describe_policy(clo), db);
 }
 
+void inspect_database(const CommandLineOptions &clo, Database &db) {
+  if (clo.tagdag) {
+    JAST json = create_tagdag(db, clo.tagdag);
+    std::cout << json << std::endl;
+    return;
+  }
+  else if (clo.history) {
+    query_runs(db);
+  }
+  else {
+    query_jobs(clo,db);
+  }
+}
+
 }  // namespace
 
 void print_help(const char *argv0) {
@@ -268,6 +283,7 @@ void print_help(const char *argv0) {
     << "    --last     -l      See --last-used"                                            << std::endl
     << "    --last-used        Capture all jobs used by last build. Regardless of cache"   << std::endl
     << "    --last-executed    Capture all jobs executed by the last build. Skips cache"   << std::endl
+    << "    --history          Report the cmndline history of all wake commands recorded"  << std::endl
     << "    --failed   -f      Capture jobs which failed last build"                       << std::endl
     << "    --tag      KEY=VAL Capture jobs which are tagged, matching KEY and VAL globs"  << std::endl
     << "    --canceled         Capture jobs which were canceled in the last build"         << std::endl
@@ -420,7 +436,7 @@ int main(int argc, char **argv) {
   bool is_db_inspect_capture = !clo.job_ids.empty() || !clo.output_files.empty() ||
                                !clo.input_files.empty() || !clo.labels.empty() ||
                                !clo.tags.empty() || clo.last_use || clo.last_exe || clo.failed ||
-                               clo.tagdag || clo.canceled;
+                               clo.tagdag || clo.canceled || clo.history;
 
   // DescribePolicy::human() is the default and doesn't have a flag.
   // DescribePolicy::debug() is overloaded and can't be marked as a db flag
@@ -639,7 +655,7 @@ int main(int argc, char **argv) {
   }
 
   if (is_db_inspection) {
-    inspect_database(clo, db, wake_cwd);
+    inspect_database(clo, db);
     return 0;
   }
 
