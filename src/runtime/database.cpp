@@ -80,7 +80,7 @@ struct Database::detail {
   sqlite3_stmt *tag_job;
   sqlite3_stmt *get_tags;
   sqlite3_stmt *get_all_tags;
-  sqlite3_stmt *get_runs_table;
+  sqlite3_stmt *get_all_runs;
   sqlite3_stmt *get_edges;
   sqlite3_stmt *get_file_dependency;
   sqlite3_stmt *get_output_files;
@@ -126,7 +126,7 @@ struct Database::detail {
         tag_job(0),
         get_tags(0),
         get_all_tags(0),
-        get_runs_table(0),
+        get_all_runs(0),
         get_edges(0),
         get_file_dependency(0),
         get_interleaved_output(0) {}
@@ -398,7 +398,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   const char *sql_tag_job = "insert into tags(job_id, uri, content) values(?, ?, ?)";
   const char *sql_get_tags = "select job_id, uri, content from tags where job_id=?";
   const char *sql_get_all_tags = "select job_id, uri, content from tags";
-  const char *sql_get_runs_table = "select run_id, time, cmdline from runs order by time ASC";
+  const char *sql_get_all_runs = "select run_id, time, cmdline from runs order by time ASC";
   const char *sql_get_edges =
       "select distinct user.job_id as user, used.job_id as used"
       "  from filetree user, filetree used"
@@ -473,7 +473,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_tag_job, tag_job);
   PREPARE(sql_get_tags, get_tags);
   PREPARE(sql_get_all_tags, get_all_tags);
-  PREPARE(sql_get_runs_table, get_runs_table);
+  PREPARE(sql_get_all_runs, get_all_runs);
   PREPARE(sql_get_edges, get_edges);
   PREPARE(sql_get_file_dependency, get_file_dependency);
   PREPARE(sql_get_output_files, get_output_files);
@@ -532,7 +532,7 @@ void Database::close() {
   FINALIZE(tag_job);
   FINALIZE(get_tags);
   FINALIZE(get_all_tags);
-  FINALIZE(get_runs_table);
+  FINALIZE(get_all_runs);
   FINALIZE(get_edges);
   FINALIZE(get_file_dependency);
   FINALIZE(get_output_files);
@@ -1093,14 +1093,8 @@ std::string Time::as_string() const {
   char buf[100];
   struct tm tm;
   time_t time = t / 1000000000;
-  long subs = t % 1000000000;
-  if (subs < 0) {
-    --time;
-    subs += 1000000000;
-  }
   localtime_r(&time, &tm);
-  strftime(buf, sizeof(buf) - 10, "%Y-%m-%d %H:%M:%S.", &tm);
-  snprintf(&buf[strlen(buf)], 10, "%09lu", subs);
+  strftime(buf, sizeof(buf) - 10, "%Y-%m-%d %H:%M:%S", &tm);
   return buf;
 }
 
@@ -1589,23 +1583,19 @@ std::vector<JobTag> Database::get_tags() {
   return out;
 }
 
-static std::vector<RunReflection> get_all_runs(const Database *db, sqlite3_stmt *query) {
+std::vector<RunReflection> Database::get_runs() const {
   std::vector<RunReflection> out;
-  db->begin_txn();
-  while (sqlite3_step(query) == SQLITE_ROW) {
+  begin_txn();
+  while (sqlite3_step(imp->get_all_runs) == SQLITE_ROW) {
     RunReflection run;
-    run.id = sqlite3_column_int(query, 0);
-    run.time = Time(sqlite3_column_int64(query, 1));
-    run.cmdline = rip_column(query, 2);
+    run.id = sqlite3_column_int(imp->get_all_runs, 0);
+    run.time = Time(sqlite3_column_int64(imp->get_all_runs, 1));
+    run.cmdline = rip_column(imp->get_all_runs, 2);
     out.emplace_back(run);
   }
-  finish_stmt("Could not retrieve runs", query, db->imp->debugdb);
-  db->end_txn();
+  finish_stmt("Could not retrieve runs", imp->get_all_runs, imp->debugdb);
+  end_txn();
   return out;
-}
-
-std::vector<RunReflection> Database::get_runs() const {
-  return get_all_runs(this, imp->get_runs_table);
 }
 
 std::vector<std::pair<std::string, int>> Database::get_interleaved_output(long job_id) const {
