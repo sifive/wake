@@ -528,7 +528,7 @@ std::ostream &operator<<(std::ostream &os, const GraphNode &node) {
   return os << std::endl;
 }
 
-JAST create_tagdag(Database &db, const std::string &tagExpr) {
+void output_tagdag(Database &db, const std::string &tagExpr) {
   RE2 exp(tagExpr);
 
   // Pick only those tags that match the RegExp
@@ -622,5 +622,5 @@ JAST create_tagdag(Database &db, const std::string &tagExpr) {
     }
   }
 
-  return out;
+  std::cout << out << std::endl;
 }

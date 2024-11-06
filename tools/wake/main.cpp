@@ -231,8 +231,7 @@ void inspect_database(const CommandLineOptions &clo, Database &db) {
   // tagdag and history are db inspection queries, but are very different from the
   // rest of the queries which operate on the jobs table.
   if (clo.tagdag) {
-    JAST json = create_tagdag(db, clo.tagdag);
-    std::cout << json << std::endl;
+    output_tagdag(db, clo.tagdag);
   } else if (clo.history) {
     query_runs(db);
   } else {
