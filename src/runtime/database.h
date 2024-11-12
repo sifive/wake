@@ -60,6 +60,15 @@ struct Time {
   std::string as_string() const;
 };
 
+struct RunReflection {
+  int id;
+  Time time;
+  std::string cmdline;
+  RunReflection() = default;
+  RunReflection(int id_, int64_t time_, std::string cmdline_)
+      : id(id_), time(time_), cmdline(cmdline_) {}
+};
+
 struct JobReflection {
   long job;
   bool stale;
@@ -168,6 +177,8 @@ struct Database {
 
   std::vector<JobEdge> get_edges();
   std::vector<JobTag> get_tags();
+
+  std::vector<RunReflection> get_runs() const;
 
   std::vector<FileDependency> get_file_dependencies() const;
 

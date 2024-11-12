@@ -110,6 +110,6 @@ struct DescribePolicy {
 };
 
 void describe(const std::vector<JobReflection> &jobs, DescribePolicy policy, const Database &db);
-JAST create_tagdag(Database &db, const std::string &tag);
+void output_tagdag(Database &db, const std::string &tag);
 
 #endif
