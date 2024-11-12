@@ -25,12 +25,12 @@ async fn record_hit(job_id: Uuid, hash: String, conn: Arc<DatabaseConnection>) {
         job_id: Set(job_id),
     };
     let _ = usage.insert(conn.as_ref()).await;
-    let _ = database::upsert_job_hit(conn.as_ref(), hash).await;
+    let _ = database::record_job_hit(conn.as_ref(), hash).await;
 }
 
 #[tracing::instrument(skip(hash, conn))]
 async fn record_miss(hash: String, conn: Arc<DatabaseConnection>) {
-    let _ = database::upsert_job_miss(conn.as_ref(), hash).await;
+    let _ = database::record_job_miss(conn.as_ref(), hash).await;
 }
 
 #[tracing::instrument(skip(db, stores))]
@@ -217,8 +217,14 @@ pub async fn allow_job(
     system_load: Arc<RwLock<f64>>,
     min_runtime: f64,
 ) -> StatusCode {
+    let hash = payload.hash();
+
     // Reject a subset of jobs that are never worth caching
     if payload.runtime < min_runtime {
+        let denied_hash = hash.clone();
+        tokio::spawn(async move {
+            let _ = database::record_job_denied(conn.as_ref(), denied_hash).await;
+        });
         return StatusCode::NOT_ACCEPTABLE;
     }
 
@@ -245,11 +251,14 @@ pub async fn allow_job(
     }
 
     if thread_rng().gen_bool(shed_chance) {
+        let shed_hash = hash.clone();
+        tokio::spawn(async move {
+            let _ = database::record_job_shed(conn.as_ref(), shed_hash).await;
+        });
         return StatusCode::TOO_MANY_REQUESTS;
     }
 
     // Reject jobs that are already cached
-    let hash = payload.hash();
     match job::Entity::find()
         .filter(job::Column::Hash.eq(hash.clone()))
         .one(conn.as_ref())
@@ -263,6 +272,9 @@ pub async fn allow_job(
         // Job is cached, don't try again
         Ok(Some(_)) => {
             tracing::warn!(%hash, "Rejecting job push for already cached job");
+            tokio::spawn(async move {
+                let _ = database::record_job_conflict(conn.as_ref(), hash).await;
+            });
             StatusCode::CONFLICT
         }
         // Job is not cached, use the other deciding factors

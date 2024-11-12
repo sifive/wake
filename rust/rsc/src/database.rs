@@ -1,11 +1,12 @@
 use chrono::NaiveDateTime;
 use data_encoding::BASE64;
 use entity::prelude::{
-    ApiKey, Blob, BlobStore, Job, JobHistory, LocalBlobStore, OutputDir, OutputFile, OutputSymlink,
+    ApiKey, Blob, BlobStore, Job, JobAudit, JobHistory, LocalBlobStore, OutputDir, OutputFile,
+    OutputSymlink,
 };
 use entity::{
-    api_key, blob, blob_store, job, job_history, local_blob_store, output_dir, output_file,
-    output_symlink,
+    api_key, blob, blob_store, job, job_audit, job_history, local_blob_store, output_dir,
+    output_file, output_symlink,
 };
 use itertools::Itertools;
 use migration::OnConflict;
@@ -510,7 +511,7 @@ where
 
     tokio::spawn(async move {
         for hash in hashes {
-            let _ = upsert_job_evict(db.as_ref(), hash.hash).await;
+            let _ = record_job_evict(db.as_ref(), hash.hash).await;
         }
     });
 
@@ -705,9 +706,12 @@ pub async fn delete_unreferenced_blobs<T: ConnectionTrait>(
 }
 
 // --------------------------------------------------
-// ----------          JobHistory          ----------
+// ----------           JobAudit           ----------
 // --------------------------------------------------
-pub async fn upsert_job_hit<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+// ----------            Create            ----------
+pub async fn record_job_hit<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+    record_job_event(db, hash.clone(), "hit".to_string()).await?;
+
     let active_model = job_history::ActiveModel {
         hash: Set(hash),
         hits: Set(1),
@@ -733,7 +737,9 @@ pub async fn upsert_job_hit<T: ConnectionTrait>(db: &T, hash: String) -> Result<
     Ok(())
 }
 
-pub async fn upsert_job_miss<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+pub async fn record_job_miss<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+    record_job_event(db, hash.clone(), "miss".to_string()).await?;
+
     let active_model = job_history::ActiveModel {
         hash: Set(hash),
         hits: Set(0),
@@ -759,7 +765,9 @@ pub async fn upsert_job_miss<T: ConnectionTrait>(db: &T, hash: String) -> Result
     Ok(())
 }
 
-pub async fn upsert_job_evict<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+pub async fn record_job_evict<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+    record_job_event(db, hash.clone(), "evict".to_string()).await?;
+
     let active_model = job_history::ActiveModel {
         hash: Set(hash),
         hits: Set(0),
@@ -785,10 +793,31 @@ pub async fn upsert_job_evict<T: ConnectionTrait>(db: &T, hash: String) -> Resul
     Ok(())
 }
 
-// ----------            Create            ----------
+pub async fn record_job_denied<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+    record_job_event(db, hash, "denied".to_string()).await
+}
 
-// ----------             Read             ----------
+pub async fn record_job_conflict<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+    record_job_event(db, hash, "conflict".to_string()).await
+}
 
-// ----------            Update            ----------
+pub async fn record_job_shed<T: ConnectionTrait>(db: &T, hash: String) -> Result<(), DbErr> {
+    record_job_event(db, hash, "shed".to_string()).await
+}
 
-// ----------            Delete            ----------
+pub async fn record_job_event<T: ConnectionTrait>(
+    db: &T,
+    hash: String,
+    event: String,
+) -> Result<(), DbErr> {
+    let active_model = job_audit::ActiveModel {
+        id: NotSet,
+        hash: Set(hash),
+        created_at: NotSet,
+        event: Set(event),
+    };
+
+    let _ = JobAudit::insert(active_model).exec(db).await?;
+
+    Ok(())
+}
