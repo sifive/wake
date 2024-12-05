@@ -234,7 +234,7 @@ export def makeJSONRunner ((JSONRunnerPlan rawScript extraArgs extraEnv estimate
 
     def run (job: Job) ((RunnerInput label command visible environment directory stdin res prefix record isatty fnInputs fnOutputs): RunnerInput): Result RunnerOutput Error =
         require True = executeOk
-        else failWithError "Runner {script} is not executable"
+        else markJobSetupFailure job "Runner {script} is not executable".makeError
 
         def Usage status runtime cputime membytes inbytes outbytes = record
 
@@ -263,18 +263,14 @@ export def makeJSONRunner ((JSONRunnerPlan rawScript extraArgs extraEnv estimate
                 Nil
             )
 
-        require Pass build =
-            mkdir ".build"
-            | addErrorContext "Failed to 'mkdir .build'."
-            |< getPathName
-
-        def specFile = "{build}/spec-{prefix}.json"
-        def resultFile = "{build}/result-{prefix}.json"
+        def buildDirName = ".build"
+        def specFile = "{buildDirName}/spec-{prefix}.json"
+        def resultFile = "{buildDirName}/result-{prefix}.json"
 
         require Pass _ =
             write specFile (prettyJSON json)
             | addErrorContext "Failed to 'write {specFile}: '"
-            |< getPathName
+            | rmapFail (markJobSetupFailure job)
 
         def cmd = script, "-I", "-p", specFile, "-o", resultFile, extraArgs
 

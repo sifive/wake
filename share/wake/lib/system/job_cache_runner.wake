@@ -70,7 +70,9 @@ export def mkJobCacheRunner (hashFn: RunnerInput => Result String Error) (wakero
 
         def jobCacheVisible = JArray (map mkVisJson vis)
 
-        require Pass hashKey = hashFn input
+        require Pass hashKey =
+            hashFn input
+            | rmapFail (markJobSetupFailure job)
 
         def jobCacheJsonIn =
             prettyJSON
@@ -86,14 +88,21 @@ export def mkJobCacheRunner (hashFn: RunnerInput => Result String Error) (wakero
                 "dir_redirects" :-> JObject (wakeroot :-> JString "./",),
             )
 
-        require Pass cacheResult =
-            job_cache_read jobCacheJsonIn
-            | rmapFail failWithError
+        def jobCacheJsonOutResult =
+            require Pass cacheResult =
+                job_cache_read jobCacheJsonIn
+                | rmapFail failWithError
 
-        require Pass jobCacheJsonOut = parseJSONBody cacheResult
+            require Pass jobCacheJsonOut = parseJSONBody cacheResult
 
-        require Pass (JBoolean cacheHit) = jField jobCacheJsonOut "found"
-        else failWithError "job-cache returned unexpected json schema"
+            require Pass (JBoolean cacheHit) = jField jobCacheJsonOut "found"
+            else failWithError "job-cache returned unexpected json schema"
+
+            Pass (jobCacheJsonOut; cacheHit)
+
+        require Pass (jobCacheJsonOut; cacheHit) =
+            jobCacheJsonOutResult
+            | rmapFail (markJobSetupFailure job)
 
         def isDebugOn =
             require Some value = getenv "DEBUG_WAKE_SHARED_CACHE"
@@ -107,63 +116,16 @@ export def mkJobCacheRunner (hashFn: RunnerInput => Result String Error) (wakero
                 require True = isDebugOn
 
                 def _ = write ".cache-hit/read.{prefix}.json" "//{label}\n{jobCacheJsonIn}"
-                def _ = write ".cache-hit/out.{prefix}.json" "//{label}\n{cacheResult}"
+
+                def _ =
+                    write ".cache-hit/out.{prefix}.json" "//{label}\n{prettyJSON jobCacheJsonOut}"
 
                 True
 
-            require Pass match_info = jField jobCacheJsonOut "match"
-            require Pass output_info = jField match_info "output_info"
+            require Pass (JobCacheMatch inputs outputs stdout stderr predict) =
+                parseJobCacheMatch job jobCacheJsonOut
+                | rmapFail (markJobSetupFailure job)
 
-            require Pass status =
-                jField output_info "status"
-                | jInteger
-
-            require Pass runtime =
-                jField output_info "runtime"
-                | jDouble
-
-            require Pass cputime =
-                jField output_info "cputime"
-                | jDouble
-
-            require Pass mem =
-                jField output_info "mem"
-                | jInteger
-
-            require Pass ibytes =
-                jField output_info "ibytes"
-                | jInteger
-
-            require Pass obytes =
-                jField output_info "obytes"
-                | jInteger
-
-            require Pass inputs =
-                jField match_info "input_files"
-                | jArray jString
-
-            require Pass output_files =
-                jField match_info "output_files"
-                | jArray getPath
-
-            require Pass output_dirs =
-                jField match_info "output_dirs"
-                | jArray getPath
-
-            require Pass output_symlinks =
-                jField match_info "output_symlinks"
-                | jArray getPath
-
-            require Pass stdout =
-                jField output_info "stdout"
-                | jString
-
-            require Pass stderr =
-                jField output_info "stderr"
-                | jString
-
-            def outputs = output_files ++ output_dirs ++ output_symlinks
-            def predict = Usage status runtime cputime mem ibytes obytes
             def _ = primJobVirtual job stdout stderr predict
 
             Pass (RunnerOutput inputs outputs Nil predict)
@@ -246,3 +208,67 @@ export def mkJobCacheRunner (hashFn: RunnerInput => Result String Error) (wakero
         Pass (RunnerOutput (map getPathName vis) outputs cleanable usage)
 
     makeRunner "job-cache: {name}" run
+
+tuple JobCacheMatch =
+    Inputs: List String
+    Outputs: List String
+    Stdout: String
+    Stderr: String
+    Predict: Usage
+
+def parseJobCacheMatch (job: Job) (jobCacheJsonOut: JValue): Result JobCacheMatch Error =
+    require Pass match_info = jField jobCacheJsonOut "match"
+    require Pass output_info = jField match_info "output_info"
+
+    require Pass status =
+        jField output_info "status"
+        | jInteger
+
+    require Pass runtime =
+        jField output_info "runtime"
+        | jDouble
+
+    require Pass cputime =
+        jField output_info "cputime"
+        | jDouble
+
+    require Pass mem =
+        jField output_info "mem"
+        | jInteger
+
+    require Pass ibytes =
+        jField output_info "ibytes"
+        | jInteger
+
+    require Pass obytes =
+        jField output_info "obytes"
+        | jInteger
+
+    require Pass inputs =
+        jField match_info "input_files"
+        | jArray jString
+
+    require Pass output_files =
+        jField match_info "output_files"
+        | jArray getPath
+
+    require Pass output_dirs =
+        jField match_info "output_dirs"
+        | jArray getPath
+
+    require Pass output_symlinks =
+        jField match_info "output_symlinks"
+        | jArray getPath
+
+    require Pass stdout =
+        jField output_info "stdout"
+        | jString
+
+    require Pass stderr =
+        jField output_info "stderr"
+        | jString
+
+    def outputs = output_files ++ output_dirs ++ output_symlinks
+    def predict = Usage status runtime cputime mem ibytes obytes
+
+    Pass (JobCacheMatch inputs outputs stdout stderr predict)
