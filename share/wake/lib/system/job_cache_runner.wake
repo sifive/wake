@@ -116,7 +116,9 @@ export def mkJobCacheRunner (hashFn: RunnerInput => Result String Error) (wakero
                 require True = isDebugOn
 
                 def _ = write ".cache-hit/read.{prefix}.json" "//{label}\n{jobCacheJsonIn}"
-                def _ = write ".cache-hit/out.{prefix}.json" "//{label}\n{prettyJSON jobCacheJsonOut}"
+
+                def _ =
+                    write ".cache-hit/out.{prefix}.json" "//{label}\n{prettyJSON jobCacheJsonOut}"
 
                 True
 
