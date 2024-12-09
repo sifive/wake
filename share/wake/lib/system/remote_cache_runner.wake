@@ -249,7 +249,9 @@ export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => 
     def run (job: Job) (input: RunnerInput): Result RunnerOutput Error =
         def label = input.getRunnerInputLabel
 
-        require Pass hashKey = hashFn input
+        require Pass hashKey =
+            hashFn input
+            | rmapFail (markJobSetupFailure job)
 
         # If pulling from the cache is not enabled don't bother searching.
         require True = rscApi.getRemoteCacheApiCanPull
