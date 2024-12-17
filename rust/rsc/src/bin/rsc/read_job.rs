@@ -11,7 +11,7 @@ use rsc::database;
 use sea_orm::DatabaseTransaction;
 use sea_orm::{
     prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, DatabaseConnection, DbErr,
-    EntityTrait, ModelTrait, QueryFilter, TransactionTrait,
+    EntityTrait, ModelTrait, QueryFilter, TransactionTrait, ConnectionTrait,
 };
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -34,9 +34,9 @@ async fn record_miss(hash: String, conn: Arc<DatabaseConnection>) {
 }
 
 #[tracing::instrument(skip(db, stores))]
-async fn resolve_blob(
+async fn resolve_blob<T: ConnectionTrait>(
     id: Uuid,
-    db: &DatabaseTransaction,
+    db: &T,
     stores: &HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) -> Result<ResolvedBlob, String> {
     let Ok(Some(blob)) = entity::prelude::Blob::find_by_id(id).one(db).await else {
@@ -63,15 +63,16 @@ pub async fn read_job(
     blob_stores: HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
 ) -> (StatusCode, Json<ReadJobResponse>) {
     let hash = payload.hash();
+    let hash_for_spawns = hash.clone();
 
     // TODO: This transaction is quite large with a bunch of "serialized" queries. If read_job
     // becomes a bottleneck it should be rewritten such that joining on promises is delayed for as
     // long as possible. Another option would be to collect all blob ids ahead of time and make a
     // single db query to list them all out instead of a query per blob id.
-    let result = conn
+    // Step 1: Fetch the job and related entities in a single transaction
+    let fetch_result = conn
         .as_ref()
-        .transaction::<_, (Option<Uuid>, ReadJobResponse), DbErr>(|txn| {
-            let hash = hash.clone();
+        .transaction::<_, Option<(job::Model, Vec<output_file::Model>, Vec<output_symlink::Model>, Vec<output_dir::Model>)>, DbErr>(|txn| {
             Box::pin(async move {
                 let Some(matching_job) = job::Entity::find()
                     .filter(job::Column::Hash.eq(hash.clone()))
@@ -79,135 +80,112 @@ pub async fn read_job(
                     .await?
                 else {
                     tracing::info!(%hash, "Miss");
-                    return Ok((None, ReadJobResponse::NoMatch));
+                    return Ok(None);
                 };
+            
+                let output_files = matching_job.find_related(output_file::Entity).all(txn).await?;
+                let output_symlinks = matching_job.find_related(output_symlink::Entity).all(txn).await?;
+                let output_dirs = matching_job.find_related(output_dir::Entity).all(txn).await?;
 
-                tracing::info!(%hash, "Hit");
-                let output_files = matching_job
-                    .find_related(output_file::Entity)
-                    .all(txn)
-                    .await?
-                    .into_iter()
-                    .map(|m| {
-                        let stores_copy = blob_stores.clone();
-                        async move {
-                            let blob = resolve_blob(m.blob_id, txn, &stores_copy).await?;
-
-                            Ok(ResolvedBlobFile {
-                                path: m.path,
-                                mode: m.mode,
-                                blob,
-                            })
-                        }
-                    });
-
-                let output_files: Result<Vec<ResolvedBlobFile>, String> =
-                    futures::future::join_all(output_files)
-                        .await
-                        .into_iter()
-                        .collect();
-
-                let output_files = match output_files {
-                    Err(err) => {
-                        tracing::error! {%err, "Failed to resolve all output files. Resolving job as a cache miss."};
-                        return Ok((None, ReadJobResponse::NoMatch))
-                    },
-                    Ok(files) => files,
-                };
-
-                let output_symlinks = matching_job
-                    .find_related(output_symlink::Entity)
-                    .all(txn)
-                    .await?
-                    .into_iter()
-                    .map(|m| Symlink {
-                        path: m.path,
-                        link: m.link,
-                    })
-                    .collect();
-
-                let output_dirs = matching_job
-                    .find_related(output_dir::Entity)
-                    .all(txn)
-                    .await?
-                    .into_iter()
-                    .map(|m| Dir {
-                        path: m.path,
-                        mode: m.mode,
-                        hidden: Some(m.hidden),
-                    })
-                    .collect();
-
-                let stdout_blob = match resolve_blob(matching_job.stdout_blob_id, txn, &blob_stores).await {
-                    Err(err) => {
-                        tracing::error! {%err, "Failed to resolve stdout blob. Resolving job as a cache miss."};
-                        return Ok((None, ReadJobResponse::NoMatch))
-                    },
-                    Ok(blob) => blob,
-                };
-
-                let stderr_blob = match resolve_blob(matching_job.stderr_blob_id, txn, &blob_stores).await {
-                    Err(err) => {
-                        tracing::error! {%err, "Failed to resolve stderr blob. Resolving job as a cache miss."};
-                        return Ok((None, ReadJobResponse::NoMatch))
-                    },
-                    Ok(blob) => blob,
-                };
-
-                Ok((
-                    Some(matching_job.id),
-                    ReadJobResponse::Match {
-                        output_symlinks,
-                        output_dirs,
-                        output_files,
-                        stdout_blob,
-                        stderr_blob,
-                        status: matching_job.status,
-                        runtime: matching_job.runtime,
-                        cputime: matching_job.cputime,
-                        memory: matching_job.memory as u64,
-                        ibytes: matching_job.i_bytes as u64,
-                        obytes: matching_job.o_bytes as u64,
-                    },
-                ))
+                Ok(Some((matching_job, output_files, output_symlinks, output_dirs)))
             })
         })
         .await;
+    
+    let hash_copy = hash_for_spawns.clone();
+    let Some((matching_job, output_files, output_symlinks, output_dirs)) = fetch_result.ok().flatten() else {
+        tokio::spawn(async move {
+            record_miss(hash_copy, conn.clone()).await;
+        });
+        return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
+    };
 
-    match result {
-        Ok((Some(job_id), response)) => {
-            // If we get a match we want to record the use but we don't
-            // want to block sending the response on it so we spawn a task
-            // to go do that.
-            let mut status = StatusCode::NOT_FOUND;
-            if let ReadJobResponse::Match { .. } = response {
-                status = StatusCode::OK;
-                let shared_conn = conn.clone();
-                tokio::spawn(async move {
-                    record_hit(job_id, hash, shared_conn).await;
-                });
-            }
-            (status, Json(response))
+    // Step 2: Resolve blobs outside the transaction
+    let output_files = futures::future::join_all(output_files.into_iter().map(|m| {
+        let blob_stores_copy = blob_stores.clone();
+        let blob_id = m.blob_id;
+        let conn_copy = conn.clone();
+        async move {
+            resolve_blob(blob_id, conn_copy.as_ref(), &blob_stores_copy).await.map(|resolved_blob| ResolvedBlobFile {
+                path: m.path,
+                mode: m.mode,
+                blob: resolved_blob,
+            })
         }
-        Ok((None, _)) => {
-            let shared_conn = conn.clone();
-            tokio::spawn(async move {
-                record_miss(hash, shared_conn).await;
-            });
-            (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch))
+    }))
+    .await
+    .into_iter()
+    .collect::<Result<Vec<ResolvedBlobFile>, _>>();
+
+    let output_files = match output_files {
+        Ok(files) => files,
+        Err(err) => {
+            tracing::error!(%err, "Failed to resolve all output files. Resolving job as a cache miss.");
+            return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
         }
-        Err(cause) => {
-            tracing::error! {
-              %cause,
-              "failed to read job"
-            };
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ReadJobResponse::NoMatch),
-            )
-        }
-    }
+    };
+
+    // Step 3: Collect other resolved entities
+    let output_symlinks: Vec<Symlink> = output_symlinks
+        .into_iter()
+        .map(|m| Symlink {
+            path: m.path,
+            link: m.link,
+        })
+        .collect();
+
+    let output_dirs: Vec<Dir> = output_dirs
+        .into_iter()
+        .map(|m| Dir {
+            path: m.path,
+            mode: m.mode,
+            hidden: Some(m.hidden),
+        })
+        .collect();
+
+    // Step 4: Resolve stdout and stderr blobs
+    let stdout_blob = match resolve_blob(matching_job.stdout_blob_id, conn.as_ref(), &blob_stores).await {
+            Err(err) => {
+                tracing::error! {%err, "Failed to resolve stdout blob. Resolving job as a cache miss."};
+                return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
+            },
+            Ok(blob) => blob,
+    };
+
+    let stderr_blob = match resolve_blob(matching_job.stderr_blob_id, conn.as_ref(), &blob_stores).await {
+            Err(err) => {
+                tracing::error!(%err, "Failed to resolve stderr blob. Resolving job as a cache miss.");
+                return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
+            },
+            Ok(resolved_blob) => resolved_blob,
+    };
+
+    // Step 5: Construct response
+    let response = ReadJobResponse::Match {
+        output_symlinks,
+        output_dirs,
+        output_files,
+        stdout_blob,
+        stderr_blob,
+        status: matching_job.status,
+        runtime: matching_job.runtime,
+        cputime: matching_job.cputime,
+        memory: matching_job.memory as u64,
+        ibytes: matching_job.i_bytes as u64,
+        obytes: matching_job.o_bytes as u64,
+    };
+
+    // Step 6: TODO before recording a hit and returning, need verification that objects from transaction did not change in
+    // database, or convert a hit into a miss
+    let job_id = matching_job.id;
+    let hash_copy = hash_for_spawns.clone();
+    tokio::spawn(async move {
+        record_hit(job_id, hash_copy, conn.clone()).await;
+    });
+
+    (StatusCode::OK, Json(response))
 }
+
 
 #[tracing::instrument(skip_all)]
 pub async fn allow_job(
