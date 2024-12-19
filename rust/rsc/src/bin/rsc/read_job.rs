@@ -8,7 +8,6 @@ use entity::{job, job_use, output_dir, output_file, output_symlink};
 use hyper::StatusCode;
 use rand::{thread_rng, Rng};
 use rsc::database;
-use sea_orm::DatabaseTransaction;
 use sea_orm::{
     prelude::Uuid, ActiveModelTrait, ActiveValue::*, ColumnTrait, DatabaseConnection, DbErr,
     EntityTrait, ModelTrait, QueryFilter, TransactionTrait, ConnectionTrait,
