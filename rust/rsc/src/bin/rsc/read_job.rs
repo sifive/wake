@@ -57,6 +57,28 @@ async fn resolve_blob<T: ConnectionTrait>(
 }
 
 #[tracing::instrument(skip_all)]
+async fn verify_job<T: ConnectionTrait>(
+    job:job::Model,
+    db: &T,
+    txn_output_file:Vec<output_file::Model>,
+    txn_output_symlink:Vec<output_symlink::Model>,
+    txn_output_dir:Vec<output_dir::Model>
+) -> Result<bool, DbErr> {
+    let updated_output_file = job.find_related(output_file::Entity).all(db).await?;
+    let updated_output_symlink = job.find_related(output_symlink::Entity).all(db).await?;
+    let updated_output_dir = job.find_related(output_dir::Entity).all(db).await?;
+    // light check to verify that job contents were not deleted from database
+    if  updated_output_file.len() != txn_output_file.len() ||
+        updated_output_symlink.len() != txn_output_symlink.len() ||
+        updated_output_dir.len() != txn_output_dir.len()
+    {
+        return Ok(false);
+    }
+
+    return Ok(true);
+}
+
+#[tracing::instrument(skip_all)]
 pub async fn read_job(
     Json(payload): Json<ReadJobPayload>,
     conn: Arc<DatabaseConnection>,
@@ -65,11 +87,7 @@ pub async fn read_job(
     let hash = payload.hash();
     let hash_for_spawns = hash.clone();
 
-    // TODO: This transaction is quite large with a bunch of "serialized" queries. If read_job
-    // becomes a bottleneck it should be rewritten such that joining on promises is delayed for as
-    // long as possible. Another option would be to collect all blob ids ahead of time and make a
-    // single db query to list them all out instead of a query per blob id.
-    // Step 1: Fetch the job and related entities in a single transaction
+    // Fetch the job and related entities in a single transaction
     let fetch_result = conn
         .as_ref()
         .transaction::<_, Option<(job::Model, Vec<output_file::Model>, Vec<output_symlink::Model>, Vec<output_dir::Model>)>, DbErr>(|txn| {
@@ -100,7 +118,11 @@ pub async fn read_job(
         return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
     };
 
-    // Step 2: Resolve blobs outside the transaction
+    let txn_output_files = output_files.clone();
+    let txn_output_symlinks = output_symlinks.clone();
+    let txn_output_dirs = output_dirs.clone();
+
+    // Resolve blobs outside the transaction
     let output_files = futures::future::join_all(output_files.into_iter().map(|m| {
         let blob_stores_copy = blob_stores.clone();
         let blob_id = m.blob_id;
@@ -125,7 +147,7 @@ pub async fn read_job(
         }
     };
 
-    // Step 3: Collect other resolved entities
+    // Collect other resolved entities
     let output_symlinks: Vec<Symlink> = output_symlinks
         .into_iter()
         .map(|m| Symlink {
@@ -143,7 +165,7 @@ pub async fn read_job(
         })
         .collect();
 
-    // Step 4: Resolve stdout and stderr blobs
+    // Resolve stdout and stderr blobs
     let stdout_blob = match resolve_blob(matching_job.stdout_blob_id, conn.as_ref(), &blob_stores).await {
             Err(err) => {
                 tracing::error! {%err, "Failed to resolve stdout blob. Resolving job as a cache miss."};
@@ -160,7 +182,7 @@ pub async fn read_job(
             Ok(resolved_blob) => resolved_blob,
     };
 
-    // Step 5: Construct response
+    // Construct response
     let response = ReadJobResponse::Match {
         output_symlinks,
         output_dirs,
@@ -175,15 +197,27 @@ pub async fn read_job(
         obytes: matching_job.o_bytes as u64,
     };
 
-    // Step 6: TODO before recording a hit and returning, need verification that objects from transaction did not change in
-    // database, or convert a hit into a miss
+    // Verify that objects from transaction did not change
     let job_id = matching_job.id;
     let hash_copy = hash_for_spawns.clone();
-    tokio::spawn(async move {
-        record_hit(job_id, hash_copy, conn.clone()).await;
-    });
+    match verify_job(matching_job, conn.as_ref(), txn_output_files, txn_output_symlinks, txn_output_dirs).await {
+        Ok(true) => {
+            tracing::info!(%hash_copy, "Hit");
+            tokio::spawn(async move {
+                record_hit(job_id, hash_copy, conn.clone()).await;
+            });
 
-    (StatusCode::OK, Json(response))
+            (StatusCode::OK, Json(response))
+        }
+        Ok(false) | Err(_) => {
+            tracing::error!("Job transaction instance is out of date. Resolving job as a cache miss.");
+            tokio::spawn(async move {
+                record_miss(hash_copy, conn.clone()).await;
+            });
+            
+            (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch))
+        }
+    }    
 }
 
 
