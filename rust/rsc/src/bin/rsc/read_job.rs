@@ -67,7 +67,7 @@ async fn verify_job<T: ConnectionTrait>(
     let updated_output_file = job.find_related(output_file::Entity).all(db).await?;
     let updated_output_symlink = job.find_related(output_symlink::Entity).all(db).await?;
     let updated_output_dir = job.find_related(output_dir::Entity).all(db).await?;
-    // light check to verify that job contents were not deleted from database
+    // shallow check to verify that job contents were not deleted from database
     if  updated_output_file.len() != txn_output_file.len() ||
         updated_output_symlink.len() != txn_output_symlink.len() ||
         updated_output_dir.len() != txn_output_dir.len()
