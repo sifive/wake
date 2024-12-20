@@ -56,28 +56,6 @@ async fn resolve_blob<T: ConnectionTrait>(
 }
 
 #[tracing::instrument(skip_all)]
-async fn verify_job<T: ConnectionTrait>(
-    job:job::Model,
-    db: &T,
-    txn_output_file:Vec<output_file::Model>,
-    txn_output_symlink:Vec<output_symlink::Model>,
-    txn_output_dir:Vec<output_dir::Model>
-) -> Result<bool, DbErr> {
-    let updated_output_file = job.find_related(output_file::Entity).all(db).await?;
-    let updated_output_symlink = job.find_related(output_symlink::Entity).all(db).await?;
-    let updated_output_dir = job.find_related(output_dir::Entity).all(db).await?;
-    // shallow check to verify that job contents were not deleted from database
-    if  updated_output_file.len() != txn_output_file.len() ||
-        updated_output_symlink.len() != txn_output_symlink.len() ||
-        updated_output_dir.len() != txn_output_dir.len()
-    {
-        return Ok(false);
-    }
-
-    return Ok(true);
-}
-
-#[tracing::instrument(skip_all)]
 pub async fn read_job(
     Json(payload): Json<ReadJobPayload>,
     conn: Arc<DatabaseConnection>,
@@ -117,9 +95,6 @@ pub async fn read_job(
         return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
     };
 
-    let txn_output_files = output_files.clone();
-    let txn_output_symlinks = output_symlinks.clone();
-    let txn_output_dirs = output_dirs.clone();
 
     // Resolve blobs outside the transaction
     let output_files = futures::future::join_all(output_files.into_iter().map(|m| {
@@ -196,27 +171,14 @@ pub async fn read_job(
         obytes: matching_job.o_bytes as u64,
     };
 
-    // Verify that objects from transaction did not change
     let job_id = matching_job.id;
     let hash_copy = hash_for_spawns.clone();
-    match verify_job(matching_job, conn.as_ref(), txn_output_files, txn_output_symlinks, txn_output_dirs).await {
-        Ok(true) => {
-            tracing::info!(%hash_copy, "Hit");
-            tokio::spawn(async move {
-                record_hit(job_id, hash_copy, conn.clone()).await;
-            });
+    tracing::info!(%hash_copy, "Hit");
+    tokio::spawn(async move {
+        record_hit(job_id, hash_copy, conn.clone()).await;
+    });
 
-            (StatusCode::OK, Json(response))
-        }
-        Ok(false) | Err(_) => {
-            tracing::error!("Job transaction instance is out of date. Resolving job as a cache miss.");
-            tokio::spawn(async move {
-                record_miss(hash_copy, conn.clone()).await;
-            });
-            
-            (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch))
-        }
-    }    
+    (StatusCode::OK, Json(response))    
 }
 
 
