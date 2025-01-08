@@ -5,6 +5,8 @@ use crate::types::{
 };
 use axum::Json;
 use entity::{job, job_use, output_dir, output_file, output_symlink};
+use entity::prelude::Blob;
+use futures::future::join_all;
 use hyper::StatusCode;
 use rand::{thread_rng, Rng};
 use rsc::database;
@@ -33,26 +35,51 @@ async fn record_miss(hash: String, conn: Arc<DatabaseConnection>) {
 }
 
 #[tracing::instrument(skip(db, stores))]
-async fn resolve_blob<T: ConnectionTrait>(
-    id: Uuid,
+async fn resolve_blobs<T: ConnectionTrait>(
+    ids: &[Uuid],
     db: &T,
     stores: &HashMap<Uuid, Arc<dyn blob::DebugBlobStore + Sync + Send>>,
-) -> Result<ResolvedBlob, String> {
-    let Ok(Some(blob)) = entity::prelude::Blob::find_by_id(id).one(db).await else {
-        return Err(format!("Unable to find blob {} by id", id));
-    };
+) -> Result<HashMap<Uuid, ResolvedBlob>, String> {
+    // Fetch all blobs in a single query
+    let blobs = Blob::find()
+        .filter(entity::blob::Column::Id.is_in(ids.to_vec()))
+        .all(db)
+        .await
+        .map_err(|e| format!("Failed to query blobs: {}", e))?;
 
-    let Some(store) = stores.get(&blob.store_id) else {
-        return Err(format!(
-            "Unable to find backing store {} for blob {}",
-            blob.store_id, id
-        ));
-    };
+    // Build a map of blob_id -> blob model for quick lookup
+    let blob_map: HashMap<Uuid, entity::blob::Model> = blobs.into_iter().map(|b| (b.id, b)).collect();
 
-    return Ok(ResolvedBlob {
-        id: blob.id,
-        url: store.download_url(blob.key).await,
+    // Ensure we have all requested blobs
+    for &id in ids {
+        if !blob_map.contains_key(&id) {
+            return Err(format!("Unable to find blob {} by id", id));
+        }
+    }
+
+    // Resolve all download URLs in parallel
+    let futures = blob_map.iter().map(|(id, blob)| {
+        let store_opt = stores.get(&blob.store_id).cloned();
+        let key = blob.key.clone();
+
+        async move {
+            let store = store_opt.ok_or_else(|| {
+                format!("Unable to find backing store {} for blob {}", blob.store_id, id)
+            })?;
+            let url = store.download_url(key).await;
+            Ok::<(Uuid, ResolvedBlob), String>((*id, ResolvedBlob { id: *id, url }))
+        }
     });
+
+    let results = join_all(futures).await;
+
+    let mut resolved_map = HashMap::new();
+    for res in results {
+        let (id, resolved_blob) = res?;
+        resolved_map.insert(id, resolved_blob);
+    }
+
+    Ok(resolved_map)
 }
 
 #[tracing::instrument(skip_all)]
@@ -95,23 +122,35 @@ pub async fn read_job(
         return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
     };
 
+    // Collect all the blob IDs we need to resolve
+    let mut blob_ids: Vec<Uuid> = output_files.iter().map(|f| f.blob_id).collect();
+    blob_ids.push(matching_job.stdout_blob_id);
+    blob_ids.push(matching_job.stderr_blob_id);
 
-    // Resolve blobs outside the transaction
-    let output_files = futures::future::join_all(output_files.into_iter().map(|m| {
-        let blob_stores_copy = blob_stores.clone();
-        let blob_id = m.blob_id;
-        let conn_copy = conn.clone();
-        async move {
-            resolve_blob(blob_id, conn_copy.as_ref(), &blob_stores_copy).await.map(|resolved_blob| ResolvedBlobFile {
+    // Resolve all needed blobs in one go
+    let resolved_blob_map = match resolve_blobs(&blob_ids, conn.as_ref(), &blob_stores).await {
+        Ok(map) => map,
+        Err(err) => {
+            tracing::error!(%err, "Failed to resolve blobs. Resolving job as a cache miss.");
+            return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
+        }
+    };
+
+    // Construct ResolvedBlobFile for each output file
+    let output_files = output_files
+        .into_iter()
+        .map(|m| {
+            let blob_id = m.blob_id;
+            let resolved_blob = resolved_blob_map.get(&blob_id).cloned().ok_or_else(|| {
+                format!("Missing resolved blob for {}", blob_id)
+            })?;
+            Ok(ResolvedBlobFile {
                 path: m.path,
                 mode: m.mode,
                 blob: resolved_blob,
             })
-        }
-    }))
-    .await
-    .into_iter()
-    .collect::<Result<Vec<ResolvedBlobFile>, _>>();
+        })
+        .collect::<Result<Vec<_>, String>>();
 
     let output_files = match output_files {
         Ok(files) => files,
@@ -139,21 +178,21 @@ pub async fn read_job(
         })
         .collect();
 
-    // Resolve stdout and stderr blobs
-    let stdout_blob = match resolve_blob(matching_job.stdout_blob_id, conn.as_ref(), &blob_stores).await {
-            Err(err) => {
-                tracing::error! {%err, "Failed to resolve stdout blob. Resolving job as a cache miss."};
-                return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
-            },
-            Ok(blob) => blob,
+    // Resolve stdout and stderr blobs from the map
+    let stdout_blob = match resolved_blob_map.get(&matching_job.stdout_blob_id) {
+        Some(blob) => blob.clone(),
+        None => {
+            tracing::error!("Failed to resolve stdout blob. Resolving job as a cache miss.");
+            return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
+        }
     };
 
-    let stderr_blob = match resolve_blob(matching_job.stderr_blob_id, conn.as_ref(), &blob_stores).await {
-            Err(err) => {
-                tracing::error!(%err, "Failed to resolve stderr blob. Resolving job as a cache miss.");
-                return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
-            },
-            Ok(resolved_blob) => resolved_blob,
+    let stderr_blob = match resolved_blob_map.get(&matching_job.stderr_blob_id) {
+        Some(blob) => blob.clone(),
+        None => {
+            tracing::error!("Failed to resolve stderr blob. Resolving job as a cache miss.");
+            return (StatusCode::NOT_FOUND, Json(ReadJobResponse::NoMatch));
+        }
     };
 
     // Construct response
@@ -178,7 +217,7 @@ pub async fn read_job(
         record_hit(job_id, hash_copy, conn.clone()).await;
     });
 
-    (StatusCode::OK, Json(response))    
+    (StatusCode::OK, Json(response))
 }
 
 
