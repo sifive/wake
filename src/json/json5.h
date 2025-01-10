@@ -42,7 +42,7 @@ class JsonSubscriber : public wcl::log::Subscriber {
   JsonSubscriber() = delete;
 
   void receive(const wcl::log::Event &e) override;
-  ~JsonSubscriber() override {};
+  ~JsonSubscriber() override{};
 };
 
 enum SymbolJSON {
