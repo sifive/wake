@@ -396,8 +396,7 @@ static void status_redraw(bool idle) {
     if (idle) {
       os << " ." << std::endl;
     } else {
-      os << " "
-         << "/-\\|"[ticks] << std::endl;
+      os << " " << "/-\\|"[ticks] << std::endl;
       ticks = (ticks + spinner_update) & 3;
     }
     ++used;

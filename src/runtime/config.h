@@ -77,7 +77,7 @@ struct VersionPolicy {
   static void set(VersionPolicy& p, const JAST& json);
   static void set_input(VersionPolicy& p, const input_type& v) { p.*value = v; }
   static void emit(const VersionPolicy& p, std::ostream& os) { os << p.*value; }
-  static void set_env_var(VersionPolicy& p, const char* env_var){};
+  static void set_env_var(VersionPolicy& p, const char* env_var) {};
 };
 
 struct UserConfigPolicy {
@@ -113,7 +113,7 @@ struct LogHeaderPolicy {
   static void set(LogHeaderPolicy& p, const JAST& json);
   static void set_input(LogHeaderPolicy& p, const input_type& v) { p.*value = v; }
   static void emit(const LogHeaderPolicy& p, std::ostream& os) { os << p.*value; }
-  static void set_env_var(LogHeaderPolicy& p, const char* env_var){};
+  static void set_env_var(LogHeaderPolicy& p, const char* env_var) {};
 };
 
 struct LogHeaderSourceWidthPolicy {
@@ -133,7 +133,7 @@ struct LogHeaderSourceWidthPolicy {
   static void set(LogHeaderSourceWidthPolicy& p, const JAST& json);
   static void set_input(LogHeaderSourceWidthPolicy& p, const input_type& v) { p.*value = v; }
   static void emit(const LogHeaderSourceWidthPolicy& p, std::ostream& os) { os << p.*value; }
-  static void set_env_var(LogHeaderSourceWidthPolicy& p, const char* env_var){};
+  static void set_env_var(LogHeaderSourceWidthPolicy& p, const char* env_var) {};
 };
 
 struct LabelFilterPolicy {
@@ -158,7 +158,7 @@ struct LabelFilterPolicy {
   static void emit(const LabelFilterPolicy& p, std::ostream& os) {
     os << p.label_filter->pattern();
   }
-  static void set_env_var(LogHeaderSourceWidthPolicy& p, const char* value){};
+  static void set_env_var(LogHeaderSourceWidthPolicy& p, const char* value) {};
 };
 
 struct SharedCacheMissOnFailure {
