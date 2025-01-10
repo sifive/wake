@@ -604,7 +604,7 @@ std::pair<std::string, std::string> random_unicode_string(wcl::xoshiro_256& rng)
 }
 
 TEST(term_dumb_fuzz) {
-  std::vector<std::pair<std::string, std::string> (*)(wcl::xoshiro_256 & rng)> funcs = {
+  std::vector<std::pair<std::string, std::string> (*)(wcl::xoshiro_256& rng)> funcs = {
       random_ignored_control_seq,   random_valued_control_seq,
       random_ignored_command,       random_single_character_command,
       random_two_character_command, random_three_character_command,

@@ -38,7 +38,7 @@
 
 #define SAMPLE_RATE 1024  // sampling rate
 
-#define DIV_UP(x, y) (((x) + (y)-1) / (y))
+#define DIV_UP(x, y) (((x) + (y) - 1) / (y))
 
 void RankBuilder::set(uint32_t x) {
   size_t off = x / 64;
@@ -228,7 +228,7 @@ static int select(uint64_t mask, int n) {
   uint64_t c16 = ((c8 >> 8) + c8) & m8;
   uint64_t c32 = (c16 >> 16) + c16;
   int c64 = (int)(((c32 >> 32) + c32) & 0x7f);
-  t = (c32)&0x3f;
+  t = (c32) & 0x3f;
   if (i >= t) {
     r += 32;
     i -= t;

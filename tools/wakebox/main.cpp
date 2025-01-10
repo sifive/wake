@@ -222,22 +222,21 @@ int main(int argc, char *argv[]) {
   std::vector<char *> tools(max_pairs, nullptr);
   std::vector<char *> binds(max_pairs, nullptr);
 
-  struct option options[] {
+  struct option options[]{
 #ifdef __linux__
-    {'r', "rootfs", GOPT_ARGUMENT_REQUIRED},
-        {'t', "toolchain", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, tools.data(), max_pairs},
-        {'b', "bind", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, binds.data(), max_pairs},
-        {'x', "bind-cwd", GOPT_ARGUMENT_FORBIDDEN},
+      {'r', "rootfs", GOPT_ARGUMENT_REQUIRED},
+      {'t', "toolchain", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, tools.data(), max_pairs},
+      {'b', "bind", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, binds.data(), max_pairs},
+      {'x', "bind-cwd", GOPT_ARGUMENT_FORBIDDEN},
 #endif
-        {'p', "params", GOPT_ARGUMENT_REQUIRED}, {'o', "output-stats", GOPT_ARGUMENT_REQUIRED},
-        {'s', "force-shell", GOPT_ARGUMENT_FORBIDDEN},
-        {'i', "interactive", GOPT_ARGUMENT_FORBIDDEN},
-        {'I', "isolate-retcode", GOPT_ARGUMENT_FORBIDDEN},
+      {'p', "params", GOPT_ARGUMENT_REQUIRED},
+      {'o', "output-stats", GOPT_ARGUMENT_REQUIRED},
+      {'s', "force-shell", GOPT_ARGUMENT_FORBIDDEN},
+      {'i', "interactive", GOPT_ARGUMENT_FORBIDDEN},
+      {'I', "isolate-retcode", GOPT_ARGUMENT_FORBIDDEN},
 
-        {'h', "help", GOPT_ARGUMENT_FORBIDDEN}, {
-      0, 0, GOPT_LAST
-    }
-  };
+      {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
+      {0, 0, GOPT_LAST}};
 
   argc = gopt(argv, options);
   gopt_errors("wakebox", options);

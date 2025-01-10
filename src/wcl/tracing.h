@@ -78,7 +78,7 @@ struct Event {
 class Subscriber {
  public:
   virtual void receive(const Event& e) = 0;
-  virtual ~Subscriber(){};
+  virtual ~Subscriber() {};
 };
 
 class FormatSubscriber : public Subscriber {
@@ -88,7 +88,7 @@ class FormatSubscriber : public Subscriber {
  public:
   FormatSubscriber(std::streambuf* rdbuf) : s(rdbuf) {}
   void receive(const Event& e) override;
-  ~FormatSubscriber() override{};
+  ~FormatSubscriber() override {};
 };
 
 class SimpleFormatSubscriber : public Subscriber {
@@ -98,7 +98,7 @@ class SimpleFormatSubscriber : public Subscriber {
  public:
   SimpleFormatSubscriber(std::streambuf* rdbuf) : s(rdbuf) {}
   void receive(const Event& e) override;
-  ~SimpleFormatSubscriber() override{};
+  ~SimpleFormatSubscriber() override {};
 };
 
 class FilterSubscriber : public Subscriber {
@@ -110,7 +110,7 @@ class FilterSubscriber : public Subscriber {
   FilterSubscriber(std::unique_ptr<Subscriber> s, std::function<bool(const Event&)> p)
       : subscriber(std::move(s)), predicate(p) {}
   void receive(const Event& e) override;
-  ~FilterSubscriber() override{};
+  ~FilterSubscriber() override {};
 };
 
 void subscribe(std::unique_ptr<Subscriber>);
