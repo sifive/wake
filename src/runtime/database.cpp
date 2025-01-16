@@ -1115,7 +1115,9 @@ JAST JobReflection::to_simple_json() const {
 
   std::stringstream tags_stream;
   for (const auto &tag : tags) {
-    tags_stream << "{<br>" << "  job: " << tag.job << ",<br>" << "  uri: " << tag.uri << ",<br>"
+    tags_stream << "{<br>"
+                << "  job: " << tag.job << ",<br>"
+                << "  uri: " << tag.uri << ",<br>"
                 << "  content: " << tag.content << "<br>},<br>";
   }
   json.add("tags", tags_stream.str());
@@ -1239,7 +1241,8 @@ JAST JobReflection::to_json() const {
   json.add("stderr_payload", err_stream.c_str());
 
   std::stringstream usage_stream;
-  usage_stream << "status: " << usage.status << "<br>" << "runtime: " << usage.runtime << "<br>"
+  usage_stream << "status: " << usage.status << "<br>"
+               << "runtime: " << usage.runtime << "<br>"
                << "cputime: " << usage.cputime << "<br>"
                << "membytes: " << std::to_string(usage.membytes) << "<br>"
                << "ibytes: " << std::to_string(usage.ibytes) << "<br>"
@@ -1266,7 +1269,9 @@ JAST JobReflection::to_json() const {
 
   std::stringstream tags_stream;
   for (const auto &tag : tags) {
-    tags_stream << "{<br>" << "  job: " << tag.job << ",<br>" << "  uri: " << tag.uri << ",<br>"
+    tags_stream << "{<br>"
+                << "  job: " << tag.job << ",<br>"
+                << "  uri: " << tag.uri << ",<br>"
                 << "  content: " << tag.content << "<br>},<br>";
   }
   json.add("tags", tags_stream.str());
