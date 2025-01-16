@@ -10,11 +10,11 @@ on:
 
 jobs:
     tarball:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       name: Tarball
       steps:
         - name: Clone wake
-          uses: actions/checkout@v3
+          uses: actions/checkout@v4
           with:
             fetch-depth: 0
 
@@ -52,27 +52,27 @@ jobs:
           run: PATH=$(pwd)/bin:$PATH PYTHONPATH=$(pwd)/scripts python3 scripts/wake2rst.py
 
         - name: Upload tarball
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: tarball
             path: wake_*.tar.xz
 
         - name: Upload Dockerfiles
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: dockerfiles
             path: .github/workflows/dockerfiles/
             retention-days: 1
 
         - name: Upload debian files
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: debian
             path: debian
             retention-days: 1
 
         - name: Upload test artifacts
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: tests
             include-hidden-files: true
@@ -80,21 +80,21 @@ jobs:
             retention-days: 1
 
         - name: Upload index.html
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: index.html
             path: www/index.html
             retention-days: 1
 
         - name: Upload html
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: html
             path: scripts/sphinx/build/html
             retention-days: 1
 
     docker_builds:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       needs: tarball
       name: Build ${{ matrix.target }}
       strategy:
@@ -169,25 +169,25 @@ jobs:
           run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
 
         - name: Download Tarball
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: tarball
             path: build
 
         - name: Download Debian Artifacts
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: debian
             path: build/debian
 
         - name: Download Test Artifacts
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: tests
             path: build/tests
 
         - name: Download Dockerfiles
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: dockerfiles
             path: dockerfiles
@@ -217,23 +217,23 @@ jobs:
           run: install -D -t release/${{ matrix.target }} ${{ matrix.install_src_glob }}
 
         - name: Upload
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: release_${{ matrix.target }}
             path: release/${{ matrix.target }}
 
     docs:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       needs: tarball
       name: Docs
       steps:
         - name: Download index.html
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: index.html
 
         - name: Download html
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: html
 
@@ -257,7 +257,7 @@ jobs:
         name: github-pages
         url: ${{ steps.deployment.outputs.page_url }}
 
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       needs: docs
       name: Deploy Docs to GH Pages
       steps:
@@ -269,25 +269,25 @@ jobs:
       # Only run the 'release' job if this workflow was triggered by the creation of a tag
       if: github.event_name == 'push' && github.ref_type == 'tag'
 
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       needs: [tarball, docker_builds]
       name: Create Release
       steps:
         - name: Download Tarball
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: tarball
             path: tarball
 
         - name: Download VSCode
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_vscode
             path: vscode
 
         # We don't actually release/upload wasm. It's build to maintain buildabilty
         # - name: Download wasm
-        #   uses: actions/download-artifact@v3
+        #   uses: actions/download-artifact@v4
         #   with:
         #     name: release_wasm
         #     path: wasm
@@ -296,37 +296,37 @@ jobs:
         # of alpine, and releasing a "wake_static" artifact is very misleading and prone to
         # user error and confusion
         # - name: Download Alpine
-        #   uses: actions/download-artifact@v3
+        #   uses: actions/download-artifact@v4
         #   with:
         #     name: release_alpine
         #     path: alpine
 
         - name: Download Debian Bullseye
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_debian_bullseye
             path: debian_bullseye
 
         - name: Download Rocky 8
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_rocky_8
             path: rocky_8
 
         - name: Download Rocky 9
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_rocky_9
             path: rocky_9
 
         - name: Download Ubuntu 22.04
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_ubuntu_22_04
             path: ubuntu_22_04
 
         - name: Download Fedora 38
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_fedora_38
             path: fedora_38
