@@ -10,7 +10,7 @@ on:
 
 jobs:
     tarball:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       name: Tarball
       steps:
         - name: Clone wake
@@ -94,7 +94,7 @@ jobs:
             retention-days: 1
 
     docker_builds:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       needs: tarball
       name: Build ${{ matrix.target }}
       strategy:
@@ -223,7 +223,7 @@ jobs:
             path: release/${{ matrix.target }}
 
     docs:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       needs: tarball
       name: Docs
       steps:
@@ -257,7 +257,7 @@ jobs:
         name: github-pages
         url: ${{ steps.deployment.outputs.page_url }}
 
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       needs: docs
       name: Deploy Docs to GH Pages
       steps:
@@ -269,7 +269,7 @@ jobs:
       # Only run the 'release' job if this workflow was triggered by the creation of a tag
       if: github.event_name == 'push' && github.ref_type == 'tag'
 
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       needs: [tarball, docker_builds]
       name: Create Release
       steps:
