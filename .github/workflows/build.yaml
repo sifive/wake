@@ -14,7 +14,7 @@ jobs:
       name: Tarball
       steps:
         - name: Clone wake
-          uses: actions/checkout@v3
+          uses: actions/checkout@v4
           with:
             fetch-depth: 0
 
@@ -169,25 +169,25 @@ jobs:
           run: mkdir dockerfiles && mkdir -p build/tests && mkdir build/debian && chmod ugo+rwx build
 
         - name: Download Tarball
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: tarball
             path: build
 
         - name: Download Debian Artifacts
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: debian
             path: build/debian
 
         - name: Download Test Artifacts
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: tests
             path: build/tests
 
         - name: Download Dockerfiles
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: dockerfiles
             path: dockerfiles
@@ -217,7 +217,7 @@ jobs:
           run: install -D -t release/${{ matrix.target }} ${{ matrix.install_src_glob }}
 
         - name: Upload
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: release_${{ matrix.target }}
             path: release/${{ matrix.target }}
@@ -228,12 +228,12 @@ jobs:
       name: Docs
       steps:
         - name: Download index.html
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: index.html
 
         - name: Download html
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: html
 
@@ -274,20 +274,20 @@ jobs:
       name: Create Release
       steps:
         - name: Download Tarball
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: tarball
             path: tarball
 
         - name: Download VSCode
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_vscode
             path: vscode
 
         # We don't actually release/upload wasm. It's build to maintain buildabilty
         # - name: Download wasm
-        #   uses: actions/download-artifact@v3
+        #   uses: actions/download-artifact@v4
         #   with:
         #     name: release_wasm
         #     path: wasm
@@ -296,37 +296,37 @@ jobs:
         # of alpine, and releasing a "wake_static" artifact is very misleading and prone to
         # user error and confusion
         # - name: Download Alpine
-        #   uses: actions/download-artifact@v3
+        #   uses: actions/download-artifact@v4
         #   with:
         #     name: release_alpine
         #     path: alpine
 
         - name: Download Debian Bullseye
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_debian_bullseye
             path: debian_bullseye
 
         - name: Download Rocky 8
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_rocky_8
             path: rocky_8
 
         - name: Download Rocky 9
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_rocky_9
             path: rocky_9
 
         - name: Download Ubuntu 22.04
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_ubuntu_22_04
             path: ubuntu_22_04
 
         - name: Download Fedora 38
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: release_fedora_38
             path: fedora_38
