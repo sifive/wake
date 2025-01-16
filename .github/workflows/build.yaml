@@ -52,27 +52,27 @@ jobs:
           run: PATH=$(pwd)/bin:$PATH PYTHONPATH=$(pwd)/scripts python3 scripts/wake2rst.py
 
         - name: Upload tarball
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: tarball
             path: wake_*.tar.xz
 
         - name: Upload Dockerfiles
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: dockerfiles
             path: .github/workflows/dockerfiles/
             retention-days: 1
 
         - name: Upload debian files
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: debian
             path: debian
             retention-days: 1
 
         - name: Upload test artifacts
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: tests
             include-hidden-files: true
@@ -80,14 +80,14 @@ jobs:
             retention-days: 1
 
         - name: Upload index.html
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: index.html
             path: www/index.html
             retention-days: 1
 
         - name: Upload html
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: html
             path: scripts/sphinx/build/html
