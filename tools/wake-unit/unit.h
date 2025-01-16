@@ -240,8 +240,9 @@ struct TestLogger {
     err->test_name = test_name;
     err->file = file;
     err->line = line;
-    err->predicate_error << "Expected:\n\t" << "(" << expected.size() << ")"
-                         << term_colour(TERM_MAGENTA) << '"' << json_escape(expected) << '"';
+    err->predicate_error << "Expected:\n\t"
+                         << "(" << expected.size() << ")" << term_colour(TERM_MAGENTA) << '"'
+                         << json_escape(expected) << '"';
     err->predicate_error << term_normal() << "\nBut got:\n\t";
     err->predicate_error << "(" << actual.size() << ")" << term_colour(TERM_MAGENTA) << '"'
                          << json_escape(actual) << '"';
@@ -261,8 +262,9 @@ struct TestLogger {
     err->test_name = test_name;
     err->file = file;
     err->line = line;
-    err->predicate_error << "Expected:\n\t" << "(" << expected.size() << ")"
-                         << term_colour(TERM_MAGENTA) << '"' << json_escape(expected) << '"';
+    err->predicate_error << "Expected:\n\t"
+                         << "(" << expected.size() << ")" << term_colour(TERM_MAGENTA) << '"'
+                         << json_escape(expected) << '"';
     err->predicate_error << term_normal() << "\nBut got:\n\t";
     err->predicate_error << "(" << actual.size() << ")" << term_colour(TERM_MAGENTA) << '"'
                          << json_escape(actual) << '"';
