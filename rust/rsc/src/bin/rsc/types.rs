@@ -228,7 +228,7 @@ pub enum PostBlobResponse {
     Ok { blobs: Vec<PostBlobResponsePart> },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResolvedBlob {
     pub id: Uuid,
     pub url: String,
