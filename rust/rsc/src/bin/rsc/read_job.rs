@@ -145,8 +145,9 @@ pub async fn read_job(
         .into_iter()
         .map(|m| {
             let blob_id = m.blob_id;
+            let job_id = m.job_id;
             let resolved_blob = resolved_blob_map.get(&blob_id).cloned().ok_or_else(|| {
-                format!("Missing resolved blob for {}", blob_id)
+                format!("Missing resolved blob for {}, from job_id: {}", blob_id, job_id)
             })?;
             Ok(ResolvedBlobFile {
                 path: m.path,
