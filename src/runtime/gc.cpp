@@ -158,7 +158,7 @@ void *Heap::scratch(size_t bytes) {
 }
 
 void Heap::report() const {
-  if (imp->profile_heap) {
+  if (imp->profile_heap >= 1) {
     std::stringstream s;
     s << "------------------------------------------" << std::endl;
     s << "Peak live heap " << (imp->most_pads * 8) << " bytes" << std::endl;
@@ -173,7 +173,7 @@ void Heap::report() const {
     }
     s << "------------------------------------------" << std::endl;
     // TODO: Add that this is coming from profile
-    status_get_generic_stream(STREAM_REPORT) << s.str() << std::endl;
+    std::cout << s.str() << std::endl;
   }
 }
 
@@ -194,6 +194,7 @@ void Heap::GC(size_t requested_pads) {
   size_t estimate_desired_size = imp->heap_factor * imp->last_pads + requested_pads;
   size_t elems = std::max(no_gc_overrun, estimate_desired_size);
 
+  // Resize the to space based on the above "calculation"
   imp->space ^= 1;
   Space &to = imp->spaces[imp->space];
   to.resize(elems);
@@ -201,19 +202,25 @@ void Heap::GC(size_t requested_pads) {
   Placement progress(to.array, to.array);
   std::map<const char *, ObjectStats> stats;
 
+  size_t num_roots = 0;
+  // Move and compact all root objects over to the new space
   for (RootRing *root = roots.next; root != &roots; root = root->next) {
     if (!root->root) continue;
     auto out = root->root->moveto(progress.free);
     progress.free = out.free;
     root->root = out.obj;
+    num_roots++;
   }
 
   int profile = imp->profile_heap;
+  size_t total_objs = 0;
+  // Iterating through the root objects we just moved and collect stats
   while (progress.obj != progress.free) {
     auto next = progress.obj->descend(progress.free);
     if (profile) {
       ObjectStats &s = stats[progress.obj->type()];
       ++s.objects;
+      total_objs++;
       s.pads += (static_cast<PadObject *>(next.obj) - static_cast<PadObject *>(progress.obj));
     }
     progress = next;
@@ -221,27 +228,32 @@ void Heap::GC(size_t requested_pads) {
 
   DestroyableObject *tail = nullptr;
   HeapObject *next;
+  size_t deleted_objs = 0;
+  // Iterate through objects in the (from space) and delete those which weren't moved
   for (HeapObject *obj = imp->finalize; obj; obj = next) {
+    // If we moved this object to the to space update its pointers to the to heap
     if (typeid(*obj) == typeid(MovedObject)) {
       MovedObject *mo = static_cast<MovedObject *>(obj);
       DestroyableObject *keep = static_cast<DestroyableObject *>(mo->to);
       next = keep->next;
       keep->next = tail;
       tail = keep;
-    } else {
+    } else { // if we did not move it destroy it
       next = static_cast<DestroyableObject *>(obj)->next;
       obj->~HeapObject();
+      deleted_objs++;
     }
   }
+  // Update to the last object in the to space
   imp->finalize = tail;
 
-  end = to.array + elems;
-  free = progress.free;
-  imp->last_pads = free - to.array;
+  end = to.array + elems; // elems doesn't include the extra 50% from resize
+  free = progress.free; // The place to append new things on the heap
+  imp->last_pads = free - to.array; // how many bytes were copied to the to space
   // Contain heap growth due to no_gc_overrun pessimism
   size_t desired_sized = imp->heap_factor * imp->last_pads + requested_pads;
   if (desired_sized < elems) {
-    end = to.array + desired_sized;
+    end = to.array + desired_sized; // Update the end to be smaller if we don't need that make space
   }
 
   if (imp->profile_heap) {
@@ -253,6 +265,10 @@ void Heap::GC(size_t requested_pads) {
     if (imp->profile_heap > 1 && !top.empty()) {
       s << "------------------------------------------" << std::endl;
       s << "Live heap " << (imp->last_pads * 8) << " bytes" << std::endl;
+      s << "Resize:" << elems << " elements" << std::endl;
+      s << "TotalObj:" << total_objs << " elements" << std::endl;
+      s << "Deleted:" << deleted_objs << " elements" << std::endl;
+      s << "Roots:" << num_roots << " elements" << std::endl;
       s << "------------------------------------------" << std::endl;
       s << "  Object type          Objects       Bytes" << std::endl;
       s << "  ----------------------------------------" << std::endl;
@@ -266,7 +282,7 @@ void Heap::GC(size_t requested_pads) {
       }
       s << "------------------------------------------" << std::endl;
       // TODO: Say that this is from profiling
-      status_get_generic_stream(STREAM_REPORT) << s.str() << std::endl;
+      std::cout << s.str() << std::endl;
     }
 
     if (imp->last_pads > imp->most_pads) {
