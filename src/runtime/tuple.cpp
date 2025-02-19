@@ -157,7 +157,9 @@ size_t Record::reserve(size_t size) {
 Record *Record::claim(Heap &h, Constructor *cons, size_t size) {
   bool big = size > 4;
   if (big) {
-    return new (h.claim(reserve(size))) BigRecord(cons, size);
+    Record *out = new (h.claim(reserve(size))) BigRecord(cons, size);
+    HeapAgeTracker::setAge(out, 0);
+    return out;
   } else {
     PadObject *dest = h.claim(reserve(size));
     switch (size) {
@@ -382,7 +384,9 @@ size_t Scope::reserve(size_t size) {
 Scope *Scope::claim(Heap &h, size_t size, Scope *next, Scope *parent, RFun *fun) {
   bool big = size > 4;
   if (big) {
-    return new (h.claim(reserve(size))) BigScope(size, next, parent, fun);
+    Scope *out =  new (h.claim(reserve(size))) BigScope(size, next, parent, fun);
+    HeapAgeTracker::setAge(out, 0);
+    return out;
   } else {
     PadObject *dest = h.claim(reserve(size));
     switch (size) {

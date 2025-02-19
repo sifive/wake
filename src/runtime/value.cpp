@@ -75,29 +75,39 @@ String::String(const String &s) : length(s.length) { memcpy(data(), s.data(), le
 String::String(const char *str, size_t length) : length(length) { memcpy(data(), str, length + 1); }
 
 String *String::claim(Heap &h, size_t length) {
-  return new (h.claim(reserve(length))) String(length);
+  String *out = new (h.claim(reserve(length))) String(length);
+  HeapAgeTracker::setAge(out, 0);
+  return out;
 }
 
 String *String::claim(Heap &h, const std::string &str) {
-  return new (h.claim(reserve(str.size()))) String(str.c_str(), str.size());
+  String *out = new (h.claim(reserve(str.size()))) String(str.c_str(), str.size());
+  HeapAgeTracker::setAge(out, 0);
+  return out;
 }
 
 String *String::claim(Heap &h, const char *str, size_t length) {
   String *out = new (h.claim(reserve(length))) String(str, length);
+  HeapAgeTracker::setAge(out, 0);
   out->c_str()[length] = 0;
   return out;
 }
 
 String *String::alloc(Heap &h, size_t length) {
-  return new (h.alloc(reserve(length))) String(length);
+  String *out = new (h.alloc(reserve(length))) String(length);
+  HeapAgeTracker::setAge(out, 0);
+  return out;
 }
 
 String *String::alloc(Heap &h, const std::string &str) {
-  return new (h.alloc(reserve(str.size()))) String(str.c_str(), str.size());
+  String *out = new (h.alloc(reserve(str.size()))) String(str.c_str(), str.size());
+  HeapAgeTracker::setAge(out, 0);
+  return out;
 }
 
 String *String::alloc(Heap &h, const char *str, size_t length) {
   String *out = new (h.alloc(reserve(length))) String(str, length);
+  HeapAgeTracker::setAge(out, 0);
   out->c_str()[length] = 0;
   return out;
 }
@@ -193,12 +203,14 @@ Integer::Integer(const Integer &i) : length(i.length) {
 
 Integer *Integer::claim(Heap &h, const MPZ &mpz) {
   Integer *out = new (h.claim(reserve(mpz))) Integer(mpz.value[0]._mp_size);
+  HeapAgeTracker::setAge(out, 0);
   memcpy(out->data(), mpz.value[0]._mp_d, sizeof(mp_limb_t) * abs(out->length));
   return out;
 }
 
 Integer *Integer::alloc(Heap &h, const MPZ &mpz) {
   Integer *out = new (h.alloc(reserve(mpz))) Integer(mpz.value[0]._mp_size);
+  HeapAgeTracker::setAge(out, 0);
   memcpy(out->data(), mpz.value[0]._mp_d, sizeof(mp_limb_t) * abs(out->length));
   return out;
 }
