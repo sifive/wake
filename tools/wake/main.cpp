@@ -679,6 +679,11 @@ int main(int argc, char **argv) {
     // The unreadable location might be irrelevant to the build
   }
 
+  if (clo.profileh)
+  {
+    HeapAgeTracker::initTracker(true);
+  }
+
   Profile tree;
   Runtime runtime(clo.profile ? &tree : nullptr, clo.profileh, heap_factor);
   bool sources = false;
