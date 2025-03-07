@@ -73,15 +73,15 @@ export def getFail: Result a b => Option b = match _
 # getWhenFail: retrieve the Pass value, using a default value for Fail
 #
 #   getWhenFail 42 (Pass 123) = 123
-#   getWhenFail 42 (Pass 123) = 42
+#   getWhenFail 42 (Fail "fail") = 42
 export def getWhenFail (default: pass): Result pass fail => pass = match _
     Pass a -> a
     Fail _ -> default
 
 # getWhenPass: retrieve the Fail value, using a default value for Pass
 #
-#   getWhenPass 42 (Pass 123) = 42
-#   getWhenPass 42 (Pass 123) = 123
+#   getWhenPass 42 (Pass "pass") = 42
+#   getWhenPass 42 (Fail 123) = 123
 export def getWhenPass (default: fail): Result pass fail => fail = match _
     Pass _ -> default
     Fail f -> f
