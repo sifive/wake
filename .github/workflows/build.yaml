@@ -241,7 +241,7 @@ jobs:
           run: touch .nojekyll
 
         - name: Upload
-          uses: actions/upload-pages-artifact@v1
+          uses: actions/upload-pages-artifact@v3
           with:
             path: .
 
@@ -263,7 +263,7 @@ jobs:
       steps:
         - name: Deploy
           id: deployment
-          uses: actions/deploy-pages@v1
+          uses: actions/deploy-pages@v4
 
     release:
       # Only run the 'release' job if this workflow was triggered by the creation of a tag
