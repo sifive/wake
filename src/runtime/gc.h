@@ -20,11 +20,11 @@
 
 #include <stdint.h>
 
+#include <iostream>
 #include <memory>
 #include <ostream>
 #include <typeinfo>
 #include <unordered_map>
-#include <iostream>
 #ifdef DEBUG_GC
 #include <cassert>
 #endif
@@ -58,19 +58,14 @@ struct HeapStep {
 };
 
 struct HeapAgeTracker {
-  static void initTracker(bool enable)
-  {
-    heapAgeTracker = enable;
-  }
+  static void initTracker(bool enable) { heapAgeTracker = enable; }
 
-  static void setAge(const HeapObject* obj, uint32_t age)
-  {
+  static void setAge(const HeapObject *obj, uint32_t age) {
     if (!heapAgeTracker) return;
     age_map[obj] = age;
   }
 
-  static uint32_t getAge(const HeapObject* obj)
-  {
+  static uint32_t getAge(const HeapObject *obj) {
     if (!heapAgeTracker) return 0;
     auto it = age_map.find(obj);
     if (it == age_map.end()) {
@@ -79,18 +74,16 @@ struct HeapAgeTracker {
     return it->second;
   }
 
-  static void removeAge(const HeapObject* obj)
-  {
+  static void removeAge(const HeapObject *obj) {
     if (!heapAgeTracker) return;
     age_map.erase(obj);
   }
 
-private:
-  //Don't want any instances of this
+ private:
+  // Don't want any instances of this
   HeapAgeTracker() = delete;
   static bool heapAgeTracker;
-  static std::unordered_map<const HeapObject*, uint32_t> age_map;
-
+  static std::unordered_map<const HeapObject *, uint32_t> age_map;
 };
 
 enum Category { VALUE, WORK };
@@ -392,16 +385,16 @@ size_t GCObject<T, B>::reserve() {
 template <typename T, typename B>
 template <typename... ARGS>
 T *GCObject<T, B>::claim(Heap &h, ARGS &&...args) {
-  T* obj = new (h.claim(sizeof(T) / sizeof(PadObject))) T(std::forward<ARGS>(args)...);
-  HeapAgeTracker::setAge(obj,0);
+  T *obj = new (h.claim(sizeof(T) / sizeof(PadObject))) T(std::forward<ARGS>(args)...);
+  HeapAgeTracker::setAge(obj, 0);
   return obj;
 }
 
 template <typename T, typename B>
 template <typename... ARGS>
 T *GCObject<T, B>::alloc(Heap &h, ARGS &&...args) {
-  T* obj = new (h.alloc(sizeof(T) / sizeof(PadObject))) T(std::forward<ARGS>(args)...);
-  HeapAgeTracker::setAge(obj,0);
+  T *obj = new (h.alloc(sizeof(T) / sizeof(PadObject))) T(std::forward<ARGS>(args)...);
+  HeapAgeTracker::setAge(obj, 0);
   return obj;
 }
 
@@ -410,10 +403,10 @@ Placement GCObject<T, B>::moveto(PadObject *free) {
   if (alignof(T) > alignof(PadObject))
     while (((uintptr_t)free & (alignof(T) - 1))) free = PadObject::place(free);
   T *from = self();
- 
+
   uint32_t old_age = HeapAgeTracker::getAge(from);
   T *to = new (free) T(std::move(*from));
-  
+
   HeapAgeTracker::setAge(to, old_age + 1);
   HeapAgeTracker::removeAge(from);
 

@@ -384,7 +384,7 @@ size_t Scope::reserve(size_t size) {
 Scope *Scope::claim(Heap &h, size_t size, Scope *next, Scope *parent, RFun *fun) {
   bool big = size > 4;
   if (big) {
-    Scope *out =  new (h.claim(reserve(size))) BigScope(size, next, parent, fun);
+    Scope *out = new (h.claim(reserve(size))) BigScope(size, next, parent, fun);
     HeapAgeTracker::setAge(out, 0);
     return out;
   } else {

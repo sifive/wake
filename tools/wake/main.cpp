@@ -679,8 +679,7 @@ int main(int argc, char **argv) {
     // The unreadable location might be irrelevant to the build
   }
 
-  if (clo.profileh)
-  {
+  if (clo.profileh) {
     HeapAgeTracker::initTracker(true);
   }
 

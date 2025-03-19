@@ -26,19 +26,19 @@
 #include <string.h>
 
 #include <algorithm>
+#include <chrono>
+#include <fstream>
 #include <iomanip>
 #include <map>
 #include <sstream>
 #include <vector>
-#include <chrono>
-#include <fstream>
 
 #include "status.h"
 
 #define INITIAL_HEAP_SIZE 1024
 
 bool HeapAgeTracker::heapAgeTracker = false;
-std::unordered_map<const HeapObject*, uint32_t> HeapAgeTracker::age_map;
+std::unordered_map<const HeapObject *, uint32_t> HeapAgeTracker::age_map;
 static std::ofstream g_csv;
 
 HeapObject::~HeapObject() {}
@@ -161,7 +161,9 @@ Heap::~Heap() {
 
 size_t Heap::used() const { return (free - imp->spaces[imp->space].array) * sizeof(PadObject); }
 
-size_t Heap::alloc() const { return (imp->spaces[0].alloc + imp->spaces[1].alloc) * sizeof(PadObject); }
+size_t Heap::alloc() const {
+  return (imp->spaces[0].alloc + imp->spaces[1].alloc) * sizeof(PadObject);
+}
 
 size_t Heap::avail() const { return (end - free) * sizeof(PadObject); }
 
@@ -208,16 +210,14 @@ struct StatOrder {
 void Heap::GC(size_t requested_pads) {
   auto gc_start = std::chrono::system_clock::now();
   std::time_t current_t = std::chrono::system_clock::to_time_t(gc_start);
-  std::tm* local_tm = std::localtime(&current_t);
+  std::tm *local_tm = std::localtime(&current_t);
   std::ostringstream curent_time_string;
-  
-  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                  gc_start.time_since_epoch()) % 1000;
-  
-  curent_time_string << std::put_time(local_tm, "%H:%M:%S") <<
-                  '.' << std::setfill('0') << std::setw(3) << ms.count();
- 
 
+  auto ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(gc_start.time_since_epoch()) % 1000;
+
+  curent_time_string << std::put_time(local_tm, "%H:%M:%S") << '.' << std::setfill('0')
+                     << std::setw(3) << ms.count();
   imp->gc_count += 1;
 
   Space &from = imp->spaces[imp->space];
@@ -255,8 +255,8 @@ void Heap::GC(size_t requested_pads) {
       ++s.objects;
       total_objs++;
       s.pads += (static_cast<PadObject *>(next.obj) - static_cast<PadObject *>(progress.obj));
-      
-      HeapObject* ho = static_cast<HeapObject*>(progress.obj);
+
+      HeapObject *ho = static_cast<HeapObject *>(progress.obj);
       auto obj_age = HeapAgeTracker::getAge(ho);
       if (obj_age < 2) {
         ++young_objects;
@@ -281,7 +281,7 @@ void Heap::GC(size_t requested_pads) {
       next = keep->next;
       keep->next = tail;
       tail = keep;
-    } else { // if we did not move it destroy it
+    } else {  // if we did not move it destroy it
       next = static_cast<DestroyableObject *>(obj)->next;
       obj->~HeapObject();
       deleted_objs++;
@@ -290,13 +290,14 @@ void Heap::GC(size_t requested_pads) {
   // Update to the last object in the to space
   imp->finalize = tail;
 
-  end = to.array + elems; // elems doesn't include the extra 50% from resize
-  free = progress.free; // The place to append new things on the heap
-  imp->last_pads = free - to.array; // how many bytes were copied to the to space
+  end = to.array + elems;            // elems doesn't include the extra 50% from resize
+  free = progress.free;              // The place to append new things on the heap
+  imp->last_pads = free - to.array;  // how many bytes were copied to the to space
   // Contain heap growth due to no_gc_overrun pessimism
   size_t desired_sized = imp->heap_factor * imp->last_pads + requested_pads;
   if (desired_sized < elems) {
-    end = to.array + desired_sized; // Update the end to be smaller if we don't need that much space
+    end =
+        to.array + desired_sized;  // Update the end to be smaller if we don't need that much space
   }
 
   double actual_growth = alloc() / (double)imp->previous_alloc;
@@ -315,8 +316,11 @@ void Heap::GC(size_t requested_pads) {
 
     if (imp->gc_count == 1) {
       g_csv.open("heap_log.csv", std::ios::out | std::ios::trunc);
-      g_csv << "GC#, Current Time Stamp, GC Cycle Duration (ms), Heap Factor, Actual Growth Factor, Total allocated (bytes), Current Semisphere, Semisphere 0 allocated, Semisphere 1 allocated, Live Heap (bytes), Free Space in Semi, " <<
-               "Percentage used of Semi, Percentage used of Alloc, Requested Space, Deleted, Young Objects (<2), Mid Objects (<5), Old Objects (>5), Total Objects\n";
+      g_csv << "GC#, Current Time Stamp, GC Cycle Duration (ms), Heap Factor, Actual Growth "
+               "Factor, Total allocated (bytes), Current Semisphere, Semisphere 0 allocated, "
+               "Semisphere 1 allocated, Live Heap (bytes), Free Space in Semi, "
+            << "Percentage used of Semi, Percentage used of Alloc, Requested Space, Deleted, Young "
+               "Objects (<2), Mid Objects (<5), Old Objects (>5), Total Objects\n";
     }
 
     if (imp->profile_heap > 1 && !top.empty()) {
@@ -329,14 +333,14 @@ void Heap::GC(size_t requested_pads) {
       s << "------------------------------------------" << std::endl;
       s << std::fixed << std::setprecision(2);
       s << "GC Number: " << imp->gc_count << std::endl;
-      s << "Current Time Stamp: " <<  curent_time_string.str() << std::endl;
+      s << "Current Time Stamp: " << curent_time_string.str() << std::endl;
       s << "Current GC Duration: " << gc_duration_ms << " ms" << std::endl;
       s << "Total actual allocated: " << alloc() << std::endl;
       s << "Live heap: " << used_space << " bytes" << std::endl;
       s << "Free Space left in semisphere: " << free_space << " bytes" << std::endl;
       s << "Percentage used of semisphere: " << percentage_used_semi << std::endl;
       s << "Percentage used of total allocated: " << percentage_used_allocated << std::endl;
-     
+
       s << "------------------------------------------" << std::endl;
       s << "  Object type          Objects       Bytes" << std::endl;
       s << "  ----------------------------------------" << std::endl;
@@ -349,26 +353,14 @@ void Heap::GC(size_t requested_pads) {
           << std::endl;
       }
       s << "------------------------------------------" << std::endl;
-      g_csv << std::fixed << std::setprecision(2)
-            << imp->gc_count << ", " 
-            << curent_time_string.str() << ", "
-            << gc_duration_ms << ", "
-            << imp->heap_factor << ", "
-            << actual_growth << ", "
-            << alloc() << ", "
-            << imp->space << ", "
+      g_csv << std::fixed << std::setprecision(2) << imp->gc_count << ", "
+            << curent_time_string.str() << ", " << gc_duration_ms << ", " << imp->heap_factor
+            << ", " << actual_growth << ", " << alloc() << ", " << imp->space << ", "
             << imp->spaces[0].alloc * sizeof(PadObject) << ", "
-            << imp->spaces[1].alloc * sizeof(PadObject) << ", "
-            << used_space << ", "
-            << free_space << ", "
-            << percentage_used_semi << ", "
-            << percentage_used_allocated << ", "
-            << requested_pads * sizeof(PadObject) << ", "
-            << deleted_objs << ", "
-            << young_objects << ", "
-            << mid_objects << ", "
-            << old_objects << ", "
-            << total_objs << "\n";
+            << imp->spaces[1].alloc * sizeof(PadObject) << ", " << used_space << ", " << free_space
+            << ", " << percentage_used_semi << ", " << percentage_used_allocated << ", "
+            << requested_pads * sizeof(PadObject) << ", " << deleted_objs << ", " << young_objects
+            << ", " << mid_objects << ", " << old_objects << ", " << total_objs << "\n";
 
       // TODO: Say that this is from profiling
       status_get_generic_stream(STREAM_REPORT) << s.str() << std::endl;
