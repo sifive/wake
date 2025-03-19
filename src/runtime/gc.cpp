@@ -179,7 +179,6 @@ void Heap::report() const {
     s << "------------------------------------------" << std::endl;
     s << "Peak live heap " << (imp->most_pads * 8) << " bytes" << std::endl;
     s << "Peak System Alloc: " << imp->peak_alloc << std::endl;
-    s << "Current Alloc: " << alloc() << std::endl;
     s << "------------------------------------------" << std::endl;
     s << "  Object type          Objects       Bytes" << std::endl;
     s << "  ----------------------------------------" << std::endl;
@@ -297,7 +296,7 @@ void Heap::GC(size_t requested_pads) {
   // Contain heap growth due to no_gc_overrun pessimism
   size_t desired_sized = imp->heap_factor * imp->last_pads + requested_pads;
   if (desired_sized < elems) {
-    end = to.array + desired_sized; // Update the end to be smaller if we don't need that make space
+    end = to.array + desired_sized; // Update the end to be smaller if we don't need that much space
   }
 
   double actual_growth = alloc() / (double)imp->previous_alloc;
