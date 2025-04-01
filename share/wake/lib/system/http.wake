@@ -46,10 +46,14 @@ tuple HttpRequest =
     Body: Option String
     # Multipart form data. May be a list of strings or files. Mutually exclusive with body
     FormData: Option (List HttpFormData)
+    # Specifies the total time (in seconds) that an entire request is allowed to take, from start to finish
+    MaxTime: Option Integer
+    # Specifies the maximum time (in seconds) that curl will wait for a network connection to be established
+    ConnectTime: Option Integer
 
 # The default response type to a http web request.
 export tuple HttpResponse =
-    # The status code returned from the web server. 
+    # The status code returned from the web server.
     #
     # Not all response have a status code so its not guarenteed to be set.
     export StatusCode: Option Integer
@@ -76,7 +80,7 @@ export tuple HttpResponse =
 #
 # NOTE: Relying on the internet for your build is inherently unreproducible and should be avoided.
 export def buildHttpRequest (url: String): HttpRequest =
-    HttpRequest url HttpMethodGet Nil None None
+    HttpRequest url HttpMethodGet Nil None None None None
 
 # Sets an http method to the http request.
 export def setMethod (method: HttpMethod): HttpRequest => HttpRequest =
@@ -121,6 +125,14 @@ export def unsafe_addFormData (name: String) (value: String) (contentType: Optio
             None -> Some (entry, Nil)
 
     editHttpRequestFormData setOrAppend
+
+export def setTimeout (maxTime: Integer) (connectTime: Integer): HttpRequest => HttpRequest =
+    def applyTimeout (hr: HttpRequest) =
+        hr
+        | setHttpRequestMaxTime (Some maxTime)
+        | setHttpRequestConnectTime (Some connectTime)
+
+    applyTimeout
 
 # Helper tuple for parsing a curl response
 tuple CurlResponseParts =
@@ -192,7 +204,7 @@ def methodToString = match _
     HttpMethodPatch -> "PATCH"
 
 # helper function for building up the curl cmd representing a request
-def makeCurlCmd ((HttpRequest url method headers body formData): HttpRequest) (extraFlags: List String): Result (List String) Error =
+def makeCurlCmd ((HttpRequest url method headers body formData _maxTime _connectTime): HttpRequest) (extraFlags: List String): Result (List String) Error =
     def headerToCurlFlag (HttpHeader name value) = "--header", "{name}:{value}", Nil
 
     def formDataToCurlFlag (HttpFormData name file contentType) = match contentType
@@ -243,13 +255,24 @@ def makeCurlCmd ((HttpRequest url method headers body formData): HttpRequest) (e
 #
 # WARNING: This function will likely break the sandbox and make your build unreliable
 export def makeRequest (request: HttpRequest): Result HttpResponse Error =
+    def maxTimeFlag =
+        match request.getHttpRequestMaxTime
+            None -> Nil
+            Some m -> ("--max-time", str m, Nil)
+
+    def connectTimeFlag =
+        match request.getHttpRequestConnectTime
+            None -> Nil
+            Some c -> ("--connect-timeout", str c, Nil)
+
     # -i -> Include response headers
-    require Pass cmd = makeCurlCmd request ("-i", Nil)
+    def extraFlags = ("-i", Nil) ++ maxTimeFlag ++ connectTimeFlag
+    require Pass cmd = makeCurlCmd request extraFlags
 
     def method = request.getHttpRequestMethod
     def url = request.getHttpRequestUrl
 
-    require Pass stdout =
+    def job =
         makeExecPlan cmd Nil
         | setPlanLabel "http: {method | methodToString} {url}"
         | setPlanStdout logNever
@@ -263,9 +286,23 @@ export def makeRequest (request: HttpRequest): Result HttpResponse Error =
         | setJobTag "http.method" "{method | methodToString}"
         | setJobTag "http.url" url
         | setJobInspectVisibilityHidden
-        | getJobStdout
 
-    parseCurlResponse stdout
+    match job.getJobStatus
+        Exited code ->
+            if code == 0 then
+                # cURL succeeded => parse the HTTP response
+                require Pass stdout = job.getJobStdout
+                parseCurlResponse stdout
+            else if code == 28 then
+                failWithError "curl timed out (exit code 28)"
+            else
+                require Pass err = job.getJobStderr
+                failWithError "curl exited with code {str code}:\n{err}"
+
+        Signaled sig ->
+            failWithError "curl was killed by signal {str sig}"
+
+        Aborted e -> failWithError "curl job was never launched / was aborted: {format e}"
 
 # Makes the request specified by request and writes body to a file. Avoid when possible.
 #
