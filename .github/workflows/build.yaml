@@ -252,7 +252,7 @@ jobs:
 
     deploy_docs:
       # Only run the 'deploy_docs' job if this workflow was triggered by a push to master
-      if: github.ref_name == 'test-gh-pages' && github.event_name == 'push'
+      if: github.ref_name == 'test-gh-pages'
 
       permissions:
         pages: write
