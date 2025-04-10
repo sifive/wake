@@ -36,23 +36,6 @@ export target rscRunner (rscApi: RemoteCacheApi): Runner =
 # mkRemoteCacheRunner (RemoteCacheApi ...) (\_ Pass "") "" baseRunner = (Runner ...)
 # ```
 export def mkRemoteCacheRunner (rscApi: RemoteCacheApi) (hashFn: RunnerInput => Result String Error) (wakeroot: String) ((Runner name baseDoIt): Runner): Runner =
-    def cleanupDisableRemoteCacheFile: Result Unit Error =
-        def cmd = "rm -f {disableCacheFilePath}"
-
-        require True =
-            makeShellPlan cmd Nil
-            | setPlanLabel "rsc: remove {disableCacheFilePath}"
-            | setPlanPersistence Once
-            | setPlanFnOutputs (\_ Nil)
-            | runJobWith localRunner
-            | setJobInspectVisibilityHidden
-            | isJobOk
-        else failWithError "Could not remove {disableCacheFilePath}"
-
-        Pass Unit
-
-    def _ = cleanupDisableRemoteCacheFile
-
     def runJobAndUpload job input hashKey =
         # Run the job to get the results
         require Pass output = baseDoIt job (Pass input)

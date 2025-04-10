@@ -126,11 +126,19 @@ export def unsafe_addFormData (name: String) (value: String) (contentType: Optio
 
     editHttpRequestFormData setOrAppend
 
-export def setTimeout (maxTime: Integer) (connectTime: Integer): HttpRequest => HttpRequest =
+export def setTimeout (maxTime: Option Integer) (connectTime: Option Integer): HttpRequest => HttpRequest =
+    def maxTimeOrDefault = match maxTime
+        Some t -> Some t
+        None -> Some 300
+
+    def connectTimeOrDefault = match connectTime
+        Some t -> Some t
+        None -> Some 10
+
     def applyTimeout (hr: HttpRequest) =
         hr
-        | setHttpRequestMaxTime (Some maxTime)
-        | setHttpRequestConnectTime (Some connectTime)
+        | setHttpRequestMaxTime maxTimeOrDefault
+        | setHttpRequestConnectTime connectTimeOrDefault
 
     applyTimeout
 
@@ -204,7 +212,7 @@ def methodToString = match _
     HttpMethodPatch -> "PATCH"
 
 # helper function for building up the curl cmd representing a request
-def makeCurlCmd ((HttpRequest url method headers body formData _maxTime _connectTime): HttpRequest) (extraFlags: List String): Result (List String) Error =
+def makeCurlCmd ((HttpRequest url method headers body formData maxTime connectTime): HttpRequest) (extraFlags: List String): Result (List String) Error =
     def headerToCurlFlag (HttpHeader name value) = "--header", "{name}:{value}", Nil
 
     def formDataToCurlFlag (HttpFormData name file contentType) = match contentType
@@ -229,6 +237,15 @@ def makeCurlCmd ((HttpRequest url method headers body formData _maxTime _connect
         Some x -> bodyToCurlFlag x
         None -> Pass Nil
 
+    def maxTimeFlag =
+        match maxTime
+            None -> Nil
+            Some m -> ("--max-time", str m, Nil)
+
+    def connectTimeFlag =
+        match connectTime
+            None -> Nil
+            Some c -> ("--connect-timeout", str c, Nil)
     # Curl does a preflight check before sending the request if it is large. In core use cases
     # this requres a clunky retry of the request. For now we accept the tradeoff of wasting time
     # uploading a reject file to not muddy the api. Setting 'Expect' to empty disables the check.
@@ -244,6 +261,8 @@ def makeCurlCmd ((HttpRequest url method headers body formData _maxTime _connect
         (heads | mapFlat headerToCurlFlag) ++
         bodyFlags ++
         (formData | omap (mapFlat formDataToCurlFlag) | optionToList | flatten) ++
+        maxTimeFlag ++
+        connectTimeFlag ++
         extraFlags
     )
     | Pass
@@ -255,19 +274,8 @@ def makeCurlCmd ((HttpRequest url method headers body formData _maxTime _connect
 #
 # WARNING: This function will likely break the sandbox and make your build unreliable
 export def makeRequest (request: HttpRequest): Result HttpResponse Error =
-    def maxTimeFlag =
-        match request.getHttpRequestMaxTime
-            None -> Nil
-            Some m -> ("--max-time", str m, Nil)
-
-    def connectTimeFlag =
-        match request.getHttpRequestConnectTime
-            None -> Nil
-            Some c -> ("--connect-timeout", str c, Nil)
-
     # -i -> Include response headers
-    def extraFlags = ("-i", Nil) ++ maxTimeFlag ++ connectTimeFlag
-    require Pass cmd = makeCurlCmd request extraFlags
+    require Pass cmd = makeCurlCmd request ("-i", Nil)
 
     def method = request.getHttpRequestMethod
     def url = request.getHttpRequestUrl

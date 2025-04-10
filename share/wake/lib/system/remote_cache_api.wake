@@ -33,6 +33,10 @@ export tuple RemoteCacheApi =
     export Port: Integer
     # The remote cache policy, certain policies require authorization
     export Policy: RemoteCachePolicy
+    # The total time (in seconds) that requests to the cache are allowed to take, from start to finish
+    export MaxTime: Option Integer
+    # The maximum time (in seconds) that requests to the cache will wait to establish a network connection
+    export ConnectTime: Option Integer
 
 ## --- POST /job/matching types ---
 
@@ -253,26 +257,36 @@ export def getRemoteCacheApiCanPull (api: RemoteCacheApi): Boolean =
 # makeRemoteCacheApi: Parses config string into RemoteCacheApi
 #
 # ```
-#  makeRemoteCacheApi "pushpull:local:1234:myauth" = Pass (RemoteCacheApi "local" 1234 (PushPull "myauth"))
-#  makeRemoteCacheApi "push:local:1234:myauth" = Pass (RemoteCacheApi "local" 1234 (Push "myauth"))
-#  makeRemoteCacheApi "pull:local:1234:" = Pass (RemoteCacheApi "local" 1234 Pull)
-#  makeRemoteCacheApi "pull:local:1234:myauth" = Pass (RemoteCacheApi "local" 1234 Pull)
+#  makeRemoteCacheApi "pushpull:local:1234:myauth:300:10" = Pass (RemoteCacheApi "local" 1234 (PushPull "myauth") (Some 300) (Some 10))
+#  makeRemoteCacheApi "push:local:1234:myauth" = Pass (RemoteCacheApi "local" 1234 (Push "myauth") None None)
+#  makeRemoteCacheApi "pull:local:1234:" = Pass (RemoteCacheApi "local" 1234 Pull None None)
+#  makeRemoteCacheApi "pull:local:1234:myauth" = Pass (RemoteCacheApi "local" 1234 Pull None None)
 #  makeRemoteCacheApi "push:local:1234" = Fail (...)
 #  makeRemoteCacheApi "push:local" = Fail (...)
 #  makeRemoteCacheApi "push:local:asdf:myauth" = Fail (...)
 # ```
 export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
-    require (policyStr, domain, portStr, authStr, Nil) =
-        config
-        | tokenize `:`
-    else
-        failWithError
-        "Remote cache config was set with incorrect format. Saw: '{config}'. Expected 'policy:domain:port:auth' (auth may be omitted)"
+    # split into at most 6 pieces, missing tail parts become ""
+    def parts = (config | tokenize `:`) ++ ("", "", "", "", "", Nil)
+
+    require (policyStr, domain, portStr, authStr, maxStr, connStr, _) = parts
+    else failWithError "Remote cache config was set with incorrect format. Saw: '{config}'. Expected 'policy:domain:port:auth:maxTime:connTime' (auth, maxTime, connTime may be omitted)"
 
     require Some (port) =
         portStr
         | int
     else failWithError "Remote cache config was set with non-integer port. Saw: {portStr}"
+
+    def parseOptInt (s: String): Result (Option Integer) Error =
+        if s ==* ""
+        then Pass None
+        else
+            match (int s)
+                Some i -> Pass (Some i)
+                None -> failWithError "timeout must be int"
+
+    require Pass maxT  = parseOptInt maxStr
+    require Pass connT = parseOptInt connStr
 
     require Pass policy = match (policyStr; authStr)
         "pull"; _ -> Pass (RemoteCachePolicyPullOnly)
@@ -282,7 +296,7 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
         "pushpull"; auth -> Pass (RemoteCachePolicyPushPull auth)
         p; _ -> failWithError "Policy '{p}' must be one of 'push', 'pull', 'pushpull'"
 
-    def api = RemoteCacheApi domain port policy
+    def api = RemoteCacheApi domain port policy maxT connT
 
     # When in debug mode, allow server incompatible version.
     def overrideOnDebugCache check =
@@ -320,8 +334,8 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
 #  (RemoteCacheApi "foo" 1 None) | rscApiPostStringBlob "foo" "my foo contents" = Fail "authorization required"
 # ```
 export def rscApiPostStringBlob (name: String) (value: String) (api: RemoteCacheApi): Result String Error =
-    require False = isRemoteCacheDisabled
-    else failWithError "RSC: Remote cache previously disabled due to timeout"
+    require False = isRemoteCacheDisabled Unit
+    else failWithError cascadeTimeoutErrorMessage
 
     def contentType = contentTypeFromSize value.strlen
 
@@ -337,8 +351,9 @@ export def rscApiPostStringBlob (name: String) (value: String) (api: RemoteCache
 #  (RemoteCacheApi "foo" 1 None) | rscApiPostFileBlob "foo" "/some/path/to/foo" = Fail "authorization required"
 # ```
 export def rscApiPostFileBlob (name: String) (file: String) (api: RemoteCacheApi): Result String Error =
-    require False = isRemoteCacheDisabled
-    else failWithError "RSC: Remote cache previously disabled due to timeout"
+    require False = isRemoteCacheDisabled Unit
+    else failWithError cascadeTimeoutErrorMessage
+
     # We must use unsafe here since we cannot elevate *file* to a Path without either copying it
     # or triggering the 'job output by multiple files' error.
 
@@ -355,8 +370,8 @@ export def rscApiPostFileBlob (name: String) (file: String) (api: RemoteCacheApi
 #  (RemoteCacheApi "foo" 1 None) | rscApiPostJob (CachePostRequest ...) = Fail "authorization required"
 # ```
 export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result Unit Error =
-    require False = isRemoteCacheDisabled
-    else failWithError "RSC: Remote cache previously disabled due to timeout"
+    require False = isRemoteCacheDisabled Unit
+    else failWithError cascadeTimeoutErrorMessage
 
     require Some auth = api.getRemoteCacheApiAuthorization
     else failWithError "rsc: RSC Client not configured for pushing to the server"
@@ -374,27 +389,16 @@ export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result U
 
         True
 
-    def request =
+    require Pass response =
         makeRoute api "job"
         | buildHttpRequest
         | setMethod HttpMethodPost
         | addContentTypeJsonHeader
         | addAuthorizationHeader auth
         | setBody jsonStr
-        | setTimeout 300 10
-
-    def attempt = makeRequest request
-
-    require Pass response = match attempt
-        Pass r -> Pass r
-        Fail err ->
-            def cause = err.getErrorCause
-            if cause ==* "curl timed out (exit code 28)"
-            then
-                def _ = disableRemoteCache
-                Fail  (makeError "rsc: Remote cache disabled due to timeout")
-            else
-                Fail (makeError cause)
+        | setTimeout api.getRemoteCacheApiMaxTime api.getRemoteCacheApiConnectTime
+        | makeRequest
+        | matchRequestResult req.getCachePostRequestLabel
 
     def _ =
         require True = shouldDebugRemoteCache Unit
@@ -418,8 +422,8 @@ export def rscApiPostJob (req: CachePostRequest) (api: RemoteCacheApi): Result U
 #  api | rscApiCheckJobAllowed (CacheAllowedRequest ...) = Pass True
 # ```
 export def rscApiCheckJobAllowed (req: CacheAllowedRequest) (api: RemoteCacheApi): Result Boolean Error =
-    require False = isRemoteCacheDisabled
-    else failWithError "RSC: Remote cache previously disabled due to timeout"
+    require False = isRemoteCacheDisabled Unit
+    else failWithError cascadeTimeoutErrorMessage
 
     require True = api.getRemoteCacheApiCanPush
     else failWithError "rsc: RSC Client not configured for pushing to the server"
@@ -439,26 +443,15 @@ export def rscApiCheckJobAllowed (req: CacheAllowedRequest) (api: RemoteCacheApi
 
         True
 
-    def request =
+    require Pass response =
         makeRoute api "job/allowed"
         | buildHttpRequest
         | setMethod HttpMethodPost
         | addContentTypeJsonHeader
         | setBody jsonStr
-        | setTimeout 300 10
-
-    def attempt = makeRequest request
-
-    require Pass response = match attempt
-        Pass r -> Pass r
-        Fail err ->
-            def cause = err.getErrorCause
-            if cause ==* "curl timed out (exit code 28)"
-            then
-                def _ = disableRemoteCache
-                Fail  (makeError "rsc: Remote cache disabled due to timeout")
-            else
-                Fail (makeError cause)
+        | setTimeout api.getRemoteCacheApiMaxTime api.getRemoteCacheApiConnectTime
+        | makeRequest
+        | matchRequestResult req.getCacheAllowedRequestLabel
 
     def _ =
         require True = shouldDebugRemoteCache Unit
@@ -494,8 +487,8 @@ export def rscApiCheckJobAllowed (req: CacheAllowedRequest) (api: RemoteCacheApi
 #  api | rscApiFindMatchingJob (CacheSearchRequest ...) = Pass (CacheSearchResponse ...)
 # ```
 export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi): Result CacheSearchResponse Error =
-    require False = isRemoteCacheDisabled
-    else failWithError "RSC: Remote cache previously disabled due to timeout"
+    require False = isRemoteCacheDisabled Unit
+    else failWithError cascadeTimeoutErrorMessage
 
     require True = api.getRemoteCacheApiCanPull
     else failWithError "rsc: RSC Client not configured for pulling from the server"
@@ -515,26 +508,15 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
 
         True
 
-    def request =
+    require Pass response =
         makeRoute api "job/matching"
         | buildHttpRequest
         | setMethod HttpMethodPost
         | addContentTypeJsonHeader
         | setBody jsonStr
-        | setTimeout 300 10
-
-    def attempt = makeRequest request
-
-    require Pass response = match attempt
-        Pass r -> Pass r
-        Fail err ->
-            def cause = err.getErrorCause
-            if cause ==* "curl timed out (exit code 28)"
-            then
-                def _ = disableRemoteCache
-                Fail  (makeError "rsc: Remote cache disabled due to timeout")
-            else
-                Fail (makeError cause)
+        | setTimeout api.getRemoteCacheApiMaxTime api.getRemoteCacheApiConnectTime
+        | makeRequest
+        | matchRequestResult req.getCacheSearchRequestLabel
 
     def _ =
         require True = shouldDebugRemoteCache Unit
@@ -558,24 +540,16 @@ export def rscApiFindMatchingJob (req: CacheSearchRequest) (api: RemoteCacheApi)
 #  api | rscApiCheckClientVersion "sifive/wake/1.2.3 = Pass Unit
 # ```
 export target rscApiCheckClientVersion (version: String) (api: RemoteCacheApi): Result Unit Error =
-    def request =
+    require False = isRemoteCacheDisabled Unit
+    else failWithError cascadeTimeoutErrorMessage
+
+    require Pass response =
         makeRoute api "version/check?version={version}"
         | buildHttpRequest
         | setMethod HttpMethodGet
-        | setTimeout 300 10
-
-    def attempt = makeRequest request
-
-    require Pass response = match attempt
-        Pass r -> Pass r
-        Fail err ->
-            def cause = err.getErrorCause
-            if cause ==* "curl timed out (exit code 28)"
-            then
-                def _ = disableRemoteCache
-                Fail  (makeError "rsc: Remote cache disabled due to timeout")
-            else
-                Fail (makeError cause)
+        | setTimeout api.getRemoteCacheApiMaxTime api.getRemoteCacheApiConnectTime
+        | makeRequest
+        | matchRequestResult "version check"
 
     match response.getHttpResponseStatusCode
         Some 200 -> Pass Unit
@@ -588,31 +562,20 @@ export target rscApiCheckClientVersion (version: String) (api: RemoteCacheApi): 
 #  api | rscApiCheckAuthorization = Pass Unit
 # ```
 export target rscApiCheckAuthorization (api: RemoteCacheApi): Result Unit Error =
-    require False = isRemoteCacheDisabled
-    else failWithError "RSC: Remote cache previously disabled due to timeout"
+    require False = isRemoteCacheDisabled Unit
+    else failWithError cascadeTimeoutErrorMessage
 
     require Some auth = api.getRemoteCacheApiAuthorization
     else failWithError "rsc: Checking authorization requires authorization but none was provided"
 
-    def request =
+    require Pass response =
         makeRoute api "auth/check"
         | buildHttpRequest
         | setMethod HttpMethodPost
         | addAuthorizationHeader auth
-        | setTimeout 300 10
-
-    def attempt = makeRequest request
-
-    require Pass response = match attempt
-        Pass r -> Pass r
-        Fail err ->
-            def cause = err.getErrorCause
-            if cause ==* "curl timed out (exit code 28)"
-            then
-                def _ = disableRemoteCache
-                Fail  (makeError "rsc: Remote cache disabled due to timeout")
-            else
-                Fail (makeError cause)
+        | setTimeout api.getRemoteCacheApiMaxTime api.getRemoteCacheApiConnectTime
+        | makeRequest
+        | matchRequestResult "auth check"
 
     match response.getHttpResponseStatusCode
         Some 200 -> Pass Unit
@@ -729,15 +692,46 @@ export def rscApiGetFileBlob ((CacheSearchBlob blobId uri): CacheSearchBlob) (pa
 
 export def disableCacheFilePath: String = ".build/tmp/disable_remote_cache"
 
-export def isRemoteCacheDisabled: Boolean =
-    match (unsafe_stat disableCacheFilePath)
-        (Pass _) -> True
-        (Fail _) -> False
+def timeoutErrorMessage: String = "rsc: Remote cache disabled due to timeout"
+def cascadeTimeoutErrorMessage: String = "rsc: Remote cache previously disabled due to timeout"
 
-def disableRemoteCache: Result Path Error =
-    require Pass path = write disableCacheFilePath ""
-    Pass path
+def randomUUID Unit: Result String Error =
+    def uuidJob =
+        makeExecPlan ("uuidgen", "-r", Nil) Nil
+        | setPlanLabel "generate uuid"
+        | setPlanPersistence Once # Exacally one UUID per wake invocation
+        | runJobWith localRunner
 
+    require True = isJobOk uuidJob
+    else failWithError "failed to generate UUID for Wake invocation."
+
+    uuidJob
+    | getJobStdout
+
+def disableRemoteCache Unit: Result Unit Error =
+    require Pass uuid = randomUUID Unit
+    require Pass _ = write disableCacheFilePath uuid
+    Pass Unit
+
+def readTmpFile (pathStr: String): Result String Error =
+    def imp p = prim "read"
+
+    match (imp pathStr)
+        Pass body -> Pass body
+        Fail f -> Fail (makeError f)
+
+export def isRemoteCacheDisabled Unit: Boolean =
+    require Pass currentWakeUuid = randomUUID Unit
+    else False
+
+    match (readTmpFile disableCacheFilePath)
+        Pass writtenUuid ->
+            if writtenUuid ==* currentWakeUuid
+            then
+                True
+            else
+                False
+        Fail _ -> False
 
 ## --- Helper functions ---
 
@@ -767,38 +761,41 @@ def getPathAsJson path =
         "hash" :-> JString path.getPathHash,
     )
 
-# Helper function for building the route for the resource
-def makeRoute ((RemoteCacheApi domain port _)) (resource: String): String =
-    "{domain}:{port | str}/{resource}"
-
-# Helper function for uploading a blob.
-def uploadBlobRequest (api: RemoteCacheApi) (setBlob: HttpRequest => HttpRequest): Result String Error =
-    require False = isRemoteCacheDisabled
-    else failWithError "RSC: Remote cache previously disabled due to timeout"
-
-    require Some auth = api.getRemoteCacheApiAuthorization
-    else failWithError "rsc: RSC Client not configured for pushing to the server"
-
-    def request =
-        makeRoute api "blob"
-        | buildHttpRequest
-        | setMethod HttpMethodPost
-        | addAuthorizationHeader auth
-        | setBlob
-        | setTimeout 300 10
-
-    def attempt = makeRequest request
-
-    require Pass response = match attempt
+# Helper function for further processing the result of a http request in relation to the rsc
+def matchRequestResult (label: String) (attempt: Result HttpResponse Error): Result HttpResponse Error =
+    match attempt
         Pass r -> Pass r
         Fail err ->
             def cause = err.getErrorCause
             if cause ==* "curl timed out (exit code 28)"
             then
-                def _ = disableRemoteCache
-                Fail  (makeError "rsc: Remote cache disabled due to timeout")
+                def _ = disableRemoteCache Unit
+                def _ = breadcrumb "{label}: Disabling RSC due to timeout"
+                Fail (makeError timeoutErrorMessage)
             else
                 Fail (makeError cause)
+
+# Helper function for building the route for the resource
+def makeRoute ((RemoteCacheApi domain port _ _ _)) (resource: String): String =
+    "{domain}:{port | str}/{resource}"
+
+# Helper function for uploading a blob.
+def uploadBlobRequest (api: RemoteCacheApi) (setBlob: HttpRequest => HttpRequest): Result String Error =
+    require False = isRemoteCacheDisabled Unit
+    else failWithError cascadeTimeoutErrorMessage
+
+    require Some auth = api.getRemoteCacheApiAuthorization
+    else failWithError "rsc: RSC Client not configured for pushing to the server"
+
+    require Pass response =
+        makeRoute api "blob"
+        | buildHttpRequest
+        | setMethod HttpMethodPost
+        | addAuthorizationHeader auth
+        | setBlob
+        | setTimeout api.getRemoteCacheApiMaxTime api.getRemoteCacheApiConnectTime
+        | makeRequest
+        | matchRequestResult "blob upload"
 
     require (Some 200) = response.getHttpResponseStatusCode
     else
@@ -1079,3 +1076,81 @@ def mkCacheSearchResponse (json: JValue): Result CacheSearchResponse Error =
     obytes
     | Match
     | Pass
+
+## --- Test functions ---
+export def testDisablingCacheWithEndpoints (api: RemoteCacheApi): Result Unit Error =
+
+    def testDisableCache Unit: Result Unit Error =
+        require Pass _ = disableRemoteCache Unit
+        if isRemoteCacheDisabled Unit
+        then Pass Unit
+        else failWithError "Remote cache was not disabled"
+
+    def testAuthorization Unit: Result Unit Error =
+        require Pass _ = rscApiCheckAuthorization api
+        Pass Unit
+
+
+    def testVersionCheck Unit: Result Unit Error =
+        require Pass _ = rscApiCheckClientVersion "test/1.0.0" api
+        Pass Unit
+
+    def testJobAllowed Unit: Result Unit Error =
+        def input = RunnerInput "test" Nil Nil Nil "." "" Nil "" (Usage 0 0.0 0.0 0 0 0) False (\x x) (\x x)
+        def output = RunnerOutput Nil Nil Nil (Usage 0 0.0 0.0 0 0 0)
+        def req = mkCacheAllowedRequest input output "test-hash"
+        require Pass _ = rscApiCheckJobAllowed req api
+        Pass Unit
+
+    def testJobPost Unit: Result Unit Error =
+        def postRequest = CachePostRequest"test-post-job" ("echo", Nil) "." Nil "" False "" Nil Nil Nil Nil "" "" 0 0.0 0.0 0 0 0
+        require Pass _ = rscApiPostJob postRequest api
+        Pass Unit
+
+    def testJobSearch Unit: Result Unit Error =
+        def searchRequest = CacheSearchRequest "test-search-job" ("echo", Nil) "." Nil "" False "" Nil
+
+        require Pass _ = rscApiFindMatchingJob searchRequest api
+        Pass Unit
+
+    def testStringBlobUpload Unit: Result Unit Error =
+        require Pass _ = rscApiPostStringBlob "test-blob" "test content" api
+        Pass Unit
+
+    def testFileBlobUpload Unit: Result Unit Error =
+        require Pass _ = rscApiPostFileBlob "test-blob" "/path/to/test/file" api
+        Pass Unit
+
+    def runTests Unit: Result Unit Error =
+        # First Disable Cache
+        require Pass _ = testDisableCache Unit
+
+        # Run subsequent calls and check that all of them return cascadeTimeout
+        def subsequentResults : List (Result Unit Error) =
+            testAuthorization Unit,
+            testVersionCheck Unit,
+            testJobPost Unit,
+            testJobAllowed Unit,
+            testJobSearch Unit,
+            testJobSearch Unit,
+            testStringBlobUpload Unit,
+            testFileBlobUpload Unit,
+            Nil
+
+        def hasCascadeTimeout = match subsequentResults
+            (Fail err1, Fail err2, Fail err3, Fail err4, Fail err5, Fail err6, Fail err7, Fail err8, Nil) ->
+                err1.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err2.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err3.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err4.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err5.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err6.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err7.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err8.getErrorCause ==* cascadeTimeoutErrorMessage
+            _ -> False
+
+        if hasCascadeTimeout
+        then Pass Unit
+        else Fail (makeError "No subsequent calls failed with cascade timeout message")
+
+    runTests Unit
