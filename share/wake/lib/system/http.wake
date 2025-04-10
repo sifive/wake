@@ -229,15 +229,14 @@ def makeCurlCmd ((HttpRequest url method headers body formData maxTime connectTi
         Some x -> bodyToCurlFlag x
         None -> Pass Nil
 
-    def maxTimeFlag =
-        match maxTime
-            None -> Nil
-            Some m -> ("--max-time", str m, Nil)
+    def maxTimeFlag = match maxTime
+        None -> Nil
+        Some m -> ("--max-time", str m, Nil)
 
-    def connectTimeFlag =
-        match connectTime
-            None -> Nil
-            Some c -> ("--connect-timeout", str c, Nil)
+    def connectTimeFlag = match connectTime
+        None -> Nil
+        Some c -> ("--connect-timeout", str c, Nil)
+
     # Curl does a preflight check before sending the request if it is large. In core use cases
     # this requres a clunky retry of the request. For now we accept the tradeoff of wasting time
     # uploading a reject file to not muddy the api. Setting 'Expect' to empty disables the check.
@@ -292,16 +291,15 @@ export def makeRequest (request: HttpRequest): Result HttpResponse Error =
             if code == 0 then
                 # cURL succeeded => parse the HTTP response
                 require Pass stdout = job.getJobStdout
+
                 parseCurlResponse stdout
             else if code == 28 then
                 failWithError "curl timed out (exit code 28)"
             else
                 require Pass err = job.getJobStderr
+
                 failWithError "curl exited with code {str code}:\n{err}"
-
-        Signaled sig ->
-            failWithError "curl was killed by signal {str sig}"
-
+        Signaled sig -> failWithError "curl was killed by signal {str sig}"
         Aborted e -> failWithError "curl job was never launched / was aborted: {format e}"
 
 # Makes the request specified by request and writes body to a file. Avoid when possible.
