@@ -277,16 +277,20 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
         | int
     else failWithError "Remote cache config was set with non-integer port. Saw: {portStr}"
 
-    def parseOptInt (s: String): Result (Option Integer) Error =
-        if s ==* ""
-        then Pass None
-        else
-            match (int s)
-                Some i -> Pass (Some i)
-                None -> failWithError "timeout must be int"
+    # Defualt maxTime to 300 and connTime to 10 if empty
+    def maxT =
+        if maxStr ==* ""
+        then Some 300
+        else match (int maxStr)
+            Some i -> Some i
+            None -> Some 300
 
-    require Pass maxT  = parseOptInt maxStr
-    require Pass connT = parseOptInt connStr
+    def connT =
+        if connStr ==* ""
+        then Some 10
+        else match (int connStr)
+            Some i -> Some i
+            None -> Some 10
 
     require Pass policy = match (policyStr; authStr)
         "pull"; _ -> Pass (RemoteCachePolicyPullOnly)

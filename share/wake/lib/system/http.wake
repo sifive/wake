@@ -127,18 +127,10 @@ export def unsafe_addFormData (name: String) (value: String) (contentType: Optio
     editHttpRequestFormData setOrAppend
 
 export def setTimeout (maxTime: Option Integer) (connectTime: Option Integer): HttpRequest => HttpRequest =
-    def maxTimeOrDefault = match maxTime
-        Some t -> Some t
-        None -> Some 300
-
-    def connectTimeOrDefault = match connectTime
-        Some t -> Some t
-        None -> Some 10
-
     def applyTimeout (hr: HttpRequest) =
         hr
-        | setHttpRequestMaxTime maxTimeOrDefault
-        | setHttpRequestConnectTime connectTimeOrDefault
+        | setHttpRequestMaxTime maxTime
+        | setHttpRequestConnectTime connectTime
 
     applyTimeout
 
