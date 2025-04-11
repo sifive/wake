@@ -288,19 +288,17 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
         p; _ -> failWithError "Policy '{p}' must be one of 'push', 'pull', 'pushpull'"
 
     # Default maxTime to 300 and connTime to 10 if empty
-    require Pass maxT =
-        match maxStr
-            "" -> Pass 300
-            str -> match (int str)
-                Some v -> Pass v
-                None -> failWithError "Remote cache config maxTime must be an integer. Saw: {maxStr}"
+    require Pass maxT = match maxStr
+        "" -> Pass 300
+        str -> match (int str)
+            Some v -> Pass v
+            None -> failWithError "Remote cache config maxTime must be an integer. Saw: {maxStr}"
 
-    require Pass connT =
-        match connStr
-            "" -> Pass 10
-            str -> match (int str)
-                Some v -> Pass v
-                None -> failWithError "Remote cache config connTime must be an integer. Saw: {connStr}"
+    require Pass connT = match connStr
+        "" -> Pass 10
+        str -> match (int str)
+            Some v -> Pass v
+            None -> failWithError "Remote cache config connTime must be an integer. Saw: {connStr}"
 
     def api = RemoteCacheApi domain port policy (Some maxT) (Some connT)
 
