@@ -1,0 +1,9 @@
+from wake import _
+from remote_cache import _
+
+export def test Unit: Result Unit Error =
+    # Create a test RSC API instance pointing to a non-responsive endpoint with quick timeout
+    def api = RemoteCacheApi "10.255.255.1" 8080 (RemoteCachePolicyPushPull "test-auth") (Some 1) (Some 1)
+    require Pass _ = testDisablingCacheWithEndpoints api
+
+    Pass Unit

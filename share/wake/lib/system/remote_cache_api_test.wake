@@ -1,0 +1,114 @@
+package remote_cache
+
+from wake import _
+
+export def testDisablingCacheWithEndpoints (api: RemoteCacheApi): Result Unit Error =
+    def testDisableCache Unit: Result Unit Error =
+        require Pass _ = disableRemoteCache Unit
+
+        # The guard should fail when cache is disabled
+        require Fail _ = guardRemoteCacheDisabled Unit
+        else failWithError "Remote cache was not disabled"
+
+        Pass Unit
+
+    def testAuthorization Unit: Result Unit Error =
+        require Pass _ = rscApiCheckAuthorization api
+
+        Pass Unit
+
+    def testVersionCheck Unit: Result Unit Error =
+        require Pass _ = rscApiCheckClientVersion "test/1.0.0" api
+
+        Pass Unit
+
+    def testJobAllowed Unit: Result Unit Error =
+        def input =
+            RunnerInput "test" Nil Nil Nil "." "" Nil "" (Usage 0 0.0 0.0 0 0 0) False (\x x) (\x x)
+
+        def output = RunnerOutput Nil Nil Nil (Usage 0 0.0 0.0 0 0 0)
+        def req = mkCacheAllowedRequest input output "test-hash"
+
+        require Pass _ = rscApiCheckJobAllowed req api
+
+        Pass Unit
+
+    def testJobPost Unit: Result Unit Error =
+        def postRequest =
+            CachePostRequest
+            "test-post-job"
+            ("echo", Nil)
+            "."
+            Nil
+            ""
+            False
+            ""
+            Nil
+            Nil
+            Nil
+            Nil
+            ""
+            ""
+            0
+            0.0
+            0.0
+            0
+            0
+            0
+
+        require Pass _ = rscApiPostJob postRequest api
+
+        Pass Unit
+
+    def testJobSearch Unit: Result Unit Error =
+        def searchRequest =
+            CacheSearchRequest "test-search-job" ("echo", Nil) "." Nil "" False "" Nil
+
+        require Pass _ = rscApiFindMatchingJob searchRequest api
+
+        Pass Unit
+
+    def testStringBlobUpload Unit: Result Unit Error =
+        require Pass _ = rscApiPostStringBlob "test-blob" "test content" api
+
+        Pass Unit
+
+    def testFileBlobUpload Unit: Result Unit Error =
+        require Pass _ = rscApiPostFileBlob "test-blob" "/path/to/test/file" api
+
+        Pass Unit
+
+    def runTests Unit: Result Unit Error =
+        # First Disable Cache
+        require Pass _ = testDisableCache Unit
+
+        # Run subsequent calls and check that all of them return cascadeTimeout
+        def subsequentResults: List (Result Unit Error) =
+            testAuthorization Unit,
+            testVersionCheck Unit,
+            testJobPost Unit,
+            testJobAllowed Unit,
+            testJobSearch Unit,
+            testJobSearch Unit,
+            testStringBlobUpload Unit,
+            testFileBlobUpload Unit,
+            Nil
+
+        def hasCascadeTimeout = match subsequentResults
+            (Fail err1, Fail err2, Fail err3, Fail err4, Fail err5, Fail err6, Fail err7, Fail err8, Nil) ->
+                err1.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err2.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err3.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err4.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err5.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err6.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err7.getErrorCause ==* cascadeTimeoutErrorMessage &&
+                err8.getErrorCause ==* cascadeTimeoutErrorMessage
+            _ -> False
+
+        if hasCascadeTimeout then
+            Pass Unit
+        else
+            Fail (makeError "No subsequent calls failed with cascade timeout message")
+
+    runTests Unit
