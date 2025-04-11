@@ -279,15 +279,6 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
         | int
     else failWithError "Remote cache config was set with non-integer port. Saw: {portStr}"
 
-    # Default maxTime to 300 and connTime to 10 if empty
-    def maxT =
-        int maxStr
-        | getOrElse 300
-
-    def connT =
-        int connStr
-        | getOrElse 10
-
     require Pass policy = match (policyStr; authStr)
         "pull"; _ -> Pass (RemoteCachePolicyPullOnly)
         "push"; "" -> failWithError "Policy 'push' requires authorization"
@@ -295,6 +286,21 @@ export def makeRemoteCacheApi (config: String): Result RemoteCacheApi Error =
         "push"; auth -> Pass (RemoteCachePolicyPushOnly auth)
         "pushpull"; auth -> Pass (RemoteCachePolicyPushPull auth)
         p; _ -> failWithError "Policy '{p}' must be one of 'push', 'pull', 'pushpull'"
+
+    # Default maxTime to 300 and connTime to 10 if empty
+    require Pass maxT =
+        match maxStr
+            "" -> Pass 300
+            str -> match (int str)
+                Some v -> Pass v
+                None -> failWithError "Remote cache config maxTime must be an integer. Saw: {maxStr}"
+
+    require Pass connT =
+        match connStr
+            "" -> Pass 10
+            str -> match (int str)
+                Some v -> Pass v
+                None -> failWithError "Remote cache config connTime must be an integer. Saw: {connStr}"
 
     def api = RemoteCacheApi domain port policy (Some maxT) (Some connT)
 
