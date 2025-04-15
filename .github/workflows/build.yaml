@@ -132,8 +132,8 @@ jobs:
               test_cmd: rpm -i x86_64/*.rpm && cd tests && wake runTests
               install_src_glob: build/x86_64/*.rpm
 
-            - target: ubuntu_22_04
-              dockerfile: ubuntu-22.04
+            - target: ubuntu_22_04-x64-2
+              dockerfile: ubuntu-22.04-x64-2
               extra_docker_build_args: ''
               extra_docker_run_args: -w /$(ls -d build/wake-*)
               build_cmd: debuild -us -uc
