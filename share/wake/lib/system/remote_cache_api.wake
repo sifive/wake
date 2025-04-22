@@ -705,6 +705,7 @@ def generateUUID Unit: Result String Error =
         | setPlanLabel "rsc: generate client uuid"
         | setPlanPersistence Once # Exactly one UUID per wake invocation
         | runJobWith localRunner
+        | setJobInspectVisibilityHidden
 
     require True = isJobOk uuidJob
     else failWithError "failed to generate UUID for Wake invocation."
@@ -728,13 +729,13 @@ def readTmpFile (pathStr: String): Result String Error =
         Fail f -> Fail (makeError f)
 
 export def guardRemoteCacheDisabled Unit: Result Unit Error =
+    # If the file doesn't exist then we are not disabled
+    require Pass writtenUuid = readTmpFile disableCacheFilePath
+    else Pass Unit
+
     require Pass currentWakeUuid = generateUUID Unit
 
-    def isRemoteCacheDisabled Unit = match (readTmpFile disableCacheFilePath)
-        Pass writtenUuid -> writtenUuid ==* currentWakeUuid
-        Fail _ -> False
-
-    require False = isRemoteCacheDisabled Unit
+    require True = writtenUuid !=* currentWakeUuid
     else failWithError cascadeTimeoutErrorMessage
 
     Pass Unit
