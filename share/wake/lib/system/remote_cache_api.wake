@@ -705,6 +705,7 @@ def generateUUID Unit: Result String Error =
         | setPlanLabel "rsc: generate client uuid"
         | setPlanPersistence Once # Exactly one UUID per wake invocation
         | runJobWith localRunner
+        | setJobInspectVisibilityHidden
 
     require True = isJobOk uuidJob
     else failWithError "failed to generate UUID for Wake invocation."
