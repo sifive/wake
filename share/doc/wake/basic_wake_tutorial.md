@@ -10,15 +10,15 @@ This tutorial will teach you the basics of Wake language. After completeing this
 
 3. Create a wake database: `wake --init .`.After this you will see a `wake.db` file created inside the folder.
 
-4. Create a file with `.wake` extension and copy the functions mentioned in this tutorial and run using `wake` command in the terminal as mentioned in Step 5.  
+4. Create a file with `.wake` extension and copy the functions mentioned in this tutorial and run using `wake` command in the terminal as mentioned in Step 5.
 
 5. Run command for wake: `wake -vx '<function_name> <parameter_if_any>'`. Ex: `wake -vx 'double 2'`.
-   
+
    `v` stands for verbosity and `x` stands for execute the expression.
 
-6. To know about various wake options run `wake --help`. 
+6. To know about various wake options run `wake --help`.
 
-7. For more information on wake library click [here](https://sifive.github.io/wake/).
+7. For more information on wake library click [here](https://sifiveinc.github.io/wake/).
 
 ### wake `Hello World`
 
@@ -26,7 +26,7 @@ Copy the below function into a `.wake` file you created in step 4
 ```
 def abc = "Hello World"
 ```
-Then execute the following command 
+Then execute the following command
 ```
 wake -x 'abc'
 ```
@@ -85,7 +85,7 @@ def times4 x = double (double x)
 
 * Adds 2 integer values and gives out the result.
 ```
-def sumadd x y = x+y 
+def sumadd x y = x+y
 ```
 
 * power 2 3 = 8
@@ -94,7 +94,7 @@ def power x n = x^n
 ```
 
 #### lambda operator (\)
-The lambda operator `\` is an alternative way to define the parameters of a function. 
+The lambda operator `\` is an alternative way to define the parameters of a function.
 
 * Function aveI(averageOfInteger) takes 2 arguments x and y. It adds the two values and divides the result by 2.Previously we saw that we could define this as `def aveI x y = (x+y)/2`.The function below shows the lambda operator way of defining the parameters. The two definitions are logically the same.
 ```
@@ -116,7 +116,7 @@ Few of the commonly used built-in functions in this tutorial is given below
 #### Operation on String
 * `explode` breaks a string into a list of string character.
 * `strlen` returns the length of the given string.
-* `cat` concatenates the elements in list of string to a string. 
+* `cat` concatenates the elements in list of string to a string.
 
 * strlen returns the length of the given string.
 ```
@@ -148,7 +148,7 @@ def duplicate s  ="{s}{s}"
 * `filter`  applies a function and builds a new list from it.
 * `zip` takes 2 lists and converts them to list of Pairs.
 
-#### Miscellaneous Built-In Functions 
+#### Miscellaneous Built-In Functions
 * integerToUnicode is a `wake built-in function` which takes the ASCII input and provides its equivalent character.
 ```
 wake -x 'integerToUnicode 99'
@@ -166,7 +166,7 @@ A List is a sequence of items of same type. Empty list returns `Nil`. `head` ret
 ```
 def listcreate xx = xx,xx,xx,Nil
 ```
- 
+
 * Example shows how to prepend the list of integers with the given value.
 ```
 def d = 1,2,3,Nil
@@ -195,7 +195,7 @@ wake -x '(1,2,3,Nil) ++ (4,5,6,Nil)'
 ** `a` is a list of integers because it prepends the output of `(b + strlen c)`.
 
 ```
-def madeup a b c =  (b + strlen c), a 
+def madeup a b c =  (b + strlen c), a
 ```
 
 ### Parenthesis vs Pipe
@@ -215,7 +215,7 @@ It is similar to the traditional `if` construct we use in C language. `if(condit
 ```
 def middle fullstring =
   def slength = if (strlen fullstring % 2 == 0) then (strlen fullstring / 2) else  ((strlen fullstring / 2) + 1)
-  def outputstr = explode fullstring | take slength | reverse | head 
+  def outputstr = explode fullstring | take slength | reverse | head
   outputstr
 ```
 
@@ -234,17 +234,17 @@ def incfirst fullstring chrstr = explode fullstring | tail | prepend chrstr | ca
 
 * Function reorder takes a string , split the string and then reverses the splitted string and then concantenates both (Ex: hangover -> overhang).
 ```
-def reorder fullstring = 
-  def Pair firststr laststr = 
+def reorder fullstring =
+  def Pair firststr laststr =
     explode fullstring
-    | splitAt (strlen fullstring / 2) 
-  cat (laststr ++ firststr)                         
+    | splitAt (strlen fullstring / 2)
+  cat (laststr ++ firststr)
 ```
 
 * Function dubmid takes a string, duplicates the middle character and gives out the string (Ex: hapy -> happy))
 ```
 def dubmid fullstring =
-  def Pair firststr laststr = 
+  def Pair firststr laststr =
     explode fullstring
     | splitAt (strlen fullstring / 2)
   def dupli = laststr | take 1
@@ -258,7 +258,7 @@ wake -x '"been"| explode | take 3| cat'
 
 * Replaces the first charcter with the character "c"
 ```
-wake -x '"bad"| explode | drop 1| prepend "c" | cat' 
+wake -x '"bad"| explode | drop 1| prepend "c" | cat'
 ```
 
 * Try out these examples which act on strings
@@ -299,7 +299,7 @@ wake -x 'cat((tail (explode "seat")) ++(take 1(explode "seat")))'
 
 ### Tuple
 A tuple is collection of items of different types.
-* Below example shows the declaration of a tuple. 
+* Below example shows the declaration of a tuple.
 ```
 tuple Collection =
   global IntValue : Integer
@@ -309,11 +309,11 @@ tuple Collection =
 
 `get`,`set` and `edit` are the three inbuilt methods that can be used with any Tuple.
 
-`set<tuple name><field Name>` 
+`set<tuple name><field Name>`
 `set` operation sets(writes) value to the tuple field
-`get<tuple name><field Name>` 
+`get<tuple name><field Name>`
 `get` operation gets(reads) value of the tuple field
-`edit<tuple name><field Name>` 
+`edit<tuple name><field Name>`
 `edit` operation moidifies value to the tuple field
 
 ```
@@ -328,11 +328,11 @@ A function which does one of the following is a higher order function
 1. Takes one or more functions as argument
 2. Returns a function as its result
 
-* Funtion tea shows the way to pass a function as a argument 
+* Funtion tea shows the way to pass a function as a argument
 ```
 def tea f = f 4
 ```
-* `Map is the best example for a Higher Order Function` 
+* `Map is the best example for a Higher Order Function`
 
 ### Map
 Map is a higher order function which takes a function and applies the same to every element in the list.
@@ -352,7 +352,7 @@ def op3 = double (inc (triple 1))
 def op4 = triple (inc (double 1))
 def op5 = tea double
 def op6 = tea inc
-def op7 = tea inc | double 
+def op7 = tea inc | double
 def op8 = map double (1,2,3,Nil)
 def op9 = map double (1,2,3,Nil) | map inc
 ```
@@ -397,10 +397,10 @@ def facto1 n = if n == 0 then 1 else  n * facto (n-1)
 ```
 def facto = match _
   0 = 1
-  n = n * facto (n-1) 
+  n = n * facto (n-1)
 ```
 
-* Ex: `facto 5 ` 
+* Ex: `facto 5 `
 ```
 facto = 5 * facto (5-1)
       = 5 * 4 * facto (4-1)
@@ -424,7 +424,7 @@ def d1 = match _
 
 def h n = match n
   0 = 1
-  n = h(n-1) + h(n-1) 
+  n = h(n-1) + h(n-1)
 
 def j = match _
   0 = Nil
@@ -444,7 +444,7 @@ def g = match _
 
 def l = match _
   0 = 0
-  n = n % 10 + l (n / 10) 
+  n = n % 10 + l (n / 10)
 ```
 
 * sumto 4 = 4+3+2+1+0
@@ -453,7 +453,7 @@ def sumto n = match n
   0 = 0
   n = n + sumto (n-1)
 ```
-			
+
 * listfrom 4 = (4,3,2,1,Nil)
 ```
 def listfrom n = match n
@@ -463,7 +463,7 @@ def listfrom n = match n
 
 * strcopy "ab" 4 = "abababab"
 ```
-def strcopy str n = match n 
+def strcopy str n = match n
   0 = ""
   n = "{str}{strcopy str (n-1)}"
 ```
@@ -492,14 +492,14 @@ def sumevens n = if (n==0) then 0 else if (n%2 ==0) then n + sumevens (n-2) else
 
 ```
 def natstring = "succ"
-def nat n = match n 
+def nat n = match n
   0 = "zero"
   n = "{natstring}({nat(n-1)})"
 ```
 #### Recursion On Lists
 * Adds all the elements in a list and provids the sum
 ```
-def sum n = match n 
+def sum n = match n
   Nil = 0
   h,t = h + sum t
 ```
@@ -537,7 +537,7 @@ def dupelist2 = foldr (\x \y x,x,y) Nil
 
 def dupelist1 n = mapFlat (\x (x,x,Nil) ) n
 
-def dupelist3 = mapFlat (\x (x,x,Nil) ) 
+def dupelist3 = mapFlat (\x (x,x,Nil) )
 ```
 #### More Examples
 * Returns the length of a list
@@ -555,7 +555,7 @@ def prodlist n = foldr (_ * _)1 n
 def vallist n =n | map (\x x | int | getOrElse 0)
 ```
 
-* spacelist ("1","2","3",Nil) = ("1","","2","","3","",Nil) 
+* spacelist ("1","2","3",Nil) = ("1","","2","","3","",Nil)
 ```
 def spacelist n = n | mapFlat (\x(x,"",Nil))
 ```
@@ -570,7 +570,7 @@ wake -x 'flatten ((1,2,3,Nil),(4,5,6,Nil),Nil)'
 def last1 n = n | reverse | head
 ```
 
-* Finds a given element in a given list or else returns None 
+* Finds a given element in a given list or else returns None
 ```
 wake -x '(1,2,3,1,Nil)| find (\x x==2)'
 ```
@@ -582,7 +582,7 @@ wake -x '(1,2,3,Nil)|map (\x 4*x)'
 
 * Counts the no of 1's in a given list
 ```
-def count1 n = n | filter (\x x == 1) | len  
+def count1 n = n | filter (\x x == 1) | len
 ```
 
 * Creates a list of Pairs
@@ -600,7 +600,7 @@ def altern n m = zip n m | mapFlat (\x (x.getPairFirst, x.getPairSecond,Nil) )
 def altern1 m n = match m n
   _      Nil    = Nil
   Nil    _      = Nil
-  (h,t) (h1,t1) = h,h1, altern1 t t1    
+  (h,t) (h1,t1) = h,h1, altern1 t t1
 ```
 
 * Returns the head from list (list Integers)
@@ -615,7 +615,7 @@ def tlify n = n | map (\x x | tail)
 
 * Outputs the extra element in the list by comapring the length of the given 2 lists
 ```
-def diff n m = match n m 
+def diff n m = match n m
   Nil x = x
   x Nil = x
   (_,t)(_,t1) = diff t t1
@@ -646,24 +646,24 @@ def takeN n m = m | take n
 def dropN n m = m | drop n
 ```
 
-* Creates a list with n as its first element and m as the last element 
+* Creates a list with n as its first element and m as the last element
 ```
 def upto n m = m-n+1 | seq | map (\x x+n)
 ```
 
-* Adds a space after a given string     
+* Adds a space after a given string
 ```
 def addspace s = "{s} "
 ```
 
-* Convert the String separated by spaces  into list of string 
+* Convert the String separated by spaces  into list of string
 ```
 def lex s = s | tokenize ` `
 ```
 
 * Doubles every element in the list
 ```
-def doublist n = match n 
+def doublist n = match n
   Nil = Nil
   h,t = 2*h , doublist t
 ```
@@ -682,7 +682,7 @@ def doublistmap n = n | map (\n 2*n)
 
 * Increment every element in the list using map function
 ```
-def inclistmap n = n | map (\n n+1) 
+def inclistmap n = n | map (\n n+1)
 ```
 
 * Returns a list with the leading spaces removed
@@ -693,7 +693,7 @@ def dropspace n = match n
 ```
 * Returns just the leading spaces
 ```
-def takespace n = match n 
+def takespace n = match n
   Nil = Nil
   h,t = if (h ==* " ") then h,takespace t else Nil
 ```
@@ -749,7 +749,7 @@ def queuePut1 r = foldl (\a\b b,a) Nil r
 * Try out these examples
 ```
 def listexample1 l e = l ++ (e,Nil)
-def listexample2 l = l | head | getOrElse 0 
+def listexample2 l = l | head | getOrElse 0
 def listexample3 l = l | tail
 ```
 `wake -x '("abc","def",Nil) | map(explode)|map ( head)'`
@@ -766,14 +766,14 @@ def mean l = l | foldr(_+_)0 | (\x x/ len l)
 
 * Finds the median in the given list of integers
 ```
-def median l = 
+def median l =
   def length = if (len l %2 ==0) then ((len l) /2)-1 else ((len l)/2)
   l | drop length | head
 ```
 
 #### Mutually Recursive Functions: Example
 ```
-def foo n = match n 
+def foo n = match n
   0 = "toff"
   n = bar(n-1)
 def bar n = match n
@@ -803,12 +803,12 @@ def chequeamount = Cheque (Pair "HDFC" 350.00)
 ```
 
 ### Queues
-Wake doesnt have a built-in queue. Examples shows how to create a queue and few functions that can act on queue. 
-The front of the queue is at the right, nearest the bus stop, items are added to the left. Consider the bus queue shown, boris is at the front of the queue, ivan is last. 
+Wake doesnt have a built-in queue. Examples shows how to create a queue and few functions that can act on queue.
+The front of the queue is at the right, nearest the bus stop, items are added to the left. Consider the bus queue shown, boris is at the front of the queue, ivan is last.
 `"ivan" $$ "tanya" $$ "boris" $$ P`
 * Created a data type Queue which is nothing but a FIFO.
 ```
-data Queue a = 
+data Queue a =
   P
   a $$ Queue a
 ```
