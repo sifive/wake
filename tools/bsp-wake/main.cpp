@@ -380,9 +380,21 @@ void CompileState::gotLine(JAST &row) {
   sendMessage(row);
 }
 
+static std::vector<std::string> targets(const JAST &params) {
+  std::vector<std::string> result;
+  for (auto &x : params.get("targets").children) {
+    const std::string &uri = x.second.get("uri").value;
+    if (uri.compare(0, sizeof(bsp) - 1, &bsp[0]) != 0) continue;
+    result.push_back(uri.substr(sizeof(bsp) - 1));
+  }
+  return result;
+}
+
 static void compile(JAST &response, const JAST &params, int argc, const char **argv) {
   CompileState state(argc, argv);
-  state.execute();
+  auto targs = targets(params);
+  for (auto &target : targs) state.cmdline.push_back(target);
+  if (!targs.empty()) state.execute();
   if (state.error.kind == JSON_NULLVAL) {
     JAST &result = response.add("result", JSON_OBJECT);
     bool ok = WIFEXITED(state.status) && WEXITSTATUS(state.status) == 0;
@@ -420,12 +432,7 @@ ExtractBSPDocument::ExtractBSPDocument(const std::string &method, const JAST &pa
   cmdline.push_back("bsp." + method);
 
   std::string outputs;
-  for (auto &x : params.get("targets").children) {
-    const std::string &uri = x.second.get("uri").value;
-    if (uri.compare(0, sizeof(bsp) - 1, &bsp[0]) != 0) continue;
-
-    outputs += uri.substr(sizeof(bsp) - 1) + ",";
-  }
+  for (auto &output : targets(params)) outputs += output + ",";
 
   cmdline.push_back("-o");
   cmdline.push_back(outputs);
