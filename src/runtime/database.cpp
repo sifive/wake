@@ -232,7 +232,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "create table if not exists log("
       "  log_id     integer primary key autoincrement,"
       "  job_id     integer not null references jobs(job_id) on delete cascade,"
-      "  descriptor integer not null,"  // 1=stdout, 2=stderr"
+      "  descriptor integer not null,"  // 1=stdout, 2=stderr, 3=runner_out, 4=runner_err
       "  seconds    real    not null,"  // seconds after job start
       "  output     text    not null);"
       "create index if not exists logorder on log(job_id, descriptor, log_id);"
@@ -1037,14 +1037,25 @@ std::string Database::get_output(long job, int descriptor) const {
   return out.str();
 }
 
-void Database::replay_output(long job, const char *stdout, const char *stderr) {
+void Database::replay_output(long job, const char *stdout, const char *stderr,
+                            const char *runner_out, const char *runner_err) {
   const char *why = "Could not replay job output";
   bind_integer(why, imp->replay_log, 1, job);
   while (sqlite3_step(imp->replay_log) == SQLITE_ROW) {
     int fd = sqlite3_column_int64(imp->replay_log, 0);
     const char *str = static_cast<const char *>(sqlite3_column_blob(imp->replay_log, 1));
     int len = sqlite3_column_bytes(imp->replay_log, 1);
-    if (len) status_get_generic_stream(fd == 2 ? stderr : stdout) << std::string(str, len);
+    if (len) {
+      if (fd == 1) {
+        status_get_generic_stream(stdout) << std::string(str, len);
+      } else if (fd == 2) {
+        status_get_generic_stream(stderr) << std::string(str, len);
+      } else if (fd == 3) {
+        status_get_generic_stream(runner_out) << std::string(str, len);
+      } else if (fd == 4) {
+        status_get_generic_stream(runner_err) << std::string(str, len);
+      }
+    }
   }
   finish_stmt(why, imp->replay_log, imp->debugdb);
 }
