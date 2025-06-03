@@ -151,7 +151,8 @@ struct Database {
   void save_output(  // call only if needs_build -> true
       long job, int descriptor, const char *buffer, int size, double runtime);
   std::string get_output(long job, int descriptor) const;
-  void replay_output(long job, const char *stdout, const char *stderr);
+  void replay_output(long job, const char *stdout, const char *stderr,
+                            const char *runner_out, const char *runner_err);
 
   // Returns all files created by wake jobs
   std::vector<std::string> get_outputs() const;
