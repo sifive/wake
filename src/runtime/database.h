@@ -184,6 +184,10 @@ struct Database {
   std::vector<FileDependency> get_file_dependencies() const;
 
   std::vector<std::pair<std::string, int>> get_interleaved_output(long job_id) const;
+
+  void set_runner_status(long job_id, int status);
+
+  int get_runner_status(long job_id);
 };
 
 #endif

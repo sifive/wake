@@ -38,7 +38,7 @@
 #include "wcl/iterator.h"
 
 // Increment every time the database schema changes
-#define SCHEMA_VERSION "6"
+#define SCHEMA_VERSION "7"
 
 #define VISIBLE 0
 #define INPUT 1
@@ -89,6 +89,8 @@ struct Database::detail {
   sqlite3_stmt *get_unhashed_file_paths;
   sqlite3_stmt *insert_unhashed_file;
   sqlite3_stmt *get_interleaved_output;
+  sqlite3_stmt *set_runner_status;
+  sqlite3_stmt *get_runner_status;
 
   long run_id;
   detail(bool debugdb_)
@@ -129,7 +131,9 @@ struct Database::detail {
         get_all_runs(0),
         get_edges(0),
         get_file_dependency(0),
-        get_interleaved_output(0) {}
+        get_interleaved_output(0),
+        set_runner_status(0),
+        get_runner_status(0) {}
 };
 
 static void close_db(Database::detail *imp) {
@@ -218,7 +222,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "  endtime     integer not null default 0,"
       "  keep        integer not null default 0,"
       "  stale       integer not null default 0,"   // 0=false, 1=true
-      "  is_atty     integer not null default 0);"  // 0=false, 1=true
+      "  is_atty     integer not null default 0,"  // 0=false, 1=true
+      "  runner_status integer not null default 0);"  // 0=success, non-zero=failure
       "create index if not exists job on jobs(directory, commandline, environment, stdin, "
       "signature, keep, job_id, stat_id);"
       "create index if not exists jobstats on jobs(stat_id);"
@@ -432,6 +437,10 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       " from log l"
       " where l.job_id = ?"
       " order by l.seconds";
+  const char *sql_set_runner_status =
+      "update jobs set runner_status=? where job_id=?";
+  const char *sql_get_runner_status =
+      "select runner_status from jobs where job_id=?";
 
 #define PREPARE(sql, member)                                                                     \
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);                                   \
@@ -482,6 +491,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_get_unhashed_file_paths, get_unhashed_file_paths);
   PREPARE(sql_insert_unhashed_file, insert_unhashed_file);
   PREPARE(sql_get_interleaved_output, get_interleaved_output);
+  PREPARE(sql_set_runner_status, set_runner_status);
+  PREPARE(sql_get_runner_status, get_runner_status);
 
   return "";
 }
@@ -541,6 +552,8 @@ void Database::close() {
   FINALIZE(get_unhashed_file_paths);
   FINALIZE(insert_unhashed_file);
   FINALIZE(get_interleaved_output);
+  FINALIZE(set_runner_status);
+  FINALIZE(get_runner_status);
 
   close_db(imp.get());
 }
@@ -1572,6 +1585,24 @@ std::vector<JobReflection> Database::matching(
 
   sqlite3_finalize(stmt);
   return out;
+}
+
+void Database::set_runner_status(long job_id, int status) {
+  const char *why = "Could not set runner status";
+  bind_integer(why, imp->set_runner_status, 1, status);
+  bind_integer(why, imp->set_runner_status, 2, job_id);
+  single_step(why, imp->set_runner_status, imp->debugdb);
+}
+
+int Database::get_runner_status(long job_id) {
+  int status = 0;
+  const char *why = "Could not get runner status";
+  bind_integer(why, imp->get_runner_status, 1, job_id);
+  if (sqlite3_step(imp->get_runner_status) == SQLITE_ROW) {
+    status = sqlite3_column_int(imp->get_runner_status, 0);
+  }
+  finish_stmt(why, imp->get_runner_status, imp->debugdb);
+  return status;
 }
 
 std::vector<JobEdge> Database::get_edges() {

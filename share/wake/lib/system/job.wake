@@ -172,7 +172,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
 
         def final _ = match output
             Fail e -> primJobFailFinish job e
-            Pass (RunnerOutput inputs outputs cleanable reality) ->
+            Pass (RunnerOutput inputs outputs cleanable reality _) ->
                 def hashedOutputs =
                     outputs
                     | computeHashes prefix
@@ -396,6 +396,13 @@ export def getJobRunnerError (job: Job): Result String Error =
 export def reportJobRunnerError (job: Job) (error: String): Job =
   (\j \e prim "job_report_runner_error") job error
 
+# Report a runner status for a job
+export def primJobSetRunnerStatus (job: Job) (status: Integer): Unit =
+    (\_ \_ prim "job_set_runner_status") job status
+
+# Get the runner status from a job
+export def getJobRunnerStatus (job: Job): Result Integer Error =
+    (\j prim "job_runner_status") job
 
 export def getJobInputs (job: Job): Result (List Path) Error =
     tree job 1
@@ -432,6 +439,11 @@ export def getJobOutput (job: Job): Result Path Error =
 export def isJobOk (job: Job): Boolean = match (getJobReport job)
     Fail _ -> False
     Pass u -> u.getUsageStatus == 0
+
+# Check if a job's runner status indicates success (0)
+export def isRunnerOk (job: Job): Boolean = match (getJobRunnerStatus job)
+    Fail _ -> False
+    Pass status -> status == 0
 
 export data Status =
     Exited Integer

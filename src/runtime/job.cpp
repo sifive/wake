@@ -118,6 +118,7 @@ struct Job final : public GCObject<Job, Value> {
   Usage predict;  // prediction of Runners given record (used by scheduler)
   Usage reality;  // actual measured local usage
   Usage report;   // usage to save into DB + report in Job API
+  int runner_status;        // Status code from the runner (0 = success)
 
   // There are 4 distinct wait queues for jobs
   HeapPointer<Continuation> q_stdout;   // waken once stdout closed
@@ -1224,7 +1225,8 @@ Job::Job(Database *db_, String *label_, String *dir_, String *stdin_file_, Strin
       stream_out(stream_out_),
       stream_err(stream_err_),
       runner_out(runner_out_),
-      runner_err(runner_err_)  {
+      runner_err(runner_err_),
+      runner_status(0) {
   start.tv_sec = stop.tv_sec = 0;
   start.tv_nsec = stop.tv_nsec = 0;
 
@@ -1932,6 +1934,42 @@ static PRIMFN(prim_job_record) {
   }
 }
 
+static PRIMTYPE(type_job_set_runner_status) {
+  return args.size() == 2 && args[0]->unify(Data::typeJob) && args[1]->unify(Data::typeInteger) &&
+         out->unify(Data::typeUnit);
+}
+
+static PRIMFN(prim_job_set_runner_status) {
+  EXPECT(2);
+  JOB(job, 0);
+  INTEGER_MPZ(status, 1);
+
+  int status_val = mpz_get_si(status);
+  job->runner_status = status_val;
+  job->db->set_runner_status(job->job, status_val);
+
+  runtime.heap.reserve(reserve_unit());
+  RETURN(claim_unit(runtime.heap));
+}
+
+static PRIMTYPE(type_job_runner_status) {
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(Data::typeInteger);
+  result[1].unify(Data::typeError);
+  return args.size() == 1 && args[0]->unify(Data::typeJob) && out->unify(result);
+}
+
+static PRIMFN(prim_job_runner_status) {
+  EXPECT(1);
+  JOB(job, 0);
+
+  int status = job->db->get_runner_status(job->job);
+  MPZ status_mpz(status);
+  runtime.heap.reserve(reserve_result() + Integer::reserve(status_mpz));
+  RETURN(claim_result(runtime.heap, true, Integer::claim(runtime.heap, status_mpz)));
+}
+
 static PRIMTYPE(type_access) {
   return args.size() == 2 && args[0]->unify(Data::typeString) &&
          args[1]->unify(Data::typeInteger) && out->unify(Data::typeBoolean);
@@ -2065,6 +2103,10 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   prim_register(pmap, "job_runner_output", prim_job_runner_output, type_job_output, PRIM_PURE);
 
   prim_register(pmap,"job_report_runner_error", prim_job_report_runner_error, type_job_report_runner_error, PRIM_IMPURE);
+
+  prim_register(pmap, "job_set_runner_status", prim_job_set_runner_status, type_job_set_runner_status, PRIM_IMPURE);
+
+  prim_register(pmap, "job_runner_status", prim_job_runner_status, type_job_runner_status, PRIM_PURE);
 
   // Get's the set of file paths of a job: 0=visible, 1=input, 2=output
   prim_register(pmap, "job_tree", prim_job_tree, type_job_tree, PRIM_PURE);
