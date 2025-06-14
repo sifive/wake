@@ -1175,17 +1175,25 @@ JAST JobReflection::to_structured_json() const {
 
   std::string out_stream;
   std::string err_stream;
+  std::string runner_out_stream;
+  std::string runner_err_stream;
+
   for (auto &write : std_writes) {
     if (write.second == 1) {
       out_stream += write.first;
-    }
-    if (write.second == 2) {
+    } else if (write.second == 2) {
       err_stream += write.first;
+    } else if (write.second == 3) {
+      runner_out_stream += write.first;
+    } else if (write.second == 4) {
+      runner_err_stream += write.first;
     }
   }
 
   json.add("stdout", out_stream);
   json.add("stderr", err_stream);
+  json.add("runner_output", runner_out_stream);
+  json.add("runner_error", runner_err_stream);
 
   JAST &usage_json = json.add("usage", JSON_OBJECT);
   usage_json.add("status", usage.status);

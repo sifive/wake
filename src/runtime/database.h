@@ -82,7 +82,7 @@ struct JobReflection {
   Time endtime;
   Time wake_start;
   std::string wake_cmdline;
-  // List of interleaved writes to stdout and stderr
+  // List of interleaved writes to (1) stdout, (2) stderr, (3) runner output, and (4) runner errors
   std::vector<std::pair<std::string, int>> std_writes;
   Usage usage;
   std::vector<FileReflection> visible;
