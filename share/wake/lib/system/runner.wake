@@ -151,8 +151,7 @@ export def localRunner: Runner =
                     1
                 else
                     reality.getUsageStatus
-            _ ->
-                0
+            _ -> 0
 
         def _ = primJobSetRunnerStatus job runnerStatus
 
@@ -362,6 +361,7 @@ export def makeJSONRunner ((JSONRunnerPlan rawScript extraArgs extraEnv estimate
 
         match usageResult
             Fail f -> Fail (makeError f)
-            Pass usage -> Pass (RunnerOutput filteredInputs filteredOutputs jsonOutputs usage runnerStatus)
+            Pass usage ->
+                Pass (RunnerOutput filteredInputs filteredOutputs jsonOutputs usage runnerStatus)
 
     makeRunner "json-{script}" run

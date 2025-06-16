@@ -160,7 +160,9 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
         def runner_out = getLogLevelName logRunnerOutput
         def runner_err = getLogLevelName logRunnerError
 
-        def job = primJobCreate label jobKey keep.booleanToInteger echo stdout stderr runner_out runner_err
+        def job =
+            primJobCreate label jobKey keep.booleanToInteger echo stdout stderr runner_out runner_err
+
         def prefix = str (getJobId job)
 
         def usage =
@@ -386,15 +388,15 @@ export def getJobFailedStderr (job: Job): Result String Error =
 
 # Get the runner output from a job
 export def getJobRunnerOutput (job: Job): Result String Error =
-  (\j \_ prim "job_runner_output") job 1
+    (\j \_ prim "job_runner_output") job 1
 
 # Get the runner error from a job
 export def getJobRunnerError (job: Job): Result String Error =
-  (\j \_ prim "job_runner_output") job 2
+    (\j \_ prim "job_runner_output") job 2
 
 # Report a runner error for a job
 export def reportJobRunnerError (job: Job) (error: String): Job =
-  (\j \e prim "job_report_runner_error") job error
+    (\j \e prim "job_report_runner_error") job error
 
 # Report a runner status for a job
 export def primJobSetRunnerStatus (job: Job) (status: Integer): Unit =
@@ -440,7 +442,6 @@ export def isJobOk (job: Job): Boolean = match (getJobReport job)
     Fail _ -> False
     Pass u -> u.getUsageStatus == 0
 
-# Check if a job's runner status indicates success (0)
 export def isRunnerOk (job: Job): Boolean = match (getJobRunnerStatus job)
     Fail _ -> False
     Pass status -> status == 0
@@ -475,5 +476,3 @@ export def xOK: Integer =
 
 export def access (file: String) (mode: Integer): Boolean =
     (\f \m prim "access") file mode
-
-

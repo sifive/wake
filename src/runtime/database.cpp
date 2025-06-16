@@ -221,8 +221,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "  starttime   integer not null default 0,"
       "  endtime     integer not null default 0,"
       "  keep        integer not null default 0,"
-      "  stale       integer not null default 0,"   // 0=false, 1=true
-      "  is_atty     integer not null default 0,"  // 0=false, 1=true
+      "  stale       integer not null default 0,"     // 0=false, 1=true
+      "  is_atty     integer not null default 0,"     // 0=false, 1=true
       "  runner_status integer not null default 0);"  // 0=success, non-zero=failure
       "create index if not exists job on jobs(directory, commandline, environment, stdin, "
       "signature, keep, job_id, stat_id);"
@@ -437,10 +437,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       " from log l"
       " where l.job_id = ?"
       " order by l.seconds";
-  const char *sql_set_runner_status =
-      "update jobs set runner_status=? where job_id=?";
-  const char *sql_get_runner_status =
-      "select runner_status from jobs where job_id=?";
+  const char *sql_set_runner_status = "update jobs set runner_status=? where job_id=?";
+  const char *sql_get_runner_status = "select runner_status from jobs where job_id=?";
 
 #define PREPARE(sql, member)                                                                     \
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);                                   \
@@ -1051,7 +1049,7 @@ std::string Database::get_output(long job, int descriptor) const {
 }
 
 void Database::replay_output(long job, const char *stdout, const char *stderr,
-                            const char *runner_out, const char *runner_err) {
+                             const char *runner_out, const char *runner_err) {
   const char *why = "Could not replay job output";
   bind_integer(why, imp->replay_log, 1, job);
   while (sqlite3_step(imp->replay_log) == SQLITE_ROW) {

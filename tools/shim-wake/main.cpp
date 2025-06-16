@@ -194,7 +194,7 @@ int main(int argc, char **argv) {
     close(runner_err_fd);
   }
 
-  // Close all open file handles except 0, 1, 2, 3, and 4
+  // Close all open file handles except 0-4 so we leak less into the child process
   auto res = wcl::directory_range::open("/proc/self/fd/");
   if (!res) {
     fprintf(stderr, "wcl::directory_range::open(/proc/self/fd/): %s\n", strerror(res.error()));
@@ -216,7 +216,6 @@ int main(int argc, char **argv) {
     close(fd);
   }
 
-  // Update argument indices to account for the new file descriptors
   if (strcmp(argv[7], "<hash>")) {
     execvp(argv[7], argv + 7);
     fprintf(stderr, "execvp: %s: %s\n", argv[7], strerror(errno));
