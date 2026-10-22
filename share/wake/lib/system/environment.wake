@@ -80,7 +80,7 @@ export def getenv (key: String): Option String =
 export def getSystemProperty (key: String): Option String =
     def p x = prim "get_system_property"
 
-    head (p key)
+    p key
 
 def test key =
     replace `=.*` "" _ ==* key

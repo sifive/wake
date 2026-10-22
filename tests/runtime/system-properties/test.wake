@@ -1,3 +1,20 @@
+export def primitiveSystemProperty (key: String): Option String =
+    def p x = prim "get_system_property"
+
+    p key
+
+export def primitiveSystemPropertyPresent _: Option String =
+    primitiveSystemProperty "test.value"
+
+export def primitiveSystemPropertyMissing _: Option String =
+    primitiveSystemProperty "missing.value"
+
+export def primitiveSystemPropertyEmpty _: Option String =
+    primitiveSystemProperty "test.value"
+
+export def emptySystemProperty _: Option String =
+    getSystemProperty "test.value"
+
 export def systemProperty _: String =
     match (getSystemProperty "test.value")
         Some value -> value
