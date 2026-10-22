@@ -1,31 +1,5 @@
-export def primitiveSystemProperty (key: String): Option String =
-    def p x = prim "get_system_property"
 
-    p key
+export def systemProperty (args: List String): Option String =
+    require Some key = head args
 
-export def primitiveSystemPropertyPresent _: Option String =
-    primitiveSystemProperty "test.value"
-
-export def primitiveSystemPropertyMissing _: Option String =
-    primitiveSystemProperty "missing.value"
-
-export def primitiveSystemPropertyEmpty _: Option String =
-    primitiveSystemProperty "test.value"
-
-export def emptySystemProperty _: Option String =
-    getSystemProperty "test.value"
-
-export def systemProperty _: String =
-    match (getSystemProperty "test.value")
-        Some value -> value
-        None -> "missing"
-
-export def missingSystemProperty _: String =
-    match (getSystemProperty "missing.value")
-        Some _ -> "present"
-        None -> "absent"
-
-export def environmentProperty _: String =
-    match (getenv "test.value")
-        Some _ -> "present"
-        None -> "absent"
+    getSystemProperty key

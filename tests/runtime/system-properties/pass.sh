@@ -5,10 +5,7 @@ set -eu
 WAKE="${1:+$1/wake}"
 WAKE="${WAKE:-wake}"
 
-"${WAKE}" --property test.value=command-line systemProperty
-"${WAKE}" --property test.value=command-line missingSystemProperty
-"${WAKE}" --property test.value=command-line environmentProperty
-"${WAKE}" --property test.value=command-line primitiveSystemPropertyPresent
-"${WAKE}" primitiveSystemPropertyMissing
-"${WAKE}" --property test.value= primitiveSystemPropertyEmpty
-"${WAKE}" --property test.value= emptySystemProperty
+"${WAKE}" --property test.value=command-line systemProperty test.value
+"${WAKE}" systemProperty missing.value
+"${WAKE}" --property test.value= systemProperty test.value
+env 'test.value=environment' "${WAKE}" systemProperty test.value
